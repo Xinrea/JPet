@@ -37,3 +37,18 @@ cmake .
 - 快捷查看实时粉丝数
 - 直播通知
 - ...
+
+## Live2D Open Software License
+
+Live2D Cubism Components is available under Live2D Open Software License.
+
+* [Live2D Open Software License Agreement](https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html)
+* [Live2D Open Software 使用許諾契約書](https://www.live2d.com/eula/live2d-open-software-license-agreement_jp.html)
+
+
+## Live2D Proprietary Software License
+
+Live2D Cubism Core is available under Live2D Proprietary Software License.
+
+* [Live2D Proprietary Software License Agreement](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html)
+* [Live2D Proprietary Software 使用許諾契約書](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_jp.html)
