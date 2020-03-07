@@ -1,0 +1,10 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "Joicombine.moc3",
+		"Textures": [
+			"Joicombine.1024/texture_00.png"
+		],
+		"DisplayInfo": "Joicombine.cdi3.json"
+	}
+}

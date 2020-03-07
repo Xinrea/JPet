@@ -9,3 +9,24 @@ install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
 _deps
+
+.vs 
+/scripts 
+
+# Visual Studio文件
+*.vcxproj
+*.vcxproj.filters
+*.sln
+*.user
+
+/bin
+
+# 依赖
+/glew
+/glfw
+/Core
+/Framework
+thirdParty/glew
+thirdParty/glfw
+lib/
+*.dir
