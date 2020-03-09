@@ -10,7 +10,8 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 
-.vs 
+.vs
+.vscode 
 /scripts 
 
 # Visual Studio文件
@@ -24,9 +25,13 @@ _deps
 # 依赖
 /glew
 /glfw
+/OpenGLText
+/freeglut
 /Core
 /Framework
 thirdParty/glew
 thirdParty/glfw
+thirdParty/OpenGLText
+thirdParty/freeglut
 lib/
 *.dir

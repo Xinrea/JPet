@@ -89,6 +89,7 @@ public:
     */
     bool GetIsEnd() { return _isEnd; }
 
+    bool GetIsMsg() { return _isMsg; }
     /**
     * @brief   アプリケーションを終了する。
     */
@@ -124,7 +125,10 @@ private:
     bool _captured;                              ///< クリックしているか
     float _mouseX;                               ///< マウスX座標
     float _mouseY;                               ///< マウスY座標
+    float _pX;
+    float _pY;
     bool _isEnd;                                 ///< APP終了しているか
+    bool _isMsg;
     LAppTextureManager* _textureManager;         ///< テクスチャマネージャー
 
     int _windowWidth;                            ///< Initialize関数で設定したウィンドウ幅

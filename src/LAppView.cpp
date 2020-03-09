@@ -22,7 +22,7 @@ using namespace LAppDefine;
 
 LAppView::LAppView():
     _programId(0),
-    _back(NULL),
+    _msg(NULL),
     _gear(NULL),
     _power(NULL),
     _renderSprite(NULL),
@@ -50,7 +50,7 @@ LAppView::~LAppView()
     delete _viewMatrix;
     delete _deviceToScreen;
     delete _touchManager;
-    delete _back;
+    delete _msg;
     delete _gear;
     delete _power;
 }
@@ -93,12 +93,12 @@ void LAppView::Initialize()
 
 void LAppView::Render()
 {
-
     LAppLive2DManager* Live2DManager = LAppLive2DManager::GetInstance();
 
     // Cubism更新・描画
     Live2DManager->OnUpdate();
-
+    if (LAppDelegate::GetInstance()->GetIsMsg())_msg->Render();
+    
     // 各モデルが持つ描画ターゲットをテクスチャとする場合
     if (_renderTarget == SelectTarget_ModelFrameBuffer && _renderSprite)
     {
@@ -134,8 +134,14 @@ void LAppView::InitializeSprite()
     LAppTextureManager* textureManager = LAppDelegate::GetInstance()->GetTextureManager();
     const string resourcesPath = ResourcesPath;
 
+    string imageName = MessageBox;
+    LAppTextureManager::TextureInfo* msgTexture = textureManager->CreateTextureFromPngFile(resourcesPath + imageName);
+
     float x = width * 0.5f;
     float y = height * 0.5f;
+    float fWidth = static_cast<float>(width);
+    float fHeight = static_cast<float>(height);
+    _msg = new LAppSprite(x, y, fWidth, fHeight, msgTexture->id, _programId);
 
     // 画面全体を覆うサイズ
     x = width * 0.5f;
@@ -315,4 +321,23 @@ void LAppView::ResizeSprite()
     // 描画領域サイズ
     int width, height;
     glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width, &height);
+    LAppPal::PrintLog("wsize: %d %d",width,height);
+    float x = 0.0f;
+    float y = 0.0f;
+    float fWidth = 0.0f;
+    float fHeight = 0.0f;
+
+    if (_msg)
+    {
+        GLuint id = _msg->GetTextureId();
+        LAppTextureManager::TextureInfo* texInfo = textureManager->GetTextureInfoById(id);
+        if (texInfo)
+        {
+            x = width * 0.5f;
+            y = height * 0.5f;
+            fWidth = static_cast<float>(width);
+            fHeight = static_cast<float>(height);
+            _msg->ResetRect(x, y, fWidth, fHeight);
+        }
+    }
 }

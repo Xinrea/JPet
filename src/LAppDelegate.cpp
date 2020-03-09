@@ -9,6 +9,11 @@
 #include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#include <windows.h>
+#include <WinUser.h>
+#include <shellapi.h>
 #include "LAppView.hpp"
 #include "LAppPal.hpp"
 #include "LAppDefine.hpp"
@@ -64,8 +69,12 @@ bool LAppDelegate::Initialize()
     // Windowの生成_
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GL_TRUE);
     glfwWindowHint(GLFW_DECORATED, GL_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet beta", NULL, NULL);
+    HWND hwnd = glfwGetWin32Window(_window);
+    SetWindowLong(hwnd,GWL_EXSTYLE,WS_EX_TOOLWINDOW);
+    //SetClassLong(hwnd,GCLP_HCURSOR,(long)LoadCursor(NULL,MAKEINTRESOURCE(IDC_CROSS)));
     if (_window == NULL)
     {
         if (DebugLogEnable)
@@ -184,6 +193,7 @@ LAppDelegate::LAppDelegate():
     _mouseX(0.0f),
     _mouseY(0.0f),
     _isEnd(false),
+    _isMsg(false),
     _windowWidth(0),
     _windowHeight(0)
 {
@@ -243,11 +253,22 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, i
     {
         if (GLFW_PRESS == action)
         {
-            LAppPal::PrintLog("Right Click Down");
+            if (DebugLogEnable) LAppPal::PrintLog("Right Click Down");
+            _isMsg = true;
+            _pX = _mouseX;
+            _pY = _mouseY;
         }
         else if (GLFW_RELEASE == action)
         {
-            LAppPal::PrintLog("Right Click Up");
+            if (DebugLogEnable) LAppPal::PrintLog("Right Click Up");
+            float dx = fabs(_mouseX - _pX);
+            float dy = fabs(_mouseY - _pY);
+            if (dx < 40 && dy < 40);
+            else if (_mouseX > _pX && dx > dy ) ShellExecute(NULL, "open", "https://live.bilibili.com/21484828", NULL, NULL, SW_SHOWNORMAL); //向右滑动
+            else if (_mouseX < _pX && dx > dy ) ShellExecute(NULL, "open", "https://space.bilibili.com/61639371", NULL, NULL, SW_SHOWNORMAL); //向左滑动
+            else if (_mouseY < _pY && dy > dx ) ShellExecute(NULL, "open", "https://space.bilibili.com/61639371/dynamic", NULL, NULL, SW_SHOWNORMAL); //向上滑动
+            else if (_mouseY > _pY && dy > dx ) _isEnd = true; //向下滑动
+            _isMsg = false;
         }
     }
     return;

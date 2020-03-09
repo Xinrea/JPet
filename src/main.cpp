@@ -6,7 +6,7 @@
  */
 
 #include "LAppDelegate.hpp"
-
+#pragma comment(linker, "/subsystem:\"windows\" /entry:\"mainCRTStartup\"")
 int main()
 {
     // create the application instance

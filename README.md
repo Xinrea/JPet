@@ -4,6 +4,19 @@
 
 ![img](screenshots/JPet.gif)
 
+## Live2d 模型
+
+参考：轴伊Joi
+
+绘制：Xinrea
+
+制作：Xinrea
+
+
+
+
+
+
 ## 编译
 
 该项目需要以下依赖

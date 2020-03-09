@@ -26,6 +26,7 @@ namespace LAppDefine {
 
     // 相対パス
     const csmChar* ResourcesPath = "Resources/";
+    const csmChar* MessageBox = "Img/message.png";
 
     // モデル定義------------------------------------------
     // モデルを配置したディレクトリ名の配列
@@ -50,7 +51,7 @@ namespace LAppDefine {
     const csmInt32 PriorityForce = 3;
 
     // デバッグ用ログの表示オプション
-    const csmBool DebugLogEnable = true;
+    const csmBool DebugLogEnable = false;
     const csmBool DebugTouchLogEnable = false;
 
     // Frameworkから出力するログのレベル設定

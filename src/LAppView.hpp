@@ -153,7 +153,7 @@ private:
     Csm::CubismMatrix44* _deviceToScreen;    ///< デバイスからスクリーンへの行列
     Csm::CubismViewMatrix* _viewMatrix;      ///< viewMatrix
     GLuint _programId;                       ///< シェーダID
-    LAppSprite* _back;                       ///< 背景画像
+    LAppSprite* _msg;                       ///< 背景画像
     LAppSprite* _gear;                       ///< ギア画像
     LAppSprite* _power;                      ///< 電源画像
 
