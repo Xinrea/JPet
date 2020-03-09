@@ -66,6 +66,7 @@ bool LAppDelegate::Initialize()
         _leftUrl = reader.Get("shortcut", "left", "https://t.bilibili.com/");
         _upUrl = reader.Get("shortcut", "up", "https://space.bilibili.com/61639371/dynamic");
         _rightUrl = reader.Get("shortcut", "right", "https://live.bilibili.com/21484828");
+        _scale = reader.GetFloat("display","scale",1.0f);
     }
 
     // GLFWの初期化
@@ -83,10 +84,10 @@ bool LAppDelegate::Initialize()
     glfwWindowHint(GLFW_DECORATED, GL_FALSE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
-    _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet beta", NULL, NULL);
+    _window = glfwCreateWindow(RenderTargetWidth*_scale, RenderTargetHeight*_scale, "JPet beta", NULL, NULL);
     glfwSetWindowPos(_window, _iposX, _iposY);
     HWND hwnd = glfwGetWin32Window(_window);
-    SetWindowLong(hwnd,GWL_EXSTYLE,WS_EX_TOOLWINDOW|WS_EX_LAYERED);
+    SetWindowLong(hwnd,GWL_EXSTYLE,WS_EX_TOOLWINDOW|WS_EX_LAYERED|WS_EX_ACCEPTFILES);
     // 透明部分鼠标穿透
     SetLayeredWindowAttributes(hwnd,0,0,LWA_COLORKEY);
     if (_window == NULL)
@@ -123,6 +124,7 @@ bool LAppDelegate::Initialize()
     //コールバック関数の登録
     glfwSetMouseButtonCallback(_window, EventHandler::OnMouseCallBack);
     glfwSetCursorPosCallback(_window, EventHandler::OnMouseCallBack);
+    glfwSetDropCallback(_window,EventHandler::OnDropCallBack);
 
     // ウィンドウサイズ記憶
     int width, height;
@@ -199,7 +201,7 @@ void LAppDelegate::Run()
     glfwGetWindowPos(_window, &x, &y);
     ofstream of;
     of.open("config.ini", ios::trunc);
-    of << "[position]\n" << "x=" << x << "\ny=" << y << "\n[shortcut]\n" << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl;
+    of << "[position]\n" << "x=" << x << "\ny=" << y << "\n[shortcut]\n" << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl<<"\n[display]\n"<<"scale="<<_scale;
     of.close();
 
     Release();
@@ -222,6 +224,7 @@ LAppDelegate::LAppDelegate():
     _leftUrl("https://t.bilibili.com/"),
     _upUrl("https://space.bilibili.com/61639371/dynamic"),
     _rightUrl("https://live.bilibili.com/21484828"),
+    _scale(1.0f),
     _windowWidth(0),
     _windowHeight(0)
 {
@@ -324,6 +327,19 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, double x, double y)
     }
 
     _view->OnTouchesMoved(_mouseX, _mouseY);
+}
+
+void LAppDelegate::OnDropCallBack(GLFWwindow* window, int path_count, const char* paths[])
+{
+    for (int i = 0; i < path_count; i++)
+    {
+        SHFILEOPSTRUCT shFile;
+        ZeroMemory(&shFile,sizeof(shFile));
+        shFile.pFrom = paths[i];
+        shFile.wFunc = FO_DELETE;
+        shFile.fFlags =FOF_SILENT|FOF_ALLOWUNDO|FOF_NOCONFIRMATION;
+        SHFileOperation(&shFile);
+    }
 }
 
 GLuint LAppDelegate::CreateShader()

@@ -70,6 +70,8 @@ public:
     */
     void OnMouseCallBack(GLFWwindow* window, double x, double y);
 
+    void OnDropCallBack(GLFWwindow* window, int path_count, const char* paths[]);
+
     /**
     * @brief シェーダーを登録する。
     */
@@ -135,6 +137,7 @@ private:
     // Config Part
     int _iposX,_iposY;
     std::string _leftUrl,_upUrl,_rightUrl;
+    float _scale;
     
     int _windowWidth;                            ///< Initialize関数で設定したウィンドウ幅
     int _windowHeight;                           ///< Initialize関数で設定したウィンドウ高さ
@@ -157,6 +160,11 @@ public:
     static void OnMouseCallBack(GLFWwindow* window, double x, double y)
     {
          LAppDelegate::GetInstance()->OnMouseCallBack(window, x, y);
+    }
+
+    static void OnDropCallBack(GLFWwindow* window, int path_count, const char* paths[])
+    {
+         LAppDelegate::GetInstance()->OnDropCallBack(window, path_count, paths);
     }
 
 };
