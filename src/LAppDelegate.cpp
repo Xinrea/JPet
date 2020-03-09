@@ -7,6 +7,7 @@
 
 #include "LAppDelegate.hpp"
 #include <iostream>
+#include <fstream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -20,6 +21,7 @@
 #include "LAppLive2DManager.hpp"
 #include "LAppTextureManager.hpp"
 #include "TouchManager.hpp"
+#include "ini.h"
 
 using namespace Csm;
 using namespace std;
@@ -55,6 +57,16 @@ bool LAppDelegate::Initialize()
     {
         LAppPal::PrintLog("START");
     }
+    // 设置初始化
+    INIReader reader("config.ini");
+    if (reader.ParseError() == 0)
+    {
+        _iposX = reader.GetInteger("position", "x", 0);
+        _iposY = reader.GetInteger("position", "y", 0);
+        _leftUrl = reader.Get("shortcut", "left", "https://t.bilibili.com/");
+        _upUrl = reader.Get("shortcut", "up", "https://space.bilibili.com/61639371/dynamic");
+        _rightUrl = reader.Get("shortcut", "right", "https://live.bilibili.com/21484828");
+    }
 
     // GLFWの初期化
     if (glfwInit() == GL_FALSE)
@@ -72,9 +84,11 @@ bool LAppDelegate::Initialize()
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet beta", NULL, NULL);
+    glfwSetWindowPos(_window, _iposX, _iposY);
     HWND hwnd = glfwGetWin32Window(_window);
-    SetWindowLong(hwnd,GWL_EXSTYLE,WS_EX_TOOLWINDOW);
-    //SetClassLong(hwnd,GCLP_HCURSOR,(long)LoadCursor(NULL,MAKEINTRESOURCE(IDC_CROSS)));
+    SetWindowLong(hwnd,GWL_EXSTYLE,WS_EX_TOOLWINDOW|WS_EX_LAYERED);
+    // 透明部分鼠标穿透
+    SetLayeredWindowAttributes(hwnd,0,0,LWA_COLORKEY);
     if (_window == NULL)
     {
         if (DebugLogEnable)
@@ -180,6 +194,13 @@ void LAppDelegate::Run()
         // Poll for and process events
         glfwPollEvents();
     }
+    // Release前保存配置
+    int x, y;
+    glfwGetWindowPos(_window, &x, &y);
+    ofstream of;
+    of.open("config.ini", ios::trunc);
+    of << "[position]\n" << "x=" << x << "\ny=" << y << "\n[shortcut]\n" << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl;
+    of.close();
 
     Release();
 
@@ -192,8 +213,15 @@ LAppDelegate::LAppDelegate():
     _captured(false),
     _mouseX(0.0f),
     _mouseY(0.0f),
+    _pX(0),
+    _pY(0),
     _isEnd(false),
     _isMsg(false),
+    _iposX(0),
+    _iposY(0),
+    _leftUrl("https://t.bilibili.com/"),
+    _upUrl("https://space.bilibili.com/61639371/dynamic"),
+    _rightUrl("https://live.bilibili.com/21484828"),
     _windowWidth(0),
     _windowHeight(0)
 {
@@ -263,10 +291,10 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, i
             if (DebugLogEnable) LAppPal::PrintLog("Right Click Up");
             float dx = fabs(_mouseX - _pX);
             float dy = fabs(_mouseY - _pY);
-            if (dx < 40 && dy < 40);
-            else if (_mouseX > _pX && dx > dy ) ShellExecute(NULL, "open", "https://live.bilibili.com/21484828", NULL, NULL, SW_SHOWNORMAL); //向右滑动
-            else if (_mouseX < _pX && dx > dy ) ShellExecute(NULL, "open", "https://space.bilibili.com/61639371", NULL, NULL, SW_SHOWNORMAL); //向左滑动
-            else if (_mouseY < _pY && dy > dx ) ShellExecute(NULL, "open", "https://space.bilibili.com/61639371/dynamic", NULL, NULL, SW_SHOWNORMAL); //向上滑动
+            if (dx < 60 && dy < 60);
+            else if (_mouseX > _pX && dx > dy ) ShellExecute(NULL, "open", _rightUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向右滑动
+            else if (_mouseX < _pX && dx > dy ) ShellExecute(NULL, "open", _leftUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向左滑动
+            else if (_mouseY < _pY && dy > dx ) ShellExecute(NULL, "open", _upUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向上滑动
             else if (_mouseY > _pY && dy > dx ) _isEnd = true; //向下滑动
             _isMsg = false;
         }
@@ -284,7 +312,9 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, double x, double y)
         //此时处于Drag状态，移动窗口
         int xpos, ypos;
         glfwGetWindowPos(window, &xpos, &ypos);
-        glfwSetWindowPos(window, xpos + x - 250, ypos + y - 175);
+        int width,height;
+        glfwGetWindowSize(window,&width,&height);
+        glfwSetWindowPos(window, xpos + x - width/2, ypos + y - height/2);
         //LAppPal::PrintLog("[APP]Move x:%.2f y:%.2f", x, y);
         return;
     }

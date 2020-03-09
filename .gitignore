@@ -23,6 +23,7 @@ _deps
 /bin
 
 # 依赖
+/inifile
 /glew
 /glfw
 /OpenGLText

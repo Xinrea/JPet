@@ -9,6 +9,7 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <string>
 #include "LAppAllocator.hpp"
 
 class LAppView;
@@ -131,6 +132,10 @@ private:
     bool _isMsg;
     LAppTextureManager* _textureManager;         ///< テクスチャマネージャー
 
+    // Config Part
+    int _iposX,_iposY;
+    std::string _leftUrl,_upUrl,_rightUrl;
+    
     int _windowWidth;                            ///< Initialize関数で設定したウィンドウ幅
     int _windowHeight;                           ///< Initialize関数で設定したウィンドウ高さ
 };

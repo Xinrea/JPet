@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 option(
-  CORE_CRL_MD
+  CORE_CRL_MT
   "Use Cubism Core that is multithread-specific and DLL-specific version"
   OFF
 )

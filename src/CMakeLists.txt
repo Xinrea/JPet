@@ -21,4 +21,5 @@ target_sources(${APP_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ini.h
 )
