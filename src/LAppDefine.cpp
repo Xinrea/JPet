@@ -60,4 +60,6 @@ namespace LAppDefine {
     // デフォルトのレンダーターゲットサイズ
     const csmInt32 RenderTargetWidth = 500;
     const csmInt32 RenderTargetHeight = 350;
+
+    const csmFloat32 AudioSpace = 5.0f;
 }

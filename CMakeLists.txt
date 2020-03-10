@@ -16,6 +16,7 @@ set(THIRD_PARTY_PATH ${SDK_ROOT_PATH}/thirdParty)
 set(STB_PATH ${THIRD_PARTY_PATH}/stb)
 set(GLEW_PATH ${THIRD_PARTY_PATH}/glew)
 set(GLFW_PATH ${THIRD_PARTY_PATH}/glfw)
+set(FMOD_PATH ${THIRD_PARTY_PATH}/fmod)
 set(RES_PATH ${SDK_ROOT_PATH}/Resources)
 
 # Set project.
@@ -118,12 +119,14 @@ target_link_libraries(${APP_NAME}
   Framework
   glfw
   ${OPENGL_LIBRARIES}
+  fmod_vc
   # Solve the MSVCRT confliction.
   debug -NODEFAULTLIB:libcmtd.lib
   optimized -NODEFAULTLIB:libcmt.lib
 )
 # Specify include directories.
-target_include_directories(${APP_NAME} PRIVATE ${STB_PATH})
+target_include_directories(${APP_NAME} PRIVATE ${STB_PATH} ${FMOD_PATH}/inc)
+target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/lib/${ARCH}/)
 # Build in multi-process.
 target_compile_options(${APP_NAME} PRIVATE /MP)
 

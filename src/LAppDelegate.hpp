@@ -10,6 +10,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <string>
+#include "fmod.hpp"
 #include "LAppAllocator.hpp"
 
 class LAppView;
@@ -72,6 +73,8 @@ public:
 
     void OnDropCallBack(GLFWwindow* window, int path_count, const char* paths[]);
 
+    void OnWindowPosCallBack(GLFWwindow* window, int x, int y);
+
     /**
     * @brief シェーダーを登録する。
     */
@@ -121,6 +124,11 @@ private:
      */
     bool CheckShader(GLuint shaderId);
 
+    /**
+    * @brief    播放声音，会根据位置计算左右声道进行播放
+    */
+    void Play3dSound(std::string filename);
+
     LAppAllocator _cubismAllocator;              ///< Cubism SDK Allocator
     Csm::CubismFramework::Option _cubismOption;  ///< Cubism SDK Option
     GLFWwindow* _window;                         ///< OpenGL ウィンドウ
@@ -132,6 +140,10 @@ private:
     float _pY;
     bool _isEnd;                                 ///< APP終了しているか
     bool _isMsg;
+    int _mWidth, _mHeight;
+    FMOD::System* _audioSys;
+    FMOD::Channel* _audioCh;
+    FMOD::SoundGroup* _soundGroup;
     LAppTextureManager* _textureManager;         ///< テクスチャマネージャー
 
     // Config Part
@@ -165,6 +177,11 @@ public:
     static void OnDropCallBack(GLFWwindow* window, int path_count, const char* paths[])
     {
          LAppDelegate::GetInstance()->OnDropCallBack(window, path_count, paths);
+    }
+
+    static void OnWindowPosCallBack(GLFWwindow* window, int x, int y)
+    {
+        LAppDelegate::GetInstance()->OnWindowPosCallBack(window, x,  y);
     }
 
 };

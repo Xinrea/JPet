@@ -69,6 +69,11 @@ bool LAppDelegate::Initialize()
         _scale = reader.GetFloat("display","scale",1.0f);
     }
 
+    // 音頻初始化
+    FMOD_RESULT result;
+    FMOD::System_Create(&_audioSys);
+    _audioSys->init(512,FMOD_INIT_NORMAL,0);
+
     // GLFWの初期化
     if (glfwInit() == GL_FALSE)
     {
@@ -78,6 +83,12 @@ bool LAppDelegate::Initialize()
         }
         return GL_FALSE;
     }
+    // 记录显示器分辨率尺寸
+    GLFWmonitor* pr = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(pr);
+    _mHeight = mode->height;
+    _mWidth = mode->width;
+
 
     // Windowの生成_
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GL_TRUE);
@@ -125,6 +136,7 @@ bool LAppDelegate::Initialize()
     glfwSetMouseButtonCallback(_window, EventHandler::OnMouseCallBack);
     glfwSetCursorPosCallback(_window, EventHandler::OnMouseCallBack);
     glfwSetDropCallback(_window,EventHandler::OnDropCallBack);
+    glfwSetWindowPosCallback(_window, EventHandler::OnWindowPosCallBack);
 
     // ウィンドウサイズ記憶
     int width, height;
@@ -137,6 +149,9 @@ bool LAppDelegate::Initialize()
 
     // Cubism SDK の初期化
     InitializeCubism();
+
+    //播放开场语音
+    Play3dSound("Resources/Audio/start.mp3");
 
     return GL_TRUE;
 }
@@ -156,6 +171,14 @@ void LAppDelegate::Release()
 
     //Cubism SDK の解放
     CubismFramework::Dispose();
+
+    //FMod Release
+    if (_audioSys) {
+        _audioSys->release();
+    }
+    if (_soundGroup) {
+        _soundGroup->release();
+    }
 }
 
 void LAppDelegate::Run()
@@ -195,6 +218,15 @@ void LAppDelegate::Run()
 
         // Poll for and process events
         glfwPollEvents();
+        // 聲音更新
+        FMOD_VECTOR pos = { 0.0f, 0.0f, 0.0f };
+        FMOD_VECTOR vel = { 0.0f, 0.0f, 0.0f };
+        int x, y;
+        glfwGetWindowPos(_window, &x, &y);
+        pos.x = (static_cast<float>(x) + width / 2) / (_mWidth / 2) * AudioSpace - AudioSpace;
+        pos.y = (static_cast<float>(y) + height / 2) / (_mHeight / 2) * AudioSpace - AudioSpace;
+        _audioCh->set3DAttributes(&pos, &vel);
+        _audioSys->update();
     }
     // Release前保存配置
     int x, y;
@@ -221,10 +253,15 @@ LAppDelegate::LAppDelegate():
     _isMsg(false),
     _iposX(0),
     _iposY(0),
+    _mHeight(0),
+    _mWidth(0),
     _leftUrl("https://t.bilibili.com/"),
     _upUrl("https://space.bilibili.com/61639371/dynamic"),
     _rightUrl("https://live.bilibili.com/21484828"),
     _scale(1.0f),
+    _audioSys(nullptr),
+    _audioCh(nullptr),
+    _soundGroup(nullptr),
     _windowWidth(0),
     _windowHeight(0)
 {
@@ -256,6 +293,24 @@ void LAppDelegate::InitializeCubism()
     LAppPal::UpdateTime();
 
     _view->InitializeSprite();
+}
+
+void LAppDelegate::Play3dSound(std::string filename)
+{
+    // 初始化語音
+    FMOD::Sound* tSound;
+    int x, y;
+    _audioSys->createSound(filename.c_str(), FMOD_3D, 0, &tSound);
+    _audioSys->playSound(tSound, 0, true, &_audioCh);
+    FMOD_VECTOR pos = { 0.0f, 0.0f, 0.0f };
+    FMOD_VECTOR vel = { 0.0f, 0.0f, 0.0f };
+    glfwGetWindowPos(_window, &x, &y);
+    int width, height;
+    glfwGetWindowSize(_window, &width, &height);
+    pos.x = (static_cast<float>(x)+width/2) / (_mWidth / 2) * AudioSpace - AudioSpace;
+    pos.y = (static_cast<float>(y)+height/2) / (_mHeight / 2) * AudioSpace - AudioSpace;
+    _audioCh->set3DAttributes(&pos, &vel);
+    _audioCh->setPaused(false);
 }
 
 void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, int modify)
@@ -340,6 +395,11 @@ void LAppDelegate::OnDropCallBack(GLFWwindow* window, int path_count, const char
         shFile.fFlags =FOF_SILENT|FOF_ALLOWUNDO|FOF_NOCONFIRMATION;
         SHFileOperation(&shFile);
     }
+}
+
+void LAppDelegate::OnWindowPosCallBack(GLFWwindow* window, int x, int y)
+{
+
 }
 
 GLuint LAppDelegate::CreateShader()

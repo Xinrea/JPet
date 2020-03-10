@@ -25,11 +25,13 @@
 
  - GLFW_VERSION=3.3.2
 
+ - FMOD CORE 2.0
+
  - CubismSdkForNative-4-r.1 -  Core, Framework
 
  - Visual Studio 2019 - v142 Toolset # 配置见CMakeLists.txt
 
-将glew和glfw置于`thirdParty`下;
+将glew、glfw和fmod置于`thirdParty`下;
 
 将Core和Framework置于项目目录下
 
