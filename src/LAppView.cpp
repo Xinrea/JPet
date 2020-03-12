@@ -98,30 +98,6 @@ void LAppView::Render()
     // Cubism更新・描画
     Live2DManager->OnUpdate();
     if (LAppDelegate::GetInstance()->GetIsMsg())_msg->Render();
-    
-    // 各モデルが持つ描画ターゲットをテクスチャとする場合
-    if (_renderTarget == SelectTarget_ModelFrameBuffer && _renderSprite)
-    {
-        const GLfloat uvVertex[] =
-        {
-            1.0f, 1.0f,
-            0.0f, 1.0f,
-            0.0f, 0.0f,
-            1.0f, 0.0f,
-        };
-
-        for (csmUint32 i = 0; i < Live2DManager->GetModelNum(); i++)
-        {
-            float alpha = GetSpriteAlpha(i); // サンプルとしてαに適当な差をつける
-            _renderSprite->SetColor(1.0f, 1.0f, 1.0f, alpha);
-
-            LAppModel *model = Live2DManager->GetModel(i);
-            if (model)
-            {
-                _renderSprite->RenderImmidiate( model->GetRenderBuffer().GetColorBuffer(), uvVertex);
-            }
-        }
-    }
 }
 
 void LAppView::InitializeSprite()
@@ -136,17 +112,12 @@ void LAppView::InitializeSprite()
 
     string imageName = MessageBox;
     LAppTextureManager::TextureInfo* msgTexture = textureManager->CreateTextureFromPngFile(resourcesPath + imageName);
-
+    float ty = (static_cast<float>(height) - modelHeight) / height;
     float x = width * 0.5f;
-    float y = height * 0.5f;
+    float y = 0.5f*msgTexture->height;
     float fWidth = static_cast<float>(width);
     float fHeight = static_cast<float>(height);
-    _msg = new LAppSprite(x, y, fWidth, fHeight, msgTexture->id, _programId);
-
-    // 画面全体を覆うサイズ
-    x = width * 0.5f;
-    y = height * 0.5f;
-    _renderSprite = new LAppSprite(x, y, static_cast<float>(width), static_cast<float>(height), 0, _programId);
+    _msg = new LAppSprite(x, y, msgTexture->width, msgTexture->height, msgTexture->id, _programId);
 }
 
 TouchManager* LAppView::GetTouchManager()
@@ -226,59 +197,12 @@ void LAppView::PreModelDraw(LAppModel& refModel)
 {
     // 別のレンダリングターゲットへ向けて描画する場合の使用するフレームバッファ
     Csm::Rendering::CubismOffscreenFrame_OpenGLES2* useTarget = NULL;
-
-    if (_renderTarget != SelectTarget_None)
-    {// 別のレンダリングターゲットへ向けて描画する場合
-
-        // 使用するターゲット
-        useTarget = (_renderTarget == SelectTarget_ViewFrameBuffer) ? &_renderBuffer : &refModel.GetRenderBuffer();
-
-        if (!useTarget->IsValid())
-        {// 描画ターゲット内部未作成の場合はここで作成
-            int width, height;
-            glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width, &height);
-            if (width != 0 && height != 0)
-            {
-                // モデル描画キャンバス
-                useTarget->CreateOffscreenFrame(static_cast<csmUint32>(width), static_cast<csmUint32>(height));
-            }
-        }
-
-        // レンダリング開始
-        useTarget->BeginDraw();
-        useTarget->Clear(_clearColor[0], _clearColor[1], _clearColor[2], _clearColor[3]); // 背景クリアカラー
-    }
 }
 
 void LAppView::PostModelDraw(LAppModel& refModel)
 {
     // 別のレンダリングターゲットへ向けて描画する場合の使用するフレームバッファ
     Csm::Rendering::CubismOffscreenFrame_OpenGLES2* useTarget = NULL;
-
-    if (_renderTarget != SelectTarget_None)
-    {// 別のレンダリングターゲットへ向けて描画する場合
-
-        // 使用するターゲット
-        useTarget = (_renderTarget == SelectTarget_ViewFrameBuffer) ? &_renderBuffer : &refModel.GetRenderBuffer();
-
-        // レンダリング終了
-        useTarget->EndDraw();
-
-        // LAppViewの持つフレームバッファを使うなら、スプライトへの描画はここ
-        if (_renderTarget == SelectTarget_ViewFrameBuffer && _renderSprite)
-        {
-            const GLfloat uvVertex[] =
-            {
-                1.0f, 1.0f,
-                0.0f, 1.0f,
-                0.0f, 0.0f,
-                1.0f, 0.0f,
-            };
-
-            _renderSprite->SetColor(1.0f, 1.0f, 1.0f, GetSpriteAlpha(0));
-            _renderSprite->RenderImmidiate(useTarget->GetColorBuffer(), uvVertex);
-        }
-    }
 }
 
 void LAppView::SwitchRenderingTarget(SelectTarget targetType)
@@ -333,11 +257,10 @@ void LAppView::ResizeSprite()
         LAppTextureManager::TextureInfo* texInfo = textureManager->GetTextureInfoById(id);
         if (texInfo)
         {
+            float ty = (static_cast<float>(height) - modelHeight) / height;
             x = width * 0.5f;
-            y = height * 0.5f;
-            fWidth = static_cast<float>(width);
-            fHeight = static_cast<float>(height);
-            _msg->ResetRect(x, y, fWidth, fHeight);
+            y = 0.5f * texInfo->height;
+            _msg->ResetRect(x, y, texInfo->width, texInfo->height);
         }
     }
 }

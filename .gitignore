@@ -35,5 +35,6 @@ thirdParty/glfw
 thirdParty/OpenGLText
 thirdParty/freeglut
 thirdParty/fmod
+thirdParty/imgui
 lib/
 *.dir

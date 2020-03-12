@@ -104,6 +104,7 @@ void LAppModel::LoadAssets(const csmChar* dir, const csmChar* fileName)
 
 void LAppModel::SetupModel(ICubismModelSetting* setting)
 {
+    //TODO: 模型表情和动作的初始化
     _updating = true;
     _initialized = false;
 

@@ -60,6 +60,13 @@ namespace LAppDefine {
     // デフォルトのレンダーターゲットサイズ
     extern const csmInt32 RenderTargetWidth;
     extern const csmInt32 RenderTargetHeight;
+    extern const csmInt32 modelWidth;
+    extern const csmInt32 modelHeight;
     
     extern const csmFloat32 AudioSpace;
+    extern const csmFloat32 AudioDepth;
+
+    extern const csmChar* startAudioFile;
+    extern const csmChar* dragAudioFile;
+    extern const csmChar* endAudioFile;
 }

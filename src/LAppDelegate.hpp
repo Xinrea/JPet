@@ -10,7 +10,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <string>
-#include "fmod.hpp"
+#include "AudioManager.hpp"
 #include "LAppAllocator.hpp"
 
 class LAppView;
@@ -124,11 +124,6 @@ private:
      */
     bool CheckShader(GLuint shaderId);
 
-    /**
-    * @brief    播放声音，会根据位置计算左右声道进行播放
-    */
-    void Play3dSound(std::string filename);
-
     LAppAllocator _cubismAllocator;              ///< Cubism SDK Allocator
     Csm::CubismFramework::Option _cubismOption;  ///< Cubism SDK Option
     GLFWwindow* _window;                         ///< OpenGL ウィンドウ
@@ -138,18 +133,21 @@ private:
     float _mouseY;                               ///< マウスY座標
     float _pX;
     float _pY;
+    double _cX, _cY;
     bool _isEnd;                                 ///< APP終了しているか
     bool _isMsg;
     int _mWidth, _mHeight;
-    FMOD::System* _audioSys;
-    FMOD::Channel* _audioCh;
-    FMOD::SoundGroup* _soundGroup;
+    AudioManager* _au;
     LAppTextureManager* _textureManager;         ///< テクスチャマネージャー
 
     // Config Part
     int _iposX,_iposY;
     std::string _leftUrl,_upUrl,_rightUrl;
-    float _scale;
+    bool _isSetting;
+    float _timeSetting;
+    double _holdTime;
+    int _volume;
+    bool _mute;
     
     int _windowWidth;                            ///< Initialize関数で設定したウィンドウ幅
     int _windowHeight;                           ///< Initialize関数で設定したウィンドウ高さ

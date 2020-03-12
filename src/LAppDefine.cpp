@@ -59,7 +59,15 @@ namespace LAppDefine {
 
     // デフォルトのレンダーターゲットサイズ
     const csmInt32 RenderTargetWidth = 500;
-    const csmInt32 RenderTargetHeight = 350;
+    const csmInt32 RenderTargetHeight = 500;
+    const csmInt32 modelWidth = 500;
+    const csmInt32 modelHeight = 350;
 
-    const csmFloat32 AudioSpace = 5.0f;
+    const csmFloat32 AudioSpace = 3.0f;
+    const csmFloat32 AudioDepth = 2.0f;
+
+    // 音频
+    const csmChar* startAudioFile = "Resources/Audio/start.mp3";
+    const csmChar* dragAudioFile = "Resources/Audio/drag.mp3";
+    const csmChar* endAudioFile = "Resources/Audio/end.mp3";
 }

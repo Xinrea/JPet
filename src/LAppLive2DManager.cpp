@@ -93,6 +93,7 @@ void LAppLive2DManager::OnDrag(csmFloat32 x, csmFloat32 y) const
 
 void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
 {
+    //TODO: 添加动作表情和声音
     if (DebugLogEnable)
     {
         LAppPal::PrintLog("[APP]tap point: {x:%.2f y:%.2f}", x, y);
@@ -124,7 +125,12 @@ void LAppLive2DManager::OnUpdate() const
     CubismMatrix44 projection;
     int width, height;
     glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width, &height);
+    float ratio = static_cast<float>(modelWidth) / width;
+    float ty = (static_cast<float>(height) - modelHeight) / height;
     projection.Scale(1.0f, static_cast<float>(width) / static_cast<float>(height));
+    projection.ScaleRelative(ratio,ratio);
+    projection.TranslateY(-ty);
+    
 
     if (_viewMatrix != NULL)
     {
@@ -137,15 +143,8 @@ void LAppLive2DManager::OnUpdate() const
     {
         LAppModel* model = GetModel(i);
         projection = saveProjection;
-
-        // モデル1体描画前コール
-        LAppDelegate::GetInstance()->GetView()->PreModelDraw(*model);
-
         model->Update();
         model->Draw(projection);///< 参照渡しなのでprojectionは変質する
-
-        // モデル1体描画後コール
-        LAppDelegate::GetInstance()->GetView()->PostModelDraw(*model);
     }
 }
 
@@ -202,7 +201,7 @@ void LAppLive2DManager::ChangeScene(Csm::csmInt32 index)
         LAppDelegate::GetInstance()->GetView()->SwitchRenderingTarget(useRenderTarget);
 
         // 別レンダリング先を選択した際の背景クリア色
-        float clearColor[3] = { 1.0f, 1.0f, 1.0f };
+        float clearColor[3] = { 0.0f, 0.0f, 0.0f };
         LAppDelegate::GetInstance()->GetView()->SetRenderTargetClearColor(clearColor[0], clearColor[1], clearColor[2]);
     }
 }

@@ -22,10 +22,15 @@
 #include "LAppTextureManager.hpp"
 #include "TouchManager.hpp"
 #include "ini.h"
-
+#include "imgui.h"
+#include "misc/cpp/imgui_stdlib.h"
+#include "examples/imgui_impl_glfw.h"
+#include "examples/imgui_impl_opengl3.h"
 using namespace Csm;
 using namespace std;
 using namespace LAppDefine;
+
+ImGuiStyle CherryTheme();
 
 namespace {
     LAppDelegate* s_instance = NULL;
@@ -66,13 +71,15 @@ bool LAppDelegate::Initialize()
         _leftUrl = reader.Get("shortcut", "left", "https://t.bilibili.com/");
         _upUrl = reader.Get("shortcut", "up", "https://space.bilibili.com/61639371/dynamic");
         _rightUrl = reader.Get("shortcut", "right", "https://live.bilibili.com/21484828");
-        _scale = reader.GetFloat("display","scale",1.0f);
+        _volume = reader.GetInteger("audio", "volume", 50);
+        _mute = reader.GetBoolean("audio", "mute", false);
     }
 
     // 音頻初始化
-    FMOD_RESULT result;
-    FMOD::System_Create(&_audioSys);
-    _audioSys->init(512,FMOD_INIT_NORMAL,0);
+    _au = AudioManager::GetInstance();
+    _au->Initialize();
+    _au->SetMute(_mute);
+    _au->SetVolume(_volume/10);
 
     // GLFWの初期化
     if (glfwInit() == GL_FALSE)
@@ -95,12 +102,13 @@ bool LAppDelegate::Initialize()
     glfwWindowHint(GLFW_DECORATED, GL_FALSE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
-    _window = glfwCreateWindow(RenderTargetWidth*_scale, RenderTargetHeight*_scale, "JPet beta", NULL, NULL);
+    glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
+    _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet", NULL, NULL);
     glfwSetWindowPos(_window, _iposX, _iposY);
     HWND hwnd = glfwGetWin32Window(_window);
     SetWindowLong(hwnd,GWL_EXSTYLE,WS_EX_TOOLWINDOW|WS_EX_LAYERED|WS_EX_ACCEPTFILES);
     // 透明部分鼠标穿透
-    SetLayeredWindowAttributes(hwnd,0,0,LWA_COLORKEY);
+    SetLayeredWindowAttributes(hwnd,RGB(0,255,0),0,LWA_COLORKEY);
     if (_window == NULL)
     {
         if (DebugLogEnable)
@@ -114,6 +122,19 @@ bool LAppDelegate::Initialize()
     // Windowのコンテキストをカレントに設定
     glfwMakeContextCurrent(_window);
     glfwSwapInterval(1);
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup Dear ImGui style
+    //ImGuiStyle style = CherryTheme();
+    ImGui::StyleColorsDark();
+
+    io.Fonts->AddFontFromFileTTF("Resources/Font/Default.ttf", 20.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
+    // Setup Platform/Renderer bindings
+    ImGui_ImplGlfw_InitForOpenGL(_window, true);
+    ImGui_ImplOpenGL3_Init();
 
     if (glewInit() != GLEW_OK) {
         if (DebugLogEnable)
@@ -149,10 +170,7 @@ bool LAppDelegate::Initialize()
 
     // Cubism SDK の初期化
     InitializeCubism();
-
-    //播放开场语音
-    Play3dSound("Resources/Audio/start.mp3");
-
+    _au->Play3dSound("start");
     return GL_TRUE;
 }
 
@@ -165,20 +183,13 @@ void LAppDelegate::Release()
 
     delete _textureManager;
     delete _view;
-
+    _au->Release();
+    _au->ReleaseInstance();
     // リソースを解放
     LAppLive2DManager::ReleaseInstance();
 
     //Cubism SDK の解放
     CubismFramework::Dispose();
-
-    //FMod Release
-    if (_audioSys) {
-        _audioSys->release();
-    }
-    if (_soundGroup) {
-        _soundGroup->release();
-    }
 }
 
 void LAppDelegate::Run()
@@ -204,36 +215,69 @@ void LAppDelegate::Run()
 
         // 時間更新
         LAppPal::UpdateTime();
-
+        int x,y;
+        glfwGetWindowPos(_window, &x, &y);
+        _au->Update(x,y,width,height,_mWidth,_mHeight);
         // 画面の初期化
-        //glClearColor(1.0f, 1.0f, 1.0f, 0.1f);
+        //glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearDepth(1.0);
 
         //描画更新
         _view->Render();
 
+        // 设置界面
+        if (_isSetting) {
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
+            ImGui::SetNextWindowSize(ImVec2(width, height));
+            ImGui::Begin(u8"设置", &_isSetting, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoSavedSettings);
+            if (ImGui::CollapsingHeader(u8"声音设置"))
+            {
+                ImGui::SliderInt(u8"-音量", &_volume, 0, 100);
+                ImGui::Checkbox(u8"-静音", &_mute);
+            }
+            if (ImGui::CollapsingHeader(u8"功能设置"))
+            {
+                ImGui::InputText(u8"-左滑链接", &_leftUrl, 256);
+                ImGui::InputText(u8"-上滑链接", &_upUrl, 256);
+                ImGui::InputText(u8"-右滑链接", &_rightUrl, 256);
+                ImGui::SliderFloat(u8"-呼出设置等待时间", &_timeSetting,0.5f,5.0f,"%.1fs");
+            }
+            if (ImGui::CollapsingHeader(u8"关于"))
+            {
+                ImGui::Text(u8"模型绘制：轴伊Joi");
+                ImGui::Text(u8"程序作者：Xinrea");
+                ImGui::Text(u8"程序版本：1.0.0");
+            }
+            ImGui::End();
+
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        }
+        _au->SetVolume(_volume/10);
+        _au->SetMute(_mute);
+
+
+
+
         // バッファの入れ替え
         glfwSwapBuffers(_window);
 
         // Poll for and process events
         glfwPollEvents();
-        // 聲音更新
-        FMOD_VECTOR pos = { 0.0f, 0.0f, 0.0f };
-        FMOD_VECTOR vel = { 0.0f, 0.0f, 0.0f };
-        int x, y;
-        glfwGetWindowPos(_window, &x, &y);
-        pos.x = (static_cast<float>(x) + width / 2) / (_mWidth / 2) * AudioSpace - AudioSpace;
-        pos.y = (static_cast<float>(y) + height / 2) / (_mHeight / 2) * AudioSpace - AudioSpace;
-        _audioCh->set3DAttributes(&pos, &vel);
-        _audioSys->update();
     }
     // Release前保存配置
     int x, y;
     glfwGetWindowPos(_window, &x, &y);
     ofstream of;
+    string mute = _mute ? "true" : "false";
     of.open("config.ini", ios::trunc);
-    of << "[position]\n" << "x=" << x << "\ny=" << y << "\n[shortcut]\n" << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl<<"\n[display]\n"<<"scale="<<_scale;
+    of << "[position]\n" << "x=" << x << "\ny=" << y << "\n[shortcut]\n" << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl << "\n[audio]\n" << "volume=" << _volume << "\nmute=" << mute;
     of.close();
 
     Release();
@@ -241,7 +285,7 @@ void LAppDelegate::Run()
     LAppDelegate::ReleaseInstance();
 }
 
-LAppDelegate::LAppDelegate():
+LAppDelegate::LAppDelegate() :
     _cubismOption(),
     _window(NULL),
     _captured(false),
@@ -253,15 +297,19 @@ LAppDelegate::LAppDelegate():
     _isMsg(false),
     _iposX(0),
     _iposY(0),
+    _cX(0),
+    _cY(0),
     _mHeight(0),
     _mWidth(0),
     _leftUrl("https://t.bilibili.com/"),
     _upUrl("https://space.bilibili.com/61639371/dynamic"),
     _rightUrl("https://live.bilibili.com/21484828"),
-    _scale(1.0f),
-    _audioSys(nullptr),
-    _audioCh(nullptr),
-    _soundGroup(nullptr),
+    _au(NULL),
+    _isSetting(false),
+    _timeSetting(1),
+    _holdTime(0),
+    _volume(50),
+    _mute(false),
     _windowWidth(0),
     _windowHeight(0)
 {
@@ -295,24 +343,6 @@ void LAppDelegate::InitializeCubism()
     _view->InitializeSprite();
 }
 
-void LAppDelegate::Play3dSound(std::string filename)
-{
-    // 初始化語音
-    FMOD::Sound* tSound;
-    int x, y;
-    _audioSys->createSound(filename.c_str(), FMOD_3D, 0, &tSound);
-    _audioSys->playSound(tSound, 0, true, &_audioCh);
-    FMOD_VECTOR pos = { 0.0f, 0.0f, 0.0f };
-    FMOD_VECTOR vel = { 0.0f, 0.0f, 0.0f };
-    glfwGetWindowPos(_window, &x, &y);
-    int width, height;
-    glfwGetWindowSize(_window, &width, &height);
-    pos.x = (static_cast<float>(x)+width/2) / (_mWidth / 2) * AudioSpace - AudioSpace;
-    pos.y = (static_cast<float>(y)+height/2) / (_mHeight / 2) * AudioSpace - AudioSpace;
-    _audioCh->set3DAttributes(&pos, &vel);
-    _audioCh->setPaused(false);
-}
-
 void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, int modify)
 {
     if (_view == NULL)
@@ -323,8 +353,12 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, i
     {
         if (GLFW_PRESS == action)
         {
-            _captured = true;
-            _view->OnTouchesBegan(_mouseX, _mouseY);
+            if (!_isSetting) {
+                _captured = true;
+                glfwGetCursorPos(window, &_cX, &_cY);
+                _au->Play3dSound("drag");
+                _view->OnTouchesBegan(_mouseX, _mouseY);
+            }
         }
         else if (GLFW_RELEASE == action)
         {
@@ -337,19 +371,24 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, i
     }
     if (GLFW_MOUSE_BUTTON_RIGHT == button)
     {
-        if (GLFW_PRESS == action)
+        if (GLFW_PRESS == action && !_isSetting)
         {
             if (DebugLogEnable) LAppPal::PrintLog("Right Click Down");
+            _holdTime = glfwGetTime();
             _isMsg = true;
             _pX = _mouseX;
             _pY = _mouseY;
         }
-        else if (GLFW_RELEASE == action)
+        else if (GLFW_RELEASE == action && !_isSetting)
         {
             if (DebugLogEnable) LAppPal::PrintLog("Right Click Up");
             float dx = fabs(_mouseX - _pX);
             float dy = fabs(_mouseY - _pY);
-            if (dx < 60 && dy < 60);
+            if (dx < 60 && dy < 60) {
+                // 鼠标小范围移动
+                double now = glfwGetTime();
+                if (now - _holdTime > _timeSetting) _isSetting = true;
+            }
             else if (_mouseX > _pX && dx > dy ) ShellExecute(NULL, "open", _rightUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向右滑动
             else if (_mouseX < _pX && dx > dy ) ShellExecute(NULL, "open", _leftUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向左滑动
             else if (_mouseY < _pY && dy > dx ) ShellExecute(NULL, "open", _upUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向上滑动
@@ -364,16 +403,13 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, double x, double y)
 {
     _mouseX = static_cast<float>(x);
     _mouseY = static_cast<float>(y);
-
     if (_captured)
     {
-        //此时处于Drag状态，移动窗口
         int xpos, ypos;
         glfwGetWindowPos(window, &xpos, &ypos);
-        int width,height;
-        glfwGetWindowSize(window,&width,&height);
-        glfwSetWindowPos(window, xpos + x - width/2, ypos + y - height/2);
-        //LAppPal::PrintLog("[APP]Move x:%.2f y:%.2f", x, y);
+        int width, height;
+        glfwGetWindowSize(window, &width, &height);
+        glfwSetWindowPos(window, xpos + x - _cX, ypos + y - _cY);
         return;
     }
     if (_view == NULL)
@@ -473,4 +509,73 @@ bool LAppDelegate::CheckShader(GLuint shaderId)
     }
 
     return true;
+}
+
+ImGuiStyle CherryTheme() {
+// cherry colors, 3 intensities
+#define HI(v)   ImVec4(0.419f, 0.168f, 0.317f, v)
+#define MED(v)  ImVec4(0.756f, 0.443f, 0.564f, v)
+#define LOW(v)  ImVec4(0.945f, 0.701f, 0.698f, v)
+// backgrounds (@todo: complete with BG_MED, BG_LOW)
+#define BG(v)   ImVec4(0.423f, 0.329f, 0.462f, v)
+// text
+#define TEXTC(v) ImVec4(0.860f, 0.930f, 0.890f, v)
+
+    auto& style = ImGui::GetStyle();
+    style.Colors[ImGuiCol_Text] = TEXTC(0.78f);
+    style.Colors[ImGuiCol_TextDisabled] = TEXTC(0.28f);
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.462f, 0.153f, 0.317f, 0.97f);
+    style.Colors[ImGuiCol_PopupBg] = BG(0.9f);
+    style.Colors[ImGuiCol_Border] = ImVec4(0.31f, 0.31f, 1.00f, 0.00f);
+    style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    style.Colors[ImGuiCol_FrameBg] = BG(1.00f);
+    style.Colors[ImGuiCol_FrameBgHovered] = MED(0.78f);
+    style.Colors[ImGuiCol_FrameBgActive] = MED(1.00f);
+    style.Colors[ImGuiCol_TitleBg] = LOW(1.00f);
+    style.Colors[ImGuiCol_TitleBgActive] = HI(1.00f);
+    style.Colors[ImGuiCol_TitleBgCollapsed] = BG(0.75f);
+    style.Colors[ImGuiCol_MenuBarBg] = BG(0.47f);
+    style.Colors[ImGuiCol_ScrollbarBg] = BG(1.00f);
+    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.09f, 0.15f, 0.16f, 1.00f);
+    style.Colors[ImGuiCol_ScrollbarGrabHovered] = MED(0.78f);
+    style.Colors[ImGuiCol_ScrollbarGrabActive] = MED(1.00f);
+    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.71f, 0.22f, 0.27f, 1.00f);
+    style.Colors[ImGuiCol_SliderGrab] = LOW(0.7f);
+    style.Colors[ImGuiCol_SliderGrabActive] = HI(0.8f);
+    style.Colors[ImGuiCol_Button] = ImVec4(0.47f, 0.77f, 0.83f, 0.14f);
+    style.Colors[ImGuiCol_ButtonHovered] = MED(0.86f);
+    style.Colors[ImGuiCol_ButtonActive] = MED(1.00f);
+    style.Colors[ImGuiCol_Header] = MED(0.76f);
+    style.Colors[ImGuiCol_HeaderHovered] = MED(0.86f);
+    style.Colors[ImGuiCol_HeaderActive] = HI(1.00f);
+    style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.47f, 0.77f, 0.83f, 0.04f);
+    style.Colors[ImGuiCol_ResizeGripHovered] = MED(0.78f);
+    style.Colors[ImGuiCol_ResizeGripActive] = MED(1.00f);
+    style.Colors[ImGuiCol_PlotLines] = TEXTC(0.63f);
+    style.Colors[ImGuiCol_PlotLinesHovered] = MED(1.00f);
+    style.Colors[ImGuiCol_PlotHistogram] = TEXTC(0.63f);
+    style.Colors[ImGuiCol_PlotHistogramHovered] = MED(1.00f);
+    style.Colors[ImGuiCol_TextSelectedBg] = MED(0.43f);
+    // [...]
+    style.Colors[ImGuiCol_ModalWindowDarkening] = BG(0.73f);
+
+    style.WindowPadding = ImVec2(6, 4);
+    style.WindowRounding = 0.0f;
+    style.FramePadding = ImVec2(5, 2);
+    style.FrameRounding = 3.0f;
+    style.ItemSpacing = ImVec2(7, 1);
+    style.ItemInnerSpacing = ImVec2(1, 1);
+    style.TouchExtraPadding = ImVec2(0, 0);
+    style.IndentSpacing = 6.0f;
+    style.ScrollbarSize = 12.0f;
+    style.ScrollbarRounding = 16.0f;
+    style.GrabMinSize = 20.0f;
+    style.GrabRounding = 2.0f;
+
+    style.WindowTitleAlign.x = 0.50f;
+
+    style.Colors[ImGuiCol_Border] = ImVec4(0.539f, 0.479f, 0.255f, 0.162f);
+    style.FrameBorderSize = 0.0f;
+    style.WindowBorderSize = 1.0f;
+    return style;
 }
