@@ -104,6 +104,8 @@ bool LAppDelegate::Initialize()
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
     _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet", NULL, NULL);
+    GLFWcursor* cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+    glfwSetCursor(_window, cursor);
     glfwSetWindowPos(_window, _iposX, _iposY);
     HWND hwnd = glfwGetWin32Window(_window);
     SetWindowLong(hwnd,GWL_EXSTYLE,WS_EX_TOOLWINDOW|WS_EX_LAYERED|WS_EX_ACCEPTFILES);
@@ -128,8 +130,8 @@ bool LAppDelegate::Initialize()
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
-    //ImGuiStyle style = CherryTheme();
-    ImGui::StyleColorsDark();
+    ImGuiStyle style = CherryTheme();
+    ImGui::StyleColorsDark(&style);
 
     io.Fonts->AddFontFromFileTTF("Resources/Font/Default.ttf", 20.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
     // Setup Platform/Renderer bindings
@@ -225,13 +227,11 @@ void LAppDelegate::Run()
 
         //描画更新
         _view->Render();
-
         // 设置界面
         if (_isSetting) {
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
-
             
             ImGui::SetNextWindowPos(ImVec2(0, 0));
             ImGui::SetNextWindowSize(ImVec2(width, height));
@@ -252,12 +252,17 @@ void LAppDelegate::Run()
             {
                 ImGui::Text(u8"模型制作：Xinrea");
                 ImGui::Text(u8"程序作者：Xinrea");
-                ImGui::Text(u8"程序版本：1.0.0");
+                ImGui::Text(u8"程序版本：0.0.1 beta");
             }
             ImGui::End();
 
             ImGui::Render();
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        } else
+        {
+        	//TODO 设置窗口关闭后，只需要设置一次鼠标指针
+            GLFWcursor* cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+            glfwSetCursor(_window, cursor);
         }
         _au->SetVolume(static_cast<float>(_volume) / 10);
         _au->SetMute(_mute);
@@ -375,6 +380,14 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, i
             _isMsg = true;
             _pX = _mouseX;
             _pY = _mouseY;
+        }
+        else if (GLFW_PRESS == action && _isSetting)
+        {
+            _captured = true;
+        }
+        else if (GLFW_RELEASE == action && _isSetting)
+        {
+            _captured = false;
         }
         else if (GLFW_RELEASE == action && !_isSetting)
         {
