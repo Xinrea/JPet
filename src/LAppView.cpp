@@ -156,18 +156,6 @@ void LAppView::OnTouchesEnded(float px, float py) const
             LAppPal::PrintLog("[APP]touchesEnded x:%.2f y:%.2f", x, y);
         }
         live2DManager->OnTap(x, y);
-
-        // 歯車にタップしたか
-        if (_gear->IsHit(px, py))
-        {
-            live2DManager->NextScene();
-        }
-
-        // 電源ボタンにタップしたか
-        if (_power->IsHit(px, py))
-        {
-            LAppDelegate::GetInstance()->AppEnd();
-        }
     }
 }
 

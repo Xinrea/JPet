@@ -38,10 +38,10 @@ namespace LAppDefine {
 
     // 外部定義ファイル(json)と合わせる
     const csmChar* MotionGroupIdle = "Idle"; // アイドリング
-    const csmChar* MotionGroupTapBody = "TapBody"; // 体をタップしたとき
+    const csmChar* MotionGroupTapBody = "Hit"; // 体をタップしたとき
 
     // 外部定義ファイル(json)と合わせる
-    const csmChar* HitAreaNameHead = "Head";
+    const csmChar* HitAreaNameHead = "Wanzi";
     const csmChar* HitAreaNameBody = "Body";
 
     // モーションの優先度定数
@@ -51,8 +51,8 @@ namespace LAppDefine {
     const csmInt32 PriorityForce = 3;
 
     // デバッグ用ログの表示オプション
-    const csmBool DebugLogEnable = false;
-    const csmBool DebugTouchLogEnable = false;
+    const csmBool DebugLogEnable = true;
+    const csmBool DebugTouchLogEnable = true;
 
     // Frameworkから出力するログのレベル設定
     const CubismFramework::Option::LogLevel CubismLoggingLevel = CubismFramework::Option::LogLevel_Verbose;

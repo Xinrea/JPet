@@ -107,7 +107,8 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             {
                 LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameHead);
             }
-            _models[i]->SetRandomExpression();
+            //_models[i]->SetExpression("Sad.exp3.json");
+            _models[i]->StartMotion(MotionGroupTapBody, 0,PriorityNormal, FinishedMotion);
         }
         else if (_models[i]->HitTest(HitAreaNameBody, x, y))
         {

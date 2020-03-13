@@ -112,14 +112,17 @@ void LAppModel::SetupModel(ICubismModelSetting* setting)
 
     csmByte* buffer;
     csmSizeInt size;
-
+    if (DebugLogEnable)
+    {
+        LAppPal::PrintLog("[APP]Setup model: %s", _modelSetting->GetModelFileName());
+    }
     //Cubism Model
     if (strcmp(_modelSetting->GetModelFileName(), "") != 0)
     {
         csmString path = _modelSetting->GetModelFileName();
         path = _modelHomeDir + path;
 
-        if (_debugMode)
+        if (DebugLogEnable)
         {
             LAppPal::PrintLog("[APP]create model: %s", setting->GetModelFileName());
         }
@@ -133,6 +136,10 @@ void LAppModel::SetupModel(ICubismModelSetting* setting)
     if (_modelSetting->GetExpressionCount() > 0)
     {
         const csmInt32 count = _modelSetting->GetExpressionCount();
+        if (_debugMode)
+        {
+            LAppPal::PrintLog("[APP]get expression: %d", count);
+        }
         for (csmInt32 i = 0; i < count; i++)
         {
             csmString name = _modelSetting->GetExpressionName(i);

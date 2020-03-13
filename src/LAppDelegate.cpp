@@ -79,7 +79,7 @@ bool LAppDelegate::Initialize()
     _au = AudioManager::GetInstance();
     _au->Initialize();
     _au->SetMute(_mute);
-    _au->SetVolume(_volume/10);
+    _au->SetVolume(static_cast<float>(_volume)/10);
 
     // GLFWの初期化
     if (glfwInit() == GL_FALSE)
@@ -108,7 +108,7 @@ bool LAppDelegate::Initialize()
     HWND hwnd = glfwGetWin32Window(_window);
     SetWindowLong(hwnd,GWL_EXSTYLE,WS_EX_TOOLWINDOW|WS_EX_LAYERED|WS_EX_ACCEPTFILES);
     // 透明部分鼠标穿透
-    SetLayeredWindowAttributes(hwnd,RGB(0,255,0),0,LWA_COLORKEY);
+    SetLayeredWindowAttributes(hwnd,RGB(0,0,0),0,LWA_COLORKEY);
     if (_window == NULL)
     {
         if (DebugLogEnable)
@@ -139,7 +139,7 @@ bool LAppDelegate::Initialize()
     if (glewInit() != GLEW_OK) {
         if (DebugLogEnable)
         {
-            LAppPal::PrintLog("Can't initilize glew.");
+            LAppPal::PrintLog("Can't Initilize Glew.");
         }
         glfwTerminate();
         return GL_FALSE;
@@ -250,7 +250,7 @@ void LAppDelegate::Run()
             }
             if (ImGui::CollapsingHeader(u8"关于"))
             {
-                ImGui::Text(u8"模型绘制：轴伊Joi");
+                ImGui::Text(u8"模型制作：Xinrea");
                 ImGui::Text(u8"程序作者：Xinrea");
                 ImGui::Text(u8"程序版本：1.0.0");
             }
@@ -259,7 +259,7 @@ void LAppDelegate::Run()
             ImGui::Render();
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         }
-        _au->SetVolume(_volume/10);
+        _au->SetVolume(static_cast<float>(_volume) / 10);
         _au->SetMute(_mute);
 
 
@@ -317,10 +317,7 @@ LAppDelegate::LAppDelegate() :
     _textureManager = new LAppTextureManager();
 }
 
-LAppDelegate::~LAppDelegate()
-{
-
-}
+LAppDelegate::~LAppDelegate() = default;
 
 void LAppDelegate::InitializeCubism()
 {
