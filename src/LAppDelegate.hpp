@@ -12,6 +12,8 @@
 #include <string>
 #include "AudioManager.hpp"
 #include "LAppAllocator.hpp"
+#include "wintoastlib.h"
+#include "WinToastEventHandler.h"
 
 class LAppView;
 class LAppTextureManager;
@@ -29,7 +31,7 @@ public:
     *
     * @return  クラスのインスタンス
     */
-    static LAppDelegate* GetInstance();
+    static LAppDelegate *GetInstance();
 
     /**
     * @brief   クラスのインスタンス（シングルトン）を解放する。
@@ -60,7 +62,7 @@ public:
     * @param[in]       action            実行結果
     * @param[in]       modify
     */
-    void OnMouseCallBack(GLFWwindow* window, int button, int action, int modify);
+    void OnMouseCallBack(GLFWwindow *window, int button, int action, int modify);
 
     /**
     * @brief   OpenGL用 glfwSetCursorPosCallback用関数。
@@ -69,11 +71,11 @@ public:
     * @param[in]       x                 x座標
     * @param[in]       y                 x座標
     */
-    void OnMouseCallBack(GLFWwindow* window, double x, double y);
+    void OnMouseCallBack(GLFWwindow *window, double x, double y);
 
-    void OnDropCallBack(GLFWwindow* window, int path_count, const char* paths[]);
+    void OnDropCallBack(GLFWwindow *window, int path_count, const char *paths[]);
 
-    void OnWindowPosCallBack(GLFWwindow* window, int x, int y);
+    void OnWindowPosCallBack(GLFWwindow *window, int x, int y);
 
     /**
     * @brief シェーダーを登録する。
@@ -83,12 +85,12 @@ public:
     /**
     * @brief   Window情報を取得する。
     */
-    GLFWwindow* GetWindow() { return _window; }
+    GLFWwindow *GetWindow() { return _window; }
 
     /**
     * @brief   View情報を取得する。
     */
-    LAppView* GetView() { return _view; }
+    LAppView *GetView() { return _view; }
 
     /**
     * @brief   アプリケーションを終了するかどうか。
@@ -101,7 +103,9 @@ public:
     */
     void AppEnd() { _isEnd = true; }
 
-    LAppTextureManager* GetTextureManager() { return _textureManager; }
+    void Notify();
+
+    LAppTextureManager *GetTextureManager() { return _textureManager; }
 
 private:
     /**
@@ -124,33 +128,34 @@ private:
      */
     bool CheckShader(GLuint shaderId);
 
-    LAppAllocator _cubismAllocator;              ///< Cubism SDK Allocator
-    Csm::CubismFramework::Option _cubismOption;  ///< Cubism SDK Option
-    GLFWwindow* _window;                         ///< OpenGL ウィンドウ
-    LAppView* _view;                             ///< View情報
-    bool _captured;                              ///< クリックしているか
-    float _mouseX;                               ///< マウスX座標
-    float _mouseY;                               ///< マウスY座標
+    LAppAllocator _cubismAllocator;             ///< Cubism SDK Allocator
+    Csm::CubismFramework::Option _cubismOption; ///< Cubism SDK Option
+    GLFWwindow *_window;                        ///< OpenGL ウィンドウ
+    LAppView *_view;                            ///< View情報
+    bool _captured;                             ///< クリックしているか
+    float _mouseX;                              ///< マウスX座標
+    float _mouseY;                              ///< マウスY座標
     float _pX;
     float _pY;
     double _cX, _cY;
-    bool _isEnd;                                 ///< APP終了しているか
+    bool _isEnd; ///< APP終了しているか
     bool _isMsg;
     int _mWidth, _mHeight;
-    AudioManager* _au;
-    LAppTextureManager* _textureManager;         ///< テクスチャマネージャー
+    AudioManager *_au;
+    WinToastEventHandler *_notiHandler;
+    LAppTextureManager *_textureManager; ///< テクスチャマネージャー
 
     // Config Part
-    int _iposX,_iposY;
-    std::string _leftUrl,_upUrl,_rightUrl;
+    int _iposX, _iposY;
+    std::string _leftUrl, _upUrl, _rightUrl;
     bool _isSetting;
     float _timeSetting;
     double _holdTime;
     int _volume;
     bool _mute;
-    
-    int _windowWidth;                            ///< Initialize関数で設定したウィンドウ幅
-    int _windowHeight;                           ///< Initialize関数で設定したウィンドウ高さ
+
+    int _windowWidth;  ///< Initialize関数で設定したウィンドウ幅
+    int _windowHeight; ///< Initialize関数で設定したウィンドウ高さ
 };
 
 class EventHandler
@@ -159,7 +164,7 @@ public:
     /**
     * @brief   glfwSetMouseButtonCallback用コールバック関数。
     */
-    static void OnMouseCallBack(GLFWwindow* window, int button, int action, int modify)
+    static void OnMouseCallBack(GLFWwindow *window, int button, int action, int modify)
     {
         LAppDelegate::GetInstance()->OnMouseCallBack(window, button, action, modify);
     }
@@ -167,19 +172,18 @@ public:
     /**
     * @brief   glfwSetCursorPosCallback用コールバック関数。
     */
-    static void OnMouseCallBack(GLFWwindow* window, double x, double y)
+    static void OnMouseCallBack(GLFWwindow *window, double x, double y)
     {
-         LAppDelegate::GetInstance()->OnMouseCallBack(window, x, y);
+        LAppDelegate::GetInstance()->OnMouseCallBack(window, x, y);
     }
 
-    static void OnDropCallBack(GLFWwindow* window, int path_count, const char* paths[])
+    static void OnDropCallBack(GLFWwindow *window, int path_count, const char *paths[])
     {
-         LAppDelegate::GetInstance()->OnDropCallBack(window, path_count, paths);
+        LAppDelegate::GetInstance()->OnDropCallBack(window, path_count, paths);
     }
 
-    static void OnWindowPosCallBack(GLFWwindow* window, int x, int y)
+    static void OnWindowPosCallBack(GLFWwindow *window, int x, int y)
     {
-        LAppDelegate::GetInstance()->OnWindowPosCallBack(window, x,  y);
+        LAppDelegate::GetInstance()->OnWindowPosCallBack(window, x, y);
     }
-
 };

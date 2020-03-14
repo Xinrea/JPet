@@ -15,6 +15,8 @@
 #include <windows.h>
 #include <WinUser.h>
 #include <shellapi.h>
+
+#include "../resource.h"
 #include "LAppView.hpp"
 #include "LAppPal.hpp"
 #include "LAppDefine.hpp"
@@ -26,17 +28,20 @@
 #include "misc/cpp/imgui_stdlib.h"
 #include "examples/imgui_impl_glfw.h"
 #include "examples/imgui_impl_opengl3.h"
+
 using namespace Csm;
 using namespace std;
 using namespace LAppDefine;
+using namespace WinToastLib;
 
 ImGuiStyle CherryTheme();
 
-namespace {
-    LAppDelegate* s_instance = NULL;
+namespace
+{
+LAppDelegate *s_instance = NULL;
 }
 
-LAppDelegate* LAppDelegate::GetInstance()
+LAppDelegate *LAppDelegate::GetInstance()
 {
     if (s_instance == NULL)
     {
@@ -79,7 +84,7 @@ bool LAppDelegate::Initialize()
     _au = AudioManager::GetInstance();
     _au->Initialize();
     _au->SetMute(_mute);
-    _au->SetVolume(static_cast<float>(_volume)/10);
+    _au->SetVolume(static_cast<float>(_volume) / 10);
 
     // GLFWの初期化
     if (glfwInit() == GL_FALSE)
@@ -91,11 +96,10 @@ bool LAppDelegate::Initialize()
         return GL_FALSE;
     }
     // 记录显示器分辨率尺寸
-    GLFWmonitor* pr = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = glfwGetVideoMode(pr);
+    GLFWmonitor *pr = glfwGetPrimaryMonitor();
+    const GLFWvidmode *mode = glfwGetVideoMode(pr);
     _mHeight = mode->height;
     _mWidth = mode->width;
-
 
     // Windowの生成_
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GL_TRUE);
@@ -104,13 +108,13 @@ bool LAppDelegate::Initialize()
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
     _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet", NULL, NULL);
-    GLFWcursor* cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+    GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
     glfwSetCursor(_window, cursor);
     glfwSetWindowPos(_window, _iposX, _iposY);
     HWND hwnd = glfwGetWin32Window(_window);
-    SetWindowLong(hwnd,GWL_EXSTYLE,WS_EX_TOOLWINDOW|WS_EX_LAYERED|WS_EX_ACCEPTFILES);
+    SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_ACCEPTFILES);
     // 透明部分鼠标穿透
-    SetLayeredWindowAttributes(hwnd,RGB(0,0,0),0,LWA_COLORKEY);
+    SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
     if (_window == NULL)
     {
         if (DebugLogEnable)
@@ -121,11 +125,19 @@ bool LAppDelegate::Initialize()
         return GL_FALSE;
     }
 
+    // 通知初始化
+    WinToast::instance()->setAppName(L"JPet");
+    const auto aumi = WinToast::configureAUMI(L"Xinrea", L"JPet", L"Jpet", L"Beta");
+    WinToast::instance()->setAppUserModelId(aumi);
+    WinToast::instance()->initialize();
+    _notiHandler = new WinToastEventHandler();
+
     // Windowのコンテキストをカレントに設定
     glfwMakeContextCurrent(_window);
     glfwSwapInterval(1);
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
@@ -138,7 +150,8 @@ bool LAppDelegate::Initialize()
     ImGui_ImplGlfw_InitForOpenGL(_window, true);
     ImGui_ImplOpenGL3_Init();
 
-    if (glewInit() != GLEW_OK) {
+    if (glewInit() != GLEW_OK)
+    {
         if (DebugLogEnable)
         {
             LAppPal::PrintLog("Can't Initilize Glew.");
@@ -158,7 +171,7 @@ bool LAppDelegate::Initialize()
     //コールバック関数の登録
     glfwSetMouseButtonCallback(_window, EventHandler::OnMouseCallBack);
     glfwSetCursorPosCallback(_window, EventHandler::OnMouseCallBack);
-    glfwSetDropCallback(_window,EventHandler::OnDropCallBack);
+    glfwSetDropCallback(_window, EventHandler::OnDropCallBack);
     glfwSetWindowPosCallback(_window, EventHandler::OnWindowPosCallBack);
 
     // ウィンドウサイズ記憶
@@ -201,7 +214,7 @@ void LAppDelegate::Run()
     {
         int width, height;
         glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width, &height);
-        if( (_windowWidth!=width || _windowHeight!=height) && width>0 && height>0)
+        if ((_windowWidth != width || _windowHeight != height) && width > 0 && height > 0)
         {
             //AppViewの初期化
             _view->Initialize();
@@ -217,9 +230,9 @@ void LAppDelegate::Run()
 
         // 時間更新
         LAppPal::UpdateTime();
-        int x,y;
+        int x, y;
         glfwGetWindowPos(_window, &x, &y);
-        _au->Update(x,y,width,height,_mWidth,_mHeight);
+        _au->Update(x, y, width, height, _mWidth, _mHeight);
         // 画面の初期化
         //glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -228,14 +241,15 @@ void LAppDelegate::Run()
         //描画更新
         _view->Render();
         // 设置界面
-        if (_isSetting) {
+        if (_isSetting)
+        {
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
-            
+
             ImGui::SetNextWindowPos(ImVec2(0, 0));
             ImGui::SetNextWindowSize(ImVec2(width, height));
-            ImGui::Begin(u8"设置", &_isSetting, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoSavedSettings);
+            ImGui::Begin(u8"设置", &_isSetting, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
             if (ImGui::CollapsingHeader(u8"声音设置"))
             {
                 ImGui::SliderInt(u8"-音量", &_volume, 0, 100);
@@ -246,29 +260,27 @@ void LAppDelegate::Run()
                 ImGui::InputText(u8"-左滑链接", &_leftUrl, 256);
                 ImGui::InputText(u8"-上滑链接", &_upUrl, 256);
                 ImGui::InputText(u8"-右滑链接", &_rightUrl, 256);
-                ImGui::SliderFloat(u8"-呼出设置等待时间", &_timeSetting,0.5f,5.0f,"%.1fs");
+                ImGui::SliderFloat(u8"-呼出设置等待时间", &_timeSetting, 0.5f, 5.0f, "%.1fs");
             }
             if (ImGui::CollapsingHeader(u8"关于"))
             {
                 ImGui::Text(u8"模型制作：Xinrea");
                 ImGui::Text(u8"程序作者：Xinrea");
-                ImGui::Text(u8"程序版本：0.0.1 beta");
+                ImGui::Text(u8"程序版本：20200314beta");
             }
             ImGui::End();
 
             ImGui::Render();
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        } else
+        }
+        else
         {
-        	//TODO 设置窗口关闭后，只需要设置一次鼠标指针
-            GLFWcursor* cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+            //TODO 设置窗口关闭后，只需要设置一次鼠标指针
+            GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
             glfwSetCursor(_window, cursor);
         }
         _au->SetVolume(static_cast<float>(_volume) / 10);
         _au->SetMute(_mute);
-
-
-
 
         // バッファの入れ替え
         glfwSwapBuffers(_window);
@@ -276,13 +288,18 @@ void LAppDelegate::Run()
         // Poll for and process events
         glfwPollEvents();
     }
+    ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplOpenGL3_Shutdown();
     // Release前保存配置
     int x, y;
     glfwGetWindowPos(_window, &x, &y);
     ofstream of;
     string mute = _mute ? "true" : "false";
     of.open("config.ini", ios::trunc);
-    of << "[position]\n" << "x=" << x << "\ny=" << y << "\n[shortcut]\n" << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl << "\n[audio]\n" << "volume=" << _volume << "\nmute=" << mute;
+    of << "[position]\n"
+       << "x=" << x << "\ny=" << y << "\n[shortcut]\n"
+       << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl << "\n[audio]\n"
+       << "volume=" << _volume << "\nmute=" << mute;
     of.close();
 
     Release();
@@ -290,33 +307,33 @@ void LAppDelegate::Run()
     LAppDelegate::ReleaseInstance();
 }
 
-LAppDelegate::LAppDelegate() :
-    _cubismOption(),
-    _window(NULL),
-    _captured(false),
-    _mouseX(0.0f),
-    _mouseY(0.0f),
-    _pX(0),
-    _pY(0),
-    _isEnd(false),
-    _isMsg(false),
-    _iposX(0),
-    _iposY(0),
-    _cX(0),
-    _cY(0),
-    _mHeight(0),
-    _mWidth(0),
-    _leftUrl("https://t.bilibili.com/"),
-    _upUrl("https://space.bilibili.com/61639371/dynamic"),
-    _rightUrl("https://live.bilibili.com/21484828"),
-    _au(NULL),
-    _isSetting(false),
-    _timeSetting(1),
-    _holdTime(0),
-    _volume(50),
-    _mute(false),
-    _windowWidth(0),
-    _windowHeight(0)
+LAppDelegate::LAppDelegate() : _cubismOption(),
+                               _window(NULL),
+                               _captured(false),
+                               _mouseX(0.0f),
+                               _mouseY(0.0f),
+                               _pX(0),
+                               _pY(0),
+                               _isEnd(false),
+                               _isMsg(false),
+                               _iposX(0),
+                               _iposY(0),
+                               _cX(0),
+                               _cY(0),
+                               _mHeight(0),
+                               _mWidth(0),
+                               _leftUrl("https://t.bilibili.com/"),
+                               _upUrl("https://space.bilibili.com/61639371/dynamic"),
+                               _rightUrl("https://live.bilibili.com/21484828"),
+                               _au(NULL),
+                               _notiHandler(NULL),
+                               _isSetting(false),
+                               _timeSetting(1),
+                               _holdTime(0),
+                               _volume(50),
+                               _mute(false),
+                               _windowWidth(0),
+                               _windowHeight(0)
 {
     _view = new LAppView();
     _textureManager = new LAppTextureManager();
@@ -345,7 +362,7 @@ void LAppDelegate::InitializeCubism()
     _view->InitializeSprite();
 }
 
-void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, int modify)
+void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action, int modify)
 {
     if (_view == NULL)
     {
@@ -355,11 +372,13 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, i
     {
         if (GLFW_PRESS == action)
         {
-            if (!_isSetting) {
+            if (!_isSetting)
+            {
                 _captured = true;
                 glfwGetCursorPos(window, &_cX, &_cY);
                 _au->Play3dSound("drag");
                 _view->OnTouchesBegan(_mouseX, _mouseY);
+                Notify();
             }
         }
         else if (GLFW_RELEASE == action)
@@ -375,7 +394,8 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, i
     {
         if (GLFW_PRESS == action && !_isSetting)
         {
-            if (DebugLogEnable) LAppPal::PrintLog("Right Click Down");
+            if (DebugLogEnable)
+                LAppPal::PrintLog("Right Click Down");
             _holdTime = glfwGetTime();
             _isMsg = true;
             _pX = _mouseX;
@@ -391,25 +411,32 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, int button, int action, i
         }
         else if (GLFW_RELEASE == action && !_isSetting)
         {
-            if (DebugLogEnable) LAppPal::PrintLog("Right Click Up");
+            if (DebugLogEnable)
+                LAppPal::PrintLog("Right Click Up");
             float dx = fabs(_mouseX - _pX);
             float dy = fabs(_mouseY - _pY);
-            if (dx < 60 && dy < 60) {
+            if (dx < 60 && dy < 60)
+            {
                 // 鼠标小范围移动
                 double now = glfwGetTime();
-                if (now - _holdTime > _timeSetting) _isSetting = true;
+                if (now - _holdTime > _timeSetting)
+                    _isSetting = true;
             }
-            else if (_mouseX > _pX && dx > dy ) ShellExecute(NULL, "open", _rightUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向右滑动
-            else if (_mouseX < _pX && dx > dy ) ShellExecute(NULL, "open", _leftUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向左滑动
-            else if (_mouseY < _pY && dy > dx ) ShellExecute(NULL, "open", _upUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向上滑动
-            else if (_mouseY > _pY && dy > dx ) _isEnd = true; //向下滑动
+            else if (_mouseX > _pX && dx > dy)
+                ShellExecute(NULL, "open", _rightUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向右滑动
+            else if (_mouseX < _pX && dx > dy)
+                ShellExecute(NULL, "open", _leftUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向左滑动
+            else if (_mouseY < _pY && dy > dx)
+                ShellExecute(NULL, "open", _upUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向上滑动
+            else if (_mouseY > _pY && dy > dx)
+                _isEnd = true; //向下滑动
             _isMsg = false;
         }
     }
     return;
 }
 
-void LAppDelegate::OnMouseCallBack(GLFWwindow* window, double x, double y)
+void LAppDelegate::OnMouseCallBack(GLFWwindow *window, double x, double y)
 {
     _mouseX = static_cast<float>(x);
     _mouseY = static_cast<float>(y);
@@ -430,29 +457,28 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow* window, double x, double y)
     _view->OnTouchesMoved(_mouseX, _mouseY);
 }
 
-void LAppDelegate::OnDropCallBack(GLFWwindow* window, int path_count, const char* paths[])
+void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count, const char *paths[])
 {
     for (int i = 0; i < path_count; i++)
     {
         SHFILEOPSTRUCT shFile;
-        ZeroMemory(&shFile,sizeof(shFile));
+        ZeroMemory(&shFile, sizeof(shFile));
         shFile.pFrom = paths[i];
         shFile.wFunc = FO_DELETE;
-        shFile.fFlags =FOF_SILENT|FOF_ALLOWUNDO|FOF_NOCONFIRMATION;
+        shFile.fFlags = FOF_SILENT | FOF_ALLOWUNDO | FOF_NOCONFIRMATION;
         SHFileOperation(&shFile);
     }
 }
 
-void LAppDelegate::OnWindowPosCallBack(GLFWwindow* window, int x, int y)
+void LAppDelegate::OnWindowPosCallBack(GLFWwindow *window, int x, int y)
 {
-
 }
 
 GLuint LAppDelegate::CreateShader()
 {
     //バーテックスシェーダのコンパイル
     GLuint vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
-    const char* vertexShader =
+    const char *vertexShader =
         "#version 120\n"
         "attribute vec3 position;"
         "attribute vec2 uv;"
@@ -463,14 +489,14 @@ GLuint LAppDelegate::CreateShader()
         "}";
     glShaderSource(vertexShaderId, 1, &vertexShader, NULL);
     glCompileShader(vertexShaderId);
-    if(!CheckShader(vertexShaderId))
+    if (!CheckShader(vertexShaderId))
     {
         return 0;
     }
 
     //フラグメントシェーダのコンパイル
     GLuint fragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
-    const char* fragmentShader =
+    const char *fragmentShader =
         "#version 120\n"
         "varying vec2 vuv;"
         "uniform sampler2D texture;"
@@ -505,7 +531,7 @@ bool LAppDelegate::CheckShader(GLuint shaderId)
     glGetShaderiv(shaderId, GL_INFO_LOG_LENGTH, &logLength);
     if (logLength > 0)
     {
-        GLchar* log = reinterpret_cast<GLchar*>(CSM_MALLOC(logLength));
+        GLchar *log = reinterpret_cast<GLchar *>(CSM_MALLOC(logLength));
         glGetShaderInfoLog(shaderId, logLength, &logLength, log);
         CubismLogError("Shader compile log: %s", log);
         CSM_FREE(log);
@@ -521,17 +547,18 @@ bool LAppDelegate::CheckShader(GLuint shaderId)
     return true;
 }
 
-ImGuiStyle CherryTheme() {
+ImGuiStyle CherryTheme()
+{
 // cherry colors, 3 intensities
-#define HI(v)   ImVec4(0.419f, 0.168f, 0.317f, v)
-#define MED(v)  ImVec4(0.756f, 0.443f, 0.564f, v)
-#define LOW(v)  ImVec4(0.945f, 0.701f, 0.698f, v)
+#define HI(v) ImVec4(0.419f, 0.168f, 0.317f, v)
+#define MED(v) ImVec4(0.756f, 0.443f, 0.564f, v)
+#define LOW(v) ImVec4(0.945f, 0.701f, 0.698f, v)
 // backgrounds (@todo: complete with BG_MED, BG_LOW)
-#define BG(v)   ImVec4(0.423f, 0.329f, 0.462f, v)
+#define BG(v) ImVec4(0.423f, 0.329f, 0.462f, v)
 // text
 #define TEXTC(v) ImVec4(0.860f, 0.930f, 0.890f, v)
 
-    auto& style = ImGui::GetStyle();
+    auto &style = ImGui::GetStyle();
     style.Colors[ImGuiCol_Text] = TEXTC(0.78f);
     style.Colors[ImGuiCol_TextDisabled] = TEXTC(0.28f);
     style.Colors[ImGuiCol_WindowBg] = ImVec4(0.462f, 0.153f, 0.317f, 0.97f);
@@ -588,4 +615,12 @@ ImGuiStyle CherryTheme() {
     style.FrameBorderSize = 0.0f;
     style.WindowBorderSize = 1.0f;
     return style;
+}
+
+void LAppDelegate::Notify()
+{
+    WinToastTemplate templ = WinToastTemplate(WinToastTemplate::Text02);
+    templ.setTextField(L"轴伊开播了", WinToastTemplate::FirstLine);
+    templ.setTextField(L"点击前往直播间", WinToastTemplate::SecondLine);
+    WinToast::instance()->showToast(templ, _notiHandler);
 }

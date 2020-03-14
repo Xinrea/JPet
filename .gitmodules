@@ -1,0 +1,9 @@
+[submodule "thirdParty/WinToast"]
+	path = thirdParty/WinToast
+	url = https://github.com/mohabouje/WinToast
+[submodule "thirdParty/imgui"]
+	path = thirdParty/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "thirdParty/restclient-cpp"]
+	path = thirdParty/restclient-cpp
+	url = https://github.com/mrtazz/restclient-cpp.git

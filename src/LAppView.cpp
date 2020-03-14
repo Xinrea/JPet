@@ -110,7 +110,7 @@ void LAppView::InitializeSprite()
     LAppTextureManager* textureManager = LAppDelegate::GetInstance()->GetTextureManager();
     const string resourcesPath = ResourcesPath;
 
-    string imageName = MessageBox;
+    string imageName = OptionImg;
     LAppTextureManager::TextureInfo* msgTexture = textureManager->CreateTextureFromPngFile(resourcesPath + imageName);
     float ty = (static_cast<float>(height) - modelHeight) / height;
     float x = width * 0.5f;

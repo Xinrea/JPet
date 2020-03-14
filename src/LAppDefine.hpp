@@ -12,6 +12,7 @@
 * @brief  Sample Appで使用する定数
 *
 */
+
 namespace LAppDefine {
 
     using namespace Csm;
@@ -28,7 +29,7 @@ namespace LAppDefine {
     extern const csmFloat32 ViewLogicalMaxTop;      ///< 論理的なビュー座標系の上端の最大値
 
     extern const csmChar* ResourcesPath;            ///< 素材パス
-    extern const csmChar* MessageBox;         ///< 背景画像ファイル
+    extern const csmChar* OptionImg;         ///< 背景画像ファイル
     extern const csmChar* GearImageName;         ///< 歯車画像ファイル
     extern const csmChar* PowerImageName;        ///< 終了ボタン画像ファイル
 

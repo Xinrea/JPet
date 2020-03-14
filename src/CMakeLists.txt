@@ -24,6 +24,8 @@ target_sources(${APP_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ini.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.cpp
     ${IMGUI_PATH}/imgui.h
     ${IMGUI_PATH}/imconfig.h
     ${IMGUI_PATH}/imgui_internal.h
@@ -39,4 +41,6 @@ target_sources(${APP_NAME}
     ${IMGUI_PATH}/examples/imgui_impl_opengl3.cpp
     ${IMGUI_PATH}/misc/cpp/imgui_stdlib.h
     ${IMGUI_PATH}/misc/cpp/imgui_stdlib.cpp
+    ${TOAST_PATH}/src/wintoastlib.h
+    ${TOAST_PATH}/src/wintoastlib.cpp
 )

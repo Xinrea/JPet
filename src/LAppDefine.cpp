@@ -26,7 +26,7 @@ namespace LAppDefine {
 
     // 相対パス
     const csmChar* ResourcesPath = "Resources/";
-    const csmChar* MessageBox = "Img/message.png";
+    const csmChar* OptionImg = "Img/message.png";
 
     // モデル定義------------------------------------------
     // モデルを配置したディレクトリ名の配列

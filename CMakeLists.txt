@@ -18,6 +18,8 @@ set(GLEW_PATH ${THIRD_PARTY_PATH}/glew)
 set(GLFW_PATH ${THIRD_PARTY_PATH}/glfw)
 set(FMOD_PATH ${THIRD_PARTY_PATH}/fmod)
 set(IMGUI_PATH ${THIRD_PARTY_PATH}/imgui)
+set(TOAST_PATH ${THIRD_PARTY_PATH}/WinToast)
+set(REST_PATH ${THIRD_PARTY_PATH}/restclient-cpp)
 set(RES_PATH ${SDK_ROOT_PATH}/Resources)
 
 # Set project.
@@ -96,6 +98,7 @@ set_target_properties(Live2DCubismCore
 # Add GLEW ,GLFW.
 add_subdirectory(${GLEW_PATH}/build/cmake ${CMAKE_CURRENT_BINARY_DIR}/glew)
 add_subdirectory(${GLFW_PATH} ${CMAKE_CURRENT_BINARY_DIR}/glfw)
+add_subdirectory(${REST_PATH})
 
 # Specify Cubism Framework rendering.
 set(FRAMEWORK_SOURCE OpenGL)
@@ -126,8 +129,8 @@ target_link_libraries(${APP_NAME}
   optimized -NODEFAULTLIB:libcmt.lib
 )
 # Specify include directories.
-target_include_directories(${APP_NAME} PRIVATE ${STB_PATH} ${FMOD_PATH}/inc ${IMGUI_PATH})
-target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/lib/${ARCH}/)
+target_include_directories(${APP_NAME} PRIVATE ${STB_PATH} ${FMOD_PATH}/inc ${IMGUI_PATH} ${TOAST_PATH}/src ${REST_PATH}/include)
+target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/lib/${ARCH}/ ${CPR_LIBRARIES})
 # Build in multi-process.
 target_compile_options(${APP_NAME} PRIVATE /MP)
 

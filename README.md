@@ -27,13 +27,11 @@
 
  - FMOD CORE 2.0
 
- - IMGUI
-
  - CubismSdkForNative-4-r.1 -  Core, Framework
 
  - Visual Studio 2019 - v142 Toolset # 配置见CMakeLists.txt
 
-将glew、glfw、fmod和imgui置于`thirdParty`下;
+将glew、glfw、fmod置于`thirdParty`下;
 
 将Core和Framework置于项目目录下
 
