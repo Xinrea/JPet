@@ -19,7 +19,9 @@ set(GLFW_PATH ${THIRD_PARTY_PATH}/glfw)
 set(FMOD_PATH ${THIRD_PARTY_PATH}/fmod)
 set(IMGUI_PATH ${THIRD_PARTY_PATH}/imgui)
 set(TOAST_PATH ${THIRD_PARTY_PATH}/WinToast)
-set(REST_PATH ${THIRD_PARTY_PATH}/restclient-cpp)
+set(HTTP_PATH ${THIRD_PARTY_PATH}/cpp-httplib)
+set(OPENSSL_PATH ${THIRD_PARTY_PATH}/OpenSSL)
+set(JSON_PATH ${THIRD_PARTY_PATH}/rapidjson)
 set(RES_PATH ${SDK_ROOT_PATH}/Resources)
 
 # Set project.
@@ -98,7 +100,6 @@ set_target_properties(Live2DCubismCore
 # Add GLEW ,GLFW.
 add_subdirectory(${GLEW_PATH}/build/cmake ${CMAKE_CURRENT_BINARY_DIR}/glew)
 add_subdirectory(${GLFW_PATH} ${CMAKE_CURRENT_BINARY_DIR}/glfw)
-add_subdirectory(${REST_PATH})
 
 # Specify Cubism Framework rendering.
 set(FRAMEWORK_SOURCE OpenGL)
@@ -124,13 +125,15 @@ target_link_libraries(${APP_NAME}
   glfw
   ${OPENGL_LIBRARIES}
   fmod_vc
+  libssl
+  libcrypto
   # Solve the MSVCRT confliction.
   debug -NODEFAULTLIB:libcmtd.lib
   optimized -NODEFAULTLIB:libcmt.lib
 )
 # Specify include directories.
-target_include_directories(${APP_NAME} PRIVATE ${STB_PATH} ${FMOD_PATH}/inc ${IMGUI_PATH} ${TOAST_PATH}/src ${REST_PATH}/include)
-target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/lib/${ARCH}/ ${CPR_LIBRARIES})
+target_include_directories(${APP_NAME} PRIVATE ${STB_PATH} ${FMOD_PATH}/inc ${IMGUI_PATH} ${TOAST_PATH}/src ${HTTP_PATH} ${OPENSSL_PATH}/include ${JSON_PATH}/include)
+target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/lib/${ARCH}/ ${OPENSSL_PATH}/lib)
 # Build in multi-process.
 target_compile_options(${APP_NAME} PRIVATE /MP)
 
@@ -160,7 +163,7 @@ set_target_properties(${APP_NAME} PROPERTIES
 #
 # INFO: USE_RENDER_TARGET has higher priority than USE_MODEL_RENDER_TARGET.
 #
-# target_compile_definitions(${APP_NAME}
-#   PRIVATE
-#     USE_RENDER_TARGET
-# )
+target_compile_definitions(${APP_NAME}
+  PRIVATE
+    CPPHTTPLIB_OPENSSL_SUPPORT
+)

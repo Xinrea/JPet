@@ -86,6 +86,10 @@ bool LAppDelegate::Initialize()
     _au->SetMute(_mute);
     _au->SetVolume(static_cast<float>(_volume) / 10);
 
+    // 狀態監視初始化
+    _us = new UserStateManager();
+    _us->Init();
+
     // GLFWの初期化
     if (glfwInit() == GL_FALSE)
     {
@@ -240,6 +244,14 @@ void LAppDelegate::Run()
 
         //描画更新
         _view->Render();
+
+        static bool lastLive = false;
+        bool statenow = _us->GetState();
+        if (lastLive == false && statenow == true)
+        {
+            Notify();
+        }
+        lastLive = statenow;
         // 设置界面
         if (_isSetting)
         {
@@ -266,7 +278,7 @@ void LAppDelegate::Run()
             {
                 ImGui::Text(u8"模型制作：Xinrea");
                 ImGui::Text(u8"程序作者：Xinrea");
-                ImGui::Text(u8"程序版本：20200314beta");
+                ImGui::Text(u8"程序版本：20200315beta");
             }
             ImGui::End();
 
@@ -290,6 +302,7 @@ void LAppDelegate::Run()
     }
     ImGui_ImplGlfw_Shutdown();
     ImGui_ImplOpenGL3_Shutdown();
+    _us->Stop();
     // Release前保存配置
     int x, y;
     glfwGetWindowPos(_window, &x, &y);
@@ -326,6 +339,8 @@ LAppDelegate::LAppDelegate() : _cubismOption(),
                                _upUrl("https://space.bilibili.com/61639371/dynamic"),
                                _rightUrl("https://live.bilibili.com/21484828"),
                                _au(NULL),
+                               _us(NULL),
+                               _isLive(false),
                                _notiHandler(NULL),
                                _isSetting(false),
                                _timeSetting(1),
@@ -378,7 +393,6 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action, i
                 glfwGetCursorPos(window, &_cX, &_cY);
                 _au->Play3dSound("drag");
                 _view->OnTouchesBegan(_mouseX, _mouseY);
-                Notify();
             }
         }
         else if (GLFW_RELEASE == action)

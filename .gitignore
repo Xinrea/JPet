@@ -37,5 +37,8 @@ thirdParty/freeglut
 thirdParty/fmod
 thirdParty/imgui
 thirdParty/WinToast
+thirdParty/cpp-httplib
+thirdParty/OpenSSL
+thirdParty/rapidjson
 lib/
 *.dir

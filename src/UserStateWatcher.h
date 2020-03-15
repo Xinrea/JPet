@@ -1,5 +1,10 @@
+#include <thread>
+
 class UserStateWatcher
 {
 public:
-    void Watch(int roomID, int time);
-}
+	bool isLive = false;
+	bool isExit = false;
+    void Watch();
+	std::thread WatchThread();
+};

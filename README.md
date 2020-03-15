@@ -27,11 +27,17 @@
 
  - FMOD CORE 2.0
 
+ - cpp-httplib
+
+ - imgui
+
+ - WinToast
+
  - CubismSdkForNative-4-r.1 -  Core, Framework
 
  - Visual Studio 2019 - v142 Toolset # 配置见CMakeLists.txt
 
-将glew、glfw、fmod置于`thirdParty`下;
+将依赖置于`thirdParty`下;
 
 将Core和Framework置于项目目录下
 
@@ -52,7 +58,7 @@ cmake .
 - ~~快捷打开直播间/主页~~
 - 自定义图标
 - 快捷查看实时粉丝数
-- 直播通知
+- ~~直播通知~~
 - 托盘图标和菜单
 - ~~拖放删除文件~~
 - ~~自定义缩放参数~~

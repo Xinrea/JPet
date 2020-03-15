@@ -14,6 +14,7 @@
 #include "LAppAllocator.hpp"
 #include "wintoastlib.h"
 #include "WinToastEventHandler.h"
+#include "UserStateManager.h"
 
 class LAppView;
 class LAppTextureManager;
@@ -140,8 +141,10 @@ private:
     double _cX, _cY;
     bool _isEnd; ///< APP終了しているか
     bool _isMsg;
+    bool _isLive;
     int _mWidth, _mHeight;
     AudioManager *_au;
+    UserStateManager* _us;
     WinToastEventHandler *_notiHandler;
     LAppTextureManager *_textureManager; ///< テクスチャマネージャー
 

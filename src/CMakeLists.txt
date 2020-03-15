@@ -26,6 +26,10 @@ target_sources(${APP_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/ini.h
     ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UserStateManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/UserStateManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UserStateWatcher.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/UserStateWatcher.cpp
     ${IMGUI_PATH}/imgui.h
     ${IMGUI_PATH}/imconfig.h
     ${IMGUI_PATH}/imgui_internal.h
@@ -43,4 +47,5 @@ target_sources(${APP_NAME}
     ${IMGUI_PATH}/misc/cpp/imgui_stdlib.cpp
     ${TOAST_PATH}/src/wintoastlib.h
     ${TOAST_PATH}/src/wintoastlib.cpp
+    ${HTTP_PATH}/httplib.h
 )
