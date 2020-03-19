@@ -1,8 +1,13 @@
 #include "WinToastEventHandler.h"
 
+WinToastEventHandler::WinToastEventHandler(std::string u)
+{
+    url = u;
+}
+
 void WinToastEventHandler::toastActivated() const
 {
-    ShellExecute(NULL, "open", "https://live.bilibili.com/21484828", NULL, NULL, SW_SHOWNORMAL);
+    ShellExecute(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 }
 
 void WinToastEventHandler::toastActivated(int actionIndex) const

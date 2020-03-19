@@ -8,6 +8,7 @@
 #include "LAppDelegate.hpp"
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -15,8 +16,10 @@
 #include <windows.h>
 #include <WinUser.h>
 #include <shellapi.h>
+#include <CommCtrl.h>
 
-#include "../resource.h"
+
+#include "resource.h"
 #include "LAppView.hpp"
 #include "LAppPal.hpp"
 #include "LAppDefine.hpp"
@@ -24,17 +27,17 @@
 #include "LAppTextureManager.hpp"
 #include "TouchManager.hpp"
 #include "ini.h"
-#include "imgui.h"
-#include "misc/cpp/imgui_stdlib.h"
-#include "examples/imgui_impl_glfw.h"
-#include "examples/imgui_impl_opengl3.h"
+
+#define WM_IAWENTRAY  WM_USER+5  
 
 using namespace Csm;
 using namespace std;
 using namespace LAppDefine;
 using namespace WinToastLib;
 
-ImGuiStyle CherryTheme();
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK PreWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+WNDPROC DefaultProc;
 
 namespace
 {
@@ -65,10 +68,13 @@ bool LAppDelegate::Initialize()
 {
     if (DebugLogEnable)
     {
-        LAppPal::PrintLog("START");
+        LAppPal::PrintLog("[LAppDelegate]START");
     }
     // 设置初始化
-    INIReader reader("config.ini");
+    CHAR documents[MAX_PATH];
+    HRESULT result = SHGetFolderPathA(NULL, CSIDL_PERSONAL, NULL, SHGFP_TYPE_CURRENT, documents);
+    string inipath(documents);
+    INIReader reader(inipath+"\\JPetConfig.ini");
     if (reader.ParseError() == 0)
     {
         _iposX = reader.GetInteger("position", "x", 0);
@@ -76,15 +82,22 @@ bool LAppDelegate::Initialize()
         _leftUrl = reader.Get("shortcut", "left", "https://t.bilibili.com/");
         _upUrl = reader.Get("shortcut", "up", "https://space.bilibili.com/61639371/dynamic");
         _rightUrl = reader.Get("shortcut", "right", "https://live.bilibili.com/21484828");
-        _volume = reader.GetInteger("audio", "volume", 50);
+        _volume = reader.GetInteger("audio", "volume", 30);
         _mute = reader.GetBoolean("audio", "mute", false);
+    	_scale = reader.GetFloat("display", "scale", 1.0f);
+        Green = reader.GetBoolean("display", "green", false);
+        LiveNotify = reader.GetBoolean("notify", "live", true);
+        FollowNotify = reader.GetBoolean("notify", "follow", true);
+        DynamicNotify = reader.GetBoolean("notify", "dynamic", true);
     }
-
+    RenderTargetWidth = _scale*DRenderTargetWidth;
+    RenderTargetHeight = _scale*DRenderTargetHeight;
     // 音頻初始化
     _au = AudioManager::GetInstance();
     _au->Initialize();
     _au->SetMute(_mute);
     _au->SetVolume(static_cast<float>(_volume) / 10);
+    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]AudioManager Init");
 
     // 狀態監視初始化
     _us = new UserStateManager();
@@ -95,7 +108,7 @@ bool LAppDelegate::Initialize()
     {
         if (DebugLogEnable)
         {
-            LAppPal::PrintLog("Can't initilize GLFW");
+            LAppPal::PrintLog("[LAppDelegate]Can't initilize GLFW");
         }
         return GL_FALSE;
     }
@@ -105,6 +118,13 @@ bool LAppDelegate::Initialize()
     _mHeight = mode->height;
     _mWidth = mode->width;
 
+    // 路径
+    char curPath[256];
+    GetModuleFileName(GetModuleHandle(NULL), curPath, sizeof(curPath));
+    std::string path = curPath;
+    _exePath = path.substr(0, path.find_last_of("\\") + 1);
+    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Get Execute Path");
+    
     // Windowの生成_
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GL_TRUE);
     glfwWindowHint(GLFW_DECORATED, GL_FALSE);
@@ -119,11 +139,13 @@ bool LAppDelegate::Initialize()
     SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_ACCEPTFILES);
     // 透明部分鼠标穿透
     SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]SetLayeredWindow COLORKEY");
+
     if (_window == NULL)
     {
         if (DebugLogEnable)
         {
-            LAppPal::PrintLog("Can't create GLFW window.");
+            LAppPal::PrintLog("[LAppDelegate]Can't create GLFW window.");
         }
         glfwTerminate();
         return GL_FALSE;
@@ -134,31 +156,20 @@ bool LAppDelegate::Initialize()
     const auto aumi = WinToast::configureAUMI(L"Xinrea", L"JPet", L"Jpet", L"Beta");
     WinToast::instance()->setAppUserModelId(aumi);
     WinToast::instance()->initialize();
-    _notiHandler = new WinToastEventHandler();
+    _LiveHandler = new WinToastEventHandler("https://live.bilibili.com/21484828");
+    _DynamicHandler = new WinToastEventHandler("https://space.bilibili.com/61639371/dynamic");
+    _FollowHandler = new WinToastEventHandler("https://space.bilibili.com/61639371");
+    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Notification Init");
 
     // Windowのコンテキストをカレントに設定
     glfwMakeContextCurrent(_window);
     glfwSwapInterval(1);
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-    // Setup Dear ImGui style
-    ImGuiStyle style = CherryTheme();
-    ImGui::StyleColorsDark(&style);
-
-    io.Fonts->AddFontFromFileTTF("Resources/Font/Default.ttf", 20.0f, NULL, io.Fonts->GetGlyphRangesChineseFull());
-    // Setup Platform/Renderer bindings
-    ImGui_ImplGlfw_InitForOpenGL(_window, true);
-    ImGui_ImplOpenGL3_Init();
 
     if (glewInit() != GLEW_OK)
     {
         if (DebugLogEnable)
         {
-            LAppPal::PrintLog("Can't Initilize Glew.");
+            LAppPal::PrintLog("[LAppDelegate]Can't Initilize Glew.");
         }
         glfwTerminate();
         return GL_FALSE;
@@ -177,19 +188,32 @@ bool LAppDelegate::Initialize()
     glfwSetCursorPosCallback(_window, EventHandler::OnMouseCallBack);
     glfwSetDropCallback(_window, EventHandler::OnDropCallBack);
     glfwSetWindowPosCallback(_window, EventHandler::OnWindowPosCallBack);
+    glfwSetTrayClickCallback(_window, EventHandler::OnTrayClickCallBack);
 
     // ウィンドウサイズ記憶
     int width, height;
     glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width, &height);
     _windowWidth = width;
     _windowHeight = height;
+    // 托盘初始化
+    nid.cbSize = sizeof(NOTIFYICONDATA);     //初始化结构的大小  
+    nid.hWnd = hwnd;                         //指定接收托盘消息的句柄  
+    nid.uID = IDI_ICON1;                     //指定托盘图标的ID  
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;  //设定结构里有效的位置  
+             //NIF_ICON:     指定hIcon是有效的，（这里设定自定义系统托盘图标必须的  
+             //NIF_MESSAGE:  指定uCallbackMessage是有效的，用于程序接收来自托盘图标的消息，需要自定义一个消息  
+               //NIF_TIP:      指定szTip是有效的，功能是当鼠标移动到图标上时，显示提示信息   
+    nid.uCallbackMessage = WM_IAWENTRAY;     //自定义的消息，我在一开始定义了一个自定义消息
+    nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));  //设置图标的句柄  
+    strcpy(nid.szTip, TEXT("JPet - 桌面宠物轴伊"));
+    Shell_NotifyIcon(NIM_ADD, &nid);
 
     //AppViewの初期化
     _view->Initialize();
 
     // Cubism SDK の初期化
     InitializeCubism();
-    _au->Play3dSound("start");
+
     return GL_TRUE;
 }
 
@@ -234,63 +258,65 @@ void LAppDelegate::Run()
 
         // 時間更新
         LAppPal::UpdateTime();
-        int x, y;
-        glfwGetWindowPos(_window, &x, &y);
-        _au->Update(x, y, width, height, _mWidth, _mHeight);
+
+    	//鼠标捕捉
+        static double cx, cy;
+        glfwGetCursorPos(_window, &cx, &cy);
+        // 非拖动状态下，跟随鼠标位置；拖动状态下，通过OnTouchMoved模拟物理效果
+        if (!_captured)_view->OnTouchesMoved(static_cast<float>(cx), static_cast<float>(cy));
+        
+
         // 画面の初期化
-        //glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        if (!Green)glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        else glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
         glClearDepth(1.0);
 
         //描画更新
         _view->Render();
 
         static bool lastLive = false;
-        bool statenow = _us->GetState();
+        static float scale = _scale;
+        static bool isShowing = false;
+        // 直播提醒
+        bool statenow = _us->GetLiveState();
         if (lastLive == false && statenow == true)
         {
-            Notify();
+            if (LiveNotify)Notify(L"阿轴开播了",L"点击前往直播间",_LiveHandler);
         }
         lastLive = statenow;
+
+        // 动态提醒
+        if (_us->GetDynamicState()) {
+            _us->SetDynamicState();
+            if(DynamicNotify)Notify(L"阿轴有新动态了", L"点击查看动态", _DynamicHandler);
+        }
+
+        // 新粉丝提醒
+        if (_us->GetFollowState()) {
+            _us->SetFollowState();
+            if (FollowNotify) {
+                LAppLive2DManager::GetInstance()->OnFollow();
+                Notify(L"新粉丝", L"点击打开B站主页", _FollowHandler);
+            }
+        }
+
         // 设置界面
-        if (_isSetting)
+        if (_isSetting && !isShowing)
         {
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
-
-            ImGui::SetNextWindowPos(ImVec2(0, 0));
-            ImGui::SetNextWindowSize(ImVec2(width, height));
-            ImGui::Begin(u8"设置", &_isSetting, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
-            if (ImGui::CollapsingHeader(u8"声音设置"))
-            {
-                ImGui::SliderInt(u8"-音量", &_volume, 0, 100);
-                ImGui::Checkbox(u8"-静音", &_mute);
-            }
-            if (ImGui::CollapsingHeader(u8"功能设置"))
-            {
-                ImGui::InputText(u8"-左滑链接", &_leftUrl, 256);
-                ImGui::InputText(u8"-上滑链接", &_upUrl, 256);
-                ImGui::InputText(u8"-右滑链接", &_rightUrl, 256);
-                ImGui::SliderFloat(u8"-呼出设置等待时间", &_timeSetting, 0.5f, 5.0f, "%.1fs");
-            }
-            if (ImGui::CollapsingHeader(u8"关于"))
-            {
-                ImGui::Text(u8"模型制作：Xinrea");
-                ImGui::Text(u8"程序作者：Xinrea");
-                ImGui::Text(u8"程序版本：20200315beta");
-            }
-            ImGui::End();
-
-            ImGui::Render();
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            isShowing = true;
+            std::thread settingThread = SettingWindowThread();
+            settingThread.detach();
         }
-        else
+        if (!_isSetting) isShowing = false;
+        else if (scale != _scale)
         {
-            //TODO 设置窗口关闭后，只需要设置一次鼠标指针
-            GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
-            glfwSetCursor(_window, cursor);
+            scale = _scale;
+            RenderTargetHeight = _scale * DRenderTargetHeight;
+            RenderTargetWidth = _scale * DRenderTargetWidth;
+            glfwSetWindowSize(_window, RenderTargetWidth, RenderTargetHeight);
         }
+
         _au->SetVolume(static_cast<float>(_volume) / 10);
         _au->SetMute(_mute);
 
@@ -300,21 +326,25 @@ void LAppDelegate::Run()
         // Poll for and process events
         glfwPollEvents();
     }
-    ImGui_ImplGlfw_Shutdown();
-    ImGui_ImplOpenGL3_Shutdown();
     _us->Stop();
     // Release前保存配置
     int x, y;
     glfwGetWindowPos(_window, &x, &y);
     ofstream of;
-    string mute = _mute ? "true" : "false";
-    of.open("config.ini", ios::trunc);
+    of.open(documentPath+"\\JPetConfig.ini", ios::trunc);
     of << "[position]\n"
-       << "x=" << x << "\ny=" << y << "\n[shortcut]\n"
-       << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl << "\n[audio]\n"
-       << "volume=" << _volume << "\nmute=" << mute;
+        << "x=" << x << "\ny=" << y << "\n[shortcut]\n"
+        << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl << "\n[audio]\n"
+        << "volume=" << _volume << "\nmute=" << (_mute?"true":"false")
+        << "\n[display]\nscale=" << _scale
+        << "\ngreen=" << (Green ? "true" : "false")
+        << "\n[notify]\nlive=" << (LiveNotify ? "true" : "false")
+        << "\nfollow=" << (FollowNotify ? "true" : "false")
+        << "\ndynamic=" << (DynamicNotify ? "true" : "false");
+
     of.close();
 
+    Shell_NotifyIcon(NIM_DELETE, &nid);
     Release();
 
     LAppDelegate::ReleaseInstance();
@@ -341,11 +371,10 @@ LAppDelegate::LAppDelegate() : _cubismOption(),
                                _au(NULL),
                                _us(NULL),
                                _isLive(false),
-                               _notiHandler(NULL),
                                _isSetting(false),
                                _timeSetting(1),
                                _holdTime(0),
-                               _volume(50),
+                               _volume(30),
                                _mute(false),
                                _windowWidth(0),
                                _windowHeight(0)
@@ -387,13 +416,9 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action, i
     {
         if (GLFW_PRESS == action)
         {
-            if (!_isSetting)
-            {
-                _captured = true;
-                glfwGetCursorPos(window, &_cX, &_cY);
-                _au->Play3dSound("drag");
-                _view->OnTouchesBegan(_mouseX, _mouseY);
-            }
+            _captured = true;
+            glfwGetCursorPos(window, &_cX, &_cY);
+            _view->OnTouchesBegan(_mouseX, _mouseY);
         }
         else if (GLFW_RELEASE == action)
         {
@@ -406,27 +431,19 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action, i
     }
     if (GLFW_MOUSE_BUTTON_RIGHT == button)
     {
-        if (GLFW_PRESS == action && !_isSetting)
+        if (GLFW_PRESS == action)
         {
             if (DebugLogEnable)
-                LAppPal::PrintLog("Right Click Down");
+                LAppPal::PrintLog("[LAppDelegate]Right Click Down");
             _holdTime = glfwGetTime();
             _isMsg = true;
             _pX = _mouseX;
             _pY = _mouseY;
         }
-        else if (GLFW_PRESS == action && _isSetting)
-        {
-            _captured = true;
-        }
-        else if (GLFW_RELEASE == action && _isSetting)
-        {
-            _captured = false;
-        }
-        else if (GLFW_RELEASE == action && !_isSetting)
+        else if (GLFW_RELEASE == action)
         {
             if (DebugLogEnable)
-                LAppPal::PrintLog("Right Click Up");
+                LAppPal::PrintLog("[LAppDelegate]Right Click Up");
             float dx = fabs(_mouseX - _pX);
             float dy = fabs(_mouseY - _pY);
             if (dx < 60 && dy < 60)
@@ -461,31 +478,83 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, double x, double y)
         int width, height;
         glfwGetWindowSize(window, &width, &height);
         glfwSetWindowPos(window, xpos + x - _cX, ypos + y - _cY);
+        // 简单模拟拖动时的物理效果
+        double dx = x - _cX;
+        if (dx > 0) {
+            _view->OnTouchesMoved(x - 30*dx, ypos - 2 * height / 3);
+        }
+        if (dx < 0) {
+            _view->OnTouchesMoved(x - 30*dx, ypos - 2 * height / 3);
+        }
         return;
     }
-    if (_view == NULL)
-    {
-        return;
-    }
-
-    _view->OnTouchesMoved(_mouseX, _mouseY);
 }
 
-void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count, const char *paths[])
+std::wstring StringToWString(const std::string& str)
+{
+    int num = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+    wchar_t* wide = new wchar_t[num];
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, wide, num);
+    std::wstring w_str(wide);
+    delete[] wide;
+    return w_str;
+}
+
+void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count, const WCHAR*paths[])
 {
     for (int i = 0; i < path_count; i++)
     {
-        SHFILEOPSTRUCT shFile;
-        ZeroMemory(&shFile, sizeof(shFile));
-        shFile.pFrom = paths[i];
-        shFile.wFunc = FO_DELETE;
-        shFile.fFlags = FOF_SILENT | FOF_ALLOWUNDO | FOF_NOCONFIRMATION;
-        SHFileOperation(&shFile);
+        WCHAR p[MAX_PATH];
+        wmemset(p, 0, MAX_PATH);
+        StrCpyW(p, paths[i]);
+        SHFILEOPSTRUCTW op;
+        op.hwnd = NULL;
+        op.pTo = NULL;
+        op.wFunc = FO_DELETE;
+        op.fFlags = FOF_ALLOWUNDO | FOF_SIMPLEPROGRESS;
+        op.pFrom = p;
+        SHFileOperationW(&op);
+        if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Delete File Complete");
     }
 }
 
 void LAppDelegate::OnWindowPosCallBack(GLFWwindow *window, int x, int y)
 {
+}
+
+
+// 托盘菜单设置
+#define IDM_SET   2001
+#define IDM_RESET 2002
+#define IDM_EXIT  2003
+
+void LAppDelegate::OnTrayClickCallBack(GLFWwindow* window, int b, unsigned w)
+{
+    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Tray Clicked: %d", b);
+    if (b == 2)
+    {
+        Menu();
+    }
+    else {
+        switch (w)
+        {
+        case IDM_SET:
+        {
+            _isSetting = true;
+            break;
+        }
+        case IDM_EXIT:
+        {
+            _isEnd = true;
+            break;
+        }
+        case IDM_RESET:
+        {
+            glfwSetWindowPos(window, 0, 0);
+            break;
+        }
+        }
+    }
 }
 
 GLuint LAppDelegate::CreateShader()
@@ -561,80 +630,125 @@ bool LAppDelegate::CheckShader(GLuint shaderId)
     return true;
 }
 
-ImGuiStyle CherryTheme()
+void LAppDelegate::Notify(const WCHAR* title,const WCHAR* content, WinToastEventHandler* handler)
 {
-// cherry colors, 3 intensities
-#define HI(v) ImVec4(0.419f, 0.168f, 0.317f, v)
-#define MED(v) ImVec4(0.756f, 0.443f, 0.564f, v)
-#define LOW(v) ImVec4(0.945f, 0.701f, 0.698f, v)
-// backgrounds (@todo: complete with BG_MED, BG_LOW)
-#define BG(v) ImVec4(0.423f, 0.329f, 0.462f, v)
-// text
-#define TEXTC(v) ImVec4(0.860f, 0.930f, 0.890f, v)
+    WinToastTemplate templ = WinToastTemplate(WinToastTemplate::ImageAndText02);
 
-    auto &style = ImGui::GetStyle();
-    style.Colors[ImGuiCol_Text] = TEXTC(0.78f);
-    style.Colors[ImGuiCol_TextDisabled] = TEXTC(0.28f);
-    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.462f, 0.153f, 0.317f, 0.97f);
-    style.Colors[ImGuiCol_PopupBg] = BG(0.9f);
-    style.Colors[ImGuiCol_Border] = ImVec4(0.31f, 0.31f, 1.00f, 0.00f);
-    style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    style.Colors[ImGuiCol_FrameBg] = BG(1.00f);
-    style.Colors[ImGuiCol_FrameBgHovered] = MED(0.78f);
-    style.Colors[ImGuiCol_FrameBgActive] = MED(1.00f);
-    style.Colors[ImGuiCol_TitleBg] = LOW(1.00f);
-    style.Colors[ImGuiCol_TitleBgActive] = HI(1.00f);
-    style.Colors[ImGuiCol_TitleBgCollapsed] = BG(0.75f);
-    style.Colors[ImGuiCol_MenuBarBg] = BG(0.47f);
-    style.Colors[ImGuiCol_ScrollbarBg] = BG(1.00f);
-    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.09f, 0.15f, 0.16f, 1.00f);
-    style.Colors[ImGuiCol_ScrollbarGrabHovered] = MED(0.78f);
-    style.Colors[ImGuiCol_ScrollbarGrabActive] = MED(1.00f);
-    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.71f, 0.22f, 0.27f, 1.00f);
-    style.Colors[ImGuiCol_SliderGrab] = LOW(0.7f);
-    style.Colors[ImGuiCol_SliderGrabActive] = HI(0.8f);
-    style.Colors[ImGuiCol_Button] = ImVec4(0.47f, 0.77f, 0.83f, 0.14f);
-    style.Colors[ImGuiCol_ButtonHovered] = MED(0.86f);
-    style.Colors[ImGuiCol_ButtonActive] = MED(1.00f);
-    style.Colors[ImGuiCol_Header] = MED(0.76f);
-    style.Colors[ImGuiCol_HeaderHovered] = MED(0.86f);
-    style.Colors[ImGuiCol_HeaderActive] = HI(1.00f);
-    style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.47f, 0.77f, 0.83f, 0.04f);
-    style.Colors[ImGuiCol_ResizeGripHovered] = MED(0.78f);
-    style.Colors[ImGuiCol_ResizeGripActive] = MED(1.00f);
-    style.Colors[ImGuiCol_PlotLines] = TEXTC(0.63f);
-    style.Colors[ImGuiCol_PlotLinesHovered] = MED(1.00f);
-    style.Colors[ImGuiCol_PlotHistogram] = TEXTC(0.63f);
-    style.Colors[ImGuiCol_PlotHistogramHovered] = MED(1.00f);
-    style.Colors[ImGuiCol_TextSelectedBg] = MED(0.43f);
-    // [...]
-    style.Colors[ImGuiCol_ModalWindowDarkening] = BG(0.73f);
-
-    style.WindowPadding = ImVec2(6, 4);
-    style.WindowRounding = 0.0f;
-    style.FramePadding = ImVec2(5, 2);
-    style.FrameRounding = 3.0f;
-    style.ItemSpacing = ImVec2(7, 1);
-    style.ItemInnerSpacing = ImVec2(1, 1);
-    style.TouchExtraPadding = ImVec2(0, 0);
-    style.IndentSpacing = 6.0f;
-    style.ScrollbarSize = 12.0f;
-    style.ScrollbarRounding = 16.0f;
-    style.GrabMinSize = 20.0f;
-    style.GrabRounding = 2.0f;
-
-    style.WindowTitleAlign.x = 0.50f;
-
-    style.Colors[ImGuiCol_Border] = ImVec4(0.539f, 0.479f, 0.255f, 0.162f);
-    style.FrameBorderSize = 0.0f;
-    style.WindowBorderSize = 1.0f;
-    return style;
+    templ.setTextField(title,WinToastTemplate::FirstLine);
+    templ.setTextField(content, WinToastTemplate::SecondLine);
+    std::string img = _exePath + "Resources/Img/Avatar.png";
+    templ.setImagePath(StringToWString(img));
+    WinToast::instance()->showToast(templ, handler,nullptr);
 }
 
-void LAppDelegate::Notify()
+LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    WinToastTemplate templ = WinToastTemplate(WinToastTemplate::Text02);
-    templ.setTextField(L"轴伊开播了", WinToastTemplate::FirstLine);
-    templ.setTextField(L"点击前往直播间", WinToastTemplate::SecondLine);
-    WinToast::instance()->showToast(templ, _notiHandler);
+    static float TimeSetting;
+    switch (uMsg)
+    {
+    case WM_INITDIALOG:
+    {
+        SendMessage(GetDlgItem(hwnd, IDC_MUTE), BM_SETCHECK, LAppDelegate::GetInstance()->GetMute()?BST_CHECKED:BST_UNCHECKED, 0);
+        SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE, !LAppDelegate::GetInstance()->GetMute(), 0);
+        SendMessage(GetDlgItem(hwnd, IDC_VOLUME), TBM_SETPOS, true, LAppDelegate::GetInstance()->GetVolume());
+        SendMessage(GetDlgItem(hwnd, IDC_SCALE), TBM_SETRANGE, true, MAKELONG(5,15));
+        SendMessage(GetDlgItem(hwnd, IDC_SCALE), TBM_SETPOS, true, LAppDelegate::GetInstance()->GetScale()*10);
+        SendMessage(GetDlgItem(hwnd, IDC_LEFT), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetLURL().c_str());
+        SendMessage(GetDlgItem(hwnd, IDC_UP), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetUURL().c_str());
+        SendMessage(GetDlgItem(hwnd, IDC_RIGHT), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetRURL().c_str());
+
+        SendMessage(GetDlgItem(hwnd, IDC_LIVENOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->LiveNotify ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessage(GetDlgItem(hwnd, IDC_FOLLOWNOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->FollowNotify ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->DynamicNotify ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_SETCHECK, LAppDelegate::GetInstance()->Green ? BST_CHECKED : BST_UNCHECKED, 0);
+    }
+    return true;
+
+    case  WM_COMMAND:
+    {
+    		switch(LOWORD(wParam))
+    		{
+            case IDC_APPLY:
+	            {
+                float scale = static_cast<float>(SendMessage(GetDlgItem(hwnd, IDC_SCALE), TBM_GETPOS, 0, 0)) / 10;
+                if (DebugLogEnable) LAppPal::PrintLog("Volume: %d; scale: %f", SendMessage(GetDlgItem(hwnd, IDC_VOLUME), TBM_GETPOS, 0, 0),scale);
+                LAppDelegate::GetInstance()->SetMute(SendMessage(GetDlgItem(hwnd, IDC_MUTE), BM_GETCHECK, 0, 0));
+                LAppDelegate::GetInstance()->SetVolume(SendMessage(GetDlgItem(hwnd, IDC_VOLUME), TBM_GETPOS, 0, 0));
+                LAppDelegate::GetInstance()->SetScale(scale);
+                // left
+                int len = SendMessage(GetDlgItem(hwnd, IDC_LEFT), WM_GETTEXTLENGTH, 0, 0);
+                TCHAR* buff = new TCHAR[len + 1];
+                SendMessage(GetDlgItem(hwnd, IDC_LEFT), WM_GETTEXT, len + 1, (LPARAM)buff);
+                LAppDelegate::GetInstance()->SetLURL(std::string(buff));
+                free(buff);
+                // up
+                len = SendMessage(GetDlgItem(hwnd, IDC_UP), WM_GETTEXTLENGTH, 0, 0);
+                buff = new TCHAR[len + 1];
+                SendMessage(GetDlgItem(hwnd, IDC_UP), WM_GETTEXT, len + 1, (LPARAM)buff);
+                LAppDelegate::GetInstance()->SetUURL(std::string(buff));
+                free(buff);
+                // right
+                len = SendMessage(GetDlgItem(hwnd, IDC_RIGHT), WM_GETTEXTLENGTH, 0, 0);
+                buff = new TCHAR[len + 1];
+                SendMessage(GetDlgItem(hwnd, IDC_RIGHT), WM_GETTEXT, len + 1, (LPARAM)buff);
+                LAppDelegate::GetInstance()->SetRURL(std::string(buff));
+                free(buff);
+
+                LAppDelegate::GetInstance()->LiveNotify = SendMessage(GetDlgItem(hwnd, IDC_LIVENOTIFY), BM_GETCHECK, 0, 0);
+                LAppDelegate::GetInstance()->FollowNotify = SendMessage(GetDlgItem(hwnd, IDC_FOLLOWNOTIFY), BM_GETCHECK, 0, 0);
+                LAppDelegate::GetInstance()->DynamicNotify = SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_GETCHECK, 0, 0);
+                LAppDelegate::GetInstance()->Green = SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_GETCHECK, 0, 0);
+                EndDialog(hwnd, 0);
+
+                break;
+	            }
+            case IDC_MUTE:
+                {
+                    bool checked = SendMessage(GetDlgItem(hwnd, IDC_MUTE), BM_GETCHECK, 0, 0);
+            	    if (checked) SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE, false, 0);
+                    else SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE, true, 0);
+                    break;
+                }
+    		}
+    }
+    return 0;
+
+    case WM_DESTROY:
+    {
+        LAppDelegate::GetInstance()->SetIsSetting(false);
+        EndDialog(hwnd, 0);
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+void LAppDelegate::SettingWindow()
+{
+DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_SETTING), glfwGetWin32Window(_window),
+        SettingProc);
+}
+
+std::thread LAppDelegate::SettingWindowThread()
+{
+    return std::thread(&LAppDelegate::SettingWindow, this);
+}
+
+void LAppDelegate::Menu()
+{
+    POINT p;
+    GetCursorPos(&p);
+    HMENU hMenu;
+    hMenu = CreatePopupMenu();
+    AppendMenu(hMenu, MF_STRING, IDM_RESET, TEXT("重置位置"));
+    AppendMenu(hMenu, MF_STRING, IDM_SET, TEXT("设置"));
+    AppendMenu(hMenu, MF_STRING, IDM_EXIT, TEXT("退出"));
+    SetForegroundWindow(glfwGetWin32Window(_window));
+    TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, p.x, p.y, NULL, glfwGetWin32Window(_window), NULL);
+}
+
+std::thread LAppDelegate::MenuThread()
+{
+    return std::thread(&LAppDelegate::Menu, this);
 }

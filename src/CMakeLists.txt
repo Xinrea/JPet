@@ -30,21 +30,9 @@ target_sources(${APP_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/UserStateManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UserStateWatcher.h
     ${CMAKE_CURRENT_SOURCE_DIR}/UserStateWatcher.cpp
-    ${IMGUI_PATH}/imgui.h
-    ${IMGUI_PATH}/imconfig.h
-    ${IMGUI_PATH}/imgui_internal.h
-    ${IMGUI_PATH}/imstb_rectpack.h
-    ${IMGUI_PATH}/imstb_textedit.h
-    ${IMGUI_PATH}/imstb_truetype.h
-    ${IMGUI_PATH}/imgui.cpp
-    ${IMGUI_PATH}/imgui_draw.cpp
-    ${IMGUI_PATH}/imgui_widgets.cpp
-    ${IMGUI_PATH}/examples/imgui_impl_glfw.h
-    ${IMGUI_PATH}/examples/imgui_impl_glfw.cpp
-    ${IMGUI_PATH}/examples/imgui_impl_opengl3.h
-    ${IMGUI_PATH}/examples/imgui_impl_opengl3.cpp
-    ${IMGUI_PATH}/misc/cpp/imgui_stdlib.h
-    ${IMGUI_PATH}/misc/cpp/imgui_stdlib.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UserStateWatcher.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/resource.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/JPet.rc
     ${TOAST_PATH}/src/wintoastlib.h
     ${TOAST_PATH}/src/wintoastlib.cpp
     ${HTTP_PATH}/httplib.h

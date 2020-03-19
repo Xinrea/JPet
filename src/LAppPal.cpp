@@ -76,13 +76,17 @@ void LAppPal::UpdateTime()
 void LAppPal::PrintLog(const csmChar* format, ...)
 {
     va_list args;
-    csmChar buf[256];
+    csmChar buf[512];
     va_start(args, format);
     vsnprintf_s(buf, sizeof(buf), format, args); // 標準出力でレンダリング
 #ifdef CSM_DEBUG_MEMORY_LEAKING
 // メモリリークチェック時は大量の標準出力がはしり重いのでprintfを利用する
     std::printf(buf);
 #else
+    std::fstream file;
+    file.open(documentPath+"\\JPetLog.txt", std::ios::out | std::ios::app);
+    file << buf <<std::endl;
+    file.close();
     std::cerr << buf << std::endl;
 #endif
     va_end(args);

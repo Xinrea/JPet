@@ -7,6 +7,7 @@
 
 #include "LAppDefine.hpp"
 #include <CubismFramework.hpp>
+#include <string>
 
 namespace LAppDefine {
 
@@ -32,17 +33,40 @@ namespace LAppDefine {
     // モデルを配置したディレクトリ名の配列
     // ディレクトリ名とmodel3.jsonの名前を一致させておくこと
     const csmChar* ModelDir[] = {
-        "Joicombine"
+        "joi"
     };
     const csmInt32 ModelDirSize = sizeof(ModelDir) / sizeof(const csmChar*);
 
     // 外部定義ファイル(json)と合わせる
     const csmChar* MotionGroupIdle = "Idle"; // アイドリング
-    const csmChar* MotionGroupTapBody = "Hit"; // 体をタップしたとき
+    const csmChar* MotionGroupTapHead = "HeadMotion"; // 体をタップしたとき
+    const csmChar* MotionGroupClothChange = "ClothChange";
+    const csmChar* MotionGroupMouthChange = "MouthChange";
+    const csmChar* MotionGroupFaceChange = "FaceChange";
+    const csmChar* MotionGroupEyeChange = "EyeChange";
+    const csmChar* MotionGroupPartChange = "PartChange";
+    const csmChar* MotionGroupSpecial = "SpecialMotion";
 
     // 外部定義ファイル(json)と合わせる
-    const csmChar* HitAreaNameHead = "Wanzi";
-    const csmChar* HitAreaNameBody = "Body";
+    const csmChar* HitAreaNameHead = "AreaHead";
+    const csmChar* HitAreaNameBody = "AreaBody";
+    const int GunChangeList[2] = { 14,13 };
+    const csmChar* HitAreaNameMouth = "AreaMouth";
+    const csmChar* HitAreaNameWanzi = "AreaWanzi";
+    const int EditChangeList[2] = { 16,15 };
+    const csmChar* HitAreaNameArmL = "AreaArmL";
+    const csmChar* HitAreaNameArmR = "AreaArmR";
+    const int SleeveChangeList[2] = { 11,12 };
+    const csmChar* HitAreaNameLegs = "AreaLegs";
+    const int SocksChangeList[2] = { 2,3 };
+    const csmChar* HitAreaNameHat = "AreaHat";
+    const int HatChangeList[3] = { 0,1,8 };
+    const csmChar* HitAreaNameEarL = "AreaEarL";
+    const int EarLChangeList[2] = { 4,5 };
+    const csmChar* HitAreaNameLegBelt = "AreaLegBelt";
+    const int LegBeltChangeList[2] = { 6,7 };
+    const csmChar* HitAreaNameChange = "AreaChange";
+    const csmChar* HitAreaNameEyes = "AreaEyes";
 
     // モーションの優先度定数
     const csmInt32 PriorityNone = 0;
@@ -52,16 +76,18 @@ namespace LAppDefine {
 
     // デバッグ用ログの表示オプション
     const csmBool DebugLogEnable = true;
-    const csmBool DebugTouchLogEnable = true;
+    const csmBool DebugTouchLogEnable = false;
 
     // Frameworkから出力するログのレベル設定
     const CubismFramework::Option::LogLevel CubismLoggingLevel = CubismFramework::Option::LogLevel_Verbose;
 
     // デフォルトのレンダーターゲットサイズ
-    const csmInt32 RenderTargetWidth = 500;
-    const csmInt32 RenderTargetHeight = 500;
-    const csmInt32 modelWidth = 500;
-    const csmInt32 modelHeight = 350;
+    const csmInt32 DRenderTargetWidth = 512;
+    const csmInt32 DRenderTargetHeight = 512;
+    csmInt32 RenderTargetWidth = 512;
+    csmInt32 RenderTargetHeight = 512;
+    const csmInt32 modelWidth = 1024;
+    const csmInt32 modelHeight = 1024;
 
     const csmFloat32 AudioSpace = 3.0f;
     const csmFloat32 AudioDepth = 2.0f;
@@ -70,4 +96,6 @@ namespace LAppDefine {
     const csmChar* startAudioFile = "Resources/Audio/start.mp3";
     const csmChar* dragAudioFile = "Resources/Audio/drag.mp3";
     const csmChar* endAudioFile = "Resources/Audio/end.mp3";
+
+    std::string documentPath = "";
 }

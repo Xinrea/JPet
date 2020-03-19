@@ -16,6 +16,7 @@
 #include "LAppModel.hpp"
 #include "LAppView.hpp"
 
+
 using namespace Csm;
 using namespace LAppDefine;
 using namespace std;
@@ -52,6 +53,8 @@ void LAppLive2DManager::ReleaseInstance()
 LAppLive2DManager::LAppLive2DManager()
     : _viewMatrix(NULL)
     , _sceneIndex(0)
+	, _isNew(true)
+	, _mouthCount(0)
 {
     ChangeScene(_sceneIndex);
 }
@@ -91,6 +94,14 @@ void LAppLive2DManager::OnDrag(csmFloat32 x, csmFloat32 y) const
     }
 }
 
+void LAppLive2DManager::OnFollow() {
+    if (DebugLogEnable)
+    {
+        LAppPal::PrintLog("[APP]New Follow");
+    }
+    _models[0]->StartRandomMotion(MotionGroupSpecial, PriorityForce, FinishedMotion);
+}
+
 void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
 {
     //TODO: 添加动作表情和声音
@@ -98,17 +109,112 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
     {
         LAppPal::PrintLog("[APP]tap point: {x:%.2f y:%.2f}", x, y);
     }
-
+    CubismMotionQueueEntryHandle hr;
     for (csmUint32 i = 0; i < _models.GetSize(); i++)
     {
-        if (_models[i]->HitTest(HitAreaNameHead, x, y))
+        if (_models[i]->HitTest(HitAreaNameChange, x, y))
+        {
+            if (DebugLogEnable)
+            {
+                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameChange);
+            }
+            hr = _models[i]->StartMotion(MotionGroupClothChange, _isNew ? 0 : 1, PriorityForce, FinishedMotion);
+            if (hr != InvalidMotionQueueEntryHandleValue) _isNew = !_isNew;
+        }
+        else if (_isNew && _models[i]->HitTest(HitAreaNameHat, x, y))
+        {
+            if (DebugLogEnable)
+            {
+                LAppPal::PrintLog("[APP]hit area: [%s], motion: %d from [%d,%d,%d] %d", HitAreaNameHat, HatChangeList[_hatCount % 3], HatChangeList[0], HatChangeList[1], HatChangeList[2], _hatCount);
+            }
+            if (_editMode)
+            {
+                hr = _models[i]->StartMotion(MotionGroupPartChange, HatChangeList[_hatCount % 3], PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) _hatCount++;
+            }
+            else
+            {
+                //TouchMotion
+            }
+        }
+        else if (_isNew && _models[i]->HitTest(HitAreaNameEarL, x, y))
+        {
+            if (DebugLogEnable)
+            {
+                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameEarL);
+            }
+            if (_editMode)
+            {
+                hr = _models[i]->StartMotion(MotionGroupPartChange, EarLChangeList[_earLCount % 2], PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) _earLCount++;
+            }
+
+        }
+        else if (_models[i]->HitTest(HitAreaNameWanzi, x, y))
+        {
+            if (DebugLogEnable)
+            {
+                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameWanzi);
+            }
+            hr = _models[i]->StartMotion(MotionGroupPartChange, EditChangeList[_editMode], PriorityNormal, FinishedMotion);
+            if (hr != InvalidMotionQueueEntryHandleValue) _editMode = !_editMode;
+
+        }
+        else if (_models[i]->HitTest(HitAreaNameMouth, x, y))
+        {
+            if (DebugLogEnable)
+            {
+                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameMouth);
+            }
+            if (_editMode)
+            {
+                hr = _models[i]->StartMotion(MotionGroupMouthChange, _mouthCount % 6, PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) _mouthCount++;
+            }
+
+        }
+        else if (_models[i]->HitTest(HitAreaNameEyes, x, y))
+        {
+            if (DebugLogEnable)
+            {
+                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameEyes);
+            }
+            if (_editMode)
+            {
+                hr = _models[i]->StartMotion(MotionGroupEyeChange, _eyeCount % 4, PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) _eyeCount++;
+            }
+            else
+            {
+            }
+
+        }
+        else if (_models[i]->HitTest(HitAreaNameHead, x, y))
         {
             if (DebugLogEnable)
             {
                 LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameHead);
             }
-            //_models[i]->SetExpression("Sad.exp3.json");
-            _models[i]->StartMotion(MotionGroupTapBody, 0,PriorityNormal, FinishedMotion);
+            if (_editMode)
+            {
+            }
+            else
+            {
+                hr = _models[i]->StartRandomMotion(MotionGroupTapHead, PriorityNormal, FinishedMotion);
+            }
+            
+        }
+        else if (_isNew && _models[i]->HitTest(HitAreaNameArmL, x, y) || _models[i]->HitTest(HitAreaNameArmR, x, y))
+        {
+            if (DebugLogEnable)
+            {
+                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameArmL);
+            }
+            if (_editMode)
+            {
+                hr = _models[i]->StartMotion(MotionGroupPartChange, SleeveChangeList[_sleeveCount % 2], PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) _sleeveCount++;
+            }
         }
         else if (_models[i]->HitTest(HitAreaNameBody, x, y))
         {
@@ -116,8 +222,37 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             {
                 LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameBody);
             }
-            _models[i]->StartRandomMotion(MotionGroupTapBody, PriorityNormal, FinishedMotion);
+            if (_editMode)
+            {
+                hr = _models[i]->StartMotion(MotionGroupPartChange, GunChangeList[_gunCount % 2], PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) _gunCount++;
+            }
         }
+        else if (_isNew && _models[i]->HitTest(HitAreaNameLegBelt, x, y))
+        {
+            if (DebugLogEnable)
+            {
+                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameLegBelt);
+            }
+            if (_editMode)
+            {
+                hr = _models[i]->StartMotion(MotionGroupPartChange, LegBeltChangeList[_legBeltCount % 2], PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) _legBeltCount++;
+            }
+        }
+        else if (!_isNew && _models[i]->HitTest(HitAreaNameLegs, x, y))
+        {
+            if (DebugLogEnable)
+            {
+                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameLegs);
+            }
+            if (_editMode)
+            {
+                hr = _models[i]->StartMotion(MotionGroupPartChange, SocksChangeList[_socksCount % 2], PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) _socksCount++;
+            }
+        }
+    	// TODO 其它动作
     }
 }
 
@@ -126,16 +261,16 @@ void LAppLive2DManager::OnUpdate() const
     CubismMatrix44 projection;
     int width, height;
     glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width, &height);
-    float ratio = static_cast<float>(modelWidth) / width;
-    float ty = (static_cast<float>(height) - modelHeight) / height;
-    projection.Scale(1.0f, static_cast<float>(width) / static_cast<float>(height));
-    projection.ScaleRelative(ratio,ratio);
-    projection.TranslateY(-ty);
+    //float ratio = static_cast<float>(modelWidth) / width;
+    //float ty = (static_cast<float>(height) - modelHeight) / height;
+    //projection.Scale(1.0f, static_cast<float>(width) / static_cast<float>(height));
+    //projection.ScaleRelative(ratio,ratio);
+    //projection.TranslateY(-ty);
     
 
     if (_viewMatrix != NULL)
     {
-        projection.MultiplyByMatrix(_viewMatrix);
+    //    projection.MultiplyByMatrix(_viewMatrix);
     }
 
     const CubismMatrix44    saveProjection = projection;
@@ -144,6 +279,7 @@ void LAppLive2DManager::OnUpdate() const
     {
         LAppModel* model = GetModel(i);
         projection = saveProjection;
+        projection.Scale(2, 2);
         model->Update();
         model->Draw(projection);///< 参照渡しなのでprojectionは変質する
     }

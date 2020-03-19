@@ -40,5 +40,10 @@ thirdParty/WinToast
 thirdParty/cpp-httplib
 thirdParty/OpenSSL
 thirdParty/rapidjson
+thirdParty/boost
 lib/
 *.dir
+*.aps
+
+# live2d
+*.can3

@@ -7,6 +7,7 @@
 
 #include "LAppSprite.hpp"
 #include "LAppDelegate.hpp"
+#include "LAppPal.hpp"
 
 LAppSprite::LAppSprite(float x, float y, float width, float height, GLuint textureId, GLuint programId)
     : _rect()
@@ -63,10 +64,10 @@ void LAppSprite::Render() const
     // 頂点データ
     float positionVertex[] =
     {
-        (_rect.right - maxWidth * 0.5f) / (maxWidth * 0.5f), (_rect.up   - maxHeight * 0.5f) / (maxHeight * 0.5f),
-        (_rect.left  - maxWidth * 0.5f) / (maxWidth * 0.5f), (_rect.up   - maxHeight * 0.5f) / (maxHeight * 0.5f),
-        (_rect.left  - maxWidth * 0.5f) / (maxWidth * 0.5f), (_rect.down - maxHeight * 0.5f) / (maxHeight * 0.5f),
-        (_rect.right - maxWidth * 0.5f) / (maxWidth * 0.5f), (_rect.down - maxHeight * 0.5f) / (maxHeight * 0.5f)
+        (_rect.right - maxWidth * 0.5f)/ (maxWidth * 0.5f), (_rect.up   - maxHeight * 0.5f)/ (maxHeight * 0.5f),
+        (_rect.left  - maxWidth * 0.5f)/ (maxWidth * 0.5f), (_rect.up   - maxHeight * 0.5f)/ (maxHeight * 0.5f),
+        (_rect.left  - maxWidth * 0.5f)/ (maxWidth * 0.5f), (_rect.down - maxHeight * 0.5f)/ (maxHeight * 0.5f),
+        (_rect.right - maxWidth * 0.5f)/ (maxWidth * 0.5f), (_rect.down - maxHeight * 0.5f)/ (maxHeight * 0.5f)
     };
 
     // attribute属性を登録

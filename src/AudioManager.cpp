@@ -23,36 +23,33 @@ void AudioManager::ReleaseInstance() {
 
 bool AudioManager::Initialize() {
     if (DebugLogEnable) {
-        LAppPal::PrintLog("AudioManager Initialize");
+        LAppPal::PrintLog("[AudioManager]Initialize");
     }
     FMOD::System_Create(&_system);
     _system->init(256,FMOD_INIT_NORMAL,0);
-    FMOD::Sound* tmpSound;
-    //TODO 在这里添加更多的音效选项
-    _system->createSound(startAudioFile,FMOD_3D_HEADRELATIVE,0,&tmpSound);
-    _soundMap["start"] = tmpSound;
-    _system->createSound(dragAudioFile,FMOD_3D_HEADRELATIVE,0,&tmpSound);
-    _soundMap["drag"] = tmpSound;
-    _system->createSound(endAudioFile,FMOD_3D_HEADRELATIVE,0,&tmpSound);
-    _soundMap["end"] = tmpSound;
     return true;
 }
 
-void AudioManager::Play3dSound(string soundname) {
+void AudioManager::Play3dSound(string soundfile) {
     //TODO Volume Control
     bool isPlay;
+    if (DebugLogEnable) {
+        LAppPal::PrintLog("[AudioManager]Play Sound: %s",soundfile.c_str());
+    }
     if (_mute) return;
+    FMOD::Sound* sound;
+    _system->createSound(soundfile.c_str(), FMOD_2D, 0, &sound);
     if (_channel) {
         _channel->isPlaying(&isPlay);
         if (!isPlay) {
-            _system->playSound(_soundMap[soundname], 0, true, &_channel);
+            _system->playSound(sound, 0, true, &_channel);
             _channel->setVolume(_volume);
             _channel->setPaused(false);
         }
     }
     else {
         isPlay = false;
-        _system->playSound(_soundMap[soundname], 0, true, &_channel);
+        _system->playSound(sound, 0, true, &_channel);
         _channel->setVolume(_volume);
         _channel->setPaused(false);
     }

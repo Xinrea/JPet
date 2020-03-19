@@ -20,6 +20,7 @@
 #include "LAppPal.hpp"
 #include "LAppTextureManager.hpp"
 #include "LAppDelegate.hpp"
+#include "AudioManager.hpp"
 
 using namespace Live2D::Cubism::Framework;
 using namespace Live2D::Cubism::Framework::DefaultParameterId;
@@ -355,7 +356,9 @@ void LAppModel::Update()
     if (_motionManager->IsFinished())
     {
         // モーションの再生がない場合、待機モーションの中からランダムで再生する
-        StartRandomMotion(MotionGroupIdle, PriorityIdle);
+        int r = rand()%100;
+        if (r < 90)StartMotion(MotionGroupIdle,0, PriorityIdle);
+        else StartMotion(MotionGroupIdle, 1, PriorityIdle);
     }
     else
     {
@@ -483,6 +486,7 @@ CubismMotionQueueEntryHandle LAppModel::StartMotion(const csmChar* group, csmInt
     {
         csmString path = voice;
         path = _modelHomeDir + path;
+        AudioManager::GetInstance()->Play3dSound(path.GetRawString());
     }
 
     if (_debugMode)
@@ -538,6 +542,7 @@ csmBool LAppModel::HitTest(const csmChar* hitAreaName, csmFloat32 x, csmFloat32 
     const csmInt32 count = _modelSetting->GetHitAreasCount();
     for (csmInt32 i = 0; i < count; i++)
     {
+    	//if (DebugLogEnable)LAppPal::PrintLog("Enter HitTest for [%d]%s | %s", i, _modelSetting->GetHitAreaName(i),hitAreaName);
         if (strcmp(_modelSetting->GetHitAreaName(i), hitAreaName) == 0)
         {
             const CubismIdHandle drawID = _modelSetting->GetHitAreaId(i);

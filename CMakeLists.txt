@@ -17,7 +17,6 @@ set(STB_PATH ${THIRD_PARTY_PATH}/stb)
 set(GLEW_PATH ${THIRD_PARTY_PATH}/glew)
 set(GLFW_PATH ${THIRD_PARTY_PATH}/glfw)
 set(FMOD_PATH ${THIRD_PARTY_PATH}/fmod)
-set(IMGUI_PATH ${THIRD_PARTY_PATH}/imgui)
 set(TOAST_PATH ${THIRD_PARTY_PATH}/WinToast)
 set(HTTP_PATH ${THIRD_PARTY_PATH}/cpp-httplib)
 set(OPENSSL_PATH ${THIRD_PARTY_PATH}/OpenSSL)
@@ -132,7 +131,7 @@ target_link_libraries(${APP_NAME}
   optimized -NODEFAULTLIB:libcmt.lib
 )
 # Specify include directories.
-target_include_directories(${APP_NAME} PRIVATE ${STB_PATH} ${FMOD_PATH}/inc ${IMGUI_PATH} ${TOAST_PATH}/src ${HTTP_PATH} ${OPENSSL_PATH}/include ${JSON_PATH}/include)
+target_include_directories(${APP_NAME} PRIVATE ${STB_PATH} ${FMOD_PATH}/inc ${TOAST_PATH}/src ${HTTP_PATH} ${OPENSSL_PATH}/include ${JSON_PATH}/include)
 target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/lib/${ARCH}/ ${OPENSSL_PATH}/lib)
 # Build in multi-process.
 target_compile_options(${APP_NAME} PRIVATE /MP)

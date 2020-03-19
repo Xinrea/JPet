@@ -50,6 +50,8 @@ public:
     */
     void ReleaseAllModel();
 
+    void OnFollow();
+
     /**
     * @brief   画面をドラッグしたときの処理
     *
@@ -104,4 +106,14 @@ private:
     Csm::CubismMatrix44*        _viewMatrix; ///< モデル描画に用いるView行列
     Csm::csmVector<LAppModel*>  _models; ///< モデルインスタンスのコンテナ
     Csm::csmInt32               _sceneIndex; ///< 表示するシーンのインデックス値
+    bool _isNew;
+    int _mouthCount = 0;
+    int _hatCount = 0;
+    int _earLCount = 0;
+    int _sleeveCount = 0;
+    int _socksCount = 0;
+    int _legBeltCount = 0;
+    int _gunCount = 0;
+    int _eyeCount = 2;
+    bool _editMode = false;
 };

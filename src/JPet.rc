@@ -1,0 +1,134 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// 中文(简体，中国) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+#pragma code_page(936)
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""winres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_ICON1               ICON                    "C:\\Users\\xinre\\Desktop\\joipetl2d\\assets\\logo.ico"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_SETTING DIALOGEX 0, 0, 203, 256
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "设置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_VOLUME,"msctls_trackbar32",TBS_AUTOTICKS | TBS_NOTICKS | WS_TABSTOP,39,18,104,11
+    CTEXT           "音量:",IDC_STATIC,12,18,25,13
+    CONTROL         "静音",IDC_MUTE,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,150,18,30,10
+    GROUPBOX        "音量设置",IDC_STATIC,6,6,186,30
+    GROUPBOX        "显示设置",IDC_STATIC,6,42,186,48
+    CONTROL         "",IDC_SCALE,"msctls_trackbar32",TBS_NOTICKS | WS_TABSTOP,36,54,141,11
+    CTEXT           "缩放:",IDC_STATIC,12,54,25,12
+    GROUPBOX        "快捷设置",IDC_STATIC,6,96,186,72
+    CTEXT           "左滑:",IDC_STATIC,12,108,25,12,SS_CENTERIMAGE
+    EDITTEXT        IDC_LEFT,42,108,144,12,ES_AUTOHSCROLL
+    CTEXT           "上滑:",IDC_STATIC,12,126,25,12,SS_CENTERIMAGE
+    EDITTEXT        IDC_UP,42,126,144,12,ES_AUTOHSCROLL
+    CTEXT           "右滑:",IDC_STATIC,12,144,25,12,SS_CENTERIMAGE
+    EDITTEXT        IDC_RIGHT,42,144,144,12,ES_AUTOHSCROLL
+    GROUPBOX        "功能设置",IDC_STATIC,6,174,186,54
+    CONTROL         "直播提醒",IDC_LIVENOTIFY,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,16,186,44,10
+    CONTROL         "新粉丝提醒",IDC_FOLLOWNOTIFY,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,16,198,52,10
+    CONTROL         "新动态提醒",IDC_DYNAMICNOTIFY,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,16,210,52,10
+    PUSHBUTTON      "保存设置",IDC_APPLY,132,234,62,14
+    CONTROL         "绿幕显示",IDC_GREEN,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,16,72,44,10
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_SETTING, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 196
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 249
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// AFX_DIALOG_LAYOUT
+//
+
+IDD_SETTING AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+#endif    // 中文(简体，中国) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

@@ -66,10 +66,10 @@ void LAppView::Initialize()
     }
 
     float ratio = static_cast<float>(height) / static_cast<float>(width);
-    float left = ViewLogicalLeft;
-    float right = ViewLogicalRight;
-    float bottom = -ratio;
-    float top = ratio;
+    float left = ViewLogicalMaxLeft/4;
+    float right = ViewLogicalMaxRight/4;
+    float bottom = ViewLogicalMaxBottom/4;
+    float top = ViewLogicalMaxBottom/4;
 
     _viewMatrix->SetScreenRect(left, right, bottom, top); // デバイスに対応する画面の範囲。 Xの左端, Xの右端, Yの下端, Yの上端
 
@@ -112,12 +112,11 @@ void LAppView::InitializeSprite()
 
     string imageName = OptionImg;
     LAppTextureManager::TextureInfo* msgTexture = textureManager->CreateTextureFromPngFile(resourcesPath + imageName);
-    float ty = (static_cast<float>(height) - modelHeight) / height;
     float x = width * 0.5f;
-    float y = 0.5f*msgTexture->height;
+    float y = height * 0.5f;
     float fWidth = static_cast<float>(width);
     float fHeight = static_cast<float>(height);
-    _msg = new LAppSprite(x, y, msgTexture->width, msgTexture->height, msgTexture->id, _programId);
+    _msg = new LAppSprite(x, y, fWidth, fHeight, msgTexture->id, _programId);
 }
 
 TouchManager* LAppView::GetTouchManager()
@@ -128,6 +127,18 @@ TouchManager* LAppView::GetTouchManager()
 void LAppView::OnTouchesBegan(float px, float py) const
 {
     _touchManager->TouchesBegan(px, py);
+    {
+
+        // シングルタップ
+        float x = _deviceToScreen->TransformX(_touchManager->GetX()); // 論理座標変換した座標を取得。
+        float y = _deviceToScreen->TransformY(_touchManager->GetY()); // 論理座標変換した座標を取得。
+        LAppLive2DManager* live2DManager = LAppLive2DManager::GetInstance();
+        if (DebugTouchLogEnable)
+        {
+            LAppPal::PrintLog("[APP]touchesEnded x:%.2f y:%.2f", x, y);
+        }
+        live2DManager->OnTap(x, y);
+    }
 }
 
 void LAppView::OnTouchesMoved(float px, float py) const
@@ -146,17 +157,6 @@ void LAppView::OnTouchesEnded(float px, float py) const
     // タッチ終了
     LAppLive2DManager* live2DManager = LAppLive2DManager::GetInstance();
     live2DManager->OnDrag(0.0f, 0.0f);
-    {
-
-        // シングルタップ
-        float x = _deviceToScreen->TransformX(_touchManager->GetX()); // 論理座標変換した座標を取得。
-        float y = _deviceToScreen->TransformY(_touchManager->GetY()); // 論理座標変換した座標を取得。
-        if (DebugTouchLogEnable)
-        {
-            LAppPal::PrintLog("[APP]touchesEnded x:%.2f y:%.2f", x, y);
-        }
-        live2DManager->OnTap(x, y);
-    }
 }
 
 float LAppView::TransformViewX(float deviceX) const
@@ -236,8 +236,6 @@ void LAppView::ResizeSprite()
     LAppPal::PrintLog("wsize: %d %d",width,height);
     float x = 0.0f;
     float y = 0.0f;
-    float fWidth = 0.0f;
-    float fHeight = 0.0f;
 
     if (_msg)
     {
@@ -247,8 +245,10 @@ void LAppView::ResizeSprite()
         {
             float ty = (static_cast<float>(height) - modelHeight) / height;
             x = width * 0.5f;
-            y = 0.5f * texInfo->height;
-            _msg->ResetRect(x, y, texInfo->width, texInfo->height);
+            y = 0.5f * height;
+            float fWidth = static_cast<float>(width);
+            float fHeight = static_cast<float>(height);
+            _msg->ResetRect(x, y, fWidth, fHeight);
         }
     }
 }

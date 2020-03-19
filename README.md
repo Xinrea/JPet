@@ -6,16 +6,10 @@
 
 ## Live2d 模型
 
-参考：轴伊Joi
+模型绘制：轴伊Joi
+模型制作：Xinrea
 
-绘制：Xinrea
-
-制作：Xinrea
-
-
-
-
-
+*该Live2d模型不可用于其他用途
 
 ## 编译
 
@@ -23,13 +17,13 @@
 
  - GLEW_VERSION=2.1.0
 
- - GLFW_VERSION=3.3.2
+ - GLFW_VERSION=3.3.2 # 为了使用托盘菜单，有修改添加新的CallBack，见thirdParty/_glfw
 
  - FMOD CORE 2.0
 
- - cpp-httplib
+ - boost/filesystem
 
- - imgui
+ - cpp-httplib
 
  - WinToast
 
@@ -51,15 +45,12 @@ cmake .
 
 ## TODO
 
-- 更多交互动画
-- 资源文件打包
+- ~~更多交互动画~~
 - ~~音頻播放~~
 - ~~配置保存~~
 - ~~快捷打开直播间/主页~~
-- 自定义图标
-- 快捷查看实时粉丝数
 - ~~直播通知~~
-- 托盘图标和菜单
+- ~~托盘图标和菜单~~
 - ~~拖放删除文件~~
 - ~~自定义缩放参数~~
 - 开机自启动

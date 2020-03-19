@@ -14,9 +14,25 @@ public:
     {
         _Watcher->isExit = true;
     }
-	bool GetState()
+	bool GetLiveState()
     {
         return _Watcher->isLive;
+    }
+    bool GetDynamicState()
+    {
+        return _Watcher->isNewDynamic;
+    }
+    void SetDynamicState()
+    {
+        _Watcher->isNewDynamic = false;
+    }
+    bool GetFollowState()
+    {
+        return _Watcher->isNewFollow;
+    }
+    void SetFollowState()
+    {
+        _Watcher->isNewFollow = false;
     }
 private:
     UserStateWatcher* _Watcher;

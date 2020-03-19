@@ -1,6 +1,7 @@
 #include "fmod.hpp"
 #include <string>
 #include <map>
+#pragma once
 using std::map;
 using std::string;
 
@@ -23,7 +24,6 @@ public:
 private:
     FMOD::System *_system;
     FMOD::Channel *_channel;
-    map<string, FMOD::Sound *> _soundMap;
     float _volume = 5.0f;
     bool _mute = false;
 };
