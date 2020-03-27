@@ -23,9 +23,11 @@
 			"HeadMotion": [
 				{
 					"File": "TouchMotion/HeadMotion.motion3.json",
-					"Sound": "../Audio/drag.mp3",
 					"FadeInTime": 0.5,
 					"FadeOutTime": 0.5
+				},
+				{
+					"File": "TouchMotion/HeadMotion02.motion3.json"
 				}
 			],
 			"ClothChange": [
@@ -180,6 +182,22 @@
 				},
 				{
 					"File": "EyeChange/EyeV.motion3.json"
+				}
+			],
+			"EarMotion": [
+				{
+					"File": "TouchMotion/EarMotion.motion3.json"
+				},
+				{
+					"File": "TouchMotion/EarMotion02.motion3.json"
+				},
+				{
+					"File": "TouchMotion/EarMotion03.motion3.json"
+				}
+			],
+			"ArmMotion": [
+				{
+					"File": "TouchMotion/ArmMotion.motion3.json"
 				}
 			]
 		}

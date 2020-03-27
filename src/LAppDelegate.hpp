@@ -129,6 +129,7 @@ public:
     bool FollowNotify = true;
     bool DynamicNotify = true;
     bool Green = false;
+    bool InMotion = false;
     /**
     * @brief   アプリケーションを終了する。
     */

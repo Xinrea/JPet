@@ -32,7 +32,6 @@ void UserStateWatcher::Watch()
         rapidjson::Document d;
         auto res = liveCli.Get("/api/update");
         if (res && res->status == 200) {
-            if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]%s", res->body.c_str());
             d.Parse(res->body.c_str());
             rapidjson::Value& s = d["live"];
             isLive = s.GetInt() == 1 ? true : false;
@@ -42,11 +41,13 @@ void UserStateWatcher::Watch()
             }
             lastFollow = s.GetInt();
         }
+        else {
+            if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]/api/update Failed");
+        }
 
         // ¶¯Ì¬×´Ì¬¼ì²é
         auto dres = dynamicCli.Get("/dynamic_svr/v1/dynamic_svr/space_history?host_uid=61639371&need_top=0");
         if (dres && dres->status == 200) {
-            if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]Get Last Dynamic");
             d.Parse(dres->body.c_str());
             rapidjson::Value& s = d["data"]["cards"][0]["desc"]["timestamp"];
             if (lastDynamic) {
@@ -54,14 +55,18 @@ void UserStateWatcher::Watch()
             }
             lastDynamic = s.GetInt64();
         }
+        else {
+            if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]Require Dynamic Failed");
+        }
 
         if (isExit) break;
         std::this_thread::sleep_for(std::chrono::seconds(5));
 	}
-    LAppPal::PrintLog("Watch Stop");
+    if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]Watch Stop");
 }
 
 std::thread UserStateWatcher::WatchThread()
 {
+    if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]Thread Start");
     return std::thread(&UserStateWatcher::Watch, this);
 }

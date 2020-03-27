@@ -42,6 +42,8 @@ extern const csmInt32 ModelDirSize; ///< モデルディレクトリ配列のサ
 // 外部定義ファイル(json)と合わせる
 extern const csmChar *MotionGroupIdle;    ///< アイドリング時に再生するモーションのリスト
 extern const csmChar *MotionGroupTapHead; ///< 体をタップした時に再生するモーションのリスト
+extern const csmChar *MotionGroupTapEar;
+extern const csmChar* MotionGroupTapArm;
 extern const csmChar *MotionGroupClothChange;
 extern const csmChar *MotionGroupMouthChange;
 extern const csmChar *MotionGroupFaceChange;

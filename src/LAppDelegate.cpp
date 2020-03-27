@@ -75,14 +75,15 @@ bool LAppDelegate::Initialize()
     HRESULT result = SHGetFolderPathA(NULL, CSIDL_PERSONAL, NULL, SHGFP_TYPE_CURRENT, documents);
     string inipath(documents);
     INIReader reader(inipath+"\\JPetConfig.ini");
+    
     if (reader.ParseError() == 0)
     {
-        _iposX = reader.GetInteger("position", "x", 0);
-        _iposY = reader.GetInteger("position", "y", 0);
+        _iposX = reader.GetInteger("position", "x", 400);
+        _iposY = reader.GetInteger("position", "y", 400);
         _leftUrl = reader.Get("shortcut", "left", "https://t.bilibili.com/");
         _upUrl = reader.Get("shortcut", "up", "https://space.bilibili.com/61639371/dynamic");
         _rightUrl = reader.Get("shortcut", "right", "https://live.bilibili.com/21484828");
-        _volume = reader.GetInteger("audio", "volume", 30);
+        _volume = reader.GetInteger("audio", "volume", 20);
         _mute = reader.GetBoolean("audio", "mute", false);
     	_scale = reader.GetFloat("display", "scale", 1.0f);
         Green = reader.GetBoolean("display", "green", false);
@@ -90,6 +91,7 @@ bool LAppDelegate::Initialize()
         FollowNotify = reader.GetBoolean("notify", "follow", true);
         DynamicNotify = reader.GetBoolean("notify", "dynamic", true);
     }
+    else LAppPal::PrintLog("[LAppDelegate]INI Reader: %d", reader.ParseError());
     RenderTargetWidth = _scale*DRenderTargetWidth;
     RenderTargetHeight = _scale*DRenderTargetHeight;
     // 音頻初始化
@@ -214,6 +216,8 @@ bool LAppDelegate::Initialize()
     // Cubism SDK の初期化
     InitializeCubism();
 
+    _au->Play3dSound("Resources/Audio/start.mp3");
+
     return GL_TRUE;
 }
 
@@ -263,7 +267,7 @@ void LAppDelegate::Run()
         static double cx, cy;
         glfwGetCursorPos(_window, &cx, &cy);
         // 非拖动状态下，跟随鼠标位置；拖动状态下，通过OnTouchMoved模拟物理效果
-        if (!_captured)_view->OnTouchesMoved(static_cast<float>(cx), static_cast<float>(cy));
+        if (!_captured && !InMotion)_view->OnTouchesMoved(static_cast<float>(cx), static_cast<float>(cy));
         
 
         // 画面の初期化
@@ -343,8 +347,9 @@ void LAppDelegate::Run()
         << "\ndynamic=" << (DynamicNotify ? "true" : "false");
 
     of.close();
-
+    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Setting Saved");
     Shell_NotifyIcon(NIM_DELETE, &nid);
+    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]TrayICON Delete");
     Release();
 
     LAppDelegate::ReleaseInstance();
@@ -359,8 +364,8 @@ LAppDelegate::LAppDelegate() : _cubismOption(),
                                _pY(0),
                                _isEnd(false),
                                _isMsg(false),
-                               _iposX(0),
-                               _iposY(0),
+                               _iposX(400),
+                               _iposY(400),
                                _cX(0),
                                _cY(0),
                                _mHeight(0),
@@ -374,7 +379,7 @@ LAppDelegate::LAppDelegate() : _cubismOption(),
                                _isSetting(false),
                                _timeSetting(1),
                                _holdTime(0),
-                               _volume(30),
+                               _volume(20),
                                _mute(false),
                                _windowWidth(0),
                                _windowHeight(0)
@@ -433,8 +438,6 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action, i
     {
         if (GLFW_PRESS == action)
         {
-            if (DebugLogEnable)
-                LAppPal::PrintLog("[LAppDelegate]Right Click Down");
             _holdTime = glfwGetTime();
             _isMsg = true;
             _pX = _mouseX;
@@ -442,8 +445,6 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action, i
         }
         else if (GLFW_RELEASE == action)
         {
-            if (DebugLogEnable)
-                LAppPal::PrintLog("[LAppDelegate]Right Click Up");
             float dx = fabs(_mouseX - _pX);
             float dy = fabs(_mouseY - _pY);
             if (dx < 60 && dy < 60)
@@ -652,7 +653,7 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE, !LAppDelegate::GetInstance()->GetMute(), 0);
         SendMessage(GetDlgItem(hwnd, IDC_VOLUME), TBM_SETPOS, true, LAppDelegate::GetInstance()->GetVolume());
         SendMessage(GetDlgItem(hwnd, IDC_SCALE), TBM_SETRANGE, true, MAKELONG(5,15));
-        SendMessage(GetDlgItem(hwnd, IDC_SCALE), TBM_SETPOS, true, LAppDelegate::GetInstance()->GetScale()*10);
+        SendMessage(GetDlgItem(hwnd, IDC_SCALE), TBM_SETPOS, true, static_cast<double>(LAppDelegate::GetInstance()->GetScale())*10);
         SendMessage(GetDlgItem(hwnd, IDC_LEFT), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetLURL().c_str());
         SendMessage(GetDlgItem(hwnd, IDC_UP), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetUURL().c_str());
         SendMessage(GetDlgItem(hwnd, IDC_RIGHT), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetRURL().c_str());

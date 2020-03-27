@@ -357,8 +357,8 @@ void LAppModel::Update()
     {
         // モーションの再生がない場合、待機モーションの中からランダムで再生する
         int r = rand()%100;
-        if (r < 90)StartMotion(MotionGroupIdle,0, PriorityIdle);
-        else StartMotion(MotionGroupIdle, 1, PriorityIdle);
+        if (r < 90)StartMotion(MotionGroupIdle,0, PriorityIdle,NULL,true);
+        else StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
     }
     else
     {
@@ -428,8 +428,9 @@ void LAppModel::Update()
 
 }
 
-CubismMotionQueueEntryHandle LAppModel::StartMotion(const csmChar* group, csmInt32 no, csmInt32 priority, ACubismMotion::FinishedMotionCallback onFinishedMotionHandler)
+CubismMotionQueueEntryHandle LAppModel::StartMotion(const csmChar* group, csmInt32 no, csmInt32 priority, ACubismMotion::FinishedMotionCallback onFinishedMotionHandler, bool IsIdle)
 {
+    if (!IsIdle) LAppDelegate::GetInstance()->InMotion = true;
     if (priority == PriorityForce)
     {
         _motionManager->SetReservePriority(priority);

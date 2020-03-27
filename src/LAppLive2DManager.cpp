@@ -26,6 +26,7 @@ namespace {
 
     void FinishedMotion(ACubismMotion* self)
     {
+        LAppDelegate::GetInstance()->InMotion = false;
         LAppPal::PrintLog("Motion Finished: %x", self);
     }
 }
@@ -125,7 +126,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
         {
             if (DebugLogEnable)
             {
-                LAppPal::PrintLog("[APP]hit area: [%s], motion: %d from [%d,%d,%d] %d", HitAreaNameHat, HatChangeList[_hatCount % 3], HatChangeList[0], HatChangeList[1], HatChangeList[2], _hatCount);
+                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameHat);
             }
             if (_editMode)
             {
@@ -147,6 +148,10 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             {
                 hr = _models[i]->StartMotion(MotionGroupPartChange, EarLChangeList[_earLCount % 2], PriorityNormal, FinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _earLCount++;
+            }
+            else
+            {
+                _models[i]->StartRandomMotion(MotionGroupTapEar, PriorityNormal, FinishedMotion);
             }
 
         }
@@ -214,6 +219,10 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             {
                 hr = _models[i]->StartMotion(MotionGroupPartChange, SleeveChangeList[_sleeveCount % 2], PriorityNormal, FinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _sleeveCount++;
+            }
+            else
+            {
+                _models[i]->StartRandomMotion(MotionGroupTapArm, PriorityNormal, FinishedMotion);
             }
         }
         else if (_models[i]->HitTest(HitAreaNameBody, x, y))
