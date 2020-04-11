@@ -7,6 +7,7 @@
 ## Live2d 模型
 
 模型绘制：轴伊Joi
+
 模型制作：Xinrea
 
 *该Live2d模型不可用于其他用途
@@ -20,8 +21,6 @@
  - GLFW_VERSION=3.3.2 # 为了使用托盘菜单，有修改添加新的CallBack，见thirdParty/_glfw
 
  - FMOD CORE 2.0
-
- - boost/filesystem
 
  - cpp-httplib
 
@@ -55,6 +54,7 @@ cmake .
 - ~~自定义缩放参数~~
 - 开机自启动
 - ~~打包安装程序~~
+- ~~更新检查~~
 - ...
 
 ## Live2D Open Software License

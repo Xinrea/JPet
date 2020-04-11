@@ -90,6 +90,7 @@ bool LAppDelegate::Initialize()
         LiveNotify = reader.GetBoolean("notify", "live", true);
         FollowNotify = reader.GetBoolean("notify", "follow", true);
         DynamicNotify = reader.GetBoolean("notify", "dynamic", true);
+        UpdateNotify = reader.GetBoolean("notify", "update", true);
     }
     else LAppPal::PrintLog("[LAppDelegate]INI Reader: %d", reader.ParseError());
     RenderTargetWidth = _scale*DRenderTargetWidth;
@@ -161,6 +162,7 @@ bool LAppDelegate::Initialize()
     _LiveHandler = new WinToastEventHandler("https://live.bilibili.com/21484828");
     _DynamicHandler = new WinToastEventHandler("https://space.bilibili.com/61639371/dynamic");
     _FollowHandler = new WinToastEventHandler("https://space.bilibili.com/61639371");
+    _UpdateHandler = new WinToastEventHandler("https://pet.joi-club.cn");
     if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Notification Init");
 
     // Windowのコンテキストをカレントに設定
@@ -198,15 +200,12 @@ bool LAppDelegate::Initialize()
     _windowWidth = width;
     _windowHeight = height;
     // 托盘初始化
-    nid.cbSize = sizeof(NOTIFYICONDATA);     //初始化结构的大小  
-    nid.hWnd = hwnd;                         //指定接收托盘消息的句柄  
-    nid.uID = IDI_ICON1;                     //指定托盘图标的ID  
-    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;  //设定结构里有效的位置  
-             //NIF_ICON:     指定hIcon是有效的，（这里设定自定义系统托盘图标必须的  
-             //NIF_MESSAGE:  指定uCallbackMessage是有效的，用于程序接收来自托盘图标的消息，需要自定义一个消息  
-               //NIF_TIP:      指定szTip是有效的，功能是当鼠标移动到图标上时，显示提示信息   
-    nid.uCallbackMessage = WM_IAWENTRAY;     //自定义的消息，我在一开始定义了一个自定义消息
-    nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));  //设置图标的句柄  
+    nid.cbSize = sizeof(NOTIFYICONDATA);     
+    nid.hWnd = hwnd;                          
+    nid.uID = IDI_ICON1;                      
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP; 
+    nid.uCallbackMessage = WM_IAWENTRAY;    
+    nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));  
     strcpy(nid.szTip, TEXT("JPet - 桌面宠物轴伊"));
     Shell_NotifyIcon(NIM_ADD, &nid);
 
@@ -216,6 +215,7 @@ bool LAppDelegate::Initialize()
     // Cubism SDK の初期化
     InitializeCubism();
 
+    if(UpdateNotify &&_us->CheckUpdate())Notify(L"桌宠阿轴有新版本了", L"点击前往主页查看更新", _UpdateHandler);
     _au->Play3dSound("Resources/Audio/start.mp3");
 
     return GL_TRUE;
@@ -344,7 +344,8 @@ void LAppDelegate::Run()
         << "\ngreen=" << (Green ? "true" : "false")
         << "\n[notify]\nlive=" << (LiveNotify ? "true" : "false")
         << "\nfollow=" << (FollowNotify ? "true" : "false")
-        << "\ndynamic=" << (DynamicNotify ? "true" : "false");
+        << "\ndynamic=" << (DynamicNotify ? "true" : "false")
+        << "\nupdate=" << (UpdateNotify ? "true" : "false");
 
     of.close();
     if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Setting Saved");
@@ -662,6 +663,7 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         SendMessage(GetDlgItem(hwnd, IDC_FOLLOWNOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->FollowNotify ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->DynamicNotify ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_SETCHECK, LAppDelegate::GetInstance()->Green ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_SETCHECK, LAppDelegate::GetInstance()->UpdateNotify ? BST_CHECKED : BST_UNCHECKED, 0);
     }
     return true;
 
@@ -699,6 +701,7 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 LAppDelegate::GetInstance()->FollowNotify = SendMessage(GetDlgItem(hwnd, IDC_FOLLOWNOTIFY), BM_GETCHECK, 0, 0);
                 LAppDelegate::GetInstance()->DynamicNotify = SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_GETCHECK, 0, 0);
                 LAppDelegate::GetInstance()->Green = SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_GETCHECK, 0, 0);
+                LAppDelegate::GetInstance()->UpdateNotify = SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_GETCHECK, 0, 0);
                 EndDialog(hwnd, 0);
 
                 break;
@@ -708,6 +711,11 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     bool checked = SendMessage(GetDlgItem(hwnd, IDC_MUTE), BM_GETCHECK, 0, 0);
             	    if (checked) SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE, false, 0);
                     else SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE, true, 0);
+                    break;
+                }
+            case IDC_CHECK:
+                {
+                    ShellExecute(NULL, "open", "https://pet.joi-club.cn", NULL, NULL, SW_SHOWNORMAL);
                     break;
                 }
     		}

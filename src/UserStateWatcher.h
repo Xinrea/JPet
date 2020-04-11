@@ -8,5 +8,6 @@ public:
 	bool isNewFollow = false;
 	bool isExit = false;
     void Watch();
+	static bool CheckUpdate();
 	std::thread WatchThread();
 };

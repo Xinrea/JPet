@@ -128,6 +128,7 @@ public:
     bool LiveNotify = true;
     bool FollowNotify = true;
     bool DynamicNotify = true;
+    bool UpdateNotify = true;
     bool Green = false;
     bool InMotion = false;
     /**
@@ -189,6 +190,7 @@ private:
     WinToastEventHandler *_LiveHandler;
     WinToastEventHandler* _DynamicHandler;
     WinToastEventHandler* _FollowHandler;
+    WinToastEventHandler* _UpdateHandler;
     LAppTextureManager *_textureManager; ///< テクスチャマネージャー
 
     // Config Part

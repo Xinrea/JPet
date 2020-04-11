@@ -16,7 +16,9 @@
 #define IDC_WEIBONOTIFY                 1010
 #define IDC_GREEN                       1010
 #define IDC_APPLY                       1011
-#define IDC_DYNAMICNOTIFY2              1012
+#define IDC_CHECK                       1012
+#define IDC_DYNAMICNOTIFY2              1013
+#define IDC_STARTCHECK                  1013
 
 // Next default values for new objects
 // 
@@ -24,7 +26,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        107
 #define _APS_NEXT_COMMAND_VALUE         40005
-#define _APS_NEXT_CONTROL_VALUE         1020
+#define _APS_NEXT_CONTROL_VALUE         1021
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

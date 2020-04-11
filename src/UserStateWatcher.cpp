@@ -9,6 +9,23 @@ using namespace LAppDefine;
 
 // https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/space_history?host_uid=61639371&need_top=0
 
+bool UserStateWatcher::CheckUpdate() {
+    httplib::SSLClient liveCli("pet.joi-club.cn", 443);
+    liveCli.set_ca_cert_path("Resources/ca.crt");
+    liveCli.enable_server_certificate_verification(true);
+    liveCli.set_timeout_sec(1);
+    auto res = liveCli.Get("/version.txt");
+    if (res && res->status == 200) {
+        if (DebugLogEnable) LAppPal::PrintLog((std::string("[UserStateWatcher]Check Update Latest: ") + res->body).c_str());
+        if (strcmp(VERSION, res->body.c_str()) < 0) return true;
+        else return false;
+    }
+    else {
+        if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]Check Update Failed");
+    }
+    return false;
+}
+
 
 void UserStateWatcher::Watch()
 {
@@ -33,13 +50,21 @@ void UserStateWatcher::Watch()
         auto res = liveCli.Get("/api/update");
         if (res && res->status == 200) {
             d.Parse(res->body.c_str());
-            rapidjson::Value& s = d["live"];
-            isLive = s.GetInt() == 1 ? true : false;
-            s = d["subscribe"];
-            if (lastFollow) {
-                isNewFollow = s.GetInt() > lastFollow ? true : false;
+            auto itr = d.FindMember("live");
+            if (itr != d.MemberEnd()) {
+                rapidjson::Value& s = itr->value;
+                isLive = s.GetInt() == 1 ? true : false;
             }
-            lastFollow = s.GetInt();
+            
+            itr = d.FindMember("subscribe");
+            if (itr != d.MemberEnd()) {
+                rapidjson::Value& s = itr->value;
+                s = d["subscribe"];
+                if (lastFollow) {
+                    isNewFollow = s.GetInt() > lastFollow ? true : false;
+                }
+                lastFollow = s.GetInt();
+            }
         }
         else {
             if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]/api/update Failed");
@@ -49,11 +74,14 @@ void UserStateWatcher::Watch()
         auto dres = dynamicCli.Get("/dynamic_svr/v1/dynamic_svr/space_history?host_uid=61639371&need_top=0");
         if (dres && dres->status == 200) {
             d.Parse(dres->body.c_str());
-            rapidjson::Value& s = d["data"]["cards"][0]["desc"]["timestamp"];
-            if (lastDynamic) {
-                isNewDynamic = s.GetInt64() > lastDynamic ? true : false;
+            if (d.HasMember("data"))
+            {
+                rapidjson::Value& s = d["data"]["cards"][0]["desc"]["timestamp"];
+                if (lastDynamic) {
+                    isNewDynamic = s.GetInt64() > lastDynamic ? true : false;
+                }
+                lastDynamic = s.GetInt64();
             }
-            lastDynamic = s.GetInt64();
         }
         else {
             if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]Require Dynamic Failed");

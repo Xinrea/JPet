@@ -34,6 +34,10 @@ public:
     {
         _Watcher->isNewFollow = false;
     }
+    bool CheckUpdate()
+    {
+        return UserStateWatcher::CheckUpdate();
+    }
 private:
     UserStateWatcher* _Watcher;
 };
