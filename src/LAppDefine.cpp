@@ -37,6 +37,8 @@ namespace LAppDefine {
     };
     const csmInt32 ModelDirSize = sizeof(ModelDir) / sizeof(const csmChar*);
 
+    const csmInt32 StartAuidoNum = 9;
+
     // 外部定義ファイル(json)と合わせる
     const csmChar* MotionGroupIdle = "Idle"; // アイドリング
     const csmChar* MotionGroupTapHead = "HeadMotion"; // 体をタップしたとき

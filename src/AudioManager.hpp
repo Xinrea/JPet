@@ -13,6 +13,7 @@ public:
     static AudioManager *GetInstance();
     static void ReleaseInstance();
     bool Initialize();
+    bool IsPlay();
     void Play3dSound(string soundname);
     void SetVolume(float v) { _volume = v; }
     float GetVolume() { return _volume; }

@@ -30,7 +30,6 @@ int main()
     {
         return 1;
     }
-
     LAppDelegate::GetInstance()->Run();
 
     return 0;

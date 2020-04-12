@@ -154,6 +154,11 @@ bool LAppDelegate::Initialize()
         return GL_FALSE;
     }
 
+    // 3d audio init
+    int x, y;
+    glfwGetWindowPos(_window, &x, &y);
+    _au->Update(x, y, RenderTargetWidth, RenderTargetHeight, _mWidth, _mHeight);
+
     // 通知初始化
     WinToast::instance()->setAppName(L"JPet");
     const auto aumi = WinToast::configureAUMI(L"Xinrea", L"JPet", L"Jpet", L"Beta");
@@ -214,9 +219,9 @@ bool LAppDelegate::Initialize()
 
     // Cubism SDK の初期化
     InitializeCubism();
-
+    srand(time(NULL));
     if(UpdateNotify &&_us->CheckUpdate())Notify(L"桌宠阿轴有新版本了", L"点击前往主页查看更新", _UpdateHandler);
-    _au->Play3dSound("Resources/Audio/start.mp3");
+    _au->Play3dSound("Resources/Audio/s0"+to_string(rand()%StartAuidoNum+1)+".mp3");
 
     return GL_TRUE;
 }
@@ -246,6 +251,11 @@ void LAppDelegate::Run()
     {
         int width, height;
         glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width, &height);
+
+        int x, y;
+        glfwGetWindowPos(_window, &x, &y);
+        _au->Update(x, y, width, height, _mWidth, _mHeight);
+
         if ((_windowWidth != width || _windowHeight != height) && width > 0 && height > 0)
         {
             //AppViewの初期化
@@ -287,6 +297,7 @@ void LAppDelegate::Run()
         if (lastLive == false && statenow == true)
         {
             if (LiveNotify)Notify(L"阿轴开播了",L"点击前往直播间",_LiveHandler);
+            _au->Play3dSound("Resources/Audio/n01.mp3");
         }
         lastLive = statenow;
 

@@ -30,15 +30,22 @@ bool AudioManager::Initialize() {
     return true;
 }
 
+bool AudioManager::IsPlay() {
+    if (_channel) {
+        bool isPlay;
+        return _channel->isPlaying(&isPlay);
+    }
+    return false;
+}
+
 void AudioManager::Play3dSound(string soundfile) {
-    //TODO Volume Control
     bool isPlay;
     if (DebugLogEnable) {
         LAppPal::PrintLog("[AudioManager]Play Sound: %s",soundfile.c_str());
     }
     if (_mute) return;
     FMOD::Sound* sound;
-    _system->createSound(soundfile.c_str(), FMOD_2D, 0, &sound);
+    _system->createSound(soundfile.c_str(), FMOD_3D_HEADRELATIVE, 0, &sound);
     if (_channel) {
         _channel->isPlaying(&isPlay);
         if (!isPlay) {
