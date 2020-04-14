@@ -3,6 +3,7 @@
 #include <iostream>
 #include <httplib.h>
 #include <rapidjson/document.h>
+#include <string>
 #include "LAppDefine.hpp"
 using namespace LAppDefine;
 
@@ -17,7 +18,12 @@ bool UserStateWatcher::CheckUpdate() {
     auto res = liveCli.Get("/version.txt");
     if (res && res->status == 200) {
         if (DebugLogEnable) LAppPal::PrintLog((std::string("[UserStateWatcher]Check Update Latest: ") + res->body).c_str());
-        if (strcmp(VERSION, res->body.c_str()) < 0) return true;
+        int now = atoi(VERSION);
+        int latest = atoi(res->body.c_str());
+        if (now < latest) {
+            LAppPal::PrintLog("[UserStateWatcher]Need Update: %s -> %s ",VERSION, res->body.c_str());
+            return true;
+        }
         else return false;
     }
     else {
