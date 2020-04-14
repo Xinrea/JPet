@@ -17,6 +17,8 @@
 #include <Id/CubismIdManager.hpp>
 #include <Motion/CubismMotionQueueEntry.hpp>
 #include <string>
+#include <random>
+#include <functional>
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
 #include "LAppTextureManager.hpp"
@@ -357,13 +359,15 @@ void LAppModel::Update()
     if (_motionManager->IsFinished())
     {
         // モーションの再生がない場合、待機モーションの中からランダムで再生する
-        srand(time(NULL));
-        int r = rand()%100;
-        if (r < 75) {
+        std::mt19937 generator;
+        std::uniform_int_distribution<int> distribution(1, 1000);
+        auto dice = std::bind(distribution, generator);
+        int r = dice();
+        if (r < 950) {
             StartMotion(MotionGroupIdle, 0, PriorityIdle, NULL, true);
-            if (rand()%100 < 3)AudioManager::GetInstance()->Play3dSound("Resources/Audio/i0"+std::to_string(rand()%7+2)+".mp3");
+            if (dice() < 15)AudioManager::GetInstance()->Play3dSound("Resources/Audio/i0"+std::to_string(dice()%IdleAudioNum+2)+".mp3");
         }
-        else if (r < 98)StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
+        else if (r < 990)StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
         else StartMotion(MotionGroupIdle, 2, PriorityIdle, NULL, true);
     }
     else

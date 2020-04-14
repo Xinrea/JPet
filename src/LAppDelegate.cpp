@@ -221,7 +221,7 @@ bool LAppDelegate::Initialize()
     InitializeCubism();
     srand(time(NULL));
     if(UpdateNotify &&_us->CheckUpdate())Notify(L"桌宠阿轴有新版本了", L"点击前往主页查看更新", _UpdateHandler);
-    _au->Play3dSound("Resources/Audio/s0"+to_string(rand()%StartAuidoNum+1)+".mp3");
+    _au->Play3dSound("Resources/Audio/s0"+to_string(rand()%StartAudioNum+1)+".mp3");
 
     return GL_TRUE;
 }
