@@ -10,6 +10,7 @@
 #include <CubismFramework.hpp>
 #include <Math/CubismMatrix44.hpp>
 #include <Type/csmVector.hpp>
+#include <string>
 
 class LAppModel;
 
@@ -86,6 +87,10 @@ public:
     */
     void ChangeScene(Csm::csmInt32 index);
 
+    void PlayTouchAudio(std::string filename);
+
+    void PlayRandomTouchAudio();
+
     /**
      * @brief   モデル個数を得る
      * @return  所持モデル個数
@@ -107,8 +112,8 @@ private:
     Csm::csmVector<LAppModel*>  _models; ///< モデルインスタンスのコンテナ
     Csm::csmInt32               _sceneIndex; ///< 表示するシーンのインデックス値
     bool _isNew;
-    int _mouthCount = 0;
-    int _hatCount = 0;
+    int _mouthCount = 1;
+    int _hatCount = 2;
     int _earLCount = 0;
     int _sleeveCount = 0;
     int _socksCount = 0;

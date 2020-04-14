@@ -25,6 +25,7 @@ public:
 private:
     FMOD::System *_system;
     FMOD::Channel *_channel;
+    map<string, FMOD::Sound*> sounds;
     float _volume = 5.0f;
     bool _mute = false;
 };

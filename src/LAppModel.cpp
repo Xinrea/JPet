@@ -359,16 +359,24 @@ void LAppModel::Update()
     if (_motionManager->IsFinished())
     {
         // モーションの再生がない場合、待機モーションの中からランダムで再生する
-        std::mt19937 generator;
+        std::random_device rd;
+        std::mt19937 generator(rd());
         std::uniform_int_distribution<int> distribution(1, 1000);
         auto dice = std::bind(distribution, generator);
-        int r = dice();
-        if (r < 950) {
-            StartMotion(MotionGroupIdle, 0, PriorityIdle, NULL, true);
-            if (dice() < 15)AudioManager::GetInstance()->Play3dSound("Resources/Audio/i0"+std::to_string(dice()%IdleAudioNum+2)+".mp3");
+        
+        if (LAppDelegate::GetInstance()->IsIdle) { // 闲置状态
+            int r = dice();
+            if (r < 950) {
+                StartMotion(MotionGroupIdle, 0, PriorityIdle, NULL, true);
+                if (dice() < 15)AudioManager::GetInstance()->Play3dSound("Resources/Audio/i0" + std::to_string(dice() % IdleAudioNum + 2) + ".mp3");
+            }
+            else if (r < 990)StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
+            else StartMotion(MotionGroupIdle, 2, PriorityIdle, NULL, true);
         }
-        else if (r < 990)StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
-        else StartMotion(MotionGroupIdle, 2, PriorityIdle, NULL, true);
+        else { // 非闲置状态, 不播放声音和闲置动作3
+            if (dice() < 900) StartMotion(MotionGroupIdle, 0, PriorityIdle, NULL, true);
+            else StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
+        }
     }
     else
     {

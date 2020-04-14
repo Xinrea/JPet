@@ -161,7 +161,7 @@ bool LAppDelegate::Initialize()
 
     // 通知初始化
     WinToast::instance()->setAppName(L"JPet");
-    const auto aumi = WinToast::configureAUMI(L"Xinrea", L"JPet", L"Jpet", L"Beta");
+    const auto aumi = WinToast::configureAUMI(L"Xinrea", L"JPet", L"Jpet", L"200415");
     WinToast::instance()->setAppUserModelId(aumi);
     WinToast::instance()->initialize();
     _LiveHandler = new WinToastEventHandler("https://live.bilibili.com/21484828");
@@ -272,6 +272,17 @@ void LAppDelegate::Run()
 
         // 時間更新
         LAppPal::UpdateTime();
+
+        // 闲置状态更新
+        if (IsCount) 
+        {
+            IdleCount++;
+        }
+        if (IdleCount > 180) // 3s under 60fps
+        {
+            SetIdle();
+            if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate] Idle On");
+        }
 
     	//鼠标捕捉
         static double cx, cy;
@@ -431,6 +442,7 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action, i
     }
     if (GLFW_MOUSE_BUTTON_LEFT == button)
     {
+        SetNotIdle();
         if (GLFW_PRESS == action)
         {
             _captured = true;
@@ -448,6 +460,7 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action, i
     }
     if (GLFW_MOUSE_BUTTON_RIGHT == button)
     {
+        SetNotIdle();
         if (GLFW_PRESS == action)
         {
             _holdTime = glfwGetTime();

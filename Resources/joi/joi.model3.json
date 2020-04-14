@@ -261,6 +261,10 @@
 		{
 			"Id": "HitArea12",
 			"Name": "AreaChange"
+		},
+		{
+			"Id": "HitArea13",
+			"Name": "AreaTail"
 		}
 	]
 }

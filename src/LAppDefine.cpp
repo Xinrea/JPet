@@ -39,6 +39,7 @@ namespace LAppDefine {
 
     const csmInt32 StartAudioNum = 9;
     const csmInt32 IdleAudioNum = 7;
+    const csmInt32 TouchAudioNum = 5;
 
     // 外部定義ファイル(json)と合わせる
     const csmChar* MotionGroupIdle = "Idle"; // アイドリング
@@ -72,6 +73,7 @@ namespace LAppDefine {
     const int LegBeltChangeList[2] = { 6,7 };
     const csmChar* HitAreaNameChange = "AreaChange";
     const csmChar* HitAreaNameEyes = "AreaEyes";
+    const csmChar* HitAreaNameTail = "AreaTail";
 
     // モーションの優先度定数
     const csmInt32 PriorityNone = 0;

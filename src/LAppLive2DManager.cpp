@@ -10,6 +10,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <Rendering/CubismRenderer.hpp>
+#include <random>
+#include <functional>
 #include "LAppPal.hpp"
 #include "LAppDefine.hpp"
 #include "LAppDelegate.hpp"
@@ -103,6 +105,27 @@ void LAppLive2DManager::OnFollow() {
     _models[0]->StartRandomMotion(MotionGroupSpecial, PriorityForce, FinishedMotion);
 }
 
+void LAppLive2DManager::PlayTouchAudio(string filename) {
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_int_distribution<int> d1(1, 100);
+    if (d1(generator) > 70) {
+        // 播放特定语音
+        AudioManager::GetInstance()->Play3dSound("Resources/Audio/" + filename);
+    }
+    else {
+        // 播放一般语音
+        PlayRandomTouchAudio();
+    }
+}
+
+void LAppLive2DManager::PlayRandomTouchAudio() {
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_int_distribution<int> d(1, TouchAudioNum);
+    AudioManager::GetInstance()->Play3dSound("Resources/Audio/r0" + to_string(d(generator)) + ".mp3");
+}
+
 void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
 {
     //TODO: 添加动作表情和声音
@@ -131,11 +154,19 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             if (_editMode)
             {
                 hr = _models[i]->StartMotion(MotionGroupPartChange, HatChangeList[_hatCount % 3], PriorityNormal, FinishedMotion);
-                if (hr != InvalidMotionQueueEntryHandleValue) _hatCount++;
+                if (hr != InvalidMotionQueueEntryHandleValue) {
+                    _hatCount++;
+                }
             }
             else
             {
                 //TouchMotion
+                if (_hatCount % 3 == 0) { // 是耳朵状态
+                    PlayTouchAudio("t06.mp3");
+                }
+                else { // 帽子或空的状态
+                    PlayRandomTouchAudio();
+                }
             }
         }
         else if (_isNew && _models[i]->HitTest(HitAreaNameEarL, x, y))
@@ -151,7 +182,10 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             else
             {
-                _models[i]->StartRandomMotion(MotionGroupTapEar, PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartRandomMotion(MotionGroupTapEar, PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) {
+                    PlayTouchAudio("t06.mp3");
+                }
             }
 
         }
@@ -161,8 +195,12 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             {
                 LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameWanzi);
             }
+            
             hr = _models[i]->StartMotion(MotionGroupPartChange, EditChangeList[_editMode], PriorityNormal, FinishedMotion);
-            if (hr != InvalidMotionQueueEntryHandleValue) _editMode = !_editMode;
+            if (hr != InvalidMotionQueueEntryHandleValue) {
+                AudioManager::GetInstance()->Play3dSound(string("Resources/Audio/") + (_editMode ? "d02.mp3" : "d01.mp3"));
+                _editMode = !_editMode;
+            }
 
         }
         else if (_models[i]->HitTest(HitAreaNameMouth, x, y))
@@ -206,6 +244,9 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             else
             {
                 hr = _models[i]->StartRandomMotion(MotionGroupTapHead, PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) {
+                    PlayTouchAudio("t01.mp3");
+                }
             }
             
         }
@@ -222,7 +263,10 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             else
             {
-                _models[i]->StartRandomMotion(MotionGroupTapArm, PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartRandomMotion(MotionGroupTapArm, PriorityNormal, FinishedMotion);
+                if (hr != InvalidMotionQueueEntryHandleValue) {
+                    PlayTouchAudio("t03.mp3");
+                }
             }
         }
         else if (_models[i]->HitTest(HitAreaNameBody, x, y))
@@ -235,6 +279,9 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             {
                 hr = _models[i]->StartMotion(MotionGroupPartChange, GunChangeList[_gunCount % 2], PriorityNormal, FinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _gunCount++;
+            }
+            else {
+                PlayTouchAudio("t02.mp3");
             }
         }
         else if (_isNew && _models[i]->HitTest(HitAreaNameLegBelt, x, y))
@@ -249,7 +296,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
                 if (hr != InvalidMotionQueueEntryHandleValue) _legBeltCount++;
             }
         }
-        else if (!_isNew && _models[i]->HitTest(HitAreaNameLegs, x, y))
+        else if (!_isNew && _models[i]->HitTest(HitAreaNameLegs, x, y)) // 旧衣服的腿
         {
             if (DebugLogEnable)
             {
@@ -260,6 +307,34 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
                 hr = _models[i]->StartMotion(MotionGroupPartChange, SocksChangeList[_socksCount % 2], PriorityNormal, FinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _socksCount++;
             }
+            else {
+                PlayTouchAudio("t04.mp3");
+            }
+        }
+        else if (_isNew && _models[i]->HitTest(HitAreaNameLegs, x, y)) // 新衣服的腿
+        {
+        if (DebugLogEnable)
+        {
+            LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameLegs);
+        }
+        if (_editMode)
+        {
+
+        }
+        else {
+            PlayTouchAudio("t04.mp3");
+        }
+        }
+        else if (_models[i]->HitTest(HitAreaNameTail, x, y))
+        {
+            if (_editMode) 
+            {
+            
+            }
+            else {
+                PlayTouchAudio("t05.mp3");
+            }
+
         }
     	// TODO 其它动作
     }

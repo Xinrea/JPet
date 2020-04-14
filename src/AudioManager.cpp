@@ -45,7 +45,16 @@ void AudioManager::Play3dSound(string soundfile) {
     }
     if (_mute) return;
     FMOD::Sound* sound;
-    _system->createSound(soundfile.c_str(), FMOD_3D_HEADRELATIVE, 0, &sound);
+    auto iter = sounds.find(soundfile);
+    if (iter == sounds.end())
+    {
+        _system->createSound(soundfile.c_str(), FMOD_3D_HEADRELATIVE, 0, &sound);
+    }
+    else
+    {
+        sound = iter->second;
+    }
+    
     if (_channel) {
         _channel->isPlaying(&isPlay);
         if (!isPlay) {
@@ -60,8 +69,6 @@ void AudioManager::Play3dSound(string soundfile) {
         _channel->setVolume(_volume);
         _channel->setPaused(false);
     }
-    
-    
 }
 
 void AudioManager::Update(int x, int y, int w, int h, int mw, int mh) {

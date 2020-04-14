@@ -131,9 +131,26 @@ public:
     bool UpdateNotify = true;
     bool Green = false;
     bool InMotion = false;
+
+    bool IsIdle = true;
+    bool IsCount = false;
+    int IdleCount = 0;
     /**
     * @brief   アプリケーションを終了する。
     */
+
+    void SetNotIdle() {
+        IsIdle = false;
+        IdleCount = 0;
+        IsCount = true;
+    }
+
+    void SetIdle() {
+        IsIdle = true;
+        IdleCount = 0;
+        IsCount = false;
+    }
+
     void AppEnd() { _isEnd = true; }
 
     void Notify(const WCHAR* title, const WCHAR* content, WinToastEventHandler* handler);

@@ -14,7 +14,7 @@
 *
 */
 
-#define VERSION "200412"
+#define VERSION "200415"
 
 namespace LAppDefine
 {
@@ -43,6 +43,7 @@ extern const csmInt32 ModelDirSize; ///< モデルディレクトリ配列のサ
 
 extern const csmInt32 StartAudioNum;
 extern const csmInt32 IdleAudioNum;
+extern const csmInt32 TouchAudioNum;
 
 // 外部定義ファイル(json)と合わせる
 extern const csmChar *MotionGroupIdle;    ///< アイドリング時に再生するモーションのリスト
@@ -75,6 +76,7 @@ extern const csmChar* HitAreaNameLegBelt;
 extern const int LegBeltChangeList[2];
 extern const csmChar* HitAreaNameChange;
 extern const csmChar* HitAreaNameEyes;
+extern const csmChar* HitAreaNameTail;
 
 // モーションの優先度定数
 extern const csmInt32 PriorityNone;   ///< モーションの優先度定数: 0
