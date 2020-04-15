@@ -278,7 +278,7 @@ void LAppDelegate::Run()
         {
             IdleCount++;
         }
-        if (IdleCount > 180) // 3s under 60fps
+        if (IdleCount > 60*6) // 10s under 60fps
         {
             SetIdle();
             if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate] Idle On");
