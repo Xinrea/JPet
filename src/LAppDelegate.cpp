@@ -345,7 +345,7 @@ void LAppDelegate::Run()
             settingThread.detach();
         }
         if (!_isSetting) isShowing = false;
-        else if (scale != _scale)
+        if (scale != _scale)
         {
             scale = _scale;
             RenderTargetHeight = _scale * DRenderTargetHeight;
