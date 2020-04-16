@@ -118,6 +118,8 @@ public:
     float GetTimeSetting() { return _timeSetting; }
     void SetTimeSetting(float t) { _timeSetting = t; }
 
+    void SetGreen(bool green);
+
     std::string GetLURL() { return _leftUrl; }
     std::string GetUURL() { return _upUrl; }
     std::string GetRURL() { return _rightUrl; }

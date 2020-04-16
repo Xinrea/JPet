@@ -140,7 +140,9 @@ bool LAppDelegate::Initialize()
     glfwSetCursor(_window, cursor);
     glfwSetWindowPos(_window, _iposX, _iposY);
     HWND hwnd = glfwGetWin32Window(_window);
-    SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_ACCEPTFILES);
+    if(Green) SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_ACCEPTFILES);
+    else SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_ACCEPTFILES);
+    
     // 透明部分鼠标穿透
     SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
     if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]SetLayeredWindow COLORKEY");
@@ -215,6 +217,9 @@ bool LAppDelegate::Initialize()
     strcpy(nid.szTip, TEXT("JPet - 桌面宠物轴伊"));
     Shell_NotifyIcon(NIM_ADD, &nid);
 
+    // 设置窗口图标（绿幕模式下会显示在任务栏）
+    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1)));
+
     //AppViewの初期化
     _view->Initialize();
 
@@ -234,6 +239,13 @@ bool LAppDelegate::Initialize()
     _au->Play3dSound("Resources/Audio/s0"+to_string(rand()%StartAudioNum+1)+".mp3");
 
     return GL_TRUE;
+}
+
+void LAppDelegate::SetGreen(bool green) {
+    Green = green;
+    HWND hwnd = glfwGetWin32Window(_window);
+    if (Green) SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_ACCEPTFILES);
+    else SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_ACCEPTFILES);
 }
 
 void LAppDelegate::Release()
@@ -741,8 +753,9 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 LAppDelegate::GetInstance()->LiveNotify = SendMessage(GetDlgItem(hwnd, IDC_LIVENOTIFY), BM_GETCHECK, 0, 0);
                 LAppDelegate::GetInstance()->FollowNotify = SendMessage(GetDlgItem(hwnd, IDC_FOLLOWNOTIFY), BM_GETCHECK, 0, 0);
                 LAppDelegate::GetInstance()->DynamicNotify = SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_GETCHECK, 0, 0);
-                LAppDelegate::GetInstance()->Green = SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_GETCHECK, 0, 0);
+                LAppDelegate::GetInstance()->SetGreen(SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_GETCHECK, 0, 0));
                 LAppDelegate::GetInstance()->UpdateNotify = SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_GETCHECK, 0, 0);
+
                 EndDialog(hwnd, 0);
 
                 break;
