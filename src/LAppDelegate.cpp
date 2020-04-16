@@ -26,6 +26,7 @@
 #include "LAppLive2DManager.hpp"
 #include "LAppTextureManager.hpp"
 #include "TouchManager.hpp"
+#include "PartStateManager.h"
 #include "ini.h"
 
 #define WM_IAWENTRAY  WM_USER+5  
@@ -161,7 +162,7 @@ bool LAppDelegate::Initialize()
 
     // 通知初始化
     WinToast::instance()->setAppName(L"JPet");
-    const auto aumi = WinToast::configureAUMI(L"Xinrea", L"JPet", L"Jpet", L"200415");
+    const auto aumi = WinToast::configureAUMI(L"Xinrea", L"JPet", L"Jpet", VERSION);
     WinToast::instance()->setAppUserModelId(aumi);
     WinToast::instance()->initialize();
     _LiveHandler = new WinToastEventHandler("https://live.bilibili.com/21484828");
@@ -219,6 +220,15 @@ bool LAppDelegate::Initialize()
 
     // Cubism SDK の初期化
     InitializeCubism();
+
+    // 初始化模型参数
+    map<string, float> initState;
+    for (int i = 0; i < PartStateManager::GetInstance()->ParamNum; i++) {
+        initState[PartStateManager::GetInstance()->ParamList[i]] = reader.GetFloat("parts", PartStateManager::GetInstance()->ParamList[i], PartStateManager::GetInstance()->ParamDefault[i]);
+    }
+    PartStateManager::GetInstance()->ImportState(initState);
+    PartStateManager::GetInstance()->SetState();
+
     srand(time(NULL));
     if(UpdateNotify &&_us->CheckUpdate())Notify(L"桌宠阿轴有新版本了", L"点击前往主页查看更新", _UpdateHandler);
     _au->Play3dSound("Resources/Audio/s0"+to_string(rand()%StartAudioNum+1)+".mp3");
@@ -356,19 +366,26 @@ void LAppDelegate::Run()
     // Release前保存配置
     int x, y;
     glfwGetWindowPos(_window, &x, &y);
+    PartStateManager::GetInstance()->SaveState();
+    auto modelState = PartStateManager::GetInstance()->GetAllState();
     ofstream of;
     of.open(documentPath+"\\JPetConfig.ini", ios::trunc);
     of << "[position]\n"
         << "x=" << x << "\ny=" << y << "\n[shortcut]\n"
         << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl << "\n[audio]\n"
-        << "volume=" << _volume << "\nmute=" << (_mute?"true":"false")
+        << "volume=" << _volume << "\nmute=" << (_mute ? "true" : "false")
         << "\n[display]\nscale=" << _scale
         << "\ngreen=" << (Green ? "true" : "false")
         << "\n[notify]\nlive=" << (LiveNotify ? "true" : "false")
         << "\nfollow=" << (FollowNotify ? "true" : "false")
         << "\ndynamic=" << (DynamicNotify ? "true" : "false")
-        << "\nupdate=" << (UpdateNotify ? "true" : "false");
-
+        << "\nupdate=" << (UpdateNotify ? "true" : "false")
+        << "\n[parts]";
+    // 保存模型状态
+    for (auto i : modelState)
+    {
+        of << "\n" + i.first + "=" << (i.second > 0.5)?1:0;
+    }
     of.close();
     if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Setting Saved");
     Shell_NotifyIcon(NIM_DELETE, &nid);

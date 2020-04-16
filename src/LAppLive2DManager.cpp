@@ -17,6 +17,7 @@
 #include "LAppDelegate.hpp"
 #include "LAppModel.hpp"
 #include "LAppView.hpp"
+#include "PartStateManager.h"
 
 
 using namespace Csm;
@@ -30,6 +31,12 @@ namespace {
     {
         LAppDelegate::GetInstance()->InMotion = false;
         LAppPal::PrintLog("Motion Finished: %x", self);
+    }
+    void PartFinishedMotion(ACubismMotion* self)
+    {
+        LAppDelegate::GetInstance()->InMotion = false;
+        LAppPal::PrintLog("Part Change Finished: %x", self);
+        PartStateManager::GetInstance()->SaveState();
     }
 }
 
@@ -142,7 +149,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             {
                 LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameChange);
             }
-            hr = _models[i]->StartMotion(MotionGroupClothChange, _isNew ? 0 : 1, PriorityForce, FinishedMotion);
+            hr = _models[i]->StartMotion(MotionGroupClothChange, _isNew ? 0 : 1, PriorityForce, PartFinishedMotion);
             if (hr != InvalidMotionQueueEntryHandleValue) _isNew = !_isNew;
         }
         else if (_isNew && _models[i]->HitTest(HitAreaNameHat, x, y))
@@ -153,7 +160,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             if (_editMode)
             {
-                hr = _models[i]->StartMotion(MotionGroupPartChange, HatChangeList[_hatCount % 3], PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartMotion(MotionGroupPartChange, HatChangeList[_hatCount % 3], PriorityNormal, PartFinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) {
                     _hatCount++;
                 }
@@ -177,7 +184,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             if (_editMode)
             {
-                hr = _models[i]->StartMotion(MotionGroupPartChange, EarLChangeList[_earLCount % 2], PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartMotion(MotionGroupPartChange, EarLChangeList[_earLCount % 2], PriorityNormal, PartFinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _earLCount++;
             }
             else
@@ -211,7 +218,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             if (_editMode)
             {
-                hr = _models[i]->StartMotion(MotionGroupMouthChange, _mouthCount % 6, PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartMotion(MotionGroupMouthChange, _mouthCount % 6, PriorityNormal, PartFinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _mouthCount++;
             }
 
@@ -224,7 +231,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             if (_editMode)
             {
-                hr = _models[i]->StartMotion(MotionGroupEyeChange, _eyeCount % 4, PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartMotion(MotionGroupEyeChange, _eyeCount % 4, PriorityNormal, PartFinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _eyeCount++;
             }
             else
@@ -258,7 +265,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             if (_editMode)
             {
-                hr = _models[i]->StartMotion(MotionGroupPartChange, SleeveChangeList[_sleeveCount % 2], PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartMotion(MotionGroupPartChange, SleeveChangeList[_sleeveCount % 2], PriorityNormal, PartFinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _sleeveCount++;
             }
             else
@@ -277,7 +284,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             if (_editMode)
             {
-                hr = _models[i]->StartMotion(MotionGroupPartChange, GunChangeList[_gunCount % 2], PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartMotion(MotionGroupPartChange, GunChangeList[_gunCount % 2], PriorityNormal, PartFinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _gunCount++;
             }
             else {
@@ -292,7 +299,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             if (_editMode)
             {
-                hr = _models[i]->StartMotion(MotionGroupPartChange, LegBeltChangeList[_legBeltCount % 2], PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartMotion(MotionGroupPartChange, LegBeltChangeList[_legBeltCount % 2], PriorityNormal, PartFinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _legBeltCount++;
             }
         }
@@ -304,7 +311,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             if (_editMode)
             {
-                hr = _models[i]->StartMotion(MotionGroupPartChange, SocksChangeList[_socksCount % 2], PriorityNormal, FinishedMotion);
+                hr = _models[i]->StartMotion(MotionGroupPartChange, SocksChangeList[_socksCount % 2], PriorityNormal, PartFinishedMotion);
                 if (hr != InvalidMotionQueueEntryHandleValue) _socksCount++;
             }
             else {

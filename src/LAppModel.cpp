@@ -24,6 +24,7 @@
 #include "LAppTextureManager.hpp"
 #include "LAppDelegate.hpp"
 #include "AudioManager.hpp"
+#include "PartStateManager.h"
 
 using namespace Live2D::Cubism::Framework;
 using namespace Live2D::Cubism::Framework::DefaultParameterId;
@@ -46,6 +47,13 @@ namespace {
             LAppPal::PrintLog("[APP]delete buffer: %s", path);
         }
         LAppPal::ReleaseBytes(buffer);
+    }
+
+    void FinishedMotion(ACubismMotion* self)
+    {
+        LAppDelegate::GetInstance()->InMotion = false;
+        LAppPal::PrintLog("[App]Recover Part Setting");
+        PartStateManager::GetInstance()->SetState();
     }
 }
 
@@ -252,6 +260,7 @@ void LAppModel::SetupModel(ICubismModelSetting* setting)
 
     _updating = false;
     _initialized = true;
+    PartStateManager::GetInstance()->SetModel(_model);
 }
 
 void LAppModel::PreloadMotionGroup(const csmChar* group)
@@ -344,6 +353,7 @@ void LAppModel::ReleaseExpressions()
 
 void LAppModel::Update()
 {
+    static bool firstUpdate = true;
     const csmFloat32 deltaTimeSeconds = LAppPal::GetDeltaTime();
     _userTimeSeconds += deltaTimeSeconds;
 
@@ -356,6 +366,10 @@ void LAppModel::Update()
 
     //-----------------------------------------------------------------
     _model->LoadParameters(); // 前回セーブされた状態をロード
+    if (firstUpdate) {
+        PartStateManager::GetInstance()->SetState();
+        firstUpdate = false;
+    }
     if (_motionManager->IsFinished())
     {
         // モーションの再生がない場合、待機モーションの中からランダムで再生する
@@ -371,7 +385,10 @@ void LAppModel::Update()
                 if (dice() < 15)AudioManager::GetInstance()->Play3dSound("Resources/Audio/i0" + std::to_string(dice() % IdleAudioNum + 2) + ".mp3");
             }
             else if (r < 990)StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
-            else StartMotion(MotionGroupIdle, 2, PriorityIdle, NULL, true);
+            else {
+                PartStateManager::GetInstance()->SaveState();
+                StartMotion(MotionGroupIdle, 2, PriorityIdle, FinishedMotion, true);
+            }
         }
         else { // 非闲置状态, 不播放声音和闲置动作3
             if (dice() < 900) StartMotion(MotionGroupIdle, 0, PriorityIdle, NULL, true);

@@ -31,6 +31,8 @@ target_sources(${APP_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/UserStateWatcher.h
     ${CMAKE_CURRENT_SOURCE_DIR}/UserStateWatcher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UserStateWatcher.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PartStateManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/PartStateManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/resource.h
     ${CMAKE_CURRENT_SOURCE_DIR}/JPet.rc
     ${TOAST_PATH}/src/wintoastlib.h

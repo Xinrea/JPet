@@ -18,7 +18,7 @@ bool UserStateWatcher::CheckUpdate() {
     auto res = liveCli.Get("/version.txt");
     if (res && res->status == 200) {
         if (DebugLogEnable) LAppPal::PrintLog((std::string("[UserStateWatcher]Check Update Latest: ") + res->body).c_str());
-        int now = atoi(VERSION);
+        int now = _wtoi(VERSION);
         int latest = atoi(res->body.c_str());
         if (now < latest) {
             LAppPal::PrintLog("[UserStateWatcher]Need Update: %s -> %s ",VERSION, res->body.c_str());
