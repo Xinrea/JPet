@@ -96,14 +96,14 @@ bool LAppDelegate::Initialize()
     else LAppPal::PrintLog("[LAppDelegate]INI Reader: %d", reader.ParseError());
     RenderTargetWidth = _scale*DRenderTargetWidth;
     RenderTargetHeight = _scale*DRenderTargetHeight;
-    // 音頻初始化
+    // 音频初始化
     _au = AudioManager::GetInstance();
     _au->Initialize();
     _au->SetMute(_mute);
     _au->SetVolume(static_cast<float>(_volume) / 10);
     if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]AudioManager Init");
 
-    // 狀態監視初始化
+    // 用户状态管理初始化
     _us = new UserStateManager();
     _us->Init();
 
@@ -122,7 +122,7 @@ bool LAppDelegate::Initialize()
     _mHeight = mode->height;
     _mWidth = mode->width;
 
-    // 路径
+    // 获取当前路径，发送通知时图片地址需要为绝对路径
     char curPath[256];
     GetModuleFileName(GetModuleHandle(NULL), curPath, sizeof(curPath));
     std::string path = curPath;
@@ -143,7 +143,7 @@ bool LAppDelegate::Initialize()
     if(Green) SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_ACCEPTFILES);
     else SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_ACCEPTFILES);
     
-    // 透明部分鼠标穿透
+    // 设置透明部分鼠标穿透
     SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
     if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]SetLayeredWindow COLORKEY");
 
@@ -157,7 +157,7 @@ bool LAppDelegate::Initialize()
         return GL_FALSE;
     }
 
-    // 3d audio init
+    // 音频设定3d位置
     int x, y;
     glfwGetWindowPos(_window, &x, &y);
     _au->Update(x, y, RenderTargetWidth, RenderTargetHeight, _mWidth, _mHeight);
@@ -207,23 +207,25 @@ bool LAppDelegate::Initialize()
     glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width, &height);
     _windowWidth = width;
     _windowHeight = height;
-    // 托盘初始化
+
+    // 托盘图标初始化
+    appIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));
     nid.cbSize = sizeof(NOTIFYICONDATA);     
     nid.hWnd = hwnd;                          
     nid.uID = IDI_ICON1;                      
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP; 
     nid.uCallbackMessage = WM_IAWENTRAY;    
-    nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));  
+    nid.hIcon = appIcon;
     strcpy(nid.szTip, TEXT("JPet - 桌面宠物轴伊"));
     Shell_NotifyIcon(NIM_ADD, &nid);
 
     // 设置窗口图标（绿幕模式下会显示在任务栏）
-    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1)));
+    SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)appIcon);
 
-    //AppViewの初期化
+    // AppView 初始化
     _view->Initialize();
 
-    // Cubism SDK の初期化
+    // Cubism SDK 初始化
     InitializeCubism();
 
     // 初始化模型参数
@@ -234,8 +236,11 @@ bool LAppDelegate::Initialize()
     PartStateManager::GetInstance()->ImportState(initState);
     PartStateManager::GetInstance()->SetState();
 
+    // 检查版本状况
     srand(time(NULL));
     if(UpdateNotify &&_us->CheckUpdate())Notify(L"桌宠阿轴有新版本了", L"点击前往主页查看更新", _UpdateHandler);
+
+    // 随机播放启动语音
     _au->Play3dSound("Resources/Audio/s0"+to_string(rand()%StartAudioNum+1)+".mp3");
 
     return GL_TRUE;
@@ -244,7 +249,10 @@ bool LAppDelegate::Initialize()
 void LAppDelegate::SetGreen(bool green) {
     Green = green;
     HWND hwnd = glfwGetWin32Window(_window);
-    if (Green) SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_ACCEPTFILES);
+    if (Green) {
+        SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_ACCEPTFILES);
+        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)appIcon);
+    }
     else SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_ACCEPTFILES);
 }
 

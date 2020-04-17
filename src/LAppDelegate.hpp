@@ -74,10 +74,12 @@ public:
     */
     void OnMouseCallBack(GLFWwindow *window, double x, double y);
 
+    // 文件拖放的CallBack，用于获取拖放文件的路径和名称
     void OnDropCallBack(GLFWwindow *window, int path_count, const WCHAR*paths[]);
 
     void OnWindowPosCallBack(GLFWwindow *window, int x, int y);
 
+    // 修改glfw添加的新CallBack，用于响应托盘事件
     void OnTrayClickCallBack(GLFWwindow* window, int b, unsigned w);
 
     /**
@@ -118,6 +120,8 @@ public:
     float GetTimeSetting() { return _timeSetting; }
     void SetTimeSetting(float t) { _timeSetting = t; }
 
+
+    // 设置绿幕状态，涉及窗口显示模式的切换
     void SetGreen(bool green);
 
     std::string GetLURL() { return _leftUrl; }
@@ -137,9 +141,6 @@ public:
     bool IsIdle = true;
     bool IsCount = false;
     int IdleCount = 0;
-    /**
-    * @brief   アプリケーションを終了する。
-    */
 
     void SetNotIdle() {
         IsIdle = false;
@@ -153,6 +154,9 @@ public:
         IsCount = false;
     }
 
+    /**
+    * @brief   アプリケーションを終了する。
+    */
     void AppEnd() { _isEnd = true; }
 
     void Notify(const WCHAR* title, const WCHAR* content, WinToastEventHandler* handler);
@@ -224,6 +228,8 @@ private:
 
     int _windowWidth;  ///< Initialize関数で設定したウィンドウ幅
     int _windowHeight; ///< Initialize関数で設定したウィンドウ高さ
+
+    HICON appIcon;
 };
 
 class EventHandler
