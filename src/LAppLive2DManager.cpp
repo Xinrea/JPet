@@ -257,16 +257,27 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
             }
             
         }
-        else if (_isNew && _models[i]->HitTest(HitAreaNameArmL, x, y) || _models[i]->HitTest(HitAreaNameArmR, x, y))
+        else if (_models[i]->HitTest(HitAreaNameArmL, x, y) || _models[i]->HitTest(HitAreaNameArmR, x, y))
         {
             if (DebugLogEnable)
             {
                 LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameArmL);
             }
-            if (_editMode)
+
+            if (_isNew)
             {
-                hr = _models[i]->StartMotion(MotionGroupPartChange, SleeveChangeList[_sleeveCount % 2], PriorityNormal, PartFinishedMotion);
-                if (hr != InvalidMotionQueueEntryHandleValue) _sleeveCount++;
+                if (_editMode)
+                {
+                    hr = _models[i]->StartMotion(MotionGroupPartChange, SleeveChangeList[_sleeveCount % 2], PriorityNormal, PartFinishedMotion);
+                    if (hr != InvalidMotionQueueEntryHandleValue) _sleeveCount++;
+                }
+                else
+                {
+                    hr = _models[i]->StartRandomMotion(MotionGroupTapArm, PriorityNormal, FinishedMotion);
+                    if (hr != InvalidMotionQueueEntryHandleValue) {
+                        PlayTouchAudio("t03.mp3");
+                    }
+                }
             }
             else
             {
