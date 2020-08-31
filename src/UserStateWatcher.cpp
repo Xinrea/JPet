@@ -46,6 +46,13 @@ void UserStateWatcher::Watch()
     dynamicCli.enable_server_certificate_verification(true);
     dynamicCli.set_timeout_sec(1);
 
+    httplib::SSLClient subCli("api.bilibili.com", 443);
+    subCli.set_ca_cert_path("Resources/ca.crt");
+    subCli.enable_server_certificate_verification(true);
+    subCli.set_timeout_sec(1);
+
+
+
     static int lastDynamic = 0;
     static INT64 lastFollow = 0;
 
@@ -54,6 +61,7 @@ void UserStateWatcher::Watch()
         // 检查直播间状态和关注数
         rapidjson::Document d;
         auto res = liveCli.Get("/api/update");
+        auto sres = subCli.Get("/x/relation/stat?vmid=61639371");
         if (res && res->status == 200) {
             d.Parse(res->body.c_str());
             auto itr = d.FindMember("live");
@@ -61,11 +69,15 @@ void UserStateWatcher::Watch()
                 rapidjson::Value& s = itr->value;
                 isLive = s.GetInt() == 1 ? true : false;
             }
-            
-            itr = d.FindMember("subscribe");
-            if (itr != d.MemberEnd()) {
-                rapidjson::Value& s = itr->value;
-                s = d["subscribe"];
+        }
+        else {
+            if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]/api/update Failed");
+        }
+
+        if (sres && sres->status == 200) {
+            d.Parse(sres->body.c_str());
+            if (d.HasMember("data")) {
+                rapidjson::Value& s = d["data"]["follower"];
                 if (lastFollow) {
                     isNewFollow = s.GetInt() > lastFollow ? true : false;
                 }
@@ -73,7 +85,7 @@ void UserStateWatcher::Watch()
             }
         }
         else {
-            if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]/api/update Failed");
+            if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]/x/relation/stat Failed");
         }
 
         // 动态状态检查

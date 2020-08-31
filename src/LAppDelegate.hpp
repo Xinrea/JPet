@@ -195,6 +195,7 @@ private:
     GLFWwindow *_window;                        ///< OpenGL ウィンドウ
     LAppView *_view;                            ///< View情報
     HWND _setHwnd;
+    HWND _mainHwnd;
     bool _captured;                             ///< クリックしているか
     float _mouseX;                              ///< マウスX座標
     float _mouseY;                              ///< マウスY座標

@@ -14,7 +14,7 @@
 *
 */
 
-#define VERSION L"200417"
+#define VERSION L"200901"
 
 namespace LAppDefine
 {

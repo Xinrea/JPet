@@ -135,6 +135,7 @@ bool LAppDelegate::Initialize()
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
+    glfwWindowHint(GLFW_DEPTH_BITS, 16);
     _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet", NULL, NULL);
     if (_window == NULL) {
         LAppPal::PrintLog("[LAppDelegate]glfwCreateWindow failed");
@@ -143,12 +144,9 @@ bool LAppDelegate::Initialize()
     glfwSetCursor(_window, cursor);
     glfwSetWindowPos(_window, _iposX, _iposY);
     HWND hwnd = glfwGetWin32Window(_window);
-    if(Green) SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_ACCEPTFILES);
-    else SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_ACCEPTFILES);
-    
-    // 设置透明部分鼠标穿透
-    SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
-    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]SetLayeredWindow COLORKEY");
+    _mainHwnd = hwnd;
+    if(Green) SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_ACCEPTFILES | WS_POPUPWINDOW | WS_EX_LAYERED);
+    else SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_ACCEPTFILES | WS_POPUPWINDOW | WS_EX_LAYERED);
 
     if (_window == NULL)
     {
@@ -197,6 +195,10 @@ bool LAppDelegate::Initialize()
     //透過設定
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // 设置透明部分鼠标穿透
+    //SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+    //if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]SetLayeredWindow COLORKEY");
 
     //コールバック関数の登録
     glfwSetMouseButtonCallback(_window, EventHandler::OnMouseCallBack);
@@ -253,10 +255,12 @@ void LAppDelegate::SetGreen(bool green) {
     Green = green;
     HWND hwnd = glfwGetWin32Window(_window);
     if (Green) {
-        SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_ACCEPTFILES);
+        SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_ACCEPTFILES | WS_EX_LAYERED);
         SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)appIcon);
     }
-    else SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_ACCEPTFILES);
+    else {
+        SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_ACCEPTFILES | WS_EX_LAYERED);
+    }
 }
 
 void LAppDelegate::Release()
@@ -325,9 +329,11 @@ void LAppDelegate::Run()
         
 
         // 画面の初期化
-        if (!Green)glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        if (!Green) {
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        }
         else glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearDepth(1.0);
 
         //描画更新
@@ -381,6 +387,8 @@ void LAppDelegate::Run()
 
         // バッファの入れ替え
         glfwSwapBuffers(_window);
+
+
 
         // Poll for and process events
         glfwPollEvents();
