@@ -36,7 +36,7 @@ bool UserStateWatcher::CheckUpdate() {
 void UserStateWatcher::Watch()
 {
     LAppPal::PrintLog("Watch Begin");
-    httplib::SSLClient liveCli("joi-club.cn", 443);
+    httplib::SSLClient liveCli("api.live.bilibili.com", 443);
     liveCli.set_ca_cert_path("Resources/ca.crt");
     liveCli.enable_server_certificate_verification(true);
     liveCli.set_timeout_sec(1);
@@ -60,18 +60,17 @@ void UserStateWatcher::Watch()
 	{
         // 检查直播间状态和关注数
         rapidjson::Document d;
-        auto res = liveCli.Get("/api/update");
+        auto res = liveCli.Get("/room/v1/Room/room_init?id=21484828");
         auto sres = subCli.Get("/x/relation/stat?vmid=61639371");
         if (res && res->status == 200) {
             d.Parse(res->body.c_str());
-            auto itr = d.FindMember("live");
-            if (itr != d.MemberEnd()) {
-                rapidjson::Value& s = itr->value;
+            if (d.HasMember("data")) {
+                rapidjson::Value& s = d["data"]["live_status"];
                 isLive = s.GetInt() == 1 ? true : false;
             }
         }
         else {
-            if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]/api/update Failed");
+            if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]live_status Failed");
         }
 
         if (sres && sres->status == 200) {
