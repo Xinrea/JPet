@@ -136,6 +136,9 @@ bool LAppDelegate::Initialize()
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
     _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet", NULL, NULL);
+    if (_window == NULL) {
+        LAppPal::PrintLog("[LAppDelegate]glfwCreateWindow failed");
+    }
     GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
     glfwSetCursor(_window, cursor);
     glfwSetWindowPos(_window, _iposX, _iposY);
