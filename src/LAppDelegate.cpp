@@ -17,6 +17,7 @@
 #include <WinUser.h>
 #include <shellapi.h>
 #include <CommCtrl.h>
+#include <VersionHelpers.h>
 
 
 #include "resource.h"
@@ -130,23 +131,14 @@ bool LAppDelegate::Initialize()
     if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Get Execute Path");
     
     // Windowの生成_
-    glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GL_TRUE);
-    glfwWindowHint(GLFW_DECORATED, GL_FALSE);
+    // 使用GLFW_DECORATED实现边框，会导致1703版本及以前，整个窗口鼠标穿透
+    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-    glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
+    glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     glfwWindowHint(GLFW_DEPTH_BITS, 16);
-    _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet", NULL, NULL);
-    if (_window == NULL) {
-        LAppPal::PrintLog("[LAppDelegate]glfwCreateWindow failed");
-    }
-    GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
-    glfwSetCursor(_window, cursor);
-    glfwSetWindowPos(_window, _iposX, _iposY);
-    HWND hwnd = glfwGetWin32Window(_window);
-    _mainHwnd = hwnd;
-    if(Green) SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_ACCEPTFILES | WS_POPUPWINDOW | WS_EX_LAYERED);
-    else SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_ACCEPTFILES | WS_POPUPWINDOW | WS_EX_LAYERED);
+    glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
+    _window = glfwCreateWindow(DRenderTargetWidth, DRenderTargetHeight, "JPet", NULL, NULL);
 
     if (_window == NULL)
     {
@@ -157,6 +149,32 @@ bool LAppDelegate::Initialize()
         glfwTerminate();
         return GL_FALSE;
     }
+
+    // 为了避免1703版本前鼠标穿透的问题，在窗口创建完成后再修改为无边框
+    glfwSetWindowAttrib(_window, GLFW_DECORATED, GLFW_FALSE);
+
+    GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+    glfwSetCursor(_window, cursor);
+    glfwSetWindowPos(_window, _iposX, _iposY);
+
+    HWND hwnd = glfwGetWin32Window(_window);
+    _mainHwnd = hwnd;
+
+    SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_ACCEPTFILES | WS_EX_LAYERED | WS_EX_TOOLWINDOW);
+
+    if (Green) {
+        DWORD exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        exStyle &= ~WS_EX_TOOLWINDOW;
+        SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+    }
+    else {
+        DWORD exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        exStyle |= WS_EX_TOOLWINDOW;
+        SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+    }
+
+    //SetLayeredWindowAttributes(hwnd,
+    //    RGB(0, 0, 0), 255, LWA_COLORKEY);
 
     // 音频设定3d位置
     int x, y;
@@ -195,10 +213,6 @@ bool LAppDelegate::Initialize()
     //透過設定
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    // 设置透明部分鼠标穿透
-    //SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
-    //if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]SetLayeredWindow COLORKEY");
 
     //コールバック関数の登録
     glfwSetMouseButtonCallback(_window, EventHandler::OnMouseCallBack);
@@ -255,11 +269,14 @@ void LAppDelegate::SetGreen(bool green) {
     Green = green;
     HWND hwnd = glfwGetWin32Window(_window);
     if (Green) {
-        SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_ACCEPTFILES | WS_EX_LAYERED);
-        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)appIcon);
+        DWORD exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        exStyle &= ~WS_EX_TOOLWINDOW;
+        SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
     }
     else {
-        SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_TOOLWINDOW | WS_EX_ACCEPTFILES | WS_EX_LAYERED);
+        DWORD exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        exStyle |= WS_EX_TOOLWINDOW;
+        SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
     }
 }
 
@@ -374,12 +391,21 @@ void LAppDelegate::Run()
             settingThread.detach();
         }
         if (!_isSetting) isShowing = false;
+
+        // 启动时刷新缩放，用于消除可能存在的边框残留
+        static bool scaleRefresh = true;
+        if (scaleRefresh) {
+            glfwSetWindowSize(_window, RenderTargetWidth, RenderTargetHeight);
+            scaleRefresh = false;
+        }
+
         if (scale != _scale)
         {
             scale = _scale;
             RenderTargetHeight = _scale * DRenderTargetHeight;
             RenderTargetWidth = _scale * DRenderTargetWidth;
             glfwSetWindowSize(_window, RenderTargetWidth, RenderTargetHeight);
+            if (DebugLogEnable)LAppPal::PrintLog("[LAppDelegate] New Window Size");
         }
 
         _au->SetVolume(static_cast<float>(_volume) / 10);
@@ -387,8 +413,6 @@ void LAppDelegate::Run()
 
         // バッファの入れ替え
         glfwSwapBuffers(_window);
-
-
 
         // Poll for and process events
         glfwPollEvents();
