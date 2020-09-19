@@ -31,7 +31,6 @@ _deps
 /Core
 /Framework
 thirdParty/glew
-thirdParty/glfw
 thirdParty/OpenGLText
 thirdParty/freeglut
 thirdParty/fmod

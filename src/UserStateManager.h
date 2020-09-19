@@ -1,12 +1,16 @@
 #include <thread>
+#include <queue>
+#include "StateMessage.hpp"
 #include "UserStateWatcher.h"
+using std::queue;
 
 class UserStateManager
 {
 public:
-    void Init()
+    void Init(std::string list)
     {
-        _Watcher = new UserStateWatcher();
+        if (_Watcher) Stop();
+        _Watcher = new UserStateWatcher(list);
         std::thread t = _Watcher->WatchThread();
         t.detach();
     }
@@ -14,25 +18,13 @@ public:
     {
         _Watcher->isExit = true;
     }
-	bool GetLiveState()
+    queue<StateMessage>& GetLiveState()
     {
-        return _Watcher->isLive;
+        return _Watcher->newLive;
     }
-    bool GetDynamicState()
+    queue<StateMessage>& GetDynamicState()
     {
-        return _Watcher->isNewDynamic;
-    }
-    void SetDynamicState()
-    {
-        _Watcher->isNewDynamic = false;
-    }
-    bool GetFollowState()
-    {
-        return _Watcher->isNewFollow;
-    }
-    void SetFollowState()
-    {
-        _Watcher->isNewFollow = false;
+        return _Watcher->newDynamic;
     }
     bool CheckUpdate()
     {

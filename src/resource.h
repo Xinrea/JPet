@@ -12,12 +12,13 @@
 #define IDC_RIGHT                       1006
 #define IDC_LIVENOTIFY                  1007
 #define IDC_FOLLOWNOTIFY                1008
+#define IDC_LEFT2                       1008
+#define IDC_FOLLOW                      1008
 #define IDC_DYNAMICNOTIFY               1009
 #define IDC_WEIBONOTIFY                 1010
 #define IDC_GREEN                       1010
 #define IDC_APPLY                       1011
 #define IDC_CHECK                       1012
-#define IDC_DYNAMICNOTIFY2              1013
 #define IDC_STARTCHECK                  1013
 
 // Next default values for new objects

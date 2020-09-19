@@ -14,7 +14,8 @@
 *
 */
 
-#define VERSION L"200901"
+#define WVERSION L"200919"
+#define VERSION "200919"
 
 namespace LAppDefine
 {

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <queue>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -19,7 +20,6 @@
 #include <CommCtrl.h>
 #include <VersionHelpers.h>
 
-
 #include "resource.h"
 #include "LAppView.hpp"
 #include "LAppPal.hpp"
@@ -29,6 +29,7 @@
 #include "TouchManager.hpp"
 #include "PartStateManager.h"
 #include "ini.h"
+#include "StateMessage.hpp"
 
 #define WM_IAWENTRAY  WM_USER+5  
 
@@ -44,6 +45,16 @@ WNDPROC DefaultProc;
 namespace
 {
 LAppDelegate *s_instance = NULL;
+}
+
+std::wstring StringToWString(const std::string& str)
+{
+    int num = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+    wchar_t* wide = new wchar_t[num];
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, wide, num);
+    std::wstring w_str(wide);
+    delete[] wide;
+    return w_str;
 }
 
 LAppDelegate *LAppDelegate::GetInstance()
@@ -88,9 +99,9 @@ bool LAppDelegate::Initialize()
         _volume = reader.GetInteger("audio", "volume", 20);
         _mute = reader.GetBoolean("audio", "mute", false);
     	_scale = reader.GetFloat("display", "scale", 1.0f);
+        _followlist = reader.Get("follow", "list", "61639371;544832401;475210;");
         Green = reader.GetBoolean("display", "green", false);
         LiveNotify = reader.GetBoolean("notify", "live", true);
-        FollowNotify = reader.GetBoolean("notify", "follow", true);
         DynamicNotify = reader.GetBoolean("notify", "dynamic", true);
         UpdateNotify = reader.GetBoolean("notify", "update", true);
     }
@@ -106,7 +117,7 @@ bool LAppDelegate::Initialize()
 
     // 用户状态管理初始化
     _us = new UserStateManager();
-    _us->Init();
+    _us->Init(_followlist);
 
     // GLFWの初期化
     if (glfwInit() == GL_FALSE)
@@ -138,7 +149,7 @@ bool LAppDelegate::Initialize()
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     glfwWindowHint(GLFW_DEPTH_BITS, 16);
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
-    _window = glfwCreateWindow(DRenderTargetWidth, DRenderTargetHeight, "JPet", NULL, NULL);
+    _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet", NULL, NULL);
 
     if (_window == NULL)
     {
@@ -159,6 +170,20 @@ bool LAppDelegate::Initialize()
 
     HWND hwnd = glfwGetWin32Window(_window);
     _mainHwnd = hwnd;
+
+    // 解决Win7下会在任务栏显示的bug
+    HWND phwnd = CreateWindow(NULL,      // window class name
+        TEXT("JPetParentWindow"),   // window caption
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+        CW_USEDEFAULT,// initial x position
+        CW_USEDEFAULT,// initial y position
+        CW_USEDEFAULT,// initial x size
+        CW_USEDEFAULT,// initial y size
+        NULL,                 // parent window handle
+        NULL,            // window menu handle
+        NULL,   // program instance handle
+        NULL);      // creation parameters
+    SetParent(hwnd, phwnd);
 
     SetWindowLong(hwnd, GWL_EXSTYLE, WS_EX_ACCEPTFILES | WS_EX_LAYERED | WS_EX_TOOLWINDOW);
 
@@ -183,12 +208,12 @@ bool LAppDelegate::Initialize()
 
     // 通知初始化
     WinToast::instance()->setAppName(L"JPet");
-    const auto aumi = WinToast::configureAUMI(L"Xinrea", L"JPet", L"Jpet", VERSION);
+    const auto aumi = WinToast::configureAUMI(L"JoiGroup", L"JPetProject", L"JPet", WVERSION);
     WinToast::instance()->setAppUserModelId(aumi);
     WinToast::instance()->initialize();
+
     _LiveHandler = new WinToastEventHandler("https://live.bilibili.com/21484828");
     _DynamicHandler = new WinToastEventHandler("https://space.bilibili.com/61639371/dynamic");
-    _FollowHandler = new WinToastEventHandler("https://space.bilibili.com/61639371");
     _UpdateHandler = new WinToastEventHandler("https://pet.joi-club.cn");
     if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Notification Init");
 
@@ -261,6 +286,9 @@ bool LAppDelegate::Initialize()
 
     // 随机播放启动语音
     _au->Play3dSound("Resources/Audio/s0"+to_string(rand()%StartAudioNum+1)+".mp3");
+
+    // 用于测试的通知
+    // Notify(L"阿轴有新动态了", L"点击查看动态", _DynamicHandler);
 
     return GL_TRUE;
 }
@@ -360,27 +388,21 @@ void LAppDelegate::Run()
         static float scale = _scale;
         static bool isShowing = false;
         // 直播提醒
-        bool statenow = _us->GetLiveState();
-        if (lastLive == false && statenow == true)
+        auto& liveQueue = _us->GetLiveState();
+        if (!liveQueue.empty())
         {
-            if (LiveNotify)Notify(L"阿轴开播了",L"点击前往直播间",_LiveHandler);
-            _au->Play3dSound("Resources/Audio/n01.mp3");
+            auto liveInfo = liveQueue.front();
+            liveQueue.pop();
+            if (LiveNotify)Notify((liveInfo.name+L"开播了").c_str(),(liveInfo.title).c_str(),new WinToastEventHandler("https://live.bilibili.com/"+liveInfo.roomid));
+            if (liveInfo.uid == "61639371")_au->Play3dSound("Resources/Audio/n01.mp3");
         }
-        lastLive = statenow;
 
         // 动态提醒
-        if (_us->GetDynamicState()) {
-            _us->SetDynamicState();
-            if(DynamicNotify)Notify(L"阿轴有新动态了", L"点击查看动态", _DynamicHandler);
-        }
-
-        // 新粉丝提醒
-        if (_us->GetFollowState()) {
-            _us->SetFollowState();
-            if (FollowNotify) {
-                LAppLive2DManager::GetInstance()->OnFollow();
-                Notify(L"新粉丝", L"点击打开B站主页", _FollowHandler);
-            }
+        auto& dynamicQueue = _us->GetDynamicState();
+        if (!dynamicQueue.empty()) {
+            auto dynamicInfo = dynamicQueue.front();
+            dynamicQueue.pop();
+            Notify((dynamicInfo.name + L"有新动态了").c_str(), L"点击查看动态", new WinToastEventHandler("https://t.bilibili.com/"+dynamicInfo.content));
         }
 
         // 设置界面
@@ -393,11 +415,11 @@ void LAppDelegate::Run()
         if (!_isSetting) isShowing = false;
 
         // 启动时刷新缩放，用于消除可能存在的边框残留
-        static bool scaleRefresh = true;
-        if (scaleRefresh) {
-            glfwSetWindowSize(_window, RenderTargetWidth, RenderTargetHeight);
-            scaleRefresh = false;
-        }
+        //static bool scaleRefresh = true;
+        //if (scaleRefresh) {
+        //    if (!IsWindows8Point1OrGreater())glfwSetWindowSize(_window, RenderTargetWidth, RenderTargetHeight);
+        //    scaleRefresh = false;
+        //}
 
         if (scale != _scale)
         {
@@ -427,12 +449,12 @@ void LAppDelegate::Run()
     of.open(documentPath+"\\JPetConfig.ini", ios::trunc);
     of << "[position]\n"
         << "x=" << x << "\ny=" << y << "\n[shortcut]\n"
-        << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl << "\n[audio]\n"
+        << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl << "\n[follow]\n"
+        << "list=" << _followlist << "\n[audio]\n"
         << "volume=" << _volume << "\nmute=" << (_mute ? "true" : "false")
         << "\n[display]\nscale=" << _scale
         << "\ngreen=" << (Green ? "true" : "false")
         << "\n[notify]\nlive=" << (LiveNotify ? "true" : "false")
-        << "\nfollow=" << (FollowNotify ? "true" : "false")
         << "\ndynamic=" << (DynamicNotify ? "true" : "false")
         << "\nupdate=" << (UpdateNotify ? "true" : "false")
         << "\n[parts]";
@@ -588,16 +610,6 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, double x, double y)
     }
 }
 
-std::wstring StringToWString(const std::string& str)
-{
-    int num = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-    wchar_t* wide = new wchar_t[num];
-    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, wide, num);
-    std::wstring w_str(wide);
-    delete[] wide;
-    return w_str;
-}
-
 void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count, const WCHAR*paths[])
 {
     for (int i = 0; i < path_count; i++)
@@ -746,6 +758,8 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        string title = string("检查更新(")+VERSION+")";
+        SendMessage(GetDlgItem(hwnd, IDC_CHECK), WM_SETTEXT, true, (LPARAM)title.c_str());
         SendMessage(GetDlgItem(hwnd, IDC_MUTE), BM_SETCHECK, LAppDelegate::GetInstance()->GetMute()?BST_CHECKED:BST_UNCHECKED, 0);
         SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE, !LAppDelegate::GetInstance()->GetMute(), 0);
         SendMessage(GetDlgItem(hwnd, IDC_VOLUME), TBM_SETPOS, true, LAppDelegate::GetInstance()->GetVolume());
@@ -754,9 +768,9 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         SendMessage(GetDlgItem(hwnd, IDC_LEFT), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetLURL().c_str());
         SendMessage(GetDlgItem(hwnd, IDC_UP), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetUURL().c_str());
         SendMessage(GetDlgItem(hwnd, IDC_RIGHT), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetRURL().c_str());
+        SendMessage(GetDlgItem(hwnd, IDC_FOLLOW), WM_SETTEXT, true, (LPARAM)LAppDelegate::GetInstance()->GetFollowList().c_str());
 
         SendMessage(GetDlgItem(hwnd, IDC_LIVENOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->LiveNotify ? BST_CHECKED : BST_UNCHECKED, 0);
-        SendMessage(GetDlgItem(hwnd, IDC_FOLLOWNOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->FollowNotify ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->DynamicNotify ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_SETCHECK, LAppDelegate::GetInstance()->Green ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_SETCHECK, LAppDelegate::GetInstance()->UpdateNotify ? BST_CHECKED : BST_UNCHECKED, 0);
@@ -793,8 +807,14 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 LAppDelegate::GetInstance()->SetRURL(std::string(buff));
                 free(buff);
 
+                // followlist
+                len = SendMessage(GetDlgItem(hwnd, IDC_FOLLOW), WM_GETTEXTLENGTH, 0, 0);
+                buff = new TCHAR[len + 1];
+                SendMessage(GetDlgItem(hwnd, IDC_FOLLOW), WM_GETTEXT, len + 1, (LPARAM)buff);
+                LAppDelegate::GetInstance()->SetFollowList(std::string(buff));
+                free(buff);
+
                 LAppDelegate::GetInstance()->LiveNotify = SendMessage(GetDlgItem(hwnd, IDC_LIVENOTIFY), BM_GETCHECK, 0, 0);
-                LAppDelegate::GetInstance()->FollowNotify = SendMessage(GetDlgItem(hwnd, IDC_FOLLOWNOTIFY), BM_GETCHECK, 0, 0);
                 LAppDelegate::GetInstance()->DynamicNotify = SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_GETCHECK, 0, 0);
                 LAppDelegate::GetInstance()->SetGreen(SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_GETCHECK, 0, 0));
                 LAppDelegate::GetInstance()->UpdateNotify = SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_GETCHECK, 0, 0);
@@ -829,6 +849,7 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     }
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
+
 
 void LAppDelegate::SettingWindow()
 {

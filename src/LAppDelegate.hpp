@@ -127,12 +127,16 @@ public:
     std::string GetLURL() { return _leftUrl; }
     std::string GetUURL() { return _upUrl; }
     std::string GetRURL() { return _rightUrl; }
+    std::string GetFollowList() { return _followlist; }
     void SetLURL(std::string s) { _leftUrl = s; }
     void SetUURL(std::string s) { _upUrl = s; }
     void SetRURL(std::string s) { _rightUrl = s; }
+    void SetFollowList(std::string s) {
+        _followlist = s; 
+        if (_us) _us->Init(s);
+    }
 
     bool LiveNotify = true;
-    bool FollowNotify = true;
     bool DynamicNotify = true;
     bool UpdateNotify = true;
     bool Green = false;
@@ -207,13 +211,13 @@ private:
     bool _isLive;
     int _mWidth, _mHeight;
     std::string _exePath;
+    std::string _followlist;
     AudioManager *_au;
     UserStateManager* _us;
     NOTIFYICONDATA nid;
 
     WinToastEventHandler *_LiveHandler;
     WinToastEventHandler* _DynamicHandler;
-    WinToastEventHandler* _FollowHandler;
     WinToastEventHandler* _UpdateHandler;
     LAppTextureManager *_textureManager; ///< テクスチャマネージャー
 
