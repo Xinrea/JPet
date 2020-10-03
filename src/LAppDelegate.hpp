@@ -124,6 +124,8 @@ public:
     // 设置绿幕状态，涉及窗口显示模式的切换
     void SetGreen(bool green);
 
+    void SaveSettings();
+
     std::string GetLURL() { return _leftUrl; }
     std::string GetUURL() { return _upUrl; }
     std::string GetRURL() { return _rightUrl; }
@@ -207,6 +209,7 @@ private:
     float _pY;
     double _cX, _cY;
     bool _isEnd; ///< APP終了しているか
+    bool _isShowing = true;
     bool _isMsg;
     bool _isLive;
     int _mWidth, _mHeight;

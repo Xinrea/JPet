@@ -146,6 +146,7 @@ bool LAppDelegate::Initialize()
     glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
+    glfwWindowHint(GLFW_ICONIFIED, GL_FALSE);
     glfwWindowHint(GLFW_FLOATING, GL_TRUE);
     glfwWindowHint(GLFW_DEPTH_BITS, 16);
     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
@@ -441,12 +442,23 @@ void LAppDelegate::Run()
     }
     _us->Stop();
     // Release前保存配置
+    SaveSettings();
+
+    Shell_NotifyIcon(NIM_DELETE, &nid);
+    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]TrayICON Delete");
+    Release();
+
+    LAppDelegate::ReleaseInstance();
+}
+
+void LAppDelegate::SaveSettings()
+{
     int x, y;
     glfwGetWindowPos(_window, &x, &y);
     PartStateManager::GetInstance()->SaveState();
     auto modelState = PartStateManager::GetInstance()->GetAllState();
     ofstream of;
-    of.open(documentPath+"\\JPetConfig.ini", ios::trunc);
+    of.open(documentPath + "\\JPetConfig.ini", ios::trunc);
     of << "[position]\n"
         << "x=" << x << "\ny=" << y << "\n[shortcut]\n"
         << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl << "\n[follow]\n"
@@ -461,15 +473,10 @@ void LAppDelegate::Run()
     // 保存模型状态
     for (auto i : modelState)
     {
-        of << "\n" + i.first + "=" << (i.second > 0.5)?1:0;
+        of << "\n" + i.first + "=" << (i.second > 0.5) ? 1 : 0;
     }
     of.close();
     if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Setting Saved");
-    Shell_NotifyIcon(NIM_DELETE, &nid);
-    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]TrayICON Delete");
-    Release();
-
-    LAppDelegate::ReleaseInstance();
 }
 
 LAppDelegate::LAppDelegate() : _cubismOption(),
@@ -580,7 +587,11 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action, i
             else if (_mouseY < _pY && dy > dx)
                 ShellExecute(NULL, "open", _upUrl.c_str(), NULL, NULL, SW_SHOWNORMAL); //向上滑动
             else if (_mouseY > _pY && dy > dx)
-                _isEnd = true; //向下滑动
+            {
+                _isShowing = false; //向下滑动
+                glfwHideWindow(_window);
+            }
+                
             _isMsg = false;
         }
     }
@@ -634,6 +645,7 @@ void LAppDelegate::OnWindowPosCallBack(GLFWwindow *window, int x, int y)
 
 
 // 托盘菜单设置
+#define IDM_HIDE  2004
 #define IDM_SET   2001
 #define IDM_RESET 2002
 #define IDM_EXIT  2003
@@ -648,6 +660,13 @@ void LAppDelegate::OnTrayClickCallBack(GLFWwindow* window, int b, unsigned w)
     else {
         switch (w)
         {
+        case IDM_HIDE:
+        {
+            if (_isShowing) glfwHideWindow(_window);
+            else glfwShowWindow(_window);
+            _isShowing = !_isShowing;
+            break;
+        }
         case IDM_SET:
         {
             _isSetting = true;
@@ -663,6 +682,10 @@ void LAppDelegate::OnTrayClickCallBack(GLFWwindow* window, int b, unsigned w)
             glfwSetWindowPos(window, 0, 0);
             break;
         }
+        default:
+            _isShowing = true;
+            glfwShowWindow(_window);
+            break;
         }
     }
 }
@@ -819,6 +842,9 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 LAppDelegate::GetInstance()->SetGreen(SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_GETCHECK, 0, 0));
                 LAppDelegate::GetInstance()->UpdateNotify = SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_GETCHECK, 0, 0);
 
+                // 即时保存设置
+                LAppDelegate::GetInstance()->SaveSettings();
+                
                 EndDialog(hwnd, 0);
 
                 break;
@@ -868,6 +894,8 @@ void LAppDelegate::Menu()
     GetCursorPos(&p);
     HMENU hMenu;
     hMenu = CreatePopupMenu();
+    if (_isShowing) AppendMenu(hMenu, MF_STRING, IDM_HIDE, TEXT("隐藏"));
+    else AppendMenu(hMenu, MF_STRING, IDM_HIDE, TEXT("显示"));
     AppendMenu(hMenu, MF_STRING, IDM_RESET, TEXT("重置位置"));
     AppendMenu(hMenu, MF_STRING, IDM_SET, TEXT("设置"));
     AppendMenu(hMenu, MF_STRING, IDM_EXIT, TEXT("退出"));

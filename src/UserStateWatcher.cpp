@@ -99,7 +99,6 @@ void UserStateWatcher::Watch()
             }
             else {
                 if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]BasicInfo Failed");
-                LAppPal::PrintLog(res->body.c_str());
                 continue;
             }
             // 根据UID获取直播间号和直播间状态
@@ -125,7 +124,6 @@ void UserStateWatcher::Watch()
             }
             else {
                 if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]BasicInfo Failed");
-                LAppPal::PrintLog(infores->body.c_str());
                 continue;
             }
 
@@ -149,11 +147,10 @@ void UserStateWatcher::Watch()
             else {
                 if (DebugLogEnable) {
                     LAppPal::PrintLog("[UserStateWatcher]Require Dynamic Failed");
-                    LAppPal::PrintLog(dres->body.c_str());
                     continue;
                 }
             }
-            std::this_thread::sleep_for(std::chrono::seconds(3));
+            std::this_thread::sleep_for(std::chrono::seconds(2));
         }
 	}
     if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]Watch Stop");
