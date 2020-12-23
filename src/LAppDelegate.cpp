@@ -100,6 +100,7 @@ bool LAppDelegate::Initialize()
         _mute = reader.GetBoolean("audio", "mute", false);
     	_scale = reader.GetFloat("display", "scale", 1.0f);
         _followlist = reader.Get("follow", "list", "61639371;544832401;475210;");
+        isLimit = reader.GetBoolean("display", "limit", false);
         Green = reader.GetBoolean("display", "green", false);
         LiveNotify = reader.GetBoolean("notify", "live", true);
         DynamicNotify = reader.GetBoolean("notify", "dynamic", true);
@@ -220,7 +221,8 @@ bool LAppDelegate::Initialize()
 
     // Windowのコンテキストをカレントに設定
     glfwMakeContextCurrent(_window);
-    glfwSwapInterval(1);
+    if (isLimit) glfwSwapInterval(2);
+    else glfwSwapInterval(1);
 
     if (glewInit() != GLEW_OK)
     {
@@ -309,6 +311,12 @@ void LAppDelegate::SetGreen(bool green) {
     }
 }
 
+void LAppDelegate::SetLimit(bool limit) {
+    isLimit = limit;
+    if (limit) glfwSwapInterval(2);
+    else glfwSwapInterval(1);
+}
+
 void LAppDelegate::Release()
 {
     // Windowの削除
@@ -330,14 +338,20 @@ void LAppDelegate::Release()
 void LAppDelegate::Run()
 {
     //メインループ
+    bool noskip = false;
     while (glfwWindowShouldClose(_window) == GL_FALSE && !_isEnd)
     {
+        noskip = !noskip;
         int width, height;
         glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width, &height);
 
-        int x, y;
-        glfwGetWindowPos(_window, &x, &y);
-        _au->Update(x, y, width, height, _mWidth, _mHeight);
+
+        static int x, y;
+        if (noskip) {
+            glfwGetWindowPos(_window, &x, &y);
+            _au->Update(x, y, width, height, _mWidth, _mHeight);
+        }
+
 
         if ((_windowWidth != width || _windowHeight != height) && width > 0 && height > 0)
         {
@@ -353,8 +367,6 @@ void LAppDelegate::Run()
             glViewport(0, 0, width, height);
         }
 
-        // 時間更新
-        LAppPal::UpdateTime();
 
         // 闲置状态更新
         if (IsCount) 
@@ -367,23 +379,35 @@ void LAppDelegate::Run()
             if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate] Idle On");
         }
 
-    	//鼠标捕捉
+        //鼠标捕捉
         static double cx, cy;
-        glfwGetCursorPos(_window, &cx, &cy);
-        // 非拖动状态下，跟随鼠标位置；拖动状态下，通过OnTouchMoved模拟物理效果
-        if (!_captured && !InMotion)_view->OnTouchesMoved(static_cast<float>(cx), static_cast<float>(cy));
-        
+        if (noskip) {
+            glfwGetCursorPos(_window, &cx, &cy);
+            // 非拖动状态下，跟随鼠标位置；拖动状态下，通过OnTouchMoved模拟物理效果
+            if (!_captured && !InMotion)_view->OnTouchesMoved(static_cast<float>(cx), static_cast<float>(cy));
+        }
+
+
 
         // 画面の初期化
         if (!Green) {
-            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+          glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         }
         else glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearDepth(1.0);
 
+        // 時間更新
+        LAppPal::UpdateTime();
+
         //描画更新
         _view->Render();
+
+        // バッファの入れ替え
+        glfwSwapBuffers(_window);
+
+        // Poll for and process events
+        glfwPollEvents();
 
         static bool lastLive = false;
         static float scale = _scale;
@@ -433,12 +457,6 @@ void LAppDelegate::Run()
 
         _au->SetVolume(static_cast<float>(_volume) / 10);
         _au->SetMute(_mute);
-
-        // バッファの入れ替え
-        glfwSwapBuffers(_window);
-
-        // Poll for and process events
-        glfwPollEvents();
     }
     _us->Stop();
     // Release前保存配置
@@ -466,6 +484,7 @@ void LAppDelegate::SaveSettings()
         << "volume=" << _volume << "\nmute=" << (_mute ? "true" : "false")
         << "\n[display]\nscale=" << _scale
         << "\ngreen=" << (Green ? "true" : "false")
+        << "\nlimit=" << (isLimit ? "true" : "false")
         << "\n[notify]\nlive=" << (LiveNotify ? "true" : "false")
         << "\ndynamic=" << (DynamicNotify ? "true" : "false")
         << "\nupdate=" << (UpdateNotify ? "true" : "false")
@@ -796,6 +815,7 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         SendMessage(GetDlgItem(hwnd, IDC_LIVENOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->LiveNotify ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_SETCHECK, LAppDelegate::GetInstance()->DynamicNotify ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_SETCHECK, LAppDelegate::GetInstance()->Green ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessage(GetDlgItem(hwnd, IDC_LIMIT), BM_SETCHECK, LAppDelegate::GetInstance()->isLimit? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_SETCHECK, LAppDelegate::GetInstance()->UpdateNotify ? BST_CHECKED : BST_UNCHECKED, 0);
     }
     return true;
@@ -840,6 +860,7 @@ LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 LAppDelegate::GetInstance()->LiveNotify = SendMessage(GetDlgItem(hwnd, IDC_LIVENOTIFY), BM_GETCHECK, 0, 0);
                 LAppDelegate::GetInstance()->DynamicNotify = SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_GETCHECK, 0, 0);
                 LAppDelegate::GetInstance()->SetGreen(SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_GETCHECK, 0, 0));
+                LAppDelegate::GetInstance()->SetLimit(SendMessage(GetDlgItem(hwnd, IDC_LIMIT), BM_GETCHECK, 0, 0));
                 LAppDelegate::GetInstance()->UpdateNotify = SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_GETCHECK, 0, 0);
 
                 // 即时保存设置

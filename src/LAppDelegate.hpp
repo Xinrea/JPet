@@ -124,6 +124,8 @@ public:
     // 设置绿幕状态，涉及窗口显示模式的切换
     void SetGreen(bool green);
 
+    void SetLimit(bool limit);
+
     void SaveSettings();
 
     std::string GetLURL() { return _leftUrl; }
@@ -142,6 +144,7 @@ public:
     bool DynamicNotify = true;
     bool UpdateNotify = true;
     bool Green = false;
+    bool isLimit = false;
     bool InMotion = false;
 
     bool IsIdle = true;
