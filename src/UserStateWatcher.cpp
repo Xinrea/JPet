@@ -1,4 +1,4 @@
-#include "UserStateWatcher.h"
+ï»¿#include "UserStateWatcher.h"
 #include <iostream>
 #include <httplib.h>
 #include <rapidjson/document.h>
@@ -20,9 +20,9 @@ std::wstring UserStateWatcher::StringToWString(const std::string& str)
 
 bool UserStateWatcher::CheckUpdate() {
     httplib::SSLClient liveCli("pet.joi-club.cn", 443);
-    liveCli.set_ca_cert_path("Resources/ca.crt");
+    liveCli.set_ca_cert_path("resources/ca.crt");
     liveCli.enable_server_certificate_verification(true);
-    liveCli.set_timeout_sec(1);
+    liveCli.set_connection_timeout(std::chrono::seconds(1));
     auto res = liveCli.Get("/version.txt");
     if (res && res->status == 200) {
         if (DebugLogEnable) LAppPal::PrintLog((std::string("[UserStateWatcher]Check Update Latest: ") + res->body).c_str());
@@ -45,24 +45,24 @@ void UserStateWatcher::Watch()
 {
     LAppPal::PrintLog("Watch Begin");
     httplib::SSLClient cookieCli("data.bilibili.com", 443);
-    cookieCli.set_ca_cert_path("Resources/ca.crt");
+    cookieCli.set_ca_cert_path("resources/ca.crt");
     cookieCli.enable_server_certificate_verification(true);
-    cookieCli.set_timeout_sec(1);
+    cookieCli.set_connection_timeout(std::chrono::seconds(1));
 
     httplib::SSLClient liveCli("api.live.bilibili.com", 443);
-    liveCli.set_ca_cert_path("Resources/ca.crt");
+    liveCli.set_ca_cert_path("resources/ca.crt");
     liveCli.enable_server_certificate_verification(true);
-    liveCli.set_timeout_sec(1);
+    liveCli.set_connection_timeout(std::chrono::seconds(1));
 
     httplib::SSLClient dynamicCli("api.vc.bilibili.com", 443);
-    dynamicCli.set_ca_cert_path("Resources/ca.crt");
+    dynamicCli.set_ca_cert_path("resources/ca.crt");
     dynamicCli.enable_server_certificate_verification(true);
-    dynamicCli.set_timeout_sec(1);
+    dynamicCli.set_connection_timeout(std::chrono::seconds(1));
 
     httplib::SSLClient nameCli("api.bilibili.com", 443);
-    nameCli.set_ca_cert_path("Resources/ca.crt");
+    nameCli.set_ca_cert_path("resources/ca.crt");
     nameCli.enable_server_certificate_verification(true);
-    nameCli.set_timeout_sec(1);
+    nameCli.set_connection_timeout(std::chrono::seconds(1));
 
     // https://data.bilibili.com/v/web/web_page_view
     static string cookies = "";
@@ -87,7 +87,7 @@ void UserStateWatcher::Watch()
             string roomid = "";
             wstring roomtitle = L"";
             wstring name = L"";
-            // ¸ù¾ÝUID»ñÈ¡êÇ³Æ
+            // ï¿½ï¿½ï¿½ï¿½UIDï¿½ï¿½È¡ï¿½Ç³ï¿½
             // https://api.bilibili.com/x/space/acc/info?mid=475210
             auto res = nameCli.Get(("/x/space/acc/info?mid=" + uid).c_str(), headers);
             if (res && res->status == 200) {
@@ -101,7 +101,7 @@ void UserStateWatcher::Watch()
                 if (DebugLogEnable) LAppPal::PrintLog("[UserStateWatcher]BasicInfo Failed");
                 continue;
             }
-            // ¸ù¾ÝUID»ñÈ¡Ö±²¥¼äºÅºÍÖ±²¥¼ä×´Ì¬
+            // ï¿½ï¿½ï¿½ï¿½UIDï¿½ï¿½È¡Ö±ï¿½ï¿½ï¿½ï¿½Åºï¿½Ö±ï¿½ï¿½ï¿½ï¿½×´Ì¬
             // https://api.live.bilibili.com/room/v1/Room/getRoomInfoOld?mid=475210
             auto infores = liveCli.Get(("/room/v1/Room/getRoomInfoOld?mid=" + uid).c_str(),headers);
             if (infores && infores->status == 200) {
@@ -114,7 +114,7 @@ void UserStateWatcher::Watch()
 
                     rapidjson::Value& l = d["data"]["liveStatus"];
                     bool nowLive = l.GetInt() == 1 ? true : false;
-                    // ¿ª²¥ÁË
+                    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                     if (nowLive && !lastLive[i])
                     {
                         newLive.push(StateMessage(uid, roomid, name, roomtitle, ""));
@@ -127,7 +127,7 @@ void UserStateWatcher::Watch()
                 continue;
             }
 
-            // ¶¯Ì¬×´Ì¬¼ì²é
+            // ï¿½ï¿½Ì¬×´Ì¬ï¿½ï¿½ï¿½
             auto dres = dynamicCli.Get(("/dynamic_svr/v1/dynamic_svr/space_history?host_uid="+uid+"&need_top=0").c_str());
             if (dres && dres->status == 200) {
                 d.Parse(dres->body.c_str());

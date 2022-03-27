@@ -1,0 +1,6 @@
+[submodule "thirdParty/glew"]
+	path = thirdParty/glew
+	url = https://github.com/nigels-com/glew.git
+[submodule "thirdparty/WinToast"]
+	path = thirdparty/WinToast
+	url = git@github.com:mohabouje/WinToast.git

@@ -26,8 +26,8 @@ namespace LAppDefine {
     const csmFloat32 ViewLogicalMaxTop = 2.0f;
 
     // 相対パス
-    const csmChar* ResourcesPath = "Resources/";
-    const csmChar* OptionImg = "Img/message.png";
+    const csmChar* ResourcesPath = "resources/";
+    const csmChar* OptionImg = "imgs/message.png";
 
     // モデル定義------------------------------------------
     // モデルを配置したディレクトリ名の配列
@@ -100,9 +100,9 @@ namespace LAppDefine {
     const csmFloat32 AudioDepth = 2.0f;
 
     // 音频
-    const csmChar* startAudioFile = "Resources/Audio/start.mp3";
-    const csmChar* dragAudioFile = "Resources/Audio/drag.mp3";
-    const csmChar* endAudioFile = "Resources/Audio/end.mp3";
+    const csmChar* startAudioFile = "resources/audios/start.mp3";
+    const csmChar* dragAudioFile = "resources/audios/drag.mp3";
+    const csmChar* endAudioFile = "resources/audios/end.mp3";
 
     std::string documentPath = "";
 }

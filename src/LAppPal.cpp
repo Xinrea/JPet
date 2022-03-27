@@ -45,7 +45,7 @@ csmByte* LAppPal::LoadFileAsBytes(const string filePath, csmSizeInt* outSize)
     {
         if (DebugLogEnable)
         {
-            PrintLog("file open error");
+            PrintLog("file open error: %s", filePath.c_str());
         }
         return NULL;
     }

@@ -245,9 +245,9 @@ bool LAppDelegate::Initialize()
     //コールバック関数の登録
     glfwSetMouseButtonCallback(_window, EventHandler::OnMouseCallBack);
     glfwSetCursorPosCallback(_window, EventHandler::OnMouseCallBack);
-    glfwSetDropCallback(_window, EventHandler::OnDropCallBack);
+    // glfwSetDropCallback(_window, EventHandler::OnDropCallBack);
     glfwSetWindowPosCallback(_window, EventHandler::OnWindowPosCallBack);
-    glfwSetTrayClickCallback(_window, EventHandler::OnTrayClickCallBack);
+    // glfwSetTrayClickCallback(_window, EventHandler::OnTrayClickCallBack);
 
     // ウィンドウサイズ記憶
     int width, height;
@@ -288,7 +288,7 @@ bool LAppDelegate::Initialize()
     if(UpdateNotify &&_us->CheckUpdate())Notify(L"桌宠阿轴有新版本了", L"点击前往主页查看更新", _UpdateHandler);
 
     // 随机播放启动语音
-    _au->Play3dSound("Resources/Audio/s0"+to_string(rand()%StartAudioNum+1)+".mp3");
+    _au->Play3dSound("resources/audios/s0"+to_string(rand()%StartAudioNum+1)+".mp3");
 
     // 用于测试的通知
     // Notify(L"阿轴有新动态了", L"点击查看动态", _DynamicHandler);
@@ -419,7 +419,7 @@ void LAppDelegate::Run()
             auto liveInfo = liveQueue.front();
             liveQueue.pop();
             if (LiveNotify)Notify((liveInfo.name+L"开播了").c_str(),(liveInfo.title).c_str(),new WinToastEventHandler("https://live.bilibili.com/"+liveInfo.roomid));
-            if (liveInfo.uid == "61639371")_au->Play3dSound("Resources/Audio/n01.mp3");
+            if (liveInfo.uid == "61639371")_au->Play3dSound("resources/audios/n01.mp3");
         }
 
         // 动态提醒
@@ -788,7 +788,7 @@ void LAppDelegate::Notify(const WCHAR* title,const WCHAR* content, WinToastEvent
 
     templ.setTextField(title,WinToastTemplate::FirstLine);
     templ.setTextField(content, WinToastTemplate::SecondLine);
-    std::string img = _exePath + "Resources/Img/Avatar.png";
+    std::string img = _exePath + "resources/imgs/Avatar.png";
     templ.setImagePath(StringToWString(img));
     WinToast::instance()->showToast(templ, handler,nullptr);
 }

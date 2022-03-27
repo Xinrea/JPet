@@ -30,19 +30,10 @@ _deps
 /freeglut
 /Core
 /Framework
-thirdParty/glew
-thirdParty/OpenGLText
-thirdParty/freeglut
-thirdParty/fmod
-thirdParty/imgui
-thirdParty/WinToast
-thirdParty/cpp-httplib
-thirdParty/OpenSSL
-thirdParty/rapidjson
-thirdParty/boost
-lib/
 *.dir
 *.aps
 
 # live2d
 *.can3
+
+build/

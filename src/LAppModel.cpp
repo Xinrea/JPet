@@ -382,7 +382,7 @@ void LAppModel::Update()
             int r = dice();
             if (r < 950) {
                 StartMotion(MotionGroupIdle, 0, PriorityIdle, NULL, true);
-                if (dice() < 15)AudioManager::GetInstance()->Play3dSound("Resources/Audio/i0" + std::to_string(dice() % IdleAudioNum + 2) + ".mp3");
+                if (dice() < 15)AudioManager::GetInstance()->Play3dSound("resources/audios/i0" + std::to_string(dice() % IdleAudioNum + 2) + ".mp3");
             }
             else if (r < 990)StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
             else {

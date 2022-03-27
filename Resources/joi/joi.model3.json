@@ -20,8 +20,7 @@
 					"FadeOutTime": 0.5
 				},
 				{
-					"File": "Idle/Idle3.motion3.json",
-					"Sound": "../Audio/i01.mp3"
+					"File": "Idle/Idle3.motion3.json"
 				}
 			],
 			"HeadMotion": [

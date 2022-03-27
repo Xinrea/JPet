@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.29)
 
 option(
   CORE_CRL_MT
@@ -8,23 +8,31 @@ option(
 
 # Set app name.
 set(APP_NAME JPet)
+
+set(CMAKE_TOOLCHAIN_FILE "D:/vcpkg/scripts/buildsystems/vcpkg.cmake")
+list(APPEND CMAKE_PREFIX_PATH "D:/vcpkg/installed/x64-windows")
+
 # Set directory paths.
-set(SDK_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR})
-set(CORE_PATH ${SDK_ROOT_PATH}/Core)
-set(FRAMEWORK_PATH ${SDK_ROOT_PATH}/Framework)
-set(THIRD_PARTY_PATH ${SDK_ROOT_PATH}/thirdParty)
-set(STB_PATH ${THIRD_PARTY_PATH}/stb)
-set(GLEW_PATH ${THIRD_PARTY_PATH}/glew)
+set(RES_PATH ${CMAKE_CURRENT_SOURCE_DIR}/resources)
+set(THIRD_PARTY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
 set(GLFW_PATH ${THIRD_PARTY_PATH}/glfw)
 set(FMOD_PATH ${THIRD_PARTY_PATH}/fmod)
-set(TOAST_PATH ${THIRD_PARTY_PATH}/WinToast)
-set(HTTP_PATH ${THIRD_PARTY_PATH}/cpp-httplib)
-set(OPENSSL_PATH ${THIRD_PARTY_PATH}/OpenSSL)
-set(JSON_PATH ${THIRD_PARTY_PATH}/rapidjson)
-set(RES_PATH ${SDK_ROOT_PATH}/Resources)
+set(SDK_ROOT_PATH ${THIRD_PARTY_PATH}/CubismSdkForNative)
+set(CORE_PATH ${SDK_ROOT_PATH}/Core)
+set(FRAMEWORK_PATH ${SDK_ROOT_PATH}/Framework)
+
 
 # Set project.
-project(${APP_NAME})
+project(${APP_NAME} CXX)
+
+set(GLEW_USE_STATIC_LIBS OFF)
+
+find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(GLEW REQUIRED)
+find_package(unofficial-wintoast CONFIG REQUIRED)
+find_package(RapidJSON CONFIG REQUIRED)
+find_package(httplib CONFIG REQUIRED)
 
 # Set Visual Studio startup project.
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${APP_NAME})
@@ -53,26 +61,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Detect architecture.
 if(CMAKE_EXE_LINKER_FLAGS STREQUAL "/machine:x64")
   set(ARCH x86_64)
+  set(FMOD_ARCH x64)
 elseif(CMAKE_EXE_LINKER_FLAGS STREQUAL "/machine:X86")
   set(ARCH x86)
+  set(FMOD_ARCH x86)
 else()
   message(FATAL_ERROR "[${APP_NAME}] Invalid linker flag ${CMAKE_EXE_LINKER_FLAGS}.")
 endif()
-# Detect compiler.
-# if(MSVC_VERSION MATCHES 1800)
-#   # Visual Studio 2013
-#   set(COMPILER 120)
-# elseif(MSVC_VERSION MATCHES 1900)
-#   # Visual Studio 2015
-#   set(COMPILER 140)
-# elseif(MSVC_VERSION GREATER_EQUAL 1910 AND MSVC_VERSION LESS 1920)
-#   # Visual Studio 2017
-#   set(COMPILER 141)
-# elseif(MSVC)
-#   message(FATAL_ERROR "[${APP_NAME}] Unsupported Visual C++ compiler used.")
-# else()
-#   message(FATAL_ERROR "[${APP_NAME}] Unsupported compiler used.")
-# endif()
+
 # Visual Studio 2019
 set(COMPILER 142)
 # Detect core crt.
@@ -97,19 +93,18 @@ set_target_properties(Live2DCubismCore
 )
 
 # Add GLEW ,GLFW.
-add_subdirectory(${GLEW_PATH}/build/cmake ${CMAKE_CURRENT_BINARY_DIR}/glew)
 add_subdirectory(${GLFW_PATH} ${CMAKE_CURRENT_BINARY_DIR}/glfw)
 
 # Specify Cubism Framework rendering.
 set(FRAMEWORK_SOURCE OpenGL)
 # Add Cubism Native Framework.
-add_subdirectory(${FRAMEWORK_PATH} ${CMAKE_CURRENT_BINARY_DIR}/Framework)
+add_subdirectory(${FRAMEWORK_PATH})
 # Add rendering definition to framework.
 target_compile_definitions(Framework PUBLIC CSM_TARGET_WIN_GL)
 # Add include path of GLEW to framework.
 target_include_directories(Framework PUBLIC ${GLEW_PATH}/include)
 # Link libraries to framework.
-target_link_libraries(Framework Live2DCubismCore glew_s)
+target_link_libraries(Framework Live2DCubismCore GLEW::GLEW)
 
 # Find opengl libraries.
 find_package(OpenGL REQUIRED)
@@ -121,18 +116,21 @@ add_subdirectory(src)
 # Link libraries to app.
 target_link_libraries(${APP_NAME}
   Framework
+  GLEW::GLEW
+  OpenSSL::SSL
+  OpenSSL::Crypto
+  unofficial::wintoast::wintoast
+  httplib::httplib
+  rapidjson
   glfw
-  ${OPENGL_LIBRARIES}
   fmod_vc
-  libssl
-  libcrypto
   # Solve the MSVCRT confliction.
   debug -NODEFAULTLIB:libcmtd.lib
   optimized -NODEFAULTLIB:libcmt.lib
 )
 # Specify include directories.
-target_include_directories(${APP_NAME} PRIVATE ${STB_PATH} ${FMOD_PATH}/inc ${TOAST_PATH}/src ${HTTP_PATH} ${OPENSSL_PATH}/include ${JSON_PATH}/include)
-target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/lib/${ARCH}/ ${OPENSSL_PATH}/lib)
+target_include_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/inc ${GLEW_INCLUDE_DIRS})
+target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/ ${GLEW_LIBRARIES})
 # Build in multi-process.
 target_compile_options(${APP_NAME} PRIVATE /MP)
 
@@ -142,8 +140,13 @@ add_custom_command(
   POST_BUILD
   COMMAND
     ${CMAKE_COMMAND} -E
-      copy_directory ${RES_PATH} $<TARGET_FILE_DIR:${APP_NAME}>/Resources
+      copy_directory ${RES_PATH} $<TARGET_FILE_DIR:${APP_NAME}>/resources
 )
+
+add_custom_command(TARGET ${APP_NAME} POST_BUILD 
+               COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${FMOD_PATH}/core/lib/${FMOD_ARCH}/fmod.dll"
+                $<TARGET_FILE_DIR:${APP_NAME}>)
 
 # Set project properties.
 set_target_properties(${APP_NAME} PROPERTIES

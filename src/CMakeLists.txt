@@ -35,7 +35,4 @@ target_sources(${APP_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/PartStateManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/resource.h
     ${CMAKE_CURRENT_SOURCE_DIR}/JPet.rc
-    ${TOAST_PATH}/src/wintoastlib.h
-    ${TOAST_PATH}/src/wintoastlib.cpp
-    ${HTTP_PATH}/httplib.h
 )

@@ -6,41 +6,27 @@
 
 ## Live2d 模型
 
-模型绘制：轴伊Joi
+模型绘制：轴伊 Joi
 
 模型制作：Xinrea
 
-*该Live2d模型不可用于其他用途
+\*该 Live2d 模型不可用于其他用途
 
 ## 编译
 
-该项目需要以下依赖
+该项目需要的部分依赖已经置于`thirdparty`下，包括：
 
- - GLEW_VERSION=2.1.0
+- GLFW
+- FMOD CORE
+- CubismSdkForNative
 
- - GLFW_VERSION=3.3.2 # 为了使用托盘菜单，有修改添加新的CallBack，见thirdParty/_glfw
+其余依赖定义在 vcpkg.json 中，可使用 vcpkg 安装：
 
- - FMOD CORE 2.0
-
- - cpp-httplib
-
- - WinToast
-
- - CubismSdkForNative-4-r.1 -  Core, Framework
-
- - Visual Studio 2019 - v142 Toolset # 配置见CMakeLists.txt
-
-将依赖置于`thirdParty`下;
-
-将Core和Framework置于项目目录下
-
-然后
-
-```
-cmake .
+```shell
+vcpkg install
 ```
 
-用Visual Studio 2019打开生成的`JPet.sln`即可
+依赖安装完成后即可使用 CMake 编译
 
 ## TODO
 
@@ -61,13 +47,12 @@ cmake .
 
 Live2D Cubism Components is available under Live2D Open Software License.
 
-* [Live2D Open Software License Agreement](https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html)
-* [Live2D Open Software 使用許諾契約書](https://www.live2d.com/eula/live2d-open-software-license-agreement_jp.html)
-
+- [Live2D Open Software License Agreement](https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html)
+- [Live2D Open Software 使用許諾契約書](https://www.live2d.com/eula/live2d-open-software-license-agreement_jp.html)
 
 ## Live2D Proprietary Software License
 
 Live2D Cubism Core is available under Live2D Proprietary Software License.
 
-* [Live2D Proprietary Software License Agreement](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html)
-* [Live2D Proprietary Software 使用許諾契約書](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_jp.html)
+- [Live2D Proprietary Software License Agreement](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html)
+- [Live2D Proprietary Software 使用許諾契約書](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_jp.html)

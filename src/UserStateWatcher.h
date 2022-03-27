@@ -34,8 +34,8 @@ public:
 	vector<string> split(const string& str, const string& delim) {
 		vector<string> res;
 		if ("" == str) return res;
-		//ÏÈ½«ÒªÇÐ¸îµÄ×Ö·û´®´ÓstringÀàÐÍ×ª»»Îªchar*ÀàÐÍ
-		char* strs = new char[str.length() + 1]; //²»ÒªÍüÁË
+		//ï¿½È½ï¿½Òªï¿½Ð¸ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½stringï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªchar*ï¿½ï¿½ï¿½ï¿½
+		char* strs = new char[str.length() + 1]; //ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½
 		strcpy(strs, str.c_str());
 
 		char* d = new char[delim.length() + 1];
@@ -43,8 +43,8 @@ public:
 
 		char* p = strtok(strs, d);
 		while (p) {
-			string s = p; //·Ö¸îµÃµ½µÄ×Ö·û´®×ª»»ÎªstringÀàÐÍ
-			res.push_back(s); //´æÈë½á¹ûÊý×é
+			string s = p; //ï¿½Ö¸ï¿½Ãµï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½×ªï¿½ï¿½Îªstringï¿½ï¿½ï¿½ï¿½
+			res.push_back(s); //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 			p = strtok(NULL, d);
 		}
 
