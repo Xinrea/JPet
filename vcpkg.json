@@ -1,0 +1,9 @@
+{
+    "dependencies": [
+        "GLEW",
+        "OpenSSL",
+        "wintoast",
+        "cpp-httplib",
+        "rapidjson"
+    ]
+}
