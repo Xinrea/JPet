@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.29)
+cmake_minimum_required(VERSION 3.27)
 
 option(
   CORE_CRL_MT
@@ -33,6 +33,7 @@ find_package(GLEW REQUIRED)
 find_package(unofficial-wintoast CONFIG REQUIRED)
 find_package(RapidJSON CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
+find_package(Stb REQUIRED)
 
 # Set Visual Studio startup project.
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${APP_NAME})
@@ -129,7 +130,7 @@ target_link_libraries(${APP_NAME}
   optimized -NODEFAULTLIB:libcmt.lib
 )
 # Specify include directories.
-target_include_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/inc ${GLEW_INCLUDE_DIRS})
+target_include_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/inc ${GLEW_INCLUDE_DIRS} ${Stb_INCLUDE_DIR})
 target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/ ${GLEW_LIBRARIES})
 # Build in multi-process.
 target_compile_options(${APP_NAME} PRIVATE /MP)
