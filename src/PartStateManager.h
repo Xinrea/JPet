@@ -1,82 +1,37 @@
-#pragma once
+ï»¿#pragma once
 #pragma once
 #include <CubismFramework.hpp>
-#include "Model/CubismModel.hpp"
-#include "Utils/CubismJson.hpp"
 #include <map>
 #include <string>
 #include <vector>
+
+#include "Model/CubismModel.hpp"
+#include "Utils/CubismJson.hpp"
 using std::map;
 using std::string;
 using std::vector;
 using namespace Live2D::Cubism::Framework;
 
-class PartStateManager
-{
-	vector<CubismIdHandle> ParamIdList;
-	map<string, float> ParamState;
-	CubismModel* model = nullptr;
-public:
-	const int ParamNum = 17;
-	const char* ParamList[17] = {
-		"ParamClothes",
-		"ParamQuan",
-		"ParamStar",
-		"ParamVeye",
-		"ParamMouth1",
-		"ParamMouth2",
-		"ParamMouth3",
-		"ParamMouth4",
-		"ParamMouth5",
-		"Param",
-		"ParamGun",
-		"ParamHat",
-		"ParamKneeSocks",
-		"ParamEarl",
-		"ParamEarr",
-		"ParamLegBelt",
-		"ParamSleeveShow"
-	};
-	const float ParamDefault[17] = {
-		0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0
-	};
-	static PartStateManager* GetInstance();
-	void SetModel(CubismModel* m);
-	void SaveState();
-	float GetState(string param);
-	void SetState();
-	void ImportState(map<string, float> State) { ParamState = State; }
-	map<string, float> GetAllState() { return ParamState; }
+class PartStateManager {
+  vector<CubismIdHandle> ParamIdList;
+  map<string, float> ParamState;
+  CubismModel* model = nullptr;
+
+ public:
+  const int ParamNum = 17;
+  const char* ParamList[17] = {
+      "ParamClothes",   "ParamQuan",   "ParamStar",   "ParamVeye",
+      "ParamMouth1",    "ParamMouth2", "ParamMouth3", "ParamMouth4",
+      "ParamMouth5",    "Param",       "ParamGun",    "ParamHat",
+      "ParamKneeSocks", "ParamEarl",   "ParamEarr",   "ParamLegBelt",
+      "ParamSleeveShow"};
+  const float ParamDefault[17] = {0, 0, 0, 0, 1, 0, 0, 0, 0,
+                                  0, 0, 0, 0, 0, 0, 0, 0};
+  static PartStateManager* GetInstance();
+  void SetModel(CubismModel* m);
+  void SaveState();
+  float GetState(string param);
+  void SetState();
+  void ImportState(map<string, float> State) { ParamState = State; }
+  map<string, float> GetAllState() { return ParamState; }
 };
-
-
-
-/*
-¹² 20 ¸ö²ÎÊý
-ÕûÌå²¿·Ö£º
-ParamClothes - ÐÂ¾ÉÒÂ·þÕûÌåÇÐ»»£º0 -> 1 | ÐÂ -> ¾É
-
-ÑÛ¾¦²¿·Ö£º
-ParamQuan	 - È¦È¦ÑÛ£º0 -> 1
-ParamStar	 - ÐÇÐÇÑÛ£º0 -> 1
-ParamVeye	 - V×ÖÑÛ£º0 -> 1
-
-×ì²¿£º
-ParamMouth1  - ÀäÄ®
-ParamMouth2  - ÕÅ¿ª
-ParamMouth3  - ²»¿ªÐÄ
-ParamMouth4  - Èý½Ç
-ParamMouth5  - »ÅÂÒ
-Param		 - ÍÂÉà: -30 -> 30
-
-ÆäËû²¿Î»£º
-ParamGun     - Ç¹
-ParamHat     - Ã±×Ó
-ParamKneeSocks - Íà×Ó
-ParamEarl    - ×ó¶ú
-ParamEarr    - ÓÒ¶ú
-ParamLegBelt - ÍÈ»·
-ParamSleeveShow - Ðä×Ó
-*/
-
-
