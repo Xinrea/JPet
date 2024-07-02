@@ -1,0 +1,493 @@
+{
+	"Version": 3,
+	"Parameters": [
+		{
+			"Id": "Param20",
+			"GroupId": "ParamGroup2",
+			"Name": "星"
+		},
+		{
+			"Id": "ParamAngleX",
+			"GroupId": "ParamGroup2",
+			"Name": "角度 X"
+		},
+		{
+			"Id": "ParamAngleY",
+			"GroupId": "ParamGroup2",
+			"Name": "角度 Y"
+		},
+		{
+			"Id": "ParamAngleZ",
+			"GroupId": "ParamGroup2",
+			"Name": "角度 Z"
+		},
+		{
+			"Id": "ParamEyeLOpen",
+			"GroupId": "ParamGroup2",
+			"Name": "左眼　开闭"
+		},
+		{
+			"Id": "ParamEyeLSmile",
+			"GroupId": "ParamGroup2",
+			"Name": "左眼　微笑"
+		},
+		{
+			"Id": "ParamBrowLForm",
+			"GroupId": "ParamGroup2",
+			"Name": "左眉　変形"
+		},
+		{
+			"Id": "Param7",
+			"GroupId": "ParamGroup2",
+			"Name": "嘴1"
+		},
+		{
+			"Id": "Param8",
+			"GroupId": "ParamGroup2",
+			"Name": "嘴2"
+		},
+		{
+			"Id": "Param9",
+			"GroupId": "ParamGroup2",
+			"Name": "嘴3"
+		},
+		{
+			"Id": "Param10",
+			"GroupId": "ParamGroup2",
+			"Name": "嘴4"
+		},
+		{
+			"Id": "Param11",
+			"GroupId": "ParamGroup2",
+			"Name": "嘴5"
+		},
+		{
+			"Id": "Param12",
+			"GroupId": "ParamGroup2",
+			"Name": "嘴6"
+		},
+		{
+			"Id": "Param13",
+			"GroupId": "ParamGroup2",
+			"Name": "星星"
+		},
+		{
+			"Id": "ParamBodyAngleX",
+			"GroupId": "ParamGroup2",
+			"Name": "身体旋转　X"
+		},
+		{
+			"Id": "ParamBodyAngleX2",
+			"GroupId": "ParamGroup2",
+			"Name": "身体旋转　X"
+		},
+		{
+			"Id": "ParamBodyAngleX3",
+			"GroupId": "ParamGroup2",
+			"Name": "身体旋转　X2"
+		},
+		{
+			"Id": "ParamBodyAngleY",
+			"GroupId": "ParamGroup2",
+			"Name": "身体旋转　Y"
+		},
+		{
+			"Id": "ParamBreath",
+			"GroupId": "ParamGroup2",
+			"Name": "呼吸"
+		},
+		{
+			"Id": "Param5",
+			"GroupId": "ParamGroup2",
+			"Name": "猫耳1"
+		},
+		{
+			"Id": "Param6",
+			"GroupId": "ParamGroup2",
+			"Name": "猫耳2"
+		},
+		{
+			"Id": "ParamHairFront",
+			"GroupId": "ParamGroup2",
+			"Name": "摇动 前发"
+		},
+		{
+			"Id": "ParamHairFront2",
+			"GroupId": "ParamGroup2",
+			"Name": "摇动 前发"
+		},
+		{
+			"Id": "ParamHairBack",
+			"GroupId": "ParamGroup2",
+			"Name": "摇动 后发"
+		},
+		{
+			"Id": "ParamHairBack2",
+			"GroupId": "ParamGroup2",
+			"Name": "摇动 后发"
+		},
+		{
+			"Id": "Param4",
+			"GroupId": "",
+			"Name": "长毛"
+		},
+		{
+			"Id": "Param",
+			"GroupId": "",
+			"Name": "粉"
+		},
+		{
+			"Id": "Param3",
+			"GroupId": "",
+			"Name": "绿"
+		},
+		{
+			"Id": "Param2",
+			"GroupId": "",
+			"Name": "冬"
+		},
+		{
+			"Id": "Param14",
+			"GroupId": "",
+			"Name": "黑脸"
+		},
+		{
+			"Id": "Param15",
+			"GroupId": "",
+			"Name": "脸红"
+		},
+		{
+			"Id": "Param16",
+			"GroupId": "",
+			"Name": "汗"
+		},
+		{
+			"Id": "Param17",
+			"GroupId": "",
+			"Name": "枪"
+		},
+		{
+			"Id": "Param21",
+			"GroupId": "",
+			"Name": "?"
+		},
+		{
+			"Id": "Param23",
+			"GroupId": "",
+			"Name": "变"
+		},
+		{
+			"Id": "Param_Angle_Rotation_1_ArtMesh76",
+			"GroupId": "ParamGroup",
+			"Name": "[0]图层 123"
+		},
+		{
+			"Id": "Param_Angle_Rotation_2_ArtMesh76",
+			"GroupId": "ParamGroup",
+			"Name": "[1]图层 123"
+		},
+		{
+			"Id": "Param_Angle_Rotation_3_ArtMesh76",
+			"GroupId": "ParamGroup",
+			"Name": "[2]图层 123"
+		},
+		{
+			"Id": "Param_Angle_Rotation_4_ArtMesh76",
+			"GroupId": "ParamGroup",
+			"Name": "[3]图层 123"
+		},
+		{
+			"Id": "Param_Angle_Rotation_5_ArtMesh76",
+			"GroupId": "ParamGroup",
+			"Name": "[4]图层 123"
+		},
+		{
+			"Id": "Param_Angle_Rotation_6_ArtMesh76",
+			"GroupId": "ParamGroup",
+			"Name": "[5]图层 123"
+		},
+		{
+			"Id": "Param_Angle_Rotation_7_ArtMesh76",
+			"GroupId": "ParamGroup",
+			"Name": "[6]图层 123"
+		}
+	],
+	"ParameterGroups": [
+		{
+			"Id": "ParamGroup2",
+			"GroupId": "",
+			"Name": "Folder 1"
+		},
+		{
+			"Id": "ParamGroup",
+			"GroupId": "",
+			"Name": "图层 123"
+		}
+	],
+	"Parts": [
+		{
+			"Id": "Part34",
+			"Name": "mengb.psd"
+		},
+		{
+			"Id": "ALL",
+			"Name": "ALL"
+		},
+		{
+			"Id": "Part76",
+			"Name": "ZMCW绿色(1).psd"
+		},
+		{
+			"Id": "Part",
+			"Name": "星星"
+		},
+		{
+			"Id": "Part2",
+			"Name": "新衣服"
+		},
+		{
+			"Id": "Part81",
+			"Name": "ZMCW冬装(1).psd"
+		},
+		{
+			"Id": "Part8",
+			"Name": "头"
+		},
+		{
+			"Id": "Part44",
+			"Name": "连体衣"
+		},
+		{
+			"Id": "Part19",
+			"Name": "手臂"
+		},
+		{
+			"Id": "Part80",
+			"Name": "6枪"
+		},
+		{
+			"Id": "Part28",
+			"Name": "尾巴"
+		},
+		{
+			"Id": "Part29",
+			"Name": "后发二选一"
+		},
+		{
+			"Id": "Part33",
+			"Name": "帽子蝴蝶结"
+		},
+		{
+			"Id": "Part3",
+			"Name": "发夹"
+		},
+		{
+			"Id": "Part4",
+			"Name": "鞋子"
+		},
+		{
+			"Id": "Part5",
+			"Name": "腿环"
+		},
+		{
+			"Id": "Part6",
+			"Name": "领结"
+		},
+		{
+			"Id": "Part7",
+			"Name": "裙子"
+		},
+		{
+			"Id": "Part11",
+			"Name": "头"
+		},
+		{
+			"Id": "Part45",
+			"Name": "围巾前"
+		},
+		{
+			"Id": "Part52",
+			"Name": "冬装"
+		},
+		{
+			"Id": "Part9",
+			"Name": "耳朵2"
+		},
+		{
+			"Id": "Part10",
+			"Name": "耳朵1"
+		},
+		{
+			"Id": "Part12",
+			"Name": "刘海"
+		},
+		{
+			"Id": "Part13",
+			"Name": "长发前发"
+		},
+		{
+			"Id": "Part14",
+			"Name": "短发 前发"
+		},
+		{
+			"Id": "Part15",
+			"Name": "嘴巴"
+		},
+		{
+			"Id": "Part16",
+			"Name": "眼睛"
+		},
+		{
+			"Id": "Part17",
+			"Name": "眼皮"
+		},
+		{
+			"Id": "Part18",
+			"Name": "脸"
+		},
+		{
+			"Id": "Part46",
+			"Name": "鞋子"
+		},
+		{
+			"Id": "Part47",
+			"Name": "腰带"
+		},
+		{
+			"Id": "Part51",
+			"Name": "连体衣"
+		},
+		{
+			"Id": "Part70",
+			"Name": "袖子"
+		},
+		{
+			"Id": "Part71",
+			"Name": "背心"
+		},
+		{
+			"Id": "Part20",
+			"Name": "左手"
+		},
+		{
+			"Id": "Part24",
+			"Name": "右手"
+		},
+		{
+			"Id": "ArtMesh76_Skinning",
+			"Name": "图层 123(蒙皮)"
+		},
+		{
+			"Id": "Part35",
+			"Name": "图层 123(旋转)"
+		},
+		{
+			"Id": "Part30",
+			"Name": "普通长后发"
+		},
+		{
+			"Id": "Part32",
+			"Name": "短后发"
+		},
+		{
+			"Id": "Part53",
+			"Name": "包包"
+		},
+		{
+			"Id": "Part54",
+			"Name": "鞋子2"
+		},
+		{
+			"Id": "Part56",
+			"Name": "鞋子1"
+		},
+		{
+			"Id": "Part58",
+			"Name": "冬装-外套"
+		},
+		{
+			"Id": "Part60",
+			"Name": "手套 副本"
+		},
+		{
+			"Id": "Part61",
+			"Name": "手套"
+		},
+		{
+			"Id": "Part62",
+			"Name": "冬装-内搭"
+		},
+		{
+			"Id": "Part67",
+			"Name": "围巾后 副本"
+		},
+		{
+			"Id": "Part68",
+			"Name": "围巾后"
+		},
+		{
+			"Id": "Part69",
+			"Name": "裤袜"
+		},
+		{
+			"Id": "Part48",
+			"Name": "组 7"
+		},
+		{
+			"Id": "Part21",
+			"Name": "袖子前右边"
+		},
+		{
+			"Id": "Part22",
+			"Name": "手右边"
+		},
+		{
+			"Id": "Part23",
+			"Name": "袖子后面2"
+		},
+		{
+			"Id": "Part25",
+			"Name": "组 1"
+		},
+		{
+			"Id": "Part26",
+			"Name": "手左边"
+		},
+		{
+			"Id": "Part27",
+			"Name": "袖子后面1"
+		},
+		{
+			"Id": "Part31",
+			"Name": "后发 长"
+		},
+		{
+			"Id": "Part55",
+			"Name": "组 8"
+		},
+		{
+			"Id": "Part57",
+			"Name": "组 9"
+		},
+		{
+			"Id": "Part59",
+			"Name": "中"
+		},
+		{
+			"Id": "Part63",
+			"Name": "毛衣中"
+		},
+		{
+			"Id": "Part64",
+			"Name": "袖子2"
+		},
+		{
+			"Id": "Part65",
+			"Name": "袖子1"
+		},
+		{
+			"Id": "Part66",
+			"Name": "裙子"
+		}
+	]
+}
