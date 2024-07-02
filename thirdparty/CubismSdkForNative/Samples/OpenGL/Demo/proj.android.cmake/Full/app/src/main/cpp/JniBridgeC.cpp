@@ -5,8 +5,9 @@
  * that can be found at https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html.
  */
 
-#include <jni.h>
 #include "JniBridgeC.hpp"
+#include <algorithm>
+#include <jni.h>
 #include "LAppDelegate.hpp"
 #include "LAppPal.hpp"
 
@@ -14,6 +15,7 @@ using namespace Csm;
 
 static JavaVM* g_JVM; // JavaVM is valid for all threads, so just save it globally
 static jclass  g_JniBridgeJavaClass;
+static jmethodID g_GetAssetsMethodId;
 static jmethodID g_LoadFileMethodId;
 static jmethodID g_MoveTaskToBackMethodId;
 
@@ -37,6 +39,7 @@ jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved)
 
     jclass clazz = env->FindClass("com/live2d/demo/JniBridgeJava");
     g_JniBridgeJavaClass = reinterpret_cast<jclass>(env->NewGlobalRef(clazz));
+    g_GetAssetsMethodId = env->GetStaticMethodID(g_JniBridgeJavaClass, "GetAssetList", "(Ljava/lang/String;)[Ljava/lang/String;");
     g_LoadFileMethodId = env->GetStaticMethodID(g_JniBridgeJavaClass, "LoadFile", "(Ljava/lang/String;)[B");
     g_MoveTaskToBackMethodId = env->GetStaticMethodID(g_JniBridgeJavaClass, "MoveTaskToBack", "()V");
 
@@ -49,12 +52,36 @@ void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved)
     env->DeleteGlobalRef(g_JniBridgeJavaClass);
 }
 
+Csm::csmVector<Csm::csmString>JniBridgeC::GetAssetList(const Csm::csmString& path)
+{
+    JNIEnv *env = GetEnv();
+    jobjectArray obj = reinterpret_cast<jobjectArray>(env->CallStaticObjectMethod(g_JniBridgeJavaClass, g_GetAssetsMethodId, env->NewStringUTF(path.GetRawString())));
+    unsigned int size = static_cast<unsigned int>(env->GetArrayLength(obj));
+    Csm::csmVector<Csm::csmString> list(size);
+    for (unsigned int i = 0; i < size; i++)
+    {
+        jstring jstr = reinterpret_cast<jstring>(env->GetObjectArrayElement(obj, i));
+        const char* chars = env->GetStringUTFChars(jstr, nullptr);
+        list.PushBack(Csm::csmString(chars));
+        env->ReleaseStringUTFChars(jstr, chars);
+        env->DeleteLocalRef(jstr);
+    }
+    return list;
+}
+
 char* JniBridgeC::LoadFileAsBytesFromJava(const char* filePath, unsigned int* outSize)
 {
     JNIEnv *env = GetEnv();
 
     // ファイルロード
     jbyteArray obj = (jbyteArray)env->CallStaticObjectMethod(g_JniBridgeJavaClass, g_LoadFileMethodId, env->NewStringUTF(filePath));
+
+    // ファイルが見つからなかったらnullが返ってくるためチェック
+    if (!obj)
+    {
+        return NULL;
+    }
+
     *outSize = static_cast<unsigned int>(env->GetArrayLength(obj));
 
     char* buffer = new char[*outSize];
@@ -133,4 +160,3 @@ extern "C"
         LAppDelegate::GetInstance()->OnTouchMoved(pointX, pointY);
     }
 }
-

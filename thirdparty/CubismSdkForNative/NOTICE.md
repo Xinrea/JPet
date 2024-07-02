@@ -4,6 +4,38 @@
 
 # Notices
 
+## [Caution] Support for Apple's Privacy Manifest Policy
+
+This product does not use the APIs or third-party products specified in Apple's privacy manifest policy.
+This will be addressed in future updates if this product requires such support.
+Please check the documentation published by Apple for details.
+
+* [Privacy updates for App Store submissions](https://developer.apple.com/news/?id=3d8a9yyh)
+
+
+## [Caution] Support for Wayland in Linux OpenGL Environment (2024-03-26)
+
+`GLFW 3.4`, which this product uses in the Linux OpenGL environment, can now be compiled for Wayland.
+However, this sample is not compatible with Wayland because `glewInit` is currently not working properly when compiling for Wayland (EGL) in `GLEW 2.2.0`.
+
+If you are using the Linux OpenGL environment, please continue to use the X11 build as usual.
+
+Please refer to the issue below for details.
+
+* [GLEW issue](https://github.com/nigels-com/glew/issues/172)
+
+
+## [Caution] Mac Catalyst build error for Metal (2024-01-25)
+
+There is an error when building Mac Catalyst for Metal.
+Specifically, when generating a project using `cmake3.27.0` or higher, errors such as `'Foundation/NSURLHandle.h' file not found` will occur.
+We will continue to investigate the details.
+
+### Workaround
+
+* Use cmake with versions less than 3.27
+
+
 ## [Caution] About Cocos2d-x setup error (2022-03-15)
 
 An error occurs in the setup-cocos2d batch that is executed when setting up the Cocos2d-x sample project.
@@ -30,13 +62,6 @@ Note that we cannot answer inquiries regarding this matter.
 Please check the Apple Developer Forums for more information.
 
 * [Apple Developer Forums - Memory leak in MTLCommandBuffer?](https://developer.apple.com/forums/thread/120931)
-
-
-## [Limitation] Support for Apple products (updated 2021-12-09)
-
-macOS Monterey v12.0 is now supported by the Cubism 4 SDK for Native R4 (4-r.4).
-In addition, Cubism 4 SDK for Native R4 Beta1 (4-r.4-beta.1) or later versions are compatible with the Apple Silicon version of Mac.
-† Please note that Cubism Editor is not currently compatible with Apple Silicon Macs.
 
 
 ## [Limitation] About the Linux (Ubuntu) sample builds of Cocos2d-x v4.0 (2021-04-15)

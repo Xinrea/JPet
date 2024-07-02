@@ -10,6 +10,7 @@
 #include <sstream>
 #include <string>
 #include <mach-o/dyld.h>
+#include <libgen.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
@@ -62,7 +63,7 @@ static LAppAllocator _cubismAllocator; ///< メモリのアロケーター
 
 static LAppTextureManager* _textureManager; ///< テクスチャの管理
 
-static std::string _rootDirectory; ///< ルートディレクトリ
+static std::string _executeAbsolutePath; ///< アプリケーションの実行パス
 static std::string _currentModelDirectory; ///< 現在のモデルのディレクトリ名
 
 static GLFWwindow* _window; ///< ウィンドウオブジェクト
@@ -77,7 +78,7 @@ int windowWidth, windowHeight; ///< ウィンドウサイズの保存
 static void InitializeCubism()
 {
     //setup cubism
-    _cubismOption.LogFunction = LAppPal::PrintMessage;
+    _cubismOption.LogFunction = LAppPal::PrintMessageLn;
     _cubismOption.LoggingLevel = Csm::CubismFramework::Option::LogLevel_Verbose;
     Csm::CubismFramework::StartUp(&_cubismAllocator, &_cubismOption);
 
@@ -86,45 +87,17 @@ static void InitializeCubism()
 }
 
 /**
-* @brief 文字列の分割
+* @brief アプリケーションの実行パスの設定
 *
-* 指定された区切り文字で文字列を分割する
+* アプリケーションの実行パスを確認し、パスを取得する
 */
-Csm::csmVector<std::string> Split(const std::string& baseString, char delimiter)
-{
-    Csm::csmVector <std::string> elems;
-    std::stringstream ss(baseString);
-    std::string item;
-
-    while (getline(ss, item, delimiter))
-    {
-        if (!item.empty())
-        {
-            elems.PushBack(item);
-        }
-    }
-
-    return elems;
-}
-
-/**
-* @brief ルートディレクトリの設定
-*
-* Linuxのルートディレクトリを確認し、パスを取得する
-*/
-void SetRootDirectory()
+void SetExecuteAbsolutePath()
 {
     char path[1024];
     uint32_t size = sizeof(path);
     _NSGetExecutablePath(path, &size);
-    Csm::csmVector<std::string> splitStrings = Split(path, '/');
-
-    _rootDirectory = "";
-    for(int i = 0; i < splitStrings.GetSize() - 1; i++)
-    {
-        _rootDirectory = _rootDirectory + "/" +splitStrings[i];
-    }
-    _rootDirectory += "/";
+    _executeAbsolutePath = dirname(path);
+    _executeAbsolutePath += "/";
 }
 
 /**
@@ -134,12 +107,12 @@ void SetRootDirectory()
 */
 static bool InitializeSystem()
 {
-    LAppPal::PrintLog("START");
+    LAppPal::PrintLogLn("START");
 
     // GLFWの初期化
     if (glfwInit() == GL_FALSE)
     {
-        LAppPal::PrintLog("Can't initilize GLFW");
+        LAppPal::PrintLogLn("Can't initilize GLFW");
 
         return GL_FALSE;
     }
@@ -148,7 +121,7 @@ static bool InitializeSystem()
     _window = glfwCreateWindow(LAppDefine::RenderTargetWidth, LAppDefine::RenderTargetHeight, "SIMPLE_SAMPLE", NULL, NULL);
     if (_window == NULL)
     {
-        LAppPal::PrintLog("Can't create GLFW window.");
+        LAppPal::PrintLogLn("Can't create GLFW window.");
 
         glfwTerminate();
         return GL_FALSE;
@@ -159,7 +132,7 @@ static bool InitializeSystem()
     glfwSwapInterval(1);
 
     if (glewInit() != GLEW_OK) {
-        LAppPal::PrintLog("Can't initilize glew.");
+        LAppPal::PrintLogLn("Can't initilize glew.");
 
         glfwTerminate();
         return GL_FALSE;
@@ -186,7 +159,7 @@ static bool InitializeSystem()
     // ドラッグ入力管理クラスの初期化
     MouseActionManager::GetInstance()->Initialize(windowWidth, windowHeight);
 
-    SetRootDirectory();
+    SetExecuteAbsolutePath();
 
     return GL_TRUE;
 }
@@ -230,7 +203,7 @@ void Release()
 void LoadModel(const std::string modelDirectoryName)
 {
     // モデルのディレクトリを指定
-    _currentModelDirectory = _rootDirectory + LAppDefine::ResourcesPath + modelDirectoryName + "/";
+    _currentModelDirectory = _executeAbsolutePath + LAppDefine::ResourcesPath + modelDirectoryName + "/";
 
     // モデルデータの新規生成
     _userModel = new CubismUserModelExtend(modelDirectoryName, _currentModelDirectory);

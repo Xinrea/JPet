@@ -12,9 +12,9 @@ This is a sample implementation of an application implemented with OpenGL.
 | Third Party | Version |
 | --- | --- |
 | [GLEW] | 2.2.0 |
-| [GLFW] | 3.3.8 |
-| [ios-cmake] | 4.3.0 |
-| [stb_image.h] | 2.28 |
+| [GLFW] | 3.4 |
+| [ios-cmake] | 4.4.1 |
+| [stb_image.h] | 2.29 |
 
 For other development environments and operation environments, see [README.md](/README.md) in the top directory.
 
@@ -76,6 +76,11 @@ Running the script in the `script` directory will generate a CMake deliverable i
 
 When you run these scripts, you can choose to generate the full version or the minimum version of the sample.
 
+Follow the steps below when building for iOS Simulator on a Mac with Apple silicon.
+
+1. Change the description of Xcode's `Project Settings - TARGETS - Demo` and `Framework`'s `Build Settings - Architectures - Architectures` according to the execution environment.
+
+
 [ios-cmake] is used as a toolchain for CMake.
 Please refer to the [thirdParty](#thirdParty) section and download in advance.
 
@@ -95,6 +100,8 @@ When you run these scripts, you can choose to generate the full version or the m
 
 [GLEW] and [GLFW] are used as additional libraries.
 Please refer to the [thirdParty](#thirdParty) section and download in advance.
+During the build process, you may be prompted to install additional packages such as `libpng` or X Windows System dependent libraries. If prompted, please install the required packages.
+
 
 ### proj.mac.cmake
 

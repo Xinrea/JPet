@@ -51,7 +51,7 @@ LAppView::LAppView():
 
 LAppView::~LAppView()
 {
-    _renderBuffer.DestroyOffscreenFrame();
+    _renderBuffer.DestroyOffscreenSurface();
     delete _renderSprite;
 
     delete _viewMatrix;
@@ -184,6 +184,13 @@ void LAppView::InitializeSprite()
 
 void LAppView::Render()
 {
+    // 画面サイズを取得する
+    int maxWidth = LAppDelegate::GetInstance()->GetWindowWidth();
+    int maxHeight = LAppDelegate::GetInstance()->GetWindowHeight();
+    _back->SetWindowSize(maxWidth, maxHeight);
+    _gear->SetWindowSize(maxWidth, maxHeight);
+    _power->SetWindowSize(maxWidth, maxHeight);
+
     _back->Render();
     _gear->Render();
     _power->Render();
@@ -220,6 +227,7 @@ void LAppView::Render()
 
             if (model)
             {
+                _renderSprite->SetWindowSize(maxWidth, maxHeight);
                 _renderSprite->RenderImmidiate(model->GetRenderBuffer().GetColorBuffer(), uvVertex);
             }
         }
@@ -253,7 +261,7 @@ void LAppView::OnTouchesEnded(float pointX, float pointY)
         float y = _deviceToScreen->TransformY(_touchManager->GetY()); // 論理座標変換した座標を取得。
         if (DebugTouchLogEnable)
         {
-            LAppPal::PrintLog("[APP]touchesEnded x:%.2f y:%.2f", x, y);
+            LAppPal::PrintLogLn("[APP]touchesEnded x:%.2f y:%.2f", x, y);
         }
         live2DManager->OnTap(x, y);
 
@@ -296,7 +304,7 @@ float LAppView::TransformScreenY(float deviceY) const
 void LAppView::PreModelDraw(LAppModel &refModel)
 {
     // 別のレンダリングターゲットへ向けて描画する場合の使用するフレームバッファ
-    Csm::Rendering::CubismOffscreenFrame_OpenGLES2* useTarget = NULL;
+    Csm::Rendering::CubismOffscreenSurface_OpenGLES2* useTarget = NULL;
 
     if (_renderTarget != SelectTarget_None)
     {// 別のレンダリングターゲットへ向けて描画する場合
@@ -310,7 +318,7 @@ void LAppView::PreModelDraw(LAppModel &refModel)
             int height = LAppDelegate::GetInstance()->GetWindowHeight();
 
             // モデル描画キャンバス
-            useTarget->CreateOffscreenFrame(static_cast<csmUint32>(width), static_cast<csmUint32>(height));
+            useTarget->CreateOffscreenSurface(static_cast<csmUint32>(width), static_cast<csmUint32>(height));
         }
 
         // レンダリング開始
@@ -322,7 +330,7 @@ void LAppView::PreModelDraw(LAppModel &refModel)
 void LAppView::PostModelDraw(LAppModel &refModel)
 {
     // 別のレンダリングターゲットへ向けて描画する場合の使用するフレームバッファ
-    Csm::Rendering::CubismOffscreenFrame_OpenGLES2* useTarget = NULL;
+    Csm::Rendering::CubismOffscreenSurface_OpenGLES2* useTarget = NULL;
 
     if (_renderTarget != SelectTarget_None)
     {// 別のレンダリングターゲットへ向けて描画する場合
@@ -345,6 +353,12 @@ void LAppView::PostModelDraw(LAppModel &refModel)
             };
 
             _renderSprite->SetColor(1.0f, 1.0f, 1.0f, GetSpriteAlpha(0));
+
+            // 画面サイズを取得する
+            int maxWidth = LAppDelegate::GetInstance()->GetWindowWidth();
+            int maxHeight = LAppDelegate::GetInstance()->GetWindowHeight();
+            _renderSprite->SetWindowSize(maxWidth, maxHeight);
+
             _renderSprite->RenderImmidiate(useTarget->GetColorBuffer(), uvVertex);
         }
     }

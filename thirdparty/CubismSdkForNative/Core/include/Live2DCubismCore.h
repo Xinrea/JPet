@@ -94,8 +94,10 @@ extern "C"
         csmMocVersion_33 = 2,
         /** moc3 file version 4.0.00 - 4.1.05 */
         csmMocVersion_40 = 3,
-        /** moc3 file version 4.2.00 - */
-        csmMocVersion_42 = 4
+        /** moc3 file version 4.2.00 - 4.2.04 */
+        csmMocVersion_42 = 4,
+        /** moc3 file version 5.0.00 - */
+        csmMocVersion_50 = 5
     };
 
     /** moc3 version identifier. */

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <sstream>
 #include <unistd.h>
+#include <libgen.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include "LAppView.hpp"
@@ -49,7 +50,7 @@ bool LAppDelegate::Initialize()
 {
     if (DebugLogEnable)
     {
-        LAppPal::PrintLog("START");
+        LAppPal::PrintLogLn("START");
     }
 
     // GLFWの初期化
@@ -57,7 +58,7 @@ bool LAppDelegate::Initialize()
     {
         if (DebugLogEnable)
         {
-            LAppPal::PrintLog("Can't initilize GLFW");
+            LAppPal::PrintLogLn("Can't initilize GLFW");
         }
         return GL_FALSE;
     }
@@ -68,7 +69,7 @@ bool LAppDelegate::Initialize()
     {
         if (DebugLogEnable)
         {
-            LAppPal::PrintLog("Can't create GLFW window.");
+            LAppPal::PrintLogLn("Can't create GLFW window.");
         }
         glfwTerminate();
         return GL_FALSE;
@@ -81,7 +82,7 @@ bool LAppDelegate::Initialize()
     if (glewInit() != GLEW_OK) {
         if (DebugLogEnable)
         {
-            LAppPal::PrintLog("Can't initilize glew.");
+            LAppPal::PrintLogLn("Can't initilize glew.");
         }
         glfwTerminate();
         return GL_FALSE;
@@ -112,7 +113,7 @@ bool LAppDelegate::Initialize()
     // Cubism3の初期化
     InitializeCubism();
 
-    SetRootDirectory();
+    SetExecuteAbsolutePath();
 
     //load model
     LAppLive2DManager::GetInstance();
@@ -190,7 +191,7 @@ LAppDelegate::LAppDelegate():
     _windowWidth(0),
     _windowHeight(0)
 {
-    _rootDirectory = "";
+    _executeAbsolutePath = "";
     _view = new LAppView();
     _textureManager = new LAppTextureManager();
 }
@@ -301,7 +302,7 @@ GLuint LAppDelegate::CreateShader()
     return programId;
 }
 
-void LAppDelegate::SetRootDirectory()
+void LAppDelegate::SetExecuteAbsolutePath()
 {
     char path[1024];
     ssize_t len = readlink("/proc/self/exe", path, 1024 - 1);
@@ -311,34 +312,6 @@ void LAppDelegate::SetRootDirectory()
         path[len] = '\0';
     }
 
-    std::string pathString(path);
-
-    pathString = pathString.substr(0, pathString.rfind("Demo"));
-    Csm::csmVector<string> splitStrings = this->Split(pathString, '/');
-
-    this->_rootDirectory = "";
-
-    for(int i = 0; i < splitStrings.GetSize(); i++)
-    {
-        this->_rootDirectory = this->_rootDirectory + "/" +splitStrings[i];
-    }
-
-    this->_rootDirectory += "/";
-}
-
-Csm::csmVector<string> LAppDelegate::Split(const std::string& baseString, char delimiter)
-{
-    Csm::csmVector<string> elems;
-    stringstream ss(baseString);
-    string item;
-
-    while(getline(ss, item, delimiter))
-    {
-        if(!item.empty())
-        {
-            elems.PushBack(item);
-        }
-    }
-
-    return elems;
+    this->_executeAbsolutePath = dirname(path);
+    this->_executeAbsolutePath += "/";
 }

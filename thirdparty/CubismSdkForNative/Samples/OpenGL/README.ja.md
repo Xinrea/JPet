@@ -12,9 +12,9 @@ OpenGL で実装したアプリケーションのサンプル実装です。
 | サードパーティ | バージョン |
 | --- | --- |
 | [GLEW] | 2.2.0 |
-| [GLFW] | 3.3.8 |
-| [ios-cmake] | 4.3.0 |
-| [stb_image.h] | 2.28 |
+| [GLFW] | 3.4 |
+| [ios-cmake] | 4.4.1 |
+| [stb_image.h] | 2.29 |
 
 その他の開発環境・動作確認環境はトップディレクトリにある [README.md](/README.ja.md) を参照してください。
 
@@ -76,6 +76,11 @@ iOS 用の CMake プロジェクトです。
 
 これらのスクリプトを実行した際にフルバージョンのサンプルを生成するか、ミニマムバージョンのサンプルを生成するかを選択することができます。
 
+Appleシリコン搭載のMacでのiOS Simulator用ビルド時は下記の手順を行ってください。
+
+1. Xcode の `Project設定 - TARGETS - Demo` および `Framework` の `Build Settings - Architectures - Architectures` の記載を実行環境に合わせて変更してください。
+
+
 CMake のツールチェーンとして [ios-cmake] を使用しています。
 [thirdParty](#thirdParty) の項目を参照して事前にダウンロードを行なってください。
 
@@ -95,6 +100,8 @@ Linux 用の CMake プロジェクトです。
 
 追加ライブラリとして [GLEW] と [GLFW] を使用しています。
 [thirdParty](#thirdParty) の項目を参照して事前にダウンロードを行なってください。
+ビルド時、これ以外に`libpng`やX Windows System依存ライブラリ等必要なパッケージのインストールを求められる場合がございますので、その際は求められたパッケージをインストールしてください。
+
 
 ### proj.mac.cmake
 

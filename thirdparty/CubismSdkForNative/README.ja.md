@@ -6,7 +6,7 @@
 
 # Cubism Native Samples
 
-Live2D Cubism 4 Editor で出力したモデルを表示するアプリケーションのサンプル実装です。
+Live2D Cubism Editor で出力したモデルを表示するアプリケーションのサンプル実装です。
 
 Cubism Native Framework および Live2D Cubism Core と組み合わせて使用します。
 
@@ -21,6 +21,13 @@ Cubism Native Framework および Live2D Cubism Core と組み合わせて使用
 本 SDK を使用する前に [お知らせ](NOTICE.ja.md)をご確認ください。
 
 
+## Cubism 5新機能や過去バージョンとの互換性について
+
+本 SDK はCubism 5に対応した製品です。  
+Cubism 5 Editorに搭載された新機能のSDK対応については [こちら](https://docs.live2d.com/cubism-sdk-manual/cubism-5-new-functions/)をご確認ください。  
+過去バージョンのCubism SDKとの互換性については [こちら](https://docs.live2d.com/cubism-sdk-manual/compatibility-with-cubism-5/)をご確認ください。
+
+
 ## ディレクトリ構成
 
 ```
@@ -33,6 +40,7 @@ Cubism Native Framework および Live2D Cubism Core と組み合わせて使用
    ├─ D3D11         # DirectX 11 のサンプルプロジェクトが含まれるディレクトリ
    ├─ Metal         # Metal のサンプルプロジェクトが含まれるディレクトリ
    ├─ OpenGL        # OpenGL のサンプルプロジェクトが含まれるディレクトリ
+   ├─ Vulkan        # Vulkan のサンプルプロジェクトが含まれるディレクトリ
    └─ Resources     # モデルのファイルや画像などのリソースが含まれるディレクトリ
 ```
 
@@ -92,28 +100,32 @@ Demo
 
 ## 変更履歴
 
-当リポジトリの変更履歴については [CHANGELOG.md](CHANGELOG.md) を参照ください。
+Samples : [CHANGELOG.md](CHANGELOG.md)
+
+Framework : [CHANGELOG.md](Framework/CHANGELOG.md)
+
+Core : [CHANGELOG.md](Core/CHANGELOG.md)
 
 
 ## 開発環境
 
 | 開発ツール | バージョン |
 | --- | --- |
-| Android Studio | Flamingo 2022.2.1 Patch 1 |
-| CMake | 3.26.3 |
+| Android Studio | Iguana 2023.2.1 |
+| CMake | 3.28.3 |
 | Visual Studio 2013 | Update 5 |
 | Visual Studio 2015 | Update 3 |
-| Visual Studio 2017 | 15.9.54 |
-| Visual Studio 2019 | 16.11.26 |
-| Visual Studio 2022 | 17.5.5 |
-| XCode | 14.3 |
+| Visual Studio 2017 | 15.9.60 |
+| Visual Studio 2019 | 16.11.34 |
+| Visual Studio 2022 | 17.9.4 |
+| Xcode | 15.3 |
 
 ### Android
 
 | Android SDK tools | バージョン |
 | --- | --- |
-| Android NDK | 25.2.9519653 |
-| Android SDK | 33.0.2 |
+| Android NDK | 26.2.11394342 |
+| Android SDK | 34.0.0 |
 | CMake | 3.22.1 |
 
 ### Linux
@@ -123,9 +135,10 @@ Demo
 | Red Hat | Amazon Linux 2 |  `amazonlinux:2` | 7.3.1 |
 | Red Hat | CentOS 7 | `centos:7` | 4.8.5 |
 | Red Hat | CentOS Stream 8 *1 | `centos:latest` | 8.5.0 |
-| Red Hat | CentOS Stream 9 | - | 11.3.1 |
+| Red Hat | CentOS Stream 9 | - | 12.2.1 |
+| Red Hat | AlmaLinux | `almalinux:latest` | 11.4.1 |
 | Debian | Ubuntu 18.04 | `ubuntu:18.04` | 7.5.0 |
-| Debian | Ubuntu 22.04.2 | `ubuntu:22.04.2` | 11.3.0 |
+| Debian | Ubuntu 22.04.4 | `ubuntu:22.04` | 11.4.0 |
 
 *1 CentOS 8はサポートしておりません
 
@@ -143,8 +156,8 @@ Demo
 
 | プラットフォーム | バージョン |
 | --- | --- |
-| iOS / iPadOS | 16.4.1 |
-| macOS | 13.3 |
+| iOS / iPadOS | 17.4 |
+| macOS | 14.4 |
 | Windows 10 | 22H2 |
 | Windows 11 | 22H2 |
 
@@ -152,7 +165,7 @@ Demo
 
 | バージョン | デバイス | Tegra |
 | --- | --- | --- |
-| 13 | Pixel 6a | |
+| 13 | Pixel 7a | |
 | 7.1.1 | Nexus 9 | ✔︎ |
 
 ### Linux
@@ -160,9 +173,8 @@ Demo
 | 系統 | ディストリビューション | バージョン |
 | --- | --- | --- |
 | Red Hat | Amazon Linux | 2 |
-| Red Hat | CentOS Stream | 8 |
-| Red Hat | CentOS Stream | 9 |
-| Debian | Ubuntu | 22.04.2 |
+| Red Hat | AlmaLinux | 9 |
+| Debian | Ubuntu | 22.04.4 |
 
 ## プロジェクトへの貢献
 
@@ -170,7 +182,7 @@ Demo
 
 ### フォークとプルリクエスト
 
-修正、改善、さらには新機能をもたらすかどうかにかかわらず、プルリクエストに感謝します。ただし、ラッパーは可能な限り軽量で浅くなるように設計されているため、バグ修正とメモリ/パフォーマンスの改善のみを行う必要があることに注意してください。メインリポジトリを可能な限りクリーンに保つために、必要に応じて個人用フォークと機能ブランチを作成してください。
+修正、改善、さらには新機能をもたらすかどうかにかかわらず、プルリクエストに感謝します。メインリポジトリを可能な限りクリーンに保つために、必要に応じて個人用フォークと機能ブランチを作成してください。
 
 ### バグ
 
@@ -180,12 +192,12 @@ Live2Dコミュニティでは、問題のレポートと機能リクエスト�
 
 SDKの将来についてのフィードバックにも関心があります。Live2Dコミュニティで提案や機能のリクエストを送信できます。このプロセスをより効果的にするために、それらをより明確に定義するのに役立つより多くの情報を含めるようお願いしています。
 
-## コミュニティ
+## フォーラム
 
-ユーザー同士でCubism SDKの活用方法の提案や質問をしたい場合は、是非コミュニティをご活用ください。
+ユーザー同士でCubism SDKの活用方法の提案や質問をしたい場合は、是非フォーラムをご活用ください。
 
-- [Live2D 公式コミュニティ](https://creatorsforum.live2d.com/)
-- [Live2D community(English)](https://community.live2d.com/)
+- [Live2D 公式クリエイターズフォーラム](https://creatorsforum.live2d.com/)
+- [Live2D Creator's Forum(English)](https://community.live2d.com/)
 
 
 ![image](logos.png)

@@ -48,7 +48,7 @@ LAppMinimumView::LAppMinimumView():
 
 LAppMinimumView::~LAppMinimumView()
 {
-    _renderBuffer.DestroyOffscreenFrame();
+    _renderBuffer.DestroyOffscreenSurface();
     delete _renderSprite;
 
     delete _viewMatrix;
@@ -147,6 +147,11 @@ void LAppMinimumView::Render()
         LAppMinimumModel *model = Live2DManager->GetModel();
         if (model)
         {
+            // 画面サイズを取得する
+            int maxWidth = LAppMinimumDelegate::GetInstance()->GetWindowWidth();
+            int maxHeight = LAppMinimumDelegate::GetInstance()->GetWindowHeight();
+            _renderSprite->SetWindowSize(maxWidth, maxHeight);
+
             _renderSprite->RenderImmidiate(model->GetRenderBuffer().GetColorBuffer(), uvVertex);
         }
     }
@@ -179,7 +184,7 @@ void LAppMinimumView::OnTouchesEnded(float pointX, float pointY)
         float y = _deviceToScreen->TransformY(_touchManager->GetY()); // 論理座標変換した座標を取得。
         if (DebugTouchLogEnable)
         {
-            LAppPal::PrintLog("[APP]touchesEnded x:%.2f y:%.2f", x, y);
+            LAppPal::PrintLogLn("[APP]touchesEnded x:%.2f y:%.2f", x, y);
         }
     }
 }
@@ -209,7 +214,7 @@ float LAppMinimumView::TransformScreenY(float deviceY) const
 void LAppMinimumView::PreModelDraw(LAppMinimumModel &refModel)
 {
     // 別のレンダリングターゲットへ向けて描画する場合の使用するフレームバッファ
-    Csm::Rendering::CubismOffscreenFrame_OpenGLES2* useTarget = nullptr;
+    Csm::Rendering::CubismOffscreenSurface_OpenGLES2* useTarget = nullptr;
 
     if (_renderTarget != SelectTarget_None)
     {// 別のレンダリングターゲットへ向けて描画する場合
@@ -223,7 +228,7 @@ void LAppMinimumView::PreModelDraw(LAppMinimumModel &refModel)
             int height = LAppMinimumDelegate::GetInstance()->GetWindowHeight();
 
             // モデル描画キャンバス
-            useTarget->CreateOffscreenFrame(static_cast<csmUint32>(width), static_cast<csmUint32>(height));
+            useTarget->CreateOffscreenSurface(static_cast<csmUint32>(width), static_cast<csmUint32>(height));
         }
 
         // レンダリング開始
@@ -235,7 +240,7 @@ void LAppMinimumView::PreModelDraw(LAppMinimumModel &refModel)
 void LAppMinimumView::PostModelDraw(LAppMinimumModel &refModel)
 {
     // 別のレンダリングターゲットへ向けて描画する場合の使用するフレームバッファ
-    Csm::Rendering::CubismOffscreenFrame_OpenGLES2* useTarget = nullptr;
+    Csm::Rendering::CubismOffscreenSurface_OpenGLES2* useTarget = nullptr;
 
     if (_renderTarget != SelectTarget_None)
     {// 別のレンダリングターゲットへ向けて描画する場合
@@ -258,6 +263,12 @@ void LAppMinimumView::PostModelDraw(LAppMinimumModel &refModel)
                     };
 
             _renderSprite->SetColor(1.0f, 1.0f, 1.0f, GetSpriteAlpha(0));
+
+            // 画面サイズを取得する
+            int maxWidth = LAppMinimumDelegate::GetInstance()->GetWindowWidth();
+            int maxHeight = LAppMinimumDelegate::GetInstance()->GetWindowHeight();
+            _renderSprite->SetWindowSize(maxWidth, maxHeight);
+
             _renderSprite->RenderImmidiate(useTarget->GetColorBuffer(), uvVertex);
         }
     }

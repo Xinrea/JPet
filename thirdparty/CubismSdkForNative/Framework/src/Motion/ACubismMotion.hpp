@@ -55,6 +55,14 @@ public:
     void UpdateParameters(CubismModel* model, CubismMotionQueueEntry* motionQueueEntry, csmFloat32 userTimeSeconds);
 
     /**
+     * モーションの再生を開始するためのセットアップを行う。
+     *
+     * @param motionQueueEntry CubismMotionQueueManagerによって管理されるモーション
+     * @param userTimeSeconds 総再生時間（秒）
+     */
+    void SetupMotionQueueEntry(CubismMotionQueueEntry* motionQueueEntry, csmFloat32 userTimeSeconds);
+
+    /**
      * @brief フェードイン
      *
      * フェードインの時間を設定する。
@@ -180,6 +188,38 @@ public:
     FinishedMotionCallback GetFinishedMotionHandler();
 
     /**
+     * @brief ユーザー任意データの登録
+     *
+     * ユーザー任意データを登録します。
+     *
+     * @param[in]   onFinishedMotionCustomData  ユーザー任意データ
+     */
+    void SetFinishedMotionCustomData(void* onFinishedMotionCustomData);
+
+    /**
+     * @brief ユーザー任意データの取得
+     *
+     * ユーザー任意データを取得します。
+     *
+     * @return  登録されているユーザー任意データ。
+     */
+    void* GetFinishedMotionCustomData();
+
+    /**
+     * @brief モーション再生終了コールバックとユーザー任意データの登録
+     *
+     * モーション再生終了コールバックを登録する。
+     * IsFinishedフラグを設定するタイミングで呼び出される。
+     * 以下の状態の際には呼び出されない:
+     *   1. 再生中のモーションが「ループ」として設定されているとき
+     *   2. コールバックにNULLが登録されているとき
+     *
+     * @param[in]   onFinishedMotionHandler     モーション再生終了コールバック関数
+     * @param[in]   onFinishedMotionCustomData  ユーザー任意データ
+     */
+    void SetFinishedMotionHandlerAndMotionCustomData(FinishedMotionCallback onFinishedMotionHandler, void* onFinishedMotionCustomData);
+
+    /**
      * @brief        透明度のカーブが存在するかどうかを確認する
      *
      * @retval       true  -> キーが存在する
@@ -203,18 +243,15 @@ public:
      */
     virtual CubismIdHandle GetModelOpacityId(csmInt32 index);
 
-protected:
     /**
+     * @brief モデルのウェイト更新
      *
-     * @brief 指定時間の透明度の値を返す
+     * モーションのウェイトを更新する。
      *
-     * @param[in]   motionTimeSeconds        現在の再生時間[秒]
-     *
-     * @return  success：モーションの当該時間におけるOpacityの値
-     *
-     * @note  更新後の値を取るにはUpdateParameters() の後に呼び出す。
+     * @param[in]   motionQueueEntry    CubismMotionQueueManagerで管理されているモーション
+     * @param[in]   userTimeSeconds     デルタ時間の積算値[秒]
      */
-    virtual csmFloat32 GetModelOpacityValue() const;
+    csmFloat32 UpdateFadeWeight(CubismMotionQueueEntry* motionQueueEntry, csmFloat32 userTimeSeconds);
 
 private:
     // Prevention of copy Constructor
@@ -228,6 +265,18 @@ protected:
      * デストラクタ。
      */
     virtual ~ACubismMotion();
+
+    /**
+     *
+     * @brief 指定時間の透明度の値を返す
+     *
+     * @param[in]   motionTimeSeconds        現在の再生時間[秒]
+     *
+     * @return  success：モーションの当該時間におけるOpacityの値
+     *
+     * @note  更新後の値を取るにはUpdateParameters() の後に呼び出す。
+     */
+    virtual csmFloat32 GetModelOpacityValue() const;
 
     /**
      * @brief モデルのパラメータの更新の実行
@@ -248,8 +297,8 @@ protected:
 
     csmVector<const csmString*>    _firedEventValues;
 
-    // モーション再生終了コールバック関数
-    FinishedMotionCallback _onFinishedMotion;
+    FinishedMotionCallback _onFinishedMotion; ///< モーション再生終了コールバック関数ポインタ
+    void* _onFinishedMotionCustomData;        ///< モーション再生終了コールバックに戻されるデータ
 };
 
 }}}

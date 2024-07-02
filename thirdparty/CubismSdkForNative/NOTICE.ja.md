@@ -4,6 +4,38 @@
 
 # お知らせ
 
+## [注意事項] Apple社のPrivacy Manifest Policy対応について
+
+Apple社が対応を必要としているPrivacy Manifest Policyについて、本製品では指定されているAPI及びサードパーティ製品を使用しておりません。
+もし本製品で対応が必要と判断した場合、今後のアップデートにて順次対応する予定です。
+詳しくはApple社が公開しているドキュメントをご確認ください。
+
+* [Privacy updates for App Store submissions](https://developer.apple.com/news/?id=3d8a9yyh)
+
+
+## [注意事項] Linux OpenGL環境でのWaylandのサポートについて (2024-03-26)
+
+本製品がLinux OpenGL環境で利用している `GLFW 3.4` が、Wayland向けにコンパイルできるようになりました。
+しかし、 `GLEW 2.2.0` では現在Wayland(EGL)向けのコンパイルを行うと `glewInit` が正常に動作しない状態であるため、本サンプルはWaylandに対応しておりません。
+
+Linux OpenGL環境をご利用の方は、引き続き通常通りX11向けビルドをご利用ください。
+
+詳しくは以下のissueを参照ください。
+
+* [GLEW issue](https://github.com/nigels-com/glew/issues/172)
+
+
+## [注意事項] Metal の Mac Catalyst のビルドエラーについて (2024-01-25)
+
+MetalのMac Catalystのビルド時にエラーが発生する場合がございます。
+具体的には`cmake3.27.0`以上を使用してプロジェクトを生成した際に`'Foundation/NSURLHandle.h' file not found`といったエラーが発生いたします。
+詳細については継続して調査いたします。
+
+### 回避方法
+
+* cmakeを3.27未満のバージョンで使用する
+
+
 ## [注意事項] Cocos2d-xセットアップのエラーについて (2022-03-15)
 
 Cocos2d-xサンプルプロジェクトのセットアップ時に実行するsetup-cocos2dバッチにおいてエラーが発生いたします。
@@ -30,13 +62,6 @@ Metal及びCocos2d-x v4.0 の macOSサンプルビルドにおいてメモリリ
 詳細については Apple Developer Forums をご確認ください。
 
 * [Apple Developer Forums - Memory leak in MTLCommandBuffer?](https://developer.apple.com/forums/thread/120931)
-
-
-## [制限事項] Apple製品の対応状況について (2021-12-09 更新)
-
-macOS Monterey v12.0につきまして、Cubism 4 SDK for Native R4 (4-r.4) にて対応いたしました。
-また、Cubism 4 SDK for Native R4 Beta1 (4-r.4-beta.1) 以降のバージョンでApple Silicon版のmacに対応しております。
-※Cubism Editorは現在Apple Silicon製のMacに対応しておりません、ご了承ください。
 
 
 ## [制限事項] Cocos2d-x v4.0 の Linux(Ubuntu)サンプルビルドについて (2021-04-15)

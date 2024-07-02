@@ -6,7 +6,8 @@
  */
 
 #include "LAppLive2DManager.hpp"
-#include <string>
+#include <string.h>
+#include <stdlib.h>
 #include <GLES2/gl2.h>
 #include <Rendering/CubismRenderer.hpp>
 #include "LAppPal.hpp"
@@ -14,17 +15,23 @@
 #include "LAppDelegate.hpp"
 #include "LAppModel.hpp"
 #include "LAppView.hpp"
+#include "JniBridgeC.hpp"
 
 using namespace Csm;
 using namespace LAppDefine;
-using namespace std;
 
 namespace {
     LAppLive2DManager* s_instance = NULL;
 
     void FinishedMotion(ACubismMotion* self)
     {
-        LAppPal::PrintLog("Motion Finished: %x", self);
+        LAppPal::PrintLogLn("Motion Finished: %x", self);
+    }
+
+    int CompareCsmString(const void* a, const void* b)
+    {
+        return strcmp(reinterpret_cast<const Csm::csmString*>(a)->GetRawString(),
+            reinterpret_cast<const Csm::csmString*>(b)->GetRawString());
     }
 }
 
@@ -53,6 +60,7 @@ LAppLive2DManager::LAppLive2DManager()
     , _sceneIndex(0)
 {
     _viewMatrix = new CubismMatrix44();
+    SetUpModel();
 
     ChangeScene(_sceneIndex);
 }
@@ -60,6 +68,7 @@ LAppLive2DManager::LAppLive2DManager()
 LAppLive2DManager::~LAppLive2DManager()
 {
     ReleaseAllModel();
+    delete _viewMatrix;
 }
 
 void LAppLive2DManager::ReleaseAllModel()
@@ -70,6 +79,28 @@ void LAppLive2DManager::ReleaseAllModel()
     }
 
     _models.Clear();
+}
+
+void LAppLive2DManager::SetUpModel()
+{
+    const char MODEL3_JSON[] = u8".model3.json";
+    _modelDir.Clear();
+    Csm::csmVector<Csm::csmString> root = JniBridgeC::GetAssetList("");
+    for (size_t i = 0; i < root.GetSize(); i++)
+    {
+        Csm::csmString target(root[i]);
+        target.Append(MODEL3_JSON, sizeof(MODEL3_JSON) - 1);
+        Csm::csmVector<Csm::csmString> sub = JniBridgeC::GetAssetList(root[i].GetRawString());
+        for (size_t j = 0; j < sub.GetSize(); j++)
+        {
+            if (target == sub[j])
+            {
+                _modelDir.PushBack(root[i]);
+                break;
+            }
+        }
+    }
+    qsort(_modelDir.GetPtr(), _modelDir.GetSize(), sizeof(csmString), CompareCsmString);
 }
 
 LAppModel* LAppLive2DManager::GetModel(csmUint32 no) const
@@ -96,7 +127,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
 {
     if (DebugLogEnable)
     {
-        LAppPal::PrintLog("[APP]tap point: {x:%.2f y:%.2f}", x, y);
+        LAppPal::PrintLogLn("[APP]tap point: {x:%.2f y:%.2f}", x, y);
     }
 
     for (csmUint32 i = 0; i < _models.GetSize(); i++)
@@ -105,7 +136,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
         {
             if (DebugLogEnable)
             {
-                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameHead);
+                LAppPal::PrintLogLn("[APP]hit area: [%s]", HitAreaNameHead);
             }
             _models[i]->SetRandomExpression();
         }
@@ -113,7 +144,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y)
         {
             if (DebugLogEnable)
             {
-                LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameBody);
+                LAppPal::PrintLogLn("[APP]hit area: [%s]", HitAreaNameBody);
             }
             _models[i]->StartRandomMotion(MotionGroupTapBody, PriorityNormal, FinishedMotion);
         }
@@ -133,7 +164,7 @@ void LAppLive2DManager::OnUpdate() const
 
         if (model->GetModel() == NULL)
         {
-            LAppPal::PrintLog("Failed to model->GetModel().");
+            LAppPal::PrintLogLn("Failed to model->GetModel().");
             continue;
         }
 
@@ -167,7 +198,7 @@ void LAppLive2DManager::OnUpdate() const
 
 void LAppLive2DManager::NextScene()
 {
-    csmInt32 no = (_sceneIndex + 1) % ModelDirSize;
+    csmInt32 no = (_sceneIndex + 1) % _modelDir.GetSize();
     ChangeScene(no);
 }
 
@@ -176,20 +207,19 @@ void LAppLive2DManager::ChangeScene(Csm::csmInt32 index)
     _sceneIndex = index;
     if (DebugLogEnable)
     {
-        LAppPal::PrintLog("[APP]model index: %d", _sceneIndex);
+        LAppPal::PrintLogLn("[APP]model index: %d", _sceneIndex);
     }
 
-    // ModelDir[]に保持したディレクトリ名から
     // model3.jsonのパスを決定する.
-    // ディレクトリ名とmodel3.jsonの名前を一致させておくこと.
-    std::string model = ModelDir[index];
-    std::string modelPath = ResourcesPath + model + "/";
-    std::string modelJsonName = ModelDir[index];
+    // ディレクトリ名とmodel3.jsonの名前を一致していることが条件
+    csmString modelPath(ResourcesPath);
+    modelPath += _modelDir[index] + "/";
+    csmString modelJsonName(_modelDir[index]);
     modelJsonName += ".model3.json";
 
     ReleaseAllModel();
     _models.PushBack(new LAppModel());
-    _models[0]->LoadAssets(modelPath.c_str(), modelJsonName.c_str());
+    _models[0]->LoadAssets(modelPath.GetRawString(), modelJsonName.GetRawString());
 
     /*
      * モデル半透明表示を行うサンプルを提示する。
@@ -211,7 +241,7 @@ void LAppLive2DManager::ChangeScene(Csm::csmInt32 index)
 #if defined(USE_RENDER_TARGET) || defined(USE_MODEL_RENDER_TARGET)
         // モデル個別にαを付けるサンプルとして、もう1体モデルを作成し、少し位置をずらす
         _models.PushBack(new LAppModel());
-        _models[1]->LoadAssets(modelPath.c_str(), modelJsonName.c_str());
+        _models[1]->LoadAssets(modelPath.GetRawString(), modelJsonName.GetRawString());
         _models[1]->GetModelMatrix()->TranslateX(0.2f);
 #endif
 

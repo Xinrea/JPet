@@ -5,6 +5,108 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
+## [5-r.1] - 2024-03-26
+
+### Added
+
+* Add x86_64 architecture to target platforms in Android.
+
+### Changed
+
+* Rename "rootDirectory" to "executeAbsolutePath".
+* The log function was changed because it was ambiguous whether or not a newline was inserted.
+* Change so that `LAppSprite` is not depend on `LAppDelegate` in D3D11 and D3D9, Metal, Vulkan.
+* Some function arguments in `LAppSprite` are changed in D3D11 and D3D9, Metal, Vulkan.
+
+### Fixed
+
+* Fixed undefined behavior and memory leak in `LAppPal`.
+* Modify code to more closely resemble Java coding style.
+* Fix model drawing disappearing when defining `USE_RENDER_TARGET` and `USE_MODEL_RENDER_TARGET`.
+* Fix an issue where the OpenGL sample for Visual Studio 2013 was not functioning correctly.
+* Fix shader build error when running nmake in Vulkan.
+
+### Removed
+
+* Remove unnecessary pre-API 21 processing.
+
+
+## [5-r.1-beta.4] - 2024-01-25
+
+### Added
+
+* Add `LAppWavFileHandler` class for Android and iOS.
+* Add functions for MotionSyncPlugin to `LAppWavFileHandler` in Windows and macOS.
+
+### Changed
+
+* Change so that `LAppSprite` is not depend on `LAppDelegate` in Android.
+* Change so that `ViewController` is not include on `LAppSprite` in iOS.
+* Change the path acquisition process to a library function on OpenGL Mac and Linux.
+* Change the compile and target SDK version of Android OS to 14.0 (API 34). 
+  * Upgrade the version of Android Gradle Plugin from 8.0.2 to 8.1.1.
+  * Upgrade the version of Gradle from 8.1.1 to 8.2.
+  * Change the minimum version of Android Studio to Hedgehog(2023.1.1).
+
+### Fixed
+
+* The version set in `sourceCompatibility` and `targetCompatibility` in `build.gradle`'s `compileOptions` has been lowered to `JavaVersion.VERSION_1_7`.
+* The version of CMake set in `externalNativeBuild` was raised to `3.22.1`.
+* Fix to check for null when reading json.
+* Replace deprecated features in Android.
+* Fix an issue that caused some graphics drivers to not render correctly in Vulkan.
+* Fix an issue that caused incorrect selection of depth format in Vulkan.
+* Fix errors that occurs when building with x86 in vulkan.
+
+
+## [5-r.1-beta.3] - 2023-10-12
+
+### Added
+
+* Add functions for MotionSyncPlugin to `LAppWavFileHandler`.
+
+### Changed
+
+* Change so that `LAppSprite` is not depend on `LAppDelegate`.
+
+
+## [5-r.1-beta.2] - 2023-09-28
+
+### Added
+
+* Add English version of README.md for Vulkan.
+
+### Changed
+
+* Replace the sample model `Mao` with the updated version that is compatible with Cubism 5.0.
+* The minimum operating system version of Android for OpenGL has been chang to 5.0 (API 21).
+  * Cocos2d-x is not supported.
+* Change to disable bitcode generation for building with Xcode.
+
+### Fixed
+
+* Fix Metal rendering results on macOS to be similar to OpenGL.
+* Fix a memory leak caused by a ViewMatrix variable. by [@COx2](https://github.com/Live2D/CubismNativeSamples/pull/40)
+
+
+## [5-r.1-beta.1] - 2023-08-17
+
+### Added
+
+* Add Wankoromochi as a model bundled with SDK.
+* Add the sample for Vulkan API in Windows.
+
+### Changed
+
+* Update third-party libraries.
+* Offscreen drawing-related terminology has been unified with "OffscreenSurface".
+* Adjusted to automatically search and use models in the Resource folder.
+
+### Fixed
+
+* Fix a bug that premultiplied alpha not works correctly when `PREMULTIPLIED_ALPHA_ENABLE` is not defined in Metal.
+
+
 ## [4-r.7] - 2023-05-25
 
 ### Added
@@ -305,6 +407,11 @@ See [Core Changelog] for details.
 * What was `Package.json` is currently being changed to`cubism-info.yml`.
 
 
+[5-r.1]: https://github.com/Live2D/CubismNativeSamples/compare/5-r.1-beta.4...5-r.1
+[5-r.1-beta.4]: https://github.com/Live2D/CubismNativeSamples/compare/5-r.1-beta.3...5-r.1-beta.4
+[5-r.1-beta.3]: https://github.com/Live2D/CubismNativeSamples/compare/5-r.1-beta.2...5-r.1-beta.3
+[5-r.1-beta.2]: https://github.com/Live2D/CubismNativeSamples/compare/5-r.1-beta.1...5-r.1-beta.2
+[5-r.1-beta.1]: https://github.com/Live2D/CubismNativeSamples/compare/4-r.7...5-r.1-beta.1
 [4-r.7]: https://github.com/Live2D/CubismNativeSamples/compare/4-r.6.2...4-r.7
 [4-r.6.2]: https://github.com/Live2D/CubismNativeSamples/compare/4-r.6.1...4-r.6.2
 [4-r.6.1]: https://github.com/Live2D/CubismNativeSamples/compare/4-r.6...4-r.6.1

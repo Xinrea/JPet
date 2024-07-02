@@ -527,13 +527,19 @@ void CubismMotion::Parse(const csmByte* motionJson, const csmSizeInt size)
 
     CubismMotionJson* json = CSM_NEW CubismMotionJson(motionJson, size);
 
+    if (!json->IsValid())
+    {
+        CSM_DELETE(json);
+        return;
+    }
+
     _motionData->Duration = json->GetMotionDuration();
     _motionData->Loop = json->IsMotionLoop();
     _motionData->CurveCount = json->GetMotionCurveCount();
     _motionData->Fps = json->GetMotionFps();
     _motionData->EventCount = json->GetEventCount();
 
-    csmBool areBeziersRestructed = json->GetEvaluationOptionFlag( EvaluationOptionFlag_AreBeziersRistricted );
+    csmBool areBeziersRestricted = json->GetEvaluationOptionFlag( EvaluationOptionFlag_AreBeziersRestricted );
 
     if (json->IsExistMotionFadeInTime())
     {
@@ -634,7 +640,7 @@ void CubismMotion::Parse(const csmByte* motionJson, const csmSizeInt size)
             }
             case CubismMotionSegmentType_Bezier: {
                 _motionData->Segments[totalSegmentCount].SegmentType = CubismMotionSegmentType_Bezier;
-                if (areBeziersRestructed || UseOldBeziersCurveMotion) {
+                if (areBeziersRestricted || UseOldBeziersCurveMotion) {
                     _motionData->Segments[totalSegmentCount].Evaluate = BezierEvaluate;
                 }
                 else
