@@ -1,5 +1,6 @@
 ﻿#include "UserStateWatcher.h"
 
+#define CPPHTTPLIB_OPENSSL_SUPPORT
 #include <httplib.h>
 #include <rapidjson/document.h>
 
@@ -46,7 +47,7 @@ bool UserStateWatcher::CheckUpdate() {
 }
 
 void UserStateWatcher::Watch() {
-  LAppPal::PrintLog("Watch Begin");
+  LAppPal::PrintLog("[UserStateWatcher]Watch Begin");
   httplib::SSLClient cookieCli("data.bilibili.com", 443);
   cookieCli.set_ca_cert_path("resources/ca.crt");
   cookieCli.enable_server_certificate_verification(true);
@@ -85,7 +86,6 @@ void UserStateWatcher::Watch() {
       string roomid = "";
       wstring roomtitle = L"";
       wstring name = L"";
-      // ����UID��ȡ�ǳ�
       // https://api.bilibili.com/x/space/acc/info?mid=475210
       auto res = nameCli.Get(("/x/space/acc/info?mid=" + uid).c_str(), headers);
       if (res && res->status == 200) {
@@ -99,7 +99,6 @@ void UserStateWatcher::Watch() {
           LAppPal::PrintLog("[UserStateWatcher]BasicInfo Failed");
         continue;
       }
-      // ����UID��ȡֱ����ź�ֱ����״̬
       // https://api.live.bilibili.com/room/v1/Room/getRoomInfoOld?mid=475210
       auto infores = liveCli.Get(
           ("/room/v1/Room/getRoomInfoOld?mid=" + uid).c_str(), headers);

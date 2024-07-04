@@ -21,6 +21,7 @@
 #include "LAppModel.hpp"
 #include "LAppPal.hpp"
 #include "LAppView.hpp"
+#include "ModelManager.hpp"
 #include "PartStateManager.h"
 
 using namespace Csm;
@@ -59,7 +60,7 @@ void LAppLive2DManager::ReleaseInstance() {
 
 LAppLive2DManager::LAppLive2DManager()
     : _viewMatrix(NULL), _sceneIndex(0), _isNew(true), _mouthCount(0) {
-  ChangeScene(_sceneIndex);
+  InitScene();
 }
 
 LAppLive2DManager::~LAppLive2DManager() { ReleaseAllModel(); }
@@ -81,6 +82,16 @@ LAppModel* LAppLive2DManager::GetModel(csmUint32 no) const {
 }
 
 void LAppLive2DManager::OnDrag(csmFloat32 x, csmFloat32 y) const {
+  // if |x| or |y| > 1, should make it in range [-1,1] to make model looks
+  // natural
+  if (abs(x) > 1) {
+    y = y / abs(x);
+    x = x / abs(x);
+  }
+  if (y > 1) {
+    x = x / abs(y);
+    y = y / abs(y);
+  }
   for (csmUint32 i = 0; i < _models.GetSize(); i++) {
     LAppModel* model = GetModel(i);
 
@@ -92,8 +103,7 @@ void LAppLive2DManager::OnFollow() {
   if (DebugLogEnable) {
     LAppPal::PrintLog("[APP]New Follow");
   }
-  _models[0]->StartRandomMotion(MotionGroupSpecial, PriorityForce,
-                                FinishedMotion);
+  _models[0]->StartRandomMotion(PriorityForce, FinishedMotion);
 }
 
 void LAppLive2DManager::PlayTouchAudio(string filename) {
@@ -128,16 +138,15 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
       if (DebugLogEnable) {
         LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameChange);
       }
-      hr = _models[i]->StartMotion(MotionGroupClothChange, _isNew ? 0 : 1,
-                                   PriorityForce, PartFinishedMotion);
+      hr = _models[i]->StartMotion(_isNew ? 0 : 1, PriorityForce,
+                                   PartFinishedMotion);
       if (hr != InvalidMotionQueueEntryHandleValue) _isNew = !_isNew;
     } else if (_isNew && _models[i]->HitTest(HitAreaNameHat, x, y)) {
       if (DebugLogEnable) {
         LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameHat);
       }
       if (_editMode) {
-        hr = _models[i]->StartMotion(MotionGroupPartChange,
-                                     HatChangeList[_hatCount % 3],
+        hr = _models[i]->StartMotion(HatChangeList[_hatCount % 3],
                                      PriorityNormal, PartFinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) {
           _hatCount++;
@@ -155,13 +164,11 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
         LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameEarL);
       }
       if (_editMode) {
-        hr = _models[i]->StartMotion(MotionGroupPartChange,
-                                     EarLChangeList[_earLCount % 2],
+        hr = _models[i]->StartMotion(EarLChangeList[_earLCount % 2],
                                      PriorityNormal, PartFinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) _earLCount++;
       } else {
-        hr = _models[i]->StartRandomMotion(MotionGroupTapEar, PriorityNormal,
-                                           FinishedMotion);
+        hr = _models[i]->StartRandomMotion(PriorityNormal, FinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) {
           PlayTouchAudio("t06.mp3");
         }
@@ -172,8 +179,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
         LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameWanzi);
       }
 
-      hr = _models[i]->StartMotion(MotionGroupPartChange,
-                                   EditChangeList[_editMode], PriorityNormal,
+      hr = _models[i]->StartMotion(EditChangeList[_editMode], PriorityNormal,
                                    FinishedMotion);
       if (hr != InvalidMotionQueueEntryHandleValue) {
         AudioManager::GetInstance()->Play3dSound(
@@ -186,8 +192,8 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
         LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameMouth);
       }
       if (_editMode) {
-        hr = _models[i]->StartMotion(MotionGroupMouthChange, _mouthCount % 6,
-                                     PriorityNormal, PartFinishedMotion);
+        hr = _models[i]->StartMotion(_mouthCount % 6, PriorityNormal,
+                                     PartFinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) _mouthCount++;
       }
 
@@ -196,8 +202,8 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
         LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameEyes);
       }
       if (_editMode) {
-        hr = _models[i]->StartMotion(MotionGroupEyeChange, _eyeCount % 4,
-                                     PriorityNormal, PartFinishedMotion);
+        hr = _models[i]->StartMotion(_eyeCount % 4, PriorityNormal,
+                                     PartFinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) _eyeCount++;
       } else {
       }
@@ -208,8 +214,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
       }
       if (_editMode) {
       } else {
-        hr = _models[i]->StartRandomMotion(MotionGroupTapHead, PriorityNormal,
-                                           FinishedMotion);
+        hr = _models[i]->StartRandomMotion(PriorityNormal, FinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) {
           PlayTouchAudio("t01.mp3");
         }
@@ -223,20 +228,17 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
 
       if (_isNew) {
         if (_editMode) {
-          hr = _models[i]->StartMotion(MotionGroupPartChange,
-                                       SleeveChangeList[_sleeveCount % 2],
+          hr = _models[i]->StartMotion(SleeveChangeList[_sleeveCount % 2],
                                        PriorityNormal, PartFinishedMotion);
           if (hr != InvalidMotionQueueEntryHandleValue) _sleeveCount++;
         } else {
-          hr = _models[i]->StartRandomMotion(MotionGroupTapArm, PriorityNormal,
-                                             FinishedMotion);
+          hr = _models[i]->StartRandomMotion(PriorityNormal, FinishedMotion);
           if (hr != InvalidMotionQueueEntryHandleValue) {
             PlayTouchAudio("t03.mp3");
           }
         }
       } else {
-        hr = _models[i]->StartRandomMotion(MotionGroupTapArm, PriorityNormal,
-                                           FinishedMotion);
+        hr = _models[i]->StartRandomMotion(PriorityNormal, FinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) {
           PlayTouchAudio("t03.mp3");
         }
@@ -246,8 +248,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
         LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameBody);
       }
       if (_editMode) {
-        hr = _models[i]->StartMotion(MotionGroupPartChange,
-                                     GunChangeList[_gunCount % 2],
+        hr = _models[i]->StartMotion(GunChangeList[_gunCount % 2],
                                      PriorityNormal, PartFinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) _gunCount++;
       } else {
@@ -258,8 +259,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
         LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameLegBelt);
       }
       if (_editMode) {
-        hr = _models[i]->StartMotion(MotionGroupPartChange,
-                                     LegBeltChangeList[_legBeltCount % 2],
+        hr = _models[i]->StartMotion(LegBeltChangeList[_legBeltCount % 2],
                                      PriorityNormal, PartFinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) _legBeltCount++;
       }
@@ -270,8 +270,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
         LAppPal::PrintLog("[APP]hit area: [%s]", HitAreaNameLegs);
       }
       if (_editMode) {
-        hr = _models[i]->StartMotion(MotionGroupPartChange,
-                                     SocksChangeList[_socksCount % 2],
+        hr = _models[i]->StartMotion(SocksChangeList[_socksCount % 2],
                                      PriorityNormal, PartFinishedMotion);
         if (hr != InvalidMotionQueueEntryHandleValue) _socksCount++;
       } else {
@@ -316,30 +315,19 @@ void LAppLive2DManager::OnUpdate() const {
   for (csmUint32 i = 0; i < modelCount; ++i) {
     LAppModel* model = GetModel(i);
     projection = saveProjection;
-    projection.Scale(2, 2);
+    projection.Scale(1, 1);
     model->Update();
     model->Draw(projection);  ///< 参照渡しなのでprojectionは変質する
   }
 }
 
-void LAppLive2DManager::NextScene() {
-  csmInt32 no = (_sceneIndex + 1) % ModelDirSize;
-  ChangeScene(no);
-}
-
-void LAppLive2DManager::ChangeScene(Csm::csmInt32 index) {
-  _sceneIndex = index;
-  if (DebugLogEnable) {
-    LAppPal::PrintLog("[APP]model index: %d", _sceneIndex);
-  }
-
+void LAppLive2DManager::InitScene() {
   // ModelDir[]に保持したディレクトリ名から
   // model3.jsonのパスを決定する.
   // ディレクトリ名とmodel3.jsonの名前を一致させておくこと.
-  std::string model = ModelDir[index];
-  std::string modelPath = ResourcesPath + model + "/";
-  std::string modelJsonName = ModelDir[index];
-  modelJsonName += ".model3.json";
+  const ModelManager* modelManager = ModelManager::GetInstance();
+  std::string modelPath = ResourcesPath + modelManager->modelName + "/";
+  std::string modelJsonName = modelManager->modelFileName;
 
   ReleaseAllModel();
   _models.PushBack(new LAppModel());

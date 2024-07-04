@@ -34,24 +34,10 @@ const csmChar *OptionImg = "imgs/message.png";
 // モデル定義------------------------------------------
 // モデルを配置したディレクトリ名の配列
 // ディレクトリ名とmodel3.jsonの名前を一致させておくこと
-const csmChar *ModelDir[] = {"joi"};
-const csmInt32 ModelDirSize = sizeof(ModelDir) / sizeof(const csmChar *);
 
 const csmInt32 StartAudioNum = 9;
 const csmInt32 IdleAudioNum = 7;
 const csmInt32 TouchAudioNum = 5;
-
-// 外部定義ファイル(json)と合わせる
-const csmChar *MotionGroupIdle = "Idle";           // アイドリング
-const csmChar *MotionGroupTapHead = "HeadMotion";  // 体をタップしたとき
-const csmChar *MotionGroupTapEar = "EarMotion";
-const csmChar *MotionGroupTapArm = "ArmMotion";
-const csmChar *MotionGroupClothChange = "ClothChange";
-const csmChar *MotionGroupMouthChange = "MouthChange";
-const csmChar *MotionGroupFaceChange = "FaceChange";
-const csmChar *MotionGroupEyeChange = "EyeChange";
-const csmChar *MotionGroupPartChange = "PartChange";
-const csmChar *MotionGroupSpecial = "SpecialMotion";
 
 // 外部定義ファイル(json)と合わせる
 const csmChar *HitAreaNameHead = "AreaHead";
@@ -94,7 +80,7 @@ const csmInt32 DRenderTargetWidth = 512;
 const csmInt32 DRenderTargetHeight = 512;
 csmInt32 RenderTargetWidth = 512;
 csmInt32 RenderTargetHeight = 512;
-const csmInt32 modelWidth = 1024;
+const csmInt32 modelWidth = 512;
 const csmInt32 modelHeight = 1024;
 
 const csmFloat32 AudioSpace = 3.0f;

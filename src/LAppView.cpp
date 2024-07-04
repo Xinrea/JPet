@@ -47,7 +47,7 @@ LAppView::LAppView()
 }
 
 LAppView::~LAppView() {
-  _renderBuffer.DestroyOffscreenFrame();
+  _renderBuffer.DestroyOffscreenSurface();
   delete _renderSprite;
   delete _viewMatrix;
   delete _deviceToScreen;
@@ -173,12 +173,12 @@ float LAppView::TransformScreenY(float deviceY) const {
 
 void LAppView::PreModelDraw(LAppModel& refModel) {
   // 別のレンダリングターゲットへ向けて描画する場合の使用するフレームバッファ
-  Csm::Rendering::CubismOffscreenFrame_OpenGLES2* useTarget = NULL;
+  Csm::Rendering::CubismOffscreenSurface_OpenGLES2* useTarget = NULL;
 }
 
 void LAppView::PostModelDraw(LAppModel& refModel) {
   // 別のレンダリングターゲットへ向けて描画する場合の使用するフレームバッファ
-  Csm::Rendering::CubismOffscreenFrame_OpenGLES2* useTarget = NULL;
+  Csm::Rendering::CubismOffscreenSurface_OpenGLES2* useTarget = NULL;
 }
 
 void LAppView::SwitchRenderingTarget(SelectTarget targetType) {

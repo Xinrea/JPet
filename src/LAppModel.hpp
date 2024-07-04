@@ -71,7 +71,7 @@ class LAppModel : public Csm::CubismUserModel {
    */
 
   Csm::CubismMotionQueueEntryHandle StartMotion(
-      const Csm::csmChar* group, Csm::csmInt32 no, Csm::csmInt32 priority,
+      Csm::csmInt32 no, Csm::csmInt32 priority,
       Csm::ACubismMotion::FinishedMotionCallback onFinishedMotionHandler = NULL,
       bool IsIdle = false);
 
@@ -86,10 +86,11 @@ class LAppModel : public Csm::CubismUserModel {
    * 開始したモーションの識別番号を返す。個別のモーションが終了したか否かを判定するIsFinished()の引数で使用する。開始できない時は「-1」
    */
   Csm::CubismMotionQueueEntryHandle StartRandomMotion(
-      const Csm::csmChar* group, Csm::csmInt32 priority,
+      Csm::csmInt32 priority,
       Csm::ACubismMotion::FinishedMotionCallback onFinishedMotionHandler =
           NULL);
 
+  void SetDraggingState(bool state);
   /**
    * @brief   引数で指定した表情モーションをセットする
    *
@@ -124,7 +125,7 @@ class LAppModel : public Csm::CubismUserModel {
   /**
    * @brief   別ターゲットに描画する際に使用するバッファの取得
    */
-  Csm::Rendering::CubismOffscreenFrame_OpenGLES2& GetRenderBuffer();
+  Csm::Rendering::CubismOffscreenSurface_OpenGLES2& GetRenderBuffer();
 
  protected:
   /**
@@ -143,6 +144,8 @@ class LAppModel : public Csm::CubismUserModel {
    *
    */
   void SetupModel(Csm::ICubismModelSetting* setting);
+
+  void SetupPresets();
 
   /**
    * @brief OpenGLのテクスチャユニットにテクスチャをロードする
@@ -183,6 +186,7 @@ class LAppModel : public Csm::CubismUserModel {
   Csm::ICubismModelSetting* _modelSetting;  ///< モデルセッティング情報
   Csm::csmString _modelHomeDir;  ///< モデルセッティングが置かれたディレクトリ
   Csm::csmFloat32 _userTimeSeconds;  ///< デルタ時間の積算値[秒]
+  bool _dragging = false;
   Csm::csmVector<Csm::CubismIdHandle>
       _eyeBlinkIds;  ///< モデルに設定されたまばたき機能用パラメータID
   Csm::csmVector<Csm::CubismIdHandle>
@@ -191,6 +195,7 @@ class LAppModel : public Csm::CubismUserModel {
       _motions;  ///< 読み込まれているモーションのリスト
   Csm::csmMap<Csm::csmString, Csm::ACubismMotion*>
       _expressions;  ///< 読み込まれている表情のリスト
+  Csm::csmMap<Csm::csmString, Csm::ACubismMotion*> _presets;
   Csm::csmVector<Csm::csmRectF> _hitArea;
   Csm::csmVector<Csm::csmRectF> _userArea;
   const Csm::CubismId* _idParamAngleX;      ///< パラメータID: ParamAngleX
@@ -200,6 +205,6 @@ class LAppModel : public Csm::CubismUserModel {
   const Csm::CubismId* _idParamEyeBallX;  ///< パラメータID: ParamEyeBallX
   const Csm::CubismId* _idParamEyeBallY;  ///< パラメータID: ParamEyeBallXY
 
-  Csm::Rendering::CubismOffscreenFrame_OpenGLES2
+  Csm::Rendering::CubismOffscreenSurface_OpenGLES2
       _renderBuffer;  ///< フレームバッファ以外の描画先
 };

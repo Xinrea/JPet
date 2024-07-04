@@ -27,6 +27,7 @@
 #include "LAppDelegate.hpp"
 #include "LAppPal.hpp"
 #include "LAppTextureManager.hpp"
+#include "ModelManager.hpp"
 #include "PartStateManager.h"
 
 using namespace Live2D::Cubism::Framework;
@@ -70,7 +71,7 @@ LAppModel::LAppModel()
 }
 
 LAppModel::~LAppModel() {
-  _renderBuffer.DestroyOffscreenFrame();
+  _renderBuffer.DestroyOffscreenSurface();
 
   ReleaseMotions();
   ReleaseExpressions();
@@ -154,6 +155,8 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
     }
   }
 
+  SetupPresets();
+
   // Physics
   if (strcmp(_modelSetting->GetPhysicsFileName(), "") != 0) {
     csmString path = _modelSetting->GetPhysicsFileName();
@@ -232,6 +235,9 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
 
   _model->SaveParameters();
 
+  LAppPal::PrintLog("[APP]Model motions count: %d, groups: %d",
+                    _modelSetting->GetMotionCount("All"),
+                    _modelSetting->GetMotionGroupCount());
   for (csmInt32 i = 0; i < _modelSetting->GetMotionGroupCount(); i++) {
     const csmChar* group = _modelSetting->GetMotionGroupName(i);
     PreloadMotionGroup(group);
@@ -244,6 +250,15 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
   PartStateManager::GetInstance()->SetModel(_model);
 }
 
+void LAppModel::SetupPresets() {
+  // drag_on and drag_off
+  auto dragExpression =
+      CubismExpressionMotion::Create("ParamDrag", 30, 0.5f, 0.5f);
+  _presets["drag_on"] = dragExpression;
+  dragExpression = CubismExpressionMotion::Create("ParamDrag", 0, 0.5f, 0.5f);
+  _presets["drag_off"] = dragExpression;
+}
+
 void LAppModel::PreloadMotionGroup(const csmChar* group) {
   const csmInt32 count = _modelSetting->GetMotionCount(group);
 
@@ -253,10 +268,8 @@ void LAppModel::PreloadMotionGroup(const csmChar* group) {
     csmString path = _modelSetting->GetMotionFileName(group, i);
     path = _modelHomeDir + path;
 
-    if (_debugMode) {
-      LAppPal::PrintLog("[APP]load motion: %s => [%s_%d] ", path.GetRawString(),
-                        group, i);
-    }
+    LAppPal::PrintLog("[APP]load motion: %s => [%s_%d] ", path.GetRawString(),
+                      group, i);
 
     csmByte* buffer;
     csmSizeInt size;
@@ -343,38 +356,7 @@ void LAppModel::Update() {
     PartStateManager::GetInstance()->SetState();
     firstUpdate = false;
   }
-  if (_motionManager->IsFinished()) {
-    // モーションの再生がない場合、待機モーションの中からランダムで再生する
-    std::random_device rd;
-    std::mt19937 generator(rd());
-    std::uniform_int_distribution<int> distribution(1, 1000);
-    auto dice = std::bind(distribution, generator);
-
-    if (LAppDelegate::GetInstance()->IsIdle) {  // 闲置状态
-      int r = dice();
-      if (r < 950) {
-        StartMotion(MotionGroupIdle, 0, PriorityIdle, NULL, true);
-        if (dice() < 15)
-          AudioManager::GetInstance()->Play3dSound(
-              "resources/audios/i0" +
-              std::to_string(dice() % IdleAudioNum + 2) + ".mp3");
-      } else if (r < 990)
-        StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
-      else {
-        PartStateManager::GetInstance()->SaveState();
-        StartMotion(MotionGroupIdle, 2, PriorityIdle, FinishedMotion, true);
-      }
-    } else {  // 非闲置状态, 不播放声音和闲置动作3
-      if (dice() < 900)
-        StartMotion(MotionGroupIdle, 0, PriorityIdle, NULL, true);
-      else
-        StartMotion(MotionGroupIdle, 1, PriorityIdle, NULL, true);
-    }
-  } else {
-    motionUpdated = _motionManager->UpdateMotion(
-        _model, deltaTimeSeconds);  // モーションを更新
-  }
-  _model->SaveParameters();  // 状態を保存
+  // _model->SaveParameters();  // 状態を保存
   //-----------------------------------------------------------------
 
   // まばたき
@@ -434,7 +416,7 @@ void LAppModel::Update() {
 }
 
 CubismMotionQueueEntryHandle LAppModel::StartMotion(
-    const csmChar* group, csmInt32 no, csmInt32 priority,
+    csmInt32 no, csmInt32 priority,
     ACubismMotion::FinishedMotionCallback onFinishedMotionHandler,
     bool IsIdle) {
   if (!IsIdle) LAppDelegate::GetInstance()->InMotion = true;
@@ -446,11 +428,15 @@ CubismMotionQueueEntryHandle LAppModel::StartMotion(
     }
     return InvalidMotionQueueEntryHandleValue;
   }
+  const csmString fileName = _modelSetting->GetMotionFileName("All", no);
 
-  const csmString fileName = _modelSetting->GetMotionFileName(group, no);
+  if (fileName == "") {
+    LAppPal::PrintLog("[APP]can't start motion with empty motions.");
+    return InvalidMotionQueueEntryHandleValue;
+  }
 
   // ex) idle_0
-  csmString name = Utils::CubismString::GetFormatedString("%s_%d", group, no);
+  csmString name = Utils::CubismString::GetFormatedString("%s_%d", "All", no);
   CubismMotion* motion =
       static_cast<CubismMotion*>(_motions[name.GetRawString()]);
   csmBool autoDelete = false;
@@ -458,18 +444,19 @@ CubismMotionQueueEntryHandle LAppModel::StartMotion(
   if (motion == NULL) {
     csmString path = fileName;
     path = _modelHomeDir + path;
-
+    LAppPal::PrintLog("[APP]load motion: %s => [%s_%d] ", path.GetRawString(),
+                      "All", no);
     csmByte* buffer;
     csmSizeInt size;
     buffer = CreateBuffer(path.GetRawString(), &size);
     motion = static_cast<CubismMotion*>(
         LoadMotion(buffer, size, NULL, onFinishedMotionHandler));
-    csmFloat32 fadeTime = _modelSetting->GetMotionFadeInTimeValue(group, no);
+    csmFloat32 fadeTime = _modelSetting->GetMotionFadeInTimeValue("All", no);
     if (fadeTime >= 0.0f) {
       motion->SetFadeInTime(fadeTime);
     }
 
-    fadeTime = _modelSetting->GetMotionFadeOutTimeValue(group, no);
+    fadeTime = _modelSetting->GetMotionFadeOutTimeValue("All", no);
     if (fadeTime >= 0.0f) {
       motion->SetFadeOutTime(fadeTime);
     }
@@ -482,7 +469,7 @@ CubismMotionQueueEntryHandle LAppModel::StartMotion(
   }
 
   // voice
-  csmString voice = _modelSetting->GetMotionSoundFileName(group, no);
+  csmString voice = _modelSetting->GetMotionSoundFileName("All", no);
   if (strcmp(voice.GetRawString(), "") != 0) {
     csmString path = voice;
     path = _modelHomeDir + path;
@@ -490,21 +477,21 @@ CubismMotionQueueEntryHandle LAppModel::StartMotion(
   }
 
   if (_debugMode) {
-    LAppPal::PrintLog("[APP]start motion: [%s_%d]", group, no);
+    LAppPal::PrintLog("[APP]start motion: [%s_%d]", "All", no);
   }
   return _motionManager->StartMotionPriority(motion, autoDelete, priority);
 }
 
 CubismMotionQueueEntryHandle LAppModel::StartRandomMotion(
-    const csmChar* group, csmInt32 priority,
+    csmInt32 priority,
     ACubismMotion::FinishedMotionCallback onFinishedMotionHandler) {
-  if (_modelSetting->GetMotionCount(group) == 0) {
+  if (_modelSetting->GetMotionCount("All") == 0) {
     return InvalidMotionQueueEntryHandleValue;
   }
 
-  csmInt32 no = rand() % _modelSetting->GetMotionCount(group);
+  csmInt32 no = rand() % _modelSetting->GetMotionCount("All");
 
-  return StartMotion(group, no, priority, onFinishedMotionHandler);
+  return StartMotion(no, priority, onFinishedMotionHandler);
 }
 
 void LAppModel::DoDraw() {
@@ -543,6 +530,17 @@ csmBool LAppModel::HitTest(const csmChar* hitAreaName, csmFloat32 x,
     }
   }
   return false;  // 存在しない場合はfalse
+}
+
+void LAppModel::SetDraggingState(bool state) {
+  if (state) {
+    _expressionManager->StartMotionPriority(_presets["drag_on"], false,
+                                            PriorityForce);
+  } else {
+    _expressionManager->StartMotionPriority(_presets["drag_off"], false,
+                                            PriorityForce);
+  }
+  _dragging = state;
 }
 
 void LAppModel::SetExpression(const csmChar* expressionID) {
@@ -625,6 +623,6 @@ void LAppModel::MotionEventFired(const csmString& eventValue) {
   CubismLogInfo("%s is fired on LAppModel!!", eventValue.GetRawString());
 }
 
-Csm::Rendering::CubismOffscreenFrame_OpenGLES2& LAppModel::GetRenderBuffer() {
+Csm::Rendering::CubismOffscreenSurface_OpenGLES2& LAppModel::GetRenderBuffer() {
   return _renderBuffer;
 }

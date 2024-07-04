@@ -76,16 +76,10 @@ class LAppLive2DManager {
   void OnUpdate() const;
 
   /**
-   * @brief   次のシーンに切り替える<br>
-   *           サンプルアプリケーションではモデルセットの切り替えを行う。
-   */
-  void NextScene();
-
-  /**
    * @brief   シーンを切り替える<br>
    *           サンプルアプリケーションではモデルセットの切り替えを行う。
    */
-  void ChangeScene(Csm::csmInt32 index);
+  void InitScene();
 
   void PlayTouchAudio(std::string filename);
 

@@ -24,10 +24,12 @@
 
 #include "LAppDefine.hpp"
 #include "LAppLive2DManager.hpp"
+#include "LAppModel.hpp"
 #include "LAppPal.hpp"
 #include "LAppTextureManager.hpp"
 #include "LAppView.hpp"
 #include "LUtils.hpp"
+#include "ModelManager.hpp"
 #include "PartStateManager.h"
 #include "StateMessage.hpp"
 #include "TouchManager.hpp"
@@ -268,6 +270,9 @@ bool LAppDelegate::Initialize() {
 
   // AppView 初始化
   _view->Initialize();
+
+  // Model Manager 初始化
+  ModelManager::GetInstance();
 
   // Cubism SDK 初始化
   InitializeCubism();
@@ -560,10 +565,19 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
       _captured = true;
       glfwGetCursorPos(window, &_cX, &_cY);
       _view->OnTouchesBegan(_mouseX, _mouseY);
+      // set expression
+      LAppModel *model = LAppLive2DManager::GetInstance()->GetModel(0);
+      if (model != NULL) {
+        model->SetDraggingState(true);
+      }
     } else if (GLFW_RELEASE == action) {
       if (_captured) {
         _captured = false;
         _view->OnTouchesEnded(_mouseX, _mouseY);
+        LAppModel *model = LAppLive2DManager::GetInstance()->GetModel(0);
+        if (model != NULL) {
+          model->SetDraggingState(false);
+        }
       }
     }
   }
