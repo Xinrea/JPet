@@ -566,10 +566,6 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
       glfwGetCursorPos(window, &_cX, &_cY);
       _view->OnTouchesBegan(_mouseX, _mouseY);
       // set expression
-      LAppModel *model = LAppLive2DManager::GetInstance()->GetModel(0);
-      if (model != NULL) {
-        model->SetDraggingState(true);
-      }
     } else if (GLFW_RELEASE == action) {
       if (_captured) {
         _captured = false;
@@ -616,6 +612,10 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, double x, double y) {
   _mouseX = static_cast<float>(x);
   _mouseY = static_cast<float>(y);
   if (_captured) {
+    LAppModel *model = LAppLive2DManager::GetInstance()->GetModel(0);
+    if (model != NULL) {
+      model->SetDraggingState(true);
+    }
     int xpos, ypos;
     glfwGetWindowPos(window, &xpos, &ypos);
     int width, height;
