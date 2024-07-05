@@ -36,16 +36,10 @@ using namespace LAppDefine;
 
 namespace {
 csmByte* CreateBuffer(const csmChar* path, csmSizeInt* size) {
-  if (DebugLogEnable) {
-    LAppPal::PrintLog("[APP]create buffer: %s ", path);
-  }
   return LAppPal::LoadFileAsBytes(path, size);
 }
 
 void DeleteBuffer(csmByte* buffer, const csmChar* path = "") {
-  if (DebugLogEnable) {
-    LAppPal::PrintLog("[APP]delete buffer: %s", path);
-  }
   LAppPal::ReleaseBytes(buffer);
 }
 

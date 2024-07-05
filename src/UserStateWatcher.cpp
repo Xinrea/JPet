@@ -1,6 +1,9 @@
 ﻿#include "UserStateWatcher.h"
 
+#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
 #define CPPHTTPLIB_OPENSSL_SUPPORT
+#endif
+
 #include <httplib.h>
 #include <rapidjson/document.h>
 
@@ -21,9 +24,8 @@ std::wstring UserStateWatcher::StringToWString(const std::string& str) {
 }
 
 bool UserStateWatcher::CheckUpdate() {
-  httplib::SSLClient liveCli("pet.joi-club.cn", 443);
-  liveCli.set_ca_cert_path("resources/ca.crt");
-  liveCli.enable_server_certificate_verification(true);
+  httplib::SSLClient liveCli("pet.vjoi.cn", 443);
+  liveCli.set_follow_location(true);
   liveCli.set_connection_timeout(std::chrono::seconds(1));
   auto res = liveCli.Get("/version.txt");
   if (res && res->status == 200) {
@@ -40,8 +42,10 @@ bool UserStateWatcher::CheckUpdate() {
     } else
       return false;
   } else {
-    if (DebugLogEnable)
+    if (DebugLogEnable) {
       LAppPal::PrintLog("[UserStateWatcher]Check Update Failed");
+      if (res) LAppPal::PrintLog(res->body.c_str());
+    }
   }
   return false;
 }
@@ -49,23 +53,15 @@ bool UserStateWatcher::CheckUpdate() {
 void UserStateWatcher::Watch() {
   LAppPal::PrintLog("[UserStateWatcher]Watch Begin");
   httplib::SSLClient cookieCli("data.bilibili.com", 443);
-  cookieCli.set_ca_cert_path("resources/ca.crt");
-  cookieCli.enable_server_certificate_verification(true);
   cookieCli.set_connection_timeout(std::chrono::seconds(1));
 
   httplib::SSLClient liveCli("api.live.bilibili.com", 443);
-  liveCli.set_ca_cert_path("resources/ca.crt");
-  liveCli.enable_server_certificate_verification(true);
   liveCli.set_connection_timeout(std::chrono::seconds(1));
 
   httplib::SSLClient dynamicCli("api.vc.bilibili.com", 443);
-  dynamicCli.set_ca_cert_path("resources/ca.crt");
-  dynamicCli.enable_server_certificate_verification(true);
   dynamicCli.set_connection_timeout(std::chrono::seconds(1));
 
   httplib::SSLClient nameCli("api.bilibili.com", 443);
-  nameCli.set_ca_cert_path("resources/ca.crt");
-  nameCli.enable_server_certificate_verification(true);
   nameCli.set_connection_timeout(std::chrono::seconds(1));
 
   // https://data.bilibili.com/v/web/web_page_view
@@ -95,8 +91,9 @@ void UserStateWatcher::Watch() {
           name = StringToWString(s.GetString());
         }
       } else {
-        if (DebugLogEnable)
+        if (DebugLogEnable) {
           LAppPal::PrintLog("[UserStateWatcher]BasicInfo Failed");
+        }
         continue;
       }
       // https://api.live.bilibili.com/room/v1/Room/getRoomInfoOld?mid=475210
@@ -112,19 +109,18 @@ void UserStateWatcher::Watch() {
 
           rapidjson::Value& l = d["data"]["liveStatus"];
           bool nowLive = l.GetInt() == 1 ? true : false;
-          // ������
           if (nowLive && !lastLive[i]) {
             newLive.push(StateMessage(uid, roomid, name, roomtitle, ""));
           }
           lastLive[i] = nowLive;
         }
       } else {
-        if (DebugLogEnable)
+        if (DebugLogEnable) {
           LAppPal::PrintLog("[UserStateWatcher]BasicInfo Failed");
+        }
         continue;
       }
 
-      // ��̬״̬���
       auto dres = dynamicCli.Get(
           ("/dynamic_svr/v1/dynamic_svr/space_history?host_uid=" + uid +
            "&need_top=0")
@@ -147,8 +143,8 @@ void UserStateWatcher::Watch() {
       } else {
         if (DebugLogEnable) {
           LAppPal::PrintLog("[UserStateWatcher]Require Dynamic Failed");
-          continue;
         }
+        continue;
       }
       std::this_thread::sleep_for(std::chrono::seconds(5));
     }
