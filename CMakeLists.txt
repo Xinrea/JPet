@@ -183,4 +183,5 @@ set_target_properties(${APP_NAME} PROPERTIES
 target_compile_definitions(${APP_NAME}
   PRIVATE
   CPPHTTPLIB_OPENSSL_SUPPORT
+  WIN32_LEAN_AND_MEAN
 )

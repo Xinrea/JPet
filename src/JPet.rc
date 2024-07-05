@@ -12,8 +12,6 @@
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
 
-/////////////////////////////////////////////////////////////////////////////
-// 中文(简体，中国) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
 LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
@@ -54,63 +52,6 @@ END
 // remains consistent on all systems.
 IDI_ICON1               ICON                    "..\\resources\\logo.ico"
 
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// Dialog
-//
-
-IDD_SETTING DIALOGEX 0, 0, 203, 296
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "设置"
-FONT 8, "MS Shell Dlg", 400, 0, 0x1
-BEGIN
-    CONTROL         "",IDC_VOLUME,"msctls_trackbar32",TBS_AUTOTICKS | TBS_NOTICKS | WS_TABSTOP,39,18,104,11
-    CTEXT           "音量:",IDC_STATIC,12,18,25,13
-    CONTROL         "静音",IDC_MUTE,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,150,18,30,10
-    GROUPBOX        "音量设置",IDC_STATIC,6,6,186,30
-    GROUPBOX        "显示设置",IDC_STATIC,6,42,186,48
-    CONTROL         "",IDC_SCALE,"msctls_trackbar32",TBS_NOTICKS | WS_TABSTOP,36,54,141,11
-    CTEXT           "缩放:",IDC_STATIC,12,54,25,12
-    GROUPBOX        "快捷设置",IDC_STATIC,6,96,186,72
-    CTEXT           "左滑:",IDC_STATIC,12,108,25,12,SS_CENTERIMAGE
-    EDITTEXT        IDC_LEFT,42,108,144,12,ES_AUTOHSCROLL
-    CTEXT           "上滑:",IDC_STATIC,12,126,25,12,SS_CENTERIMAGE
-    EDITTEXT        IDC_UP,42,126,144,12,ES_AUTOHSCROLL
-    CTEXT           "右滑:",IDC_STATIC,12,144,25,12,SS_CENTERIMAGE
-    EDITTEXT        IDC_RIGHT,42,144,144,12,ES_AUTOHSCROLL
-    GROUPBOX        "功能设置",IDC_STATIC,6,174,186,78
-    CONTROL         "直播提醒",IDC_LIVENOTIFY,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,16,206,44,10
-    CONTROL         "新动态提醒",IDC_DYNAMICNOTIFY,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,16,220,52,10
-    PUSHBUTTON      "保存设置",IDC_APPLY,132,264,62,14
-    CONTROL         "绿幕显示",IDC_GREEN,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,16,72,44,10
-    PUSHBUTTON      "查看更新",IDC_CHECK,6,264,72,14
-    CONTROL         "启动时检查更新",IDC_STARTCHECK,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,16,234,66,10
-    CTEXT           "关注列表:",IDC_STATIC,12,188,42,12,SS_CENTERIMAGE
-    EDITTEXT        IDC_FOLLOW,54,188,132,12,ES_AUTOHSCROLL
-    CONTROL         "限制帧数（重启生效）",IDC_LIMIT,"Button",BS_AUTOCHECKBOX | BS_CENTER | WS_TABSTOP,72,72,96,10
-END
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// DESIGNINFO
-//
-
-#ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO
-BEGIN
-    IDD_SETTING, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 196
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 289
-    END
-END
-#endif    // APSTUDIO_INVOKED
-
-
 /////////////////////////////////////////////////////////////////////////////
 //
 // AFX_DIALOG_LAYOUT
@@ -121,7 +62,7 @@ BEGIN
     0
 END
 
-#endif    // 中文(简体，中国) resources
+#endif    //
 /////////////////////////////////////////////////////////////////////////////
 
 

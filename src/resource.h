@@ -1,20 +1,4 @@
 ﻿#define IDI_ICON1 101
-#define IDD_SETTING 102
-#define IDC_VOLUME 1001
-#define IDC_MUTE 1002
-#define IDC_SCALE 1003
-#define IDC_LEFT 1004
-#define IDC_UP 1005
-#define IDC_RIGHT 1006
-#define IDC_LIVENOTIFY 1007
-#define IDC_FOLLOW 1008
-#define IDC_DYNAMICNOTIFY 1009
-#define IDC_GREEN 1010
-#define IDC_APPLY 1011
-#define IDC_CHECK 1012
-#define IDC_STARTCHECK 1013
-#define IDC_GREEN2 1014
-#define IDC_LIMIT 1014
 
 // Next default values for new objects
 //

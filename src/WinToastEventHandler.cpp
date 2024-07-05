@@ -1,5 +1,8 @@
 ﻿#include "WinToastEventHandler.h"
 
+#include <Windows.h>
+#include <shellapi.h>
+
 #include "LAppPal.hpp"
 
 WinToastEventHandler::WinToastEventHandler(std::string u) { url = u; }

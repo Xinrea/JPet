@@ -10,6 +10,8 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <Windows.h>
+#include <shellapi.h>
 
 #include <string>
 
@@ -193,9 +195,6 @@ class LAppDelegate {
    * @brief   CreateShader内部関数 エラーチェック
    */
   bool CheckShader(GLuint shaderId);
-
-  void SettingWindow();
-  std::thread SettingWindowThread();
 
   void Menu();
   std::thread MenuThread();

@@ -30,6 +30,7 @@
 #include "LAppView.hpp"
 #include "LUtils.hpp"
 #include "ModelManager.hpp"
+#include "PanelServer.hpp"
 #include "PartStateManager.h"
 #include "StateMessage.hpp"
 #include "TouchManager.hpp"
@@ -299,6 +300,11 @@ bool LAppDelegate::Initialize() {
   // 用于测试的通知
   // Notify(L"阿轴有新动态了", L"点击查看动态", _DynamicHandler);
 
+  // Start panel server
+
+  auto panelServer = PanelServer::GetInstance();
+  panelServer->Start();
+
   return GL_TRUE;
 }
 
@@ -438,8 +444,8 @@ void LAppDelegate::Run() {
     // 设置界面
     if (_isSetting && !isShowing) {
       isShowing = true;
-      std::thread settingThread = SettingWindowThread();
-      settingThread.detach();
+      // std::thread settingThread = SettingWindowThread();
+      // settingThread.detach();
     }
     if (!_isSetting) isShowing = false;
 
@@ -768,169 +774,6 @@ void LAppDelegate::Notify(const WCHAR *title, const WCHAR *content,
   std::wstring img = _exePath + std::wstring(L"resources/imgs/Avatar.png");
   templ.setImagePath(img);
   WinToast::instance()->showToast(templ, handler, nullptr);
-}
-
-LRESULT CALLBACK SettingProc(HWND hwnd, UINT uMsg, WPARAM wParam,
-                             LPARAM lParam) {
-  static float TimeSetting;
-  switch (uMsg) {
-    case WM_INITDIALOG: {
-      string title = string("检查更新(") + VERSION + ")";
-      SendMessage(GetDlgItem(hwnd, IDC_CHECK), WM_SETTEXT, true,
-                  (LPARAM)title.c_str());
-      SendMessage(
-          GetDlgItem(hwnd, IDC_MUTE), BM_SETCHECK,
-          LAppDelegate::GetInstance()->GetMute() ? BST_CHECKED : BST_UNCHECKED,
-          0);
-      SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE,
-                  !LAppDelegate::GetInstance()->GetMute(), 0);
-      SendMessage(GetDlgItem(hwnd, IDC_VOLUME), TBM_SETPOS, true,
-                  LAppDelegate::GetInstance()->GetVolume());
-      SendMessage(GetDlgItem(hwnd, IDC_SCALE), TBM_SETRANGE, true,
-                  MAKELONG(5, 15));
-      SendMessage(
-          GetDlgItem(hwnd, IDC_SCALE), TBM_SETPOS, true,
-          static_cast<double>(LAppDelegate::GetInstance()->GetScale()) * 10);
-      SendMessage(GetDlgItem(hwnd, IDC_LEFT), WM_SETTEXT, true,
-                  (LPARAM)LAppDelegate::GetInstance()->GetLURL().c_str());
-      SendMessage(GetDlgItem(hwnd, IDC_UP), WM_SETTEXT, true,
-                  (LPARAM)LAppDelegate::GetInstance()->GetUURL().c_str());
-      SendMessage(GetDlgItem(hwnd, IDC_RIGHT), WM_SETTEXT, true,
-                  (LPARAM)LAppDelegate::GetInstance()->GetRURL().c_str());
-      SendMessage(GetDlgItem(hwnd, IDC_FOLLOW), WM_SETTEXT, true,
-                  (LPARAM)LAppDelegate::GetInstance()->GetFollowList().c_str());
-
-      SendMessage(
-          GetDlgItem(hwnd, IDC_LIVENOTIFY), BM_SETCHECK,
-          LAppDelegate::GetInstance()->LiveNotify ? BST_CHECKED : BST_UNCHECKED,
-          0);
-      SendMessage(GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_SETCHECK,
-                  LAppDelegate::GetInstance()->DynamicNotify ? BST_CHECKED
-                                                             : BST_UNCHECKED,
-                  0);
-      SendMessage(
-          GetDlgItem(hwnd, IDC_GREEN), BM_SETCHECK,
-          LAppDelegate::GetInstance()->Green ? BST_CHECKED : BST_UNCHECKED, 0);
-      SendMessage(
-          GetDlgItem(hwnd, IDC_LIMIT), BM_SETCHECK,
-          LAppDelegate::GetInstance()->isLimit ? BST_CHECKED : BST_UNCHECKED,
-          0);
-      SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_SETCHECK,
-                  LAppDelegate::GetInstance()->UpdateNotify ? BST_CHECKED
-                                                            : BST_UNCHECKED,
-                  0);
-    }
-      return true;
-
-    case WM_COMMAND: {
-      switch (LOWORD(wParam)) {
-        case IDC_APPLY: {
-          float scale = static_cast<float>(SendMessage(
-                            GetDlgItem(hwnd, IDC_SCALE), TBM_GETPOS, 0, 0)) /
-                        10;
-          if (DebugLogEnable)
-            LAppPal::PrintLog(
-                "Volume: %d; scale: %f",
-                SendMessage(GetDlgItem(hwnd, IDC_VOLUME), TBM_GETPOS, 0, 0),
-                scale);
-          LAppDelegate::GetInstance()->SetMute(
-              SendMessage(GetDlgItem(hwnd, IDC_MUTE), BM_GETCHECK, 0, 0));
-          LAppDelegate::GetInstance()->SetVolume(
-              SendMessage(GetDlgItem(hwnd, IDC_VOLUME), TBM_GETPOS, 0, 0));
-          LAppDelegate::GetInstance()->SetScale(scale);
-          // left
-          int len =
-              SendMessage(GetDlgItem(hwnd, IDC_LEFT), WM_GETTEXTLENGTH, 0, 0);
-          TCHAR *buff = new TCHAR[len + 1];
-          SendMessage(GetDlgItem(hwnd, IDC_LEFT), WM_GETTEXT, len + 1,
-                      (LPARAM)buff);
-          std::wstring str(buff);
-          std::string url(str.begin(), str.end());
-          LAppDelegate::GetInstance()->SetLURL(url);
-          free(buff);
-          // up
-          len = SendMessage(GetDlgItem(hwnd, IDC_UP), WM_GETTEXTLENGTH, 0, 0);
-          buff = new TCHAR[len + 1];
-          SendMessage(GetDlgItem(hwnd, IDC_UP), WM_GETTEXT, len + 1,
-                      (LPARAM)buff);
-
-          str = std::wstring(buff);
-          url = std::string(str.begin(), str.end());
-          LAppDelegate::GetInstance()->SetUURL(url);
-          free(buff);
-          // right
-          len =
-              SendMessage(GetDlgItem(hwnd, IDC_RIGHT), WM_GETTEXTLENGTH, 0, 0);
-          buff = new TCHAR[len + 1];
-          SendMessage(GetDlgItem(hwnd, IDC_RIGHT), WM_GETTEXT, len + 1,
-                      (LPARAM)buff);
-          str = std::wstring(buff);
-          url = std::string(str.begin(), str.end());
-          LAppDelegate::GetInstance()->SetRURL(url);
-          free(buff);
-
-          // followlist
-          len =
-              SendMessage(GetDlgItem(hwnd, IDC_FOLLOW), WM_GETTEXTLENGTH, 0, 0);
-          buff = new TCHAR[len + 1];
-          SendMessage(GetDlgItem(hwnd, IDC_FOLLOW), WM_GETTEXT, len + 1,
-                      (LPARAM)buff);
-          str = std::wstring(buff);
-          url = std::string(str.begin(), str.end());
-          LAppDelegate::GetInstance()->SetFollowList(url);
-          free(buff);
-
-          LAppDelegate::GetInstance()->LiveNotify =
-              SendMessage(GetDlgItem(hwnd, IDC_LIVENOTIFY), BM_GETCHECK, 0, 0);
-          LAppDelegate::GetInstance()->DynamicNotify = SendMessage(
-              GetDlgItem(hwnd, IDC_DYNAMICNOTIFY), BM_GETCHECK, 0, 0);
-          LAppDelegate::GetInstance()->SetGreen(
-              SendMessage(GetDlgItem(hwnd, IDC_GREEN), BM_GETCHECK, 0, 0));
-          LAppDelegate::GetInstance()->SetLimit(
-              SendMessage(GetDlgItem(hwnd, IDC_LIMIT), BM_GETCHECK, 0, 0));
-          LAppDelegate::GetInstance()->UpdateNotify =
-              SendMessage(GetDlgItem(hwnd, IDC_STARTCHECK), BM_GETCHECK, 0, 0);
-
-          // 即时保存设置
-          LAppDelegate::GetInstance()->SaveSettings();
-
-          EndDialog(hwnd, 0);
-
-          break;
-        }
-        case IDC_MUTE: {
-          bool checked =
-              SendMessage(GetDlgItem(hwnd, IDC_MUTE), BM_GETCHECK, 0, 0);
-          if (checked)
-            SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE, false, 0);
-          else
-            SendMessage(GetDlgItem(hwnd, IDC_VOLUME), WM_ENABLE, true, 0);
-          break;
-        }
-        case IDC_CHECK: {
-          LUtils::OpenURL("https://pet.joi-club.cn");
-          break;
-        }
-      }
-    }
-      return 0;
-
-    case WM_DESTROY: {
-      LAppDelegate::GetInstance()->SetIsSetting(false);
-      EndDialog(hwnd, 0);
-    }
-      return DefWindowProc(hwnd, uMsg, wParam, lParam);
-  }
-  return DefWindowProc(hwnd, uMsg, wParam, lParam);
-}
-
-void LAppDelegate::SettingWindow() {
-  DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_SETTING),
-            glfwGetWin32Window(_window), SettingProc);
-}
-
-std::thread LAppDelegate::SettingWindowThread() {
-  return std::thread(&LAppDelegate::SettingWindow, this);
 }
 
 void LAppDelegate::Menu() {
