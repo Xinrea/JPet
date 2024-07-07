@@ -198,8 +198,7 @@ bool LAppDelegate::Initialize() {
     SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
   }
 
-  // SetLayeredWindowAttributes(hwnd,
-  //     RGB(0, 0, 0), 255, LWA_COLORKEY);
+  SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 255, LWA_COLORKEY);
 
   // 音频设定3d位置
   int x, y;
@@ -245,9 +244,8 @@ bool LAppDelegate::Initialize() {
   // コールバック関数の登録
   glfwSetMouseButtonCallback(_window, EventHandler::OnMouseCallBack);
   glfwSetCursorPosCallback(_window, EventHandler::OnMouseCallBack);
-  // glfwSetDropCallback(_window, EventHandler::OnDropCallBack);
   glfwSetWindowPosCallback(_window, EventHandler::OnWindowPosCallBack);
-  // glfwSetTrayClickCallback(_window, EventHandler::OnTrayClickCallBack);
+  glfwSetWindowTrayCallback(_window, EventHandler::OnTrayClickCallBack);
 
   // ウィンドウサイズ記憶
   int width, height;
@@ -636,23 +634,6 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, double x, double y) {
       _view->OnTouchesMoved(x - 30 * dx, ypos - 2 * height / 3);
     }
     return;
-  }
-}
-
-void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count,
-                                  const WCHAR *paths[]) {
-  for (int i = 0; i < path_count; i++) {
-    WCHAR p[MAX_PATH];
-    wmemset(p, 0, MAX_PATH);
-    StrCpyW(p, paths[i]);
-    SHFILEOPSTRUCTW op;
-    op.hwnd = NULL;
-    op.pTo = NULL;
-    op.wFunc = FO_DELETE;
-    op.fFlags = FOF_ALLOWUNDO | FOF_SIMPLEPROGRESS;
-    op.pFrom = p;
-    SHFileOperationW(&op);
-    if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Delete File Complete");
   }
 }
 

@@ -261,11 +261,6 @@ class EventHandler {
     LAppDelegate::GetInstance()->OnMouseCallBack(window, x, y);
   }
 
-  static void OnDropCallBack(GLFWwindow *window, int path_count,
-                             const WCHAR *paths[]) {
-    LAppDelegate::GetInstance()->OnDropCallBack(window, path_count, paths);
-  }
-
   static void OnWindowPosCallBack(GLFWwindow *window, int x, int y) {
     LAppDelegate::GetInstance()->OnWindowPosCallBack(window, x, y);
   }
