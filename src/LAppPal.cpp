@@ -14,8 +14,8 @@
 #include <Model/CubismMoc.hpp>
 #include <cstdarg>
 #include <cstdio>
-#include <fstream>
 #include <iostream>
+#include <mutex>
 
 #include "LAppDefine.hpp"
 
@@ -27,6 +27,9 @@ using namespace LAppDefine;
 double LAppPal::s_currentFrame = 0.0;
 double LAppPal::s_lastFrame = 0.0;
 double LAppPal::s_deltaTime = 0.0;
+std::fstream LAppPal::logFile;
+
+std::once_flag logFileFlag;
 
 csmByte* LAppPal::LoadFileAsBytes(const string& filePath, csmSizeInt* outSize) {
   // filePath;//
@@ -68,6 +71,9 @@ void LAppPal::UpdateTime() {
 }
 
 void LAppPal::PrintLog(const csmChar* format, ...) {
+  std::call_once(logFileFlag, []() {
+    logFile.open(documentPath + "\\JPetLog.txt", std::ios::out | std::ios::app);
+  });
   va_list args;
   csmChar buf[512];
   va_start(args, format);
@@ -76,10 +82,7 @@ void LAppPal::PrintLog(const csmChar* format, ...) {
   // メモリリークチェック時は大量の標準出力がはしり重いのでprintfを利用する
   std::printf(buf);
 #else
-  std::fstream file;
-  file.open(documentPath + "\\JPetLog.txt", std::ios::out | std::ios::app);
-  file << buf << std::endl;
-  file.close();
+  logFile << buf << std::endl;
   std::cerr << buf << std::endl;
 #endif
   va_end(args);

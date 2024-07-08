@@ -343,6 +343,8 @@ void LAppDelegate::Release() {
 
   // Cubism SDK の解放
   CubismFramework::Dispose();
+
+  LAppPal::ReleaseLog();
 }
 
 void LAppDelegate::Run() {
@@ -646,7 +648,6 @@ void LAppDelegate::OnWindowPosCallBack(GLFWwindow *window, int x, int y) {}
 #define IDM_EXIT 2003
 
 void LAppDelegate::OnTrayClickCallBack(GLFWwindow *window, int b, unsigned w) {
-  if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Tray Clicked: %d", b);
   if (b == 2) {
     Menu();
   } else {
