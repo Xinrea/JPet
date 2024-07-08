@@ -27,7 +27,7 @@ using namespace LAppDefine;
 double LAppPal::s_currentFrame = 0.0;
 double LAppPal::s_lastFrame = 0.0;
 double LAppPal::s_deltaTime = 0.0;
-std::fstream LAppPal::logFile;
+std::fstream LAppPal::s_logFile;
 
 std::once_flag logFileFlag;
 
@@ -72,7 +72,8 @@ void LAppPal::UpdateTime() {
 
 void LAppPal::PrintLog(const csmChar* format, ...) {
   std::call_once(logFileFlag, []() {
-    logFile.open(documentPath + "\\JPetLog.txt", std::ios::out | std::ios::app);
+    s_logFile.open(documentPath + "\\JPetLog.txt",
+                   std::ios::out | std::ios::app);
   });
   va_list args;
   csmChar buf[512];
@@ -82,7 +83,7 @@ void LAppPal::PrintLog(const csmChar* format, ...) {
   // メモリリークチェック時は大量の標準出力がはしり重いのでprintfを利用する
   std::printf(buf);
 #else
-  logFile << buf << std::endl;
+  s_logFile << buf << std::endl;
   std::cerr << buf << std::endl;
 #endif
   va_end(args);

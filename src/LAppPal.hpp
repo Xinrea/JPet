@@ -73,11 +73,14 @@ class LAppPal {
    */
   static void PrintMessage(const Csm::csmChar* message);
 
-  static void ReleaseLog() { logFile.close(); }
+  /**
+   * @brief 释放日志文件
+   */
+  static void ReleaseLog() { s_logFile.close(); }
 
  private:
   static double s_currentFrame;
   static double s_lastFrame;
   static double s_deltaTime;
-  static std::fstream logFile;
+  static std::fstream s_logFile;
 };
