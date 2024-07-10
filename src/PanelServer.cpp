@@ -8,7 +8,11 @@ void PanelServer::Start() {
 
 void PanelServer::doServe() {
   server->Get("/", [](const httplib::Request& req, httplib::Response& res) {
-    res.set_content("Hello World!", "text/plain");
+    // send response panel/index.html
+    std::ifstream ifs("resources/panel/index.html");
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                        (std::istreambuf_iterator<char>()));
+    res.set_content(content, "text/html");
   });
   server->listen("localhost", 8053);
 }

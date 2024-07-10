@@ -7,7 +7,7 @@ using std::queue;
 
 class UserStateManager {
  public:
-  void Init(std::string list) {
+  void Init(const std::vector<std::string>& list) {
     if (_Watcher) Stop();
     _Watcher = new UserStateWatcher(list);
     std::thread t = _Watcher->WatchThread();

@@ -22,6 +22,7 @@
 #include <WinUser.h>
 #include <windows.h>
 
+#include "DataManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppLive2DManager.hpp"
 #include "LAppModel.hpp"
@@ -34,7 +35,6 @@
 #include "PartStateManager.h"
 #include "StateMessage.hpp"
 #include "TouchManager.hpp"
-#include "ini.h"
 #include "resource.h"
 
 #define WM_IAWENTRAY WM_USER + 5
@@ -82,32 +82,19 @@ bool LAppDelegate::Initialize() {
   if (DebugLogEnable) {
     LAppPal::PrintLog("[LAppDelegate]START");
   }
+  DataManager *dataManager = DataManager::GetInstance();
   // 设置初始化
-  CHAR documents[MAX_PATH];
-  HRESULT result = SHGetFolderPathA(NULL, CSIDL_PERSONAL, NULL,
-                                    SHGFP_TYPE_CURRENT, documents);
-  string inipath(documents);
-  INIReader reader(inipath + "\\JPetConfig.ini");
+  dataManager->GetWindowPos(&_iposX, &_iposY);
+  dataManager->GetAudio(&_volume, &_mute);
+  dataManager->GetDisplay(&_scale, &Green, &isLimit);
+  dataManager->GetNotify(&_followlist, &DynamicNotify, &LiveNotify,
+                         &UpdateNotify);
 
-  if (reader.ParseError() == 0) {
-    _iposX = reader.GetInteger("position", "x", 400);
-    _iposY = reader.GetInteger("position", "y", 400);
-    _leftUrl = reader.Get("shortcut", "left", "https://t.bilibili.com/");
-    _upUrl = reader.Get("shortcut", "up",
-                        "https://space.bilibili.com/61639371/dynamic");
-    _rightUrl =
-        reader.Get("shortcut", "right", "https://live.bilibili.com/21484828");
-    _volume = reader.GetInteger("audio", "volume", 20);
-    _mute = reader.GetBoolean("audio", "mute", false);
-    _scale = reader.GetFloat("display", "scale", 1.0f);
-    _followlist = reader.Get("follow", "list", "61639371;544832401;475210;");
-    isLimit = reader.GetBoolean("display", "limit", false);
-    Green = reader.GetBoolean("display", "green", false);
-    LiveNotify = reader.GetBoolean("notify", "live", true);
-    DynamicNotify = reader.GetBoolean("notify", "dynamic", true);
-    UpdateNotify = reader.GetBoolean("notify", "update", true);
-  } else
-    LAppPal::PrintLog("[LAppDelegate]INI Reader: %d", reader.ParseError());
+  std::map<std::string, std::string> shortcuts;
+  dataManager->GetShortcut(&shortcuts);
+  _leftUrl = shortcuts["left"];
+  _upUrl = shortcuts["up"];
+  _rightUrl = shortcuts["right"];
   RenderTargetWidth = _scale * DRenderTargetWidth;
   RenderTargetHeight = _scale * DRenderTargetHeight;
   // 音频初始化
@@ -278,11 +265,7 @@ bool LAppDelegate::Initialize() {
 
   // 初始化模型参数
   map<string, float> initState;
-  for (int i = 0; i < PartStateManager::GetInstance()->ParamNum; i++) {
-    initState[PartStateManager::GetInstance()->ParamList[i]] =
-        reader.GetFloat("parts", PartStateManager::GetInstance()->ParamList[i],
-                        PartStateManager::GetInstance()->ParamDefault[i]);
-  }
+  dataManager->GetModalState(&initState);
   PartStateManager::GetInstance()->ImportState(initState);
   PartStateManager::GetInstance()->SetState();
 
@@ -479,29 +462,29 @@ void LAppDelegate::Run() {
 }
 
 void LAppDelegate::SaveSettings() {
+  // update window pos
   int x, y;
   glfwGetWindowPos(_window, &x, &y);
+  DataManager *dataManager = DataManager::GetInstance();
+  dataManager->UpdateWindowPos(x, y);
+
+  // update audio settings
+  dataManager->UpdateAudio(_volume, _mute);
+
+  // update shortcuts settings
+  dataManager->UpdateShortcut("left", _leftUrl);
+  dataManager->UpdateShortcut("up", _upUrl);
+  dataManager->UpdateShortcut("right", _rightUrl);
+
+  // update display settings
+  dataManager->UpdateDisplay(_scale, Green, isLimit);
+
+  // update model part states
   PartStateManager::GetInstance()->SaveState();
   auto modelState = PartStateManager::GetInstance()->GetAllState();
-  ofstream of;
-  of.open(documentPath + "\\JPetConfig.ini", ios::trunc);
-  of << "[position]\n"
-     << "x=" << x << "\ny=" << y << "\n[shortcut]\n"
-     << "left=" << _leftUrl << "\nup=" << _upUrl << "\nright=" << _rightUrl
-     << "\n[follow]\n"
-     << "list=" << _followlist << "\n[audio]\n"
-     << "volume=" << _volume << "\nmute=" << (_mute ? "true" : "false")
-     << "\n[display]\nscale=" << _scale
-     << "\ngreen=" << (Green ? "true" : "false")
-     << "\nlimit=" << (isLimit ? "true" : "false")
-     << "\n[notify]\nlive=" << (LiveNotify ? "true" : "false")
-     << "\ndynamic=" << (DynamicNotify ? "true" : "false")
-     << "\nupdate=" << (UpdateNotify ? "true" : "false") << "\n[parts]";
-  // 保存模型状态
-  for (auto i : modelState) {
-    of << "\n" + i.first + "=" << (i.second > 0.5) ? 1 : 0;
-  }
-  of.close();
+  dataManager->UpdateModalState(modelState);
+
+  dataManager->Save();
   if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Setting Saved");
 }
 

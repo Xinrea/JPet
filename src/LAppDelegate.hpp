@@ -133,11 +133,11 @@ class LAppDelegate {
   std::string GetLURL() { return _leftUrl; }
   std::string GetUURL() { return _upUrl; }
   std::string GetRURL() { return _rightUrl; }
-  std::string GetFollowList() { return _followlist; }
+  const std::vector<std::string> &GetFollowList() { return _followlist; }
   void SetLURL(std::string s) { _leftUrl = s; }
   void SetUURL(std::string s) { _upUrl = s; }
   void SetRURL(std::string s) { _rightUrl = s; }
-  void SetFollowList(std::string s) {
+  void SetFollowList(std::vector<std::string> s) {
     _followlist = s;
     if (_us) _us->Init(s);
   }
@@ -217,7 +217,7 @@ class LAppDelegate {
   bool _isLive;
   int _mWidth, _mHeight;
   std::wstring _exePath;
-  std::string _followlist;
+  std::vector<std::string> _followlist;
   AudioManager *_au;
   UserStateManager *_us;
   NOTIFYICONDATA nid;

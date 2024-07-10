@@ -1,10 +1,11 @@
 {
-    "dependencies": [
-        "glew",
-        "openssl",
-        "wintoast",
-        "cpp-httplib",
-        "rapidjson",
-        "stb"
-    ]
+  "dependencies": [
+    "glew",
+    "openssl",
+    "wintoast",
+    "cpp-httplib",
+    "rapidjson",
+    "stb",
+    "tomlplusplus"
+  ]
 }
