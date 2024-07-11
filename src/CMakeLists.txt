@@ -23,7 +23,6 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/ini.h
   ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.h
   ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UserStateManager.h
@@ -41,4 +40,6 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/PanelServer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/GamePanel.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/GamePanel.cpp
 )

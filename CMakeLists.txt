@@ -35,6 +35,7 @@ find_package(unofficial-wintoast CONFIG REQUIRED)
 find_package(RapidJSON CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
 find_package(Stb REQUIRED)
+find_package(unofficial-webview2 CONFIG REQUIRED)
 
 # Set Visual Studio startup project.
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${APP_NAME})
@@ -136,6 +137,7 @@ target_link_libraries(${APP_NAME}
   rapidjson
   glfw
   fmod_vc
+  unofficial::webview2::webview2
 
   # Solve the MSVCRT confliction.
   debug -NODEFAULTLIB:libcmtd.lib

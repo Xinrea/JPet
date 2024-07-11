@@ -286,6 +286,9 @@ bool LAppDelegate::Initialize() {
   auto panelServer = PanelServer::GetInstance();
   panelServer->Start();
 
+  // Init Game Panel
+  _panel = new GamePanel(hwnd, GetModuleHandle(NULL));
+
   return GL_TRUE;
 }
 

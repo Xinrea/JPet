@@ -16,6 +16,7 @@
 #include <string>
 
 #include "AudioManager.hpp"
+#include "GamePanel.hpp"
 #include "LAppAllocator.hpp"
 #include "UserStateManager.h"
 #include "WinToastEventHandler.h"
@@ -221,6 +222,8 @@ class LAppDelegate {
   AudioManager *_au;
   UserStateManager *_us;
   NOTIFYICONDATA nid;
+
+  GamePanel *_panel;
 
   WinToastEventHandler *_LiveHandler;
   WinToastEventHandler *_DynamicHandler;
