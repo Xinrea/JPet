@@ -83,8 +83,13 @@ void LAppPal::PrintLog(const csmChar* format, ...) {
   // メモリリークチェック時は大量の標準出力がはしり重いのでprintfを利用する
   std::printf(buf);
 #else
-  s_logFile << buf << std::endl;
-  std::cerr << buf << std::endl;
+  // add time info
+  time_t now = time(nullptr);
+  struct tm* pnow = localtime(&now);
+  char timebuf[32];
+  strftime(timebuf, sizeof(timebuf), "[%Y-%m-%d %H:%M:%S]", pnow);
+  s_logFile << timebuf << buf << std::endl;
+  std::cerr << timebuf << buf << std::endl;
 #endif
   va_end(args);
 }
