@@ -76,7 +76,7 @@ void LAppPal::PrintLog(const csmChar* format, ...) {
                    std::ios::out | std::ios::app);
   });
   va_list args;
-  csmChar buf[512];
+  csmChar buf[4096];
   va_start(args, format);
   vsnprintf_s(buf, sizeof(buf), format, args);  // 標準出力でレンダリング
 #ifdef CSM_DEBUG_MEMORY_LEAKING

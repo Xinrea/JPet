@@ -104,10 +104,6 @@ bool LAppDelegate::Initialize() {
   _au->SetVolume(static_cast<float>(_volume) / 10);
   if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]AudioManager Init");
 
-  // 用户状态管理初始化
-  _us = new UserStateManager();
-  _us->Init(_followlist);
-
   // GLFWの初期化
   if (glfwInit() == GL_FALSE) {
     if (DebugLogEnable) {
@@ -288,6 +284,9 @@ bool LAppDelegate::Initialize() {
 
   // Init Game Panel
   _panel = new GamePanel(hwnd, GetModuleHandle(NULL));
+  // 用户状态管理初始化
+  _us = new UserStateManager();
+  _us->Init(_followlist, hwnd);
 
   return GL_TRUE;
 }
@@ -401,30 +400,25 @@ void LAppDelegate::Run() {
     // Poll for and process events
     glfwPollEvents();
 
-    static bool lastLive = false;
     static float scale = _scale;
     static bool isShowing = false;
-    // 直播提醒
-    auto &liveQueue = _us->GetLiveState();
-    if (!liveQueue.empty()) {
-      auto liveInfo = liveQueue.front();
-      liveQueue.pop();
-      if (LiveNotify)
-        Notify((liveInfo.name + L"开播了").c_str(), (liveInfo.title).c_str(),
+    // notify message process
+    auto msg = _us->FetchOne();
+    if (msg.has_value()) {
+      auto messageInfo = msg.value();
+      auto wuname = StringToWString(messageInfo.target.uname);
+      auto wroomtitle = StringToWString(messageInfo.target.roomtitle);
+      if (messageInfo.type == MessageType::LiveMessage && LiveNotify) {
+        Notify(wuname + L" - 直播中", wroomtitle,
                new WinToastEventHandler("https://live.bilibili.com/" +
-                                        liveInfo.roomid));
-      if (liveInfo.uid == "61639371")
-        _au->Play3dSound("resources/audios/n01.mp3");
-    }
-
-    // 动态提醒
-    auto &dynamicQueue = _us->GetDynamicState();
-    if (!dynamicQueue.empty()) {
-      auto dynamicInfo = dynamicQueue.front();
-      dynamicQueue.pop();
-      Notify((dynamicInfo.name + L"有新动态了").c_str(), L"点击查看动态",
-             new WinToastEventHandler("https://t.bilibili.com/" +
-                                      dynamicInfo.content));
+                                        messageInfo.target.roomid));
+      }
+      if (messageInfo.type == MessageType::DynamicMessage && DynamicNotify) {
+        auto wdesc = StringToWString(messageInfo.extra2);
+        Notify(wuname + L" - 新动态", wdesc,
+               new WinToastEventHandler("https://t.bilibili.com/" +
+                                        messageInfo.extra1));
+      }
     }
 
     // 设置界面
@@ -453,7 +447,6 @@ void LAppDelegate::Run() {
     _au->SetVolume(static_cast<float>(_volume) / 10);
     _au->SetMute(_mute);
   }
-  _us->Stop();
   // Release前保存配置
   SaveSettings();
 
@@ -486,6 +479,19 @@ void LAppDelegate::SaveSettings() {
   PartStateManager::GetInstance()->SaveState();
   auto modelState = PartStateManager::GetInstance()->GetAllState();
   dataManager->UpdateModalState(modelState);
+
+  // get follow list
+  std::vector<WatchTarget> watchList;
+  _us->GetTargetList(watchList);
+  // transform watch list to string list
+  std::vector<std::string> watchListStr;
+  for (auto &target : watchList) {
+    watchListStr.push_back(target.uid);
+  }
+
+  // update notify settings
+  dataManager->UpdateNotify(watchListStr, DynamicNotify, LiveNotify,
+                            UpdateNotify);
 
   dataManager->Save();
   if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Setting Saved");
@@ -733,10 +739,10 @@ bool LAppDelegate::CheckShader(GLuint shaderId) {
   return true;
 }
 
-void LAppDelegate::Notify(const WCHAR *title, const WCHAR *content,
+void LAppDelegate::Notify(const wstring &title, const wstring &content,
                           WinToastEventHandler *handler) {
   WinToastTemplate templ = WinToastTemplate(WinToastTemplate::ImageAndText02);
-
+  // convert char* to wstring
   templ.setTextField(title, WinToastTemplate::FirstLine);
   templ.setTextField(content, WinToastTemplate::SecondLine);
   std::wstring img = _exePath + std::wstring(L"resources/imgs/Avatar.png");
@@ -745,14 +751,16 @@ void LAppDelegate::Notify(const WCHAR *title, const WCHAR *content,
 }
 
 void LAppDelegate::Menu() {
+  // TODO using a seperate window as menu
   POINT p;
   GetCursorPos(&p);
   HMENU hMenu;
   hMenu = CreatePopupMenu();
-  if (_isShowing)
+  if (_isShowing) {
     AppendMenu(hMenu, MF_STRING, IDM_HIDE, TEXT("隐藏"));
-  else
+  } else {
     AppendMenu(hMenu, MF_STRING, IDM_HIDE, TEXT("显示"));
+  }
   AppendMenu(hMenu, MF_STRING, IDM_RESET, TEXT("重置位置"));
   AppendMenu(hMenu, MF_STRING, IDM_SET, TEXT("设置"));
   AppendMenu(hMenu, MF_STRING, IDM_EXIT, TEXT("退出"));

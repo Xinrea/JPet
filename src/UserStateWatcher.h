@@ -12,23 +12,18 @@ using std::vector;
 
 class UserStateWatcher {
  public:
-  bool isExit = false;
-  vector<bool> lastLive;
-  vector<long long> lastDynamic;
-  queue<StateMessage> newLive;
-  queue<StateMessage> newDynamic;
-  vector<string> uidlist;
-  UserStateWatcher(const std::vector<std::string>& list) {
-    uidlist = list;
-    for (int i = 0; i < uidlist.size(); i++) {
-      lastDynamic.push_back(0);
-      lastLive.push_back(false);
-    }
-  }
-  void Watch();
-  static bool CheckUpdate();
-  std::thread WatchThread();
+  WatchTarget target;
+  bool lastStatus = false;
+  long long lastTime = 0;
+  UserStateWatcher(const string& uid, const string& cookies,
+                   const string& userAgent);
+  bool Check(queue<StateMessage>& messageQueue);
 
  private:
+  bool _initialized = false;
+  const string& _cookies;
+  const string& _userAgent;
+  string img_key, sub_key;
+  void initBasicInfo();
   wstring StringToWString(const std::string& str);
 };

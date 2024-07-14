@@ -42,4 +42,7 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GamePanel.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GamePanel.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/CookieWindow.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/CookieWindow.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Wbi.hpp
 )

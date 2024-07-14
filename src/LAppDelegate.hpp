@@ -111,6 +111,8 @@ class LAppDelegate {
 
   void SetIsSetting(bool s) { _isSetting = s; }
 
+  UserStateManager *GetUserStateManager() { return _us; }
+
   // 设置窗口交互
   bool GetMute() { return _mute; }
   void SetMute(bool m) { _mute = m; }
@@ -134,13 +136,14 @@ class LAppDelegate {
   std::string GetLURL() { return _leftUrl; }
   std::string GetUURL() { return _upUrl; }
   std::string GetRURL() { return _rightUrl; }
-  const std::vector<std::string> &GetFollowList() { return _followlist; }
   void SetLURL(std::string s) { _leftUrl = s; }
   void SetUURL(std::string s) { _upUrl = s; }
   void SetRURL(std::string s) { _rightUrl = s; }
-  void SetFollowList(std::vector<std::string> s) {
-    _followlist = s;
-    if (_us) _us->Init(s);
+  void AddWatch(const std::string &s) {
+    if (_us) _us->AddWatcher(s);
+  }
+  void RemoveWatch(const std::string &s) {
+    if (_us) _us->RemoveWatcher(s);
   }
 
   bool LiveNotify = true;
@@ -171,7 +174,7 @@ class LAppDelegate {
    */
   void AppEnd() { _isEnd = true; }
 
-  void Notify(const WCHAR *title, const WCHAR *content,
+  void Notify(const wstring &title, const wstring &content,
               WinToastEventHandler *handler);
 
   LAppTextureManager *GetTextureManager() { return _textureManager; }

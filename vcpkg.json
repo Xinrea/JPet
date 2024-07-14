@@ -4,9 +4,11 @@
     "openssl",
     "wintoast",
     "cpp-httplib",
-    "rapidjson",
     "stb",
     "tomlplusplus",
-    "webview2"
+    "webview2",
+    "nlohmann-json",
+    "cpr",
+    "cryptopp"
   ]
 }
