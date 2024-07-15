@@ -1,9 +1,9 @@
 #include "GamePanel.hpp"
+#include "LAppPal.hpp"
+#include "LAppDefine.hpp"
 
 #include <stdexcept>
 #include <thread>
-
-#include "LAppPal.hpp"
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam,
                          LPARAM lParam) {
@@ -33,7 +33,7 @@ GamePanel::GamePanel(HWND parent, HINSTANCE instance)
     : _parent(parent), _instance(instance), _visible(false) {
   // thread for Window
   // print parent and instance
-  LAppPal::PrintLog("[GamePanel]Parent: %p, Instance: %p", parent, instance);
+  LAppPal::PrintLog(LogLevel::Debug, "[GamePanel]Parent: %p, Instance: %p", parent, instance);
   WindowProc();
 }
 void GamePanel::WindowProc() {
@@ -66,7 +66,7 @@ void GamePanel::WindowProc() {
     return;
   }
 
-  LAppPal::PrintLog("GamePanel: %p", _window);
+  LAppPal::PrintLog(LogLevel::Debug, "[GamePanel]Window: %p", _window);
 
   SetWindowLongPtr(_window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
@@ -118,7 +118,7 @@ void GamePanel::WindowProc() {
             })
             .Get());
   } catch (std::exception& e) {
-    LAppPal::PrintLog("Failed to create WebView: %s", e.what());
+    LAppPal::PrintLog(LogLevel::Error, "Failed to create WebView: %s", e.what());
   }
 }
 

@@ -12,6 +12,13 @@
 #include <fstream>
 #include <string>
 
+enum class LogLevel {
+ Debug,
+ Info,
+ Warn,
+ Error
+};
+
 /**
  * @brief プラットフォーム依存機能を抽象化する Cubism Platform Abstraction
  * Layer.
@@ -62,6 +69,8 @@ class LAppPal {
    *
    */
   static void PrintLog(const Csm::csmChar* format, ...);
+
+  static void PrintLog(LogLevel level, const Csm::csmChar* format, ...);
 
   /**
    * @brief メッセージを出力する

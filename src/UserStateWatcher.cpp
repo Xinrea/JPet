@@ -110,8 +110,6 @@ bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
             break;
           }
         }
-        LAppPal::PrintLog("[UserStateWatcher][%s]Valid index %d / %d",
-                          target.uid.c_str(), validIndex, total);
         if (validIndex == 0 &&
             json.at("data").at("items").at(0).at("modules").contains(
                 "module_tag")) {
@@ -143,7 +141,7 @@ bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
                                    .get<long long>());
         }
         if (validIndex == -1) {
-          LAppPal::PrintLog("[UserStateWatcher][%s]No valid dynamic",
+          LAppPal::PrintLog(LogLevel::Error, "[UserStateWatcher][%s]No valid dynamic",
                             target.uid.c_str());
           lastTime = latest;
           return true;

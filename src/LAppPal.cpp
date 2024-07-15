@@ -27,9 +27,7 @@ using namespace LAppDefine;
 double LAppPal::s_currentFrame = 0.0;
 double LAppPal::s_lastFrame = 0.0;
 double LAppPal::s_deltaTime = 0.0;
-std::fstream LAppPal::s_logFile;
-
-std::once_flag logFileFlag;
+std::fstream LAppPal::s_logFile(documentPath + "\\JPetLog.txt", std::ios::out | std::ios::app);
 
 csmByte* LAppPal::LoadFileAsBytes(const string& filePath, csmSizeInt* outSize) {
   // filePath;//
@@ -71,10 +69,6 @@ void LAppPal::UpdateTime() {
 }
 
 void LAppPal::PrintLog(const csmChar* format, ...) {
-  std::call_once(logFileFlag, []() {
-    s_logFile.open(documentPath + "\\JPetLog.txt",
-                   std::ios::out | std::ios::app);
-  });
   va_list args;
   csmChar buf[4096];
   va_start(args, format);
@@ -88,8 +82,36 @@ void LAppPal::PrintLog(const csmChar* format, ...) {
   struct tm* pnow = localtime(&now);
   char timebuf[32];
   strftime(timebuf, sizeof(timebuf), "[%Y-%m-%d %H:%M:%S]", pnow);
-  s_logFile << timebuf << buf << std::endl;
-  std::cerr << timebuf << buf << std::endl;
+  s_logFile << timebuf << "[INFO]" << buf << std::endl;
+  std::cerr << timebuf << "[INFO]" << buf << std::endl;
+#endif
+  va_end(args);
+}
+
+void LAppPal::PrintLog(LogLevel level, const csmChar* format, ...) {
+  if (!DebugLogEnable && level == LogLevel::Debug) {
+    return;
+  }
+  va_list args;
+  csmChar buf[4096];
+  va_start(args, format);
+  vsnprintf_s(buf, sizeof(buf), format, args);  // 標準出力でレンダリング
+#ifdef CSM_DEBUG_MEMORY_LEAKING
+  // メモリリークチェック時は大量の標準出力がはしり重いのでprintfを利用する
+  std::printf(buf);
+#else
+  // add time info
+  time_t now = time(nullptr);
+  struct tm* pnow = localtime(&now);
+  char timebuf[32];
+  strftime(timebuf, sizeof(timebuf), "[%Y-%m-%d %H:%M:%S]", pnow);
+  string levelStr = "[INFO]";
+  if (level == LogLevel::Debug) levelStr = "[DEBUG]";
+  if (level == LogLevel::Info) levelStr = "[INFO]";
+  if (level == LogLevel::Warn) levelStr = "[WARN]";
+  if (level == LogLevel::Error) levelStr = "[ERROR]";
+  s_logFile << timebuf << levelStr << buf << std::endl;
+  std::cerr << timebuf << levelStr << buf << std::endl;
 #endif
   va_end(args);
 }

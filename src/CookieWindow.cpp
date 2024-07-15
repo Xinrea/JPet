@@ -1,9 +1,9 @@
 #include "CookieWindow.hpp"
+#include "LAppPal.hpp"
+#include "LAppDefine.hpp"
 
 #include <stdexcept>
 #include <thread>
-
-#include "LAppPal.hpp"
 
 LRESULT CALLBACK CookieWndProc(HWND hWnd, UINT message, WPARAM wParam,
                                LPARAM lParam) {
@@ -32,7 +32,7 @@ LRESULT CALLBACK CookieWndProc(HWND hWnd, UINT message, WPARAM wParam,
 CookieWindow::CookieWindow(HWND parent, HINSTANCE instance)
     : _parent(parent), _instance(instance), _visible(false) {
   // thread for Window
-  LAppPal::PrintLog("[GamePanel]Parent: %p, Instance: %p", parent, instance);
+  LAppPal::PrintLog(LogLevel::Debug, "[GamePanel]Parent: %p, Instance: %p", parent, instance);
   WindowProc();
 }
 void CookieWindow::WindowProc() {
@@ -65,7 +65,7 @@ void CookieWindow::WindowProc() {
     return;
   }
 
-  LAppPal::PrintLog("CookieWindow: %p", _window);
+  LAppPal::PrintLog(LogLevel::Debug, "[CookieWindow]Window: %p", _window);
 
   SetWindowLongPtr(_window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
