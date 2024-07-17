@@ -131,7 +131,7 @@ void DataManager::UpdateModalState(
 }
 
 void DataManager::Save() {
-  const std::string configPath = LAppDefine::documentPath + "/config.toml";
+  const std::string configPath = LAppDefine::documentPath + "/jpet.toml";
   std::ofstream file(configPath);
   if (!file.is_open()) {
     LAppPal::PrintLog("Failed to open config file for writing");

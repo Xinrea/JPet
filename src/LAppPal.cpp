@@ -27,7 +27,8 @@ using namespace LAppDefine;
 double LAppPal::s_currentFrame = 0.0;
 double LAppPal::s_lastFrame = 0.0;
 double LAppPal::s_deltaTime = 0.0;
-std::fstream LAppPal::s_logFile(documentPath + "\\JPetLog.txt", std::ios::out | std::ios::app);
+std::fstream LAppPal::s_logFile(documentPath + "/jpet.log",
+                                std::ios::out | std::ios::app);
 
 csmByte* LAppPal::LoadFileAsBytes(const string& filePath, csmSizeInt* outSize) {
   // filePath;//
