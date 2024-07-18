@@ -19,8 +19,6 @@
 #include "GamePanel.hpp"
 #include "LAppAllocator.hpp"
 #include "UserStateManager.h"
-#include "WinToastEventHandler.h"
-#include "wintoastlib.h"
 
 class LAppView;
 class LAppTextureManager;
@@ -174,9 +172,6 @@ class LAppDelegate {
    */
   void AppEnd() { _isEnd = true; }
 
-  void Notify(const wstring &title, const wstring &content,
-              WinToastEventHandler *handler);
-
   LAppTextureManager *GetTextureManager() { return _textureManager; }
 
  private:
@@ -228,9 +223,6 @@ class LAppDelegate {
 
   GamePanel *_panel;
 
-  WinToastEventHandler *_LiveHandler;
-  WinToastEventHandler *_DynamicHandler;
-  WinToastEventHandler *_UpdateHandler;
   LAppTextureManager *_textureManager;  ///< テクスチャマネージャー
 
   // Config Part

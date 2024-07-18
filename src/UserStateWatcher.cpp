@@ -69,15 +69,6 @@ void UserStateWatcher::initBasicInfo() {
   }
 }
 
-std::wstring UserStateWatcher::StringToWString(const std::string& str) {
-  int num = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-  wchar_t* wide = new wchar_t[num];
-  MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, wide, num);
-  std::wstring w_str(wide);
-  delete[] wide;
-  return w_str;
-}
-
 bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
   if (!_initialized) {
     initBasicInfo();
@@ -141,7 +132,8 @@ bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
                                    .get<long long>());
         }
         if (validIndex == -1) {
-          LAppPal::PrintLog(LogLevel::Error, "[UserStateWatcher][%s]No valid dynamic",
+          LAppPal::PrintLog(LogLevel::Error,
+                            "[UserStateWatcher][%s]No valid dynamic",
                             target.uid.c_str());
           lastTime = latest;
           return true;

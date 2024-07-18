@@ -1,5 +1,4 @@
 #include "GamePanel.hpp"
-#include "LAppPal.hpp"
 #include "LAppDefine.hpp"
 
 #include <stdexcept>
@@ -20,6 +19,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam,
     case WM_DESTROY:
       // just hide window
       ShowWindow(hWnd, SW_HIDE);
+      LAppPal::PrintLog(LogLevel::Debug, "[GamePanel] Hide panel");
       break;
     default:
       return DefWindowProc(hWnd, message, wParam, lParam);
@@ -30,10 +30,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam,
 }
 
 GamePanel::GamePanel(HWND parent, HINSTANCE instance)
-    : _parent(parent), _instance(instance), _visible(false) {
+    : _parent(parent), _instance(instance) {
   // thread for Window
   // print parent and instance
-  LAppPal::PrintLog(LogLevel::Debug, "[GamePanel]Parent: %p, Instance: %p", parent, instance);
+  LAppPal::PrintLog(LogLevel::Debug, "[GamePanel]Parent: %p, Instance: %p",
+                    parent, instance);
   WindowProc();
 }
 void GamePanel::WindowProc() {
@@ -118,7 +119,8 @@ void GamePanel::WindowProc() {
             })
             .Get());
   } catch (std::exception& e) {
-    LAppPal::PrintLog(LogLevel::Error, "Failed to create WebView: %s", e.what());
+    LAppPal::PrintLog(LogLevel::Error, "Failed to create WebView: %s",
+                      e.what());
   }
 }
 

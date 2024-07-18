@@ -3,13 +3,28 @@
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
 
+#include <filesystem>
+
 bool DataManager::init() {
-  const std::string configPath = LAppDefine::documentPath + "/config.toml";
-  try {
-    data = toml::parse_file(configPath);
-  } catch (const toml::parse_error& err) {
-    LAppPal::PrintLog("Failed to parse config file: %s", err.what());
-    return false;
+  const std::string configPath = LAppDefine::documentPath + "/jpet.toml";
+  // check file existence
+  if (!std::filesystem::exists(std::filesystem::path(configPath))) {
+    // create a new config file
+    std::ofstream file(configPath);
+    if (!file.is_open()) {
+      LAppPal::PrintLog("Failed to create config file: %s", configPath.c_str());
+      return false;
+    }
+    file.close();
+    // initialize with default values
+    LAppPal::PrintLog("Created config file: %s", configPath.c_str());
+  } else {
+    try {
+      data = toml::parse_file(configPath);
+    } catch (const toml::parse_error& err) {
+      LAppPal::PrintLog("Failed to parse config file: %s", err.what());
+      return false;
+    }
   }
   return true;
 }
@@ -27,6 +42,11 @@ DataManager* DataManager::GetInstance() {
 
 void DataManager::GetWindowPos(int* x, int* y) {
   // get x,y from data
+  if (!data.contains("window")) {
+    // update x,y in data
+    data.insert_or_assign("window", toml::table{{"x", 0}, {"y", 0}});
+    return;
+  }
   *x = data.at("window").as_table()->at("x").value_or(0);
   *y = data.at("window").as_table()->at("y").value_or(0);
 }
@@ -37,6 +57,10 @@ void DataManager::UpdateWindowPos(int x, int y) {
 }
 
 void DataManager::GetAudio(int* volume, bool* mute) {
+  // if audio doesn't exist, create it
+  if (!data.contains("audio")) {
+    data.insert("audio", toml::table{{"volume", 20}, {"mute", false}});
+  }
   // get volume, mute from data
   *volume = data.at("audio").as_table()->at("volume").value_or(20);
   *mute = data.at("audio").as_table()->at("mute").value_or(false);
@@ -69,6 +93,13 @@ void DataManager::UpdateShortcut(const std::string& key,
 }
 
 void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
+  if (!data.contains("display")) {
+    // update scale, green, rateLimit in data
+    data.insert_or_assign(
+        "display",
+        toml::table{{"scale", 1}, {"green", false}, {"rateLimit", false}});
+    return;
+  }
   // get scale, green, rateLimit from data
   *scale = data.at("display").as_table()->at("scale").value_or(1);
   *green = data.at("display").as_table()->at("green").value_or(false);

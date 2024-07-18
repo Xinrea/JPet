@@ -12,12 +12,7 @@
 #include <fstream>
 #include <string>
 
-enum class LogLevel {
- Debug,
- Info,
- Warn,
- Error
-};
+enum class LogLevel { Debug, Info, Warn, Error };
 
 /**
  * @brief プラットフォーム依存機能を抽象化する Cubism Platform Abstraction
@@ -86,6 +81,8 @@ class LAppPal {
    * @brief 释放日志文件
    */
   static void ReleaseLog() { s_logFile.close(); }
+
+  static std::wstring StringToWString(const std::string& s);
 
  private:
   static double s_currentFrame;

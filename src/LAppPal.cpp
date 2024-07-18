@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <iostream>
 #include <mutex>
+#include <codecvt>
 
 #include "LAppDefine.hpp"
 
@@ -118,3 +119,8 @@ void LAppPal::PrintLog(LogLevel level, const csmChar* format, ...) {
 }
 
 void LAppPal::PrintMessage(const csmChar* message) { PrintLog("%s", message); }
+
+std::wstring LAppPal::StringToWString(const std::string& str) {
+  std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+  return converter.from_bytes(str);
+}

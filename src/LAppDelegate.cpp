@@ -42,7 +42,6 @@
 using namespace Csm;
 using namespace std;
 using namespace LAppDefine;
-using namespace WinToastLib;
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK PreWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
@@ -51,15 +50,6 @@ WNDPROC DefaultProc;
 
 namespace {
 LAppDelegate *s_instance = NULL;
-}
-
-std::wstring StringToWString(const std::string &str) {
-  int num = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
-  wchar_t *wide = new wchar_t[num];
-  MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, wide, num);
-  std::wstring w_str(wide);
-  delete[] wide;
-  return w_str;
 }
 
 LAppDelegate *LAppDelegate::GetInstance() {
@@ -188,19 +178,6 @@ bool LAppDelegate::Initialize() {
   glfwGetWindowPos(_window, &x, &y);
   _au->Update(x, y, RenderTargetWidth, RenderTargetHeight, _mWidth, _mHeight);
 
-  // 通知初始化
-  WinToast::instance()->setAppName(L"JPet");
-  const auto aumi =
-      WinToast::configureAUMI(L"JoiGroup", L"JPetProject", L"JPet", WVERSION);
-  WinToast::instance()->setAppUserModelId(aumi);
-  WinToast::instance()->initialize();
-
-  _LiveHandler = new WinToastEventHandler("https://live.bilibili.com/21484828");
-  _DynamicHandler =
-      new WinToastEventHandler("https://space.bilibili.com/61639371/dynamic");
-  _UpdateHandler = new WinToastEventHandler("https://pet.joi-club.cn");
-  if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Notification Init");
-
   // Windowのコンテキストをカレントに設定
   glfwMakeContextCurrent(_window);
   if (isLimit)
@@ -265,27 +242,20 @@ bool LAppDelegate::Initialize() {
   PartStateManager::GetInstance()->ImportState(initState);
   PartStateManager::GetInstance()->SetState();
 
-  // 检查版本状况
   srand(time(NULL));
-  if (UpdateNotify && _us->CheckUpdate())
-    Notify(L"桌宠阿轴有新版本了", L"点击前往主页查看更新", _UpdateHandler);
 
   // 随机播放启动语音
   _au->Play3dSound("resources/audios/s0" +
                    to_string(rand() % StartAudioNum + 1) + ".mp3");
 
-  // 用于测试的通知
-  // Notify(L"阿轴有新动态了", L"点击查看动态", _DynamicHandler);
-
   // Start panel server
-
   auto panelServer = PanelServer::GetInstance();
   panelServer->Start();
 
   // Init Game Panel
   _panel = new GamePanel(hwnd, GetModuleHandle(NULL));
   // 用户状态管理初始化
-  _us = new UserStateManager();
+  _us = new UserStateManager(DynamicNotify, LiveNotify);
   _us->Init(_followlist, hwnd);
 
   return GL_TRUE;
@@ -402,24 +372,6 @@ void LAppDelegate::Run() {
 
     static float scale = _scale;
     static bool isShowing = false;
-    // notify message process
-    auto msg = _us->FetchOne();
-    if (msg.has_value()) {
-      auto messageInfo = msg.value();
-      auto wuname = StringToWString(messageInfo.target.uname);
-      auto wroomtitle = StringToWString(messageInfo.target.roomtitle);
-      if (messageInfo.type == MessageType::LiveMessage && LiveNotify) {
-        Notify(wuname + L" - 直播中", wroomtitle,
-               new WinToastEventHandler("https://live.bilibili.com/" +
-                                        messageInfo.target.roomid));
-      }
-      if (messageInfo.type == MessageType::DynamicMessage && DynamicNotify) {
-        auto wdesc = StringToWString(messageInfo.extra2);
-        Notify(wuname + L" - 新动态", wdesc,
-               new WinToastEventHandler("https://t.bilibili.com/" +
-                                        messageInfo.extra1));
-      }
-    }
 
     // 设置界面
     if (_isSetting && !isShowing) {
@@ -654,6 +606,7 @@ void LAppDelegate::OnTrayClickCallBack(GLFWwindow *window, int b, unsigned w) {
       }
       case IDM_SET: {
         _isSetting = true;
+        _panel->Show();
         break;
       }
       case IDM_EXIT: {
@@ -737,17 +690,6 @@ bool LAppDelegate::CheckShader(GLuint shaderId) {
   }
 
   return true;
-}
-
-void LAppDelegate::Notify(const wstring &title, const wstring &content,
-                          WinToastEventHandler *handler) {
-  WinToastTemplate templ = WinToastTemplate(WinToastTemplate::ImageAndText02);
-  // convert char* to wstring
-  templ.setTextField(title, WinToastTemplate::FirstLine);
-  templ.setTextField(content, WinToastTemplate::SecondLine);
-  std::wstring img = _exePath + std::wstring(L"resources/imgs/Avatar.png");
-  templ.setImagePath(img);
-  WinToast::instance()->showToast(templ, handler, nullptr);
 }
 
 void LAppDelegate::Menu() {

@@ -6,6 +6,8 @@
 
 #include <string>
 
+#include "LAppPal.hpp"
+
 /**
  * @brief A simple wrapper for webview of game info
  */
@@ -41,19 +43,10 @@ class GamePanel {
   /**
    * @brief Show the panel
    */
-  void Show();
-
-  /**
-   * @brief Hide the panel
-   */
-  void Hide();
-
-  /**
-   * @brief Check if the panel is visible
-   *
-   * @return true if the panel is visible
-   */
-  bool IsVisible();
+  void Show() {
+    ShowWindowAsync(_window, SW_SHOW);
+    LAppPal::PrintLog(LogLevel::Debug, "[GamePanel] Show panel");
+  }
 
   wil::com_ptr<ICoreWebView2Controller> webviewController;
 
@@ -61,7 +54,6 @@ class GamePanel {
   HWND _parent;
   HWND _window;
   HINSTANCE _instance;
-  bool _visible;
 
   wil::com_ptr<ICoreWebView2> webview;
 

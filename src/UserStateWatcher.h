@@ -25,5 +25,4 @@ class UserStateWatcher {
   const string& _userAgent;
   string img_key, sub_key;
   void initBasicInfo();
-  wstring StringToWString(const std::string& str);
 };
