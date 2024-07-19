@@ -40,6 +40,7 @@ const csmInt32 IdleAudioNum = 7;
 const csmInt32 TouchAudioNum = 5;
 
 // 外部定義ファイル(json)と合わせる
+const csmChar *HitAreaSetting = "HitAreaHairBall";
 const csmChar *HitAreaNameHead = "AreaHead";
 const csmChar *HitAreaNameBody = "AreaBody";
 const int GunChangeList[2] = {14, 13};

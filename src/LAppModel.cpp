@@ -516,8 +516,6 @@ csmBool LAppModel::HitTest(const csmChar* hitAreaName, csmFloat32 x,
   }
   const csmInt32 count = _modelSetting->GetHitAreasCount();
   for (csmInt32 i = 0; i < count; i++) {
-    // if (DebugLogEnable)LAppPal::PrintLog("Enter HitTest for [%d]%s | %s", i,
-    // _modelSetting->GetHitAreaName(i),hitAreaName);
     if (strcmp(_modelSetting->GetHitAreaName(i), hitAreaName) == 0) {
       const CubismIdHandle drawID = _modelSetting->GetHitAreaId(i);
       return IsHit(drawID, x, y);

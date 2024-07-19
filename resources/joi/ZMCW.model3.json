@@ -1,28 +1,40 @@
 {
-	"Version": 3,
-	"FileReferences": {
-		"Moc": "ZMCW.moc3",
-		"Textures": [
-			"ZMCW.1024/texture_00.png",
-			"ZMCW.1024/texture_01.png",
-			"ZMCW.1024/texture_02.png",
-			"ZMCW.1024/texture_03.png"
-		],
-		"Physics": "ZMCW.physics3.json",
-		"DisplayInfo": "ZMCW.cdi3.json"
-	},
-	"Groups": [
-		{
-			"Target": "Parameter",
-			"Name": "LipSync",
-			"Ids": []
-		},
-		{
-			"Target": "Parameter",
-			"Name": "EyeBlink",
-			"Ids": [
-				"ParamEyeLOpen"
-			]
-		}
-	]
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "ZMCW.moc3",
+    "Textures": [
+      "ZMCW.1024/texture_00.png",
+      "ZMCW.1024/texture_01.png",
+      "ZMCW.1024/texture_02.png",
+      "ZMCW.1024/texture_03.png"
+    ],
+    "Physics": "ZMCW.physics3.json",
+    "DisplayInfo": "ZMCW.cdi3.json"
+  },
+  "Groups": [
+    {
+      "Target": "Parameter",
+      "Name": "LipSync",
+      "Ids": []
+    },
+    {
+      "Target": "Parameter",
+      "Name": "EyeBlink",
+      "Ids": ["ParamEyeLOpen"]
+    }
+  ],
+  "HitAreas": [
+    {
+      "Id": "HitAreaHat",
+      "Name": "HitAreaHat"
+    },
+    {
+      "Id": "HitAreaEar",
+      "Name": "HitAreaHair"
+    },
+    {
+      "Id": "HitAreaHairBall",
+      "Name": "HitAreaHairBall"
+    }
+  ]
 }

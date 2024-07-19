@@ -66,6 +66,7 @@ extern const csmChar *MotionGroupEyeChange;
 extern const csmChar *MotionGroupPartChange;
 extern const csmChar *MotionGroupSpecial;
 // 外部定義ファイル(json)と合わせる
+extern const csmChar *HitAreaSetting;  ///< 当たり判定の設定ファイル
 extern const csmChar *HitAreaNameHead;  ///< 当たり判定の[Head]タグ
 extern const csmChar *HitAreaNameBody;  ///< 当たり判定の[Body]タグ
 extern const int GunChangeList[2];
