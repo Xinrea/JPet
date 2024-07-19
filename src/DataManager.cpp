@@ -170,5 +170,6 @@ void DataManager::Save() {
   }
   file << data;
   file.close();
-  LAppPal::PrintLog("Saved config file: %s", configPath.c_str());
+  LAppPal::PrintLog(LogLevel::Info, "[DataManager]Saved config file: %s",
+                    configPath.c_str());
 }

@@ -338,7 +338,7 @@ void LAppDelegate::Run() {
     if (IdleCount > 60 * 6)  // 10s under 60fps
     {
       SetIdle();
-      if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate] Idle On");
+      LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]Idle On");
     }
 
     // 鼠标捕捉
@@ -353,8 +353,9 @@ void LAppDelegate::Run() {
     // 画面の初期化
     if (!Green) {
       glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    } else
+    } else {
       glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
+    }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearDepth(1.0);
 

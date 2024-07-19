@@ -17,7 +17,7 @@ LRESULT CALLBACK CookieWndProc(HWND hWnd, UINT message, WPARAM wParam,
         cookieWindow->webviewController->put_Bounds(bounds);
       };
       break;
-    case WM_DESTROY:
+    case WM_CLOSE:
       // just hide window
       ShowWindow(hWnd, SW_HIDE);
       break;
@@ -32,7 +32,8 @@ LRESULT CALLBACK CookieWndProc(HWND hWnd, UINT message, WPARAM wParam,
 CookieWindow::CookieWindow(HWND parent, HINSTANCE instance)
     : _parent(parent), _instance(instance), _visible(false) {
   // thread for Window
-  LAppPal::PrintLog(LogLevel::Debug, "[GamePanel]Parent: %p, Instance: %p", parent, instance);
+  LAppPal::PrintLog(LogLevel::Debug, "[GamePanel]Parent: %p, Instance: %p",
+                    parent, instance);
   WindowProc();
 }
 void CookieWindow::WindowProc() {
@@ -165,7 +166,7 @@ void CookieWindow::WindowProc() {
 
 void CookieWindow::Show() {
   if (_window) {
-    ShowWindow(_window, SW_SHOW);
+    ShowWindow(_window, SW_SHOWNORMAL);
     _visible = true;
   }
 }

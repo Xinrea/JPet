@@ -3,7 +3,6 @@
 #include <wrl.h>
 #include <wil/com.h>
 #include <webview2.h>
-
 #include <string>
 
 #include "LAppPal.hpp"
@@ -43,10 +42,7 @@ class GamePanel {
   /**
    * @brief Show the panel
    */
-  void Show() {
-    ShowWindowAsync(_window, SW_SHOW);
-    LAppPal::PrintLog(LogLevel::Debug, "[GamePanel] Show panel");
-  }
+  void Show() { ShowWindow(_window, SW_SHOWNORMAL); }
 
   wil::com_ptr<ICoreWebView2Controller> webviewController;
 

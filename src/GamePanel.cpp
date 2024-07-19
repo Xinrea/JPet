@@ -2,7 +2,6 @@
 #include "LAppDefine.hpp"
 
 #include <stdexcept>
-#include <thread>
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam,
                          LPARAM lParam) {
@@ -16,10 +15,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam,
         gamePanel->webviewController->put_Bounds(bounds);
       };
       break;
-    case WM_DESTROY:
+    case WM_CLOSE:
       // just hide window
       ShowWindow(hWnd, SW_HIDE);
-      LAppPal::PrintLog(LogLevel::Debug, "[GamePanel] Hide panel");
       break;
     default:
       return DefWindowProc(hWnd, message, wParam, lParam);
@@ -59,7 +57,7 @@ void GamePanel::WindowProc() {
   }
 
   _window = CreateWindow(L"GamePanel", L"GamePanel", WS_OVERLAPPEDWINDOW,
-                         CW_USEDEFAULT, CW_USEDEFAULT, 1200, 900, NULL, NULL,
+                         CW_USEDEFAULT, CW_USEDEFAULT, 820, 1200, NULL, NULL,
                          _instance, NULL);
 
   if (!_window) {
@@ -71,7 +69,7 @@ void GamePanel::WindowProc() {
 
   SetWindowLongPtr(_window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
-  ShowWindow(_window, SW_SHOWDEFAULT);
+  ShowWindow(_window, SW_SHOWNORMAL);
   UpdateWindow(_window);
   // <-- WebView2 sample code starts here -->
   // Step 3 - Create a single WebView within the parent window
