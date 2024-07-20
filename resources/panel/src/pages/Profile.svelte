@@ -2,6 +2,11 @@
   import { Progressbar } from "flowbite-svelte";
   import { sineOut } from "svelte/easing";
 
+  const es = new EventSource("/api/sse");
+  es.onmessage = (event) => {
+    console.log(event);
+  };
+
   let currentExp = 0;
   // calculate exp to next level
   const ExpToLevel = (/** @type {number} */ exp) => {
@@ -22,13 +27,6 @@
   const levelToExp = (/** @type {number} */ level) => {
     return Math.ceil(level * level + 30);
   };
-
-  // print exp for each level sum
-  let sum = 0;
-  for (let i = 0; i < 54; i++) {
-    sum += levelToExp(i);
-    console.log(`level ${i}: ${sum}`);
-  }
 
   // current time to next time point
   let timeToNextPoint = 60 - new Date().getSeconds();

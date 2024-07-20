@@ -717,3 +717,10 @@ void LAppDelegate::Menu() {
 std::thread LAppDelegate::MenuThread() {
   return std::thread(&LAppDelegate::Menu, this);
 }
+
+
+void LAppDelegate::ShowPanel() {
+  if (_panel) _panel->Show();
+  PanelServer::GetInstance()->Notify("123");
+}
+

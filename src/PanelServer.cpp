@@ -10,6 +10,35 @@ void PanelServer::Start() {
   t.detach();
 }
 
+void PanelServer::DataSinkHandle(httplib::DataSink& sink) {
+  std::unique_lock<std::mutex> lock(_mtx);
+  int id = _messageId + 1;
+  _cv.wait(lock, [&] { return _messageId == id; });
+  sink.write(_message.c_str(), _message.size());
+}
+
+void PanelServer::Notify(const std::string& message) {
+  std::lock_guard<std::mutex> lock(_mtx);
+  _message = "data: " + message + "\n\n";
+  _messageId++;
+  _cv.notify_all();
+}
+
+void PanelServer::initSSE() {
+  // client send a request and wait for response
+  // if any message is sent to the client, the client will wait for response again
+  // so we get a connection to notify the client
+  server->Get("/api/sse", [this](const httplib::Request& req, httplib::Response& res) {
+      LAppPal::PrintLog(LogLevel::Debug, "GET /api/sse");
+      res.set_chunked_content_provider("text/event-stream",
+          [&](size_t /*offset*/, httplib::DataSink &sink) {
+            // this will block until server wants to send message
+            DataSinkHandle(sink);
+            return true;
+          });
+      });
+}
+
 void PanelServer::doServe() {
   // server->set_base_dir("resources/panel/dist");
   server->Get("/api/config/audio",
@@ -135,6 +164,9 @@ void PanelServer::doServe() {
     nlohmann::json resp = {{"watch_list", followListJson}};
     res.set_content(resp.dump(), "application/json");
   });
+
+  initSSE();
+
   server->Get("/(.*)", [](const httplib::Request& req, httplib::Response& res) {
     httplib::Client cli("localhost", 5173);
     auto result = cli.Get(req.path);
@@ -146,5 +178,6 @@ void PanelServer::doServe() {
       res.status = 500;
     }
   });
+
   server->listen("localhost", 8053);
 }

@@ -131,9 +131,7 @@ class LAppDelegate {
 
   void SaveSettings();
 
-  void ShowPanel() {
-    if (_panel) _panel->Show();
-  }
+  void ShowPanel();
 
   std::string GetLURL() { return _leftUrl; }
   std::string GetUURL() { return _upUrl; }
