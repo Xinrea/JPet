@@ -5,9 +5,12 @@
 #include <toml++/toml.hpp>
 #include <vector>
 
+#include "GameData.hpp"
+
 class DataManager {
  private:
   toml::table data;
+  std::shared_ptr<GameData> gameData;
   bool init();
   DataManager();
 
@@ -33,6 +36,10 @@ class DataManager {
 
   void GetModalState(std::map<std::string, float>* modalState);
   void UpdateModalState(const std::map<std::string, float>& modalState);
+
+  // GameData related
+  void AddExp(int exp);
+  int GetExp();
 
   void Save();
 

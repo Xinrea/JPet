@@ -23,7 +23,10 @@ int main() {
   CHAR documents[MAX_PATH];
   HRESULT result = SHGetFolderPathA(NULL, CSIDL_PERSONAL, NULL,
                                     SHGFP_TYPE_CURRENT, documents);
-  LAppDefine::documentPath = string(documents);
+  LAppDefine::documentPath = string(documents) + "\\jpet\\";
+  if (!PathFileExistsA(LAppDefine::documentPath.c_str())) {
+    CreateDirectoryA(LAppDefine::documentPath.c_str(), NULL);
+  }
   // create the application instance
   if (LAppDelegate::GetInstance()->Initialize() == GL_FALSE) {
     return 1;

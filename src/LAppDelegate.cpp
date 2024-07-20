@@ -79,6 +79,8 @@ bool LAppDelegate::Initialize() {
   dataManager->GetDisplay(&_scale, &Green, &isLimit);
   dataManager->GetNotify(&_followlist, &DynamicNotify, &LiveNotify,
                          &UpdateNotify);
+  dataManager->AddExp(1);
+  LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]DataManager test exp: %d", dataManager->GetExp());
 
   std::map<std::string, std::string> shortcuts;
   dataManager->GetShortcut(&shortcuts);

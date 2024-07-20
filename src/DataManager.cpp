@@ -26,6 +26,9 @@ bool DataManager::init() {
       return false;
     }
   }
+
+  // initialize game data
+  gameData = std::make_shared<GameData>(LAppDefine::documentPath + "/jpet.dat");
   return true;
 }
 
@@ -172,4 +175,16 @@ void DataManager::Save() {
   file.close();
   LAppPal::PrintLog(LogLevel::Info, "[DataManager]Saved config file: %s",
                     configPath.c_str());
+}
+
+void DataManager::AddExp(int exp) {
+  int currentExp = 0;
+  gameData->Get("exp", currentExp);
+  gameData->Update("exp", currentExp + exp);
+}
+
+int DataManager::GetExp() {
+  int exp = 0;
+  gameData->Get("exp", exp);
+  return exp;
 }
