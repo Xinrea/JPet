@@ -1,6 +1,7 @@
 #include "PanelServer.hpp"
 #include "LAppPal.hpp"
 #include "LAppDelegate.hpp"
+#include "DataManager.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -41,6 +42,12 @@ void PanelServer::initSSE() {
 
 void PanelServer::doServe() {
   // server->set_base_dir("resources/panel/dist");
+  server->Get("/api/profile", [](const httplib::Request& req, httplib::Response& res) {
+    LAppPal::PrintLog(LogLevel::Debug, "GET /api/profile");
+    auto json = nlohmann::json::object();
+    json["exp"] = DataManager::GetInstance()->GetExp();
+    res.set_content(json.dump(), "application/json");
+  });
   server->Get("/api/config/audio",
               [](const httplib::Request& req, httplib::Response& res) {
                 int volume = LAppDelegate::GetInstance()->GetVolume();
@@ -178,6 +185,9 @@ void PanelServer::doServe() {
       res.status = 500;
     }
   });
-
-  server->listen("localhost", 8053);
+  try {
+    server->listen("localhost", 8053);
+  } catch (const std::exception& e) {
+    LAppPal::PrintLog(LogLevel::Error, "[PanelServer]PanelServer exception: %s", e.what());
+  };
 }

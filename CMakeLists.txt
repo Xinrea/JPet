@@ -38,6 +38,7 @@ find_package(unofficial-webview2 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(cpr CONFIG REQUIRED)
 find_package(cryptopp CONFIG REQUIRED)
+find_package(croncpp CONFIG REQUIRED)
 
 # Set Visual Studio startup project.
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${APP_NAME})
@@ -66,40 +67,55 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Detect architecture.
-if(CMAKE_EXE_LINKER_FLAGS STREQUAL "/machine:x64")
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
   set(ARCH x86_64)
   set(FMOD_ARCH x64)
-elseif(CMAKE_EXE_LINKER_FLAGS STREQUAL "/machine:X86")
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
+  set(ARCH x86_64)
+  set(FMOD_ARCH x64)
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
   set(ARCH x86)
   set(FMOD_ARCH x86)
 else()
-  message(FATAL_ERROR "[${APP_NAME}] Invalid linker flag ${CMAKE_EXE_LINKER_FLAGS}.")
-endif()
-
-set(COMPILER 142)
-add_definitions(-DUNICODE -D_UNICODE)
-
-# Detect core crt.
-if(CORE_CRL_MD)
-  set(CRT MD)
-else()
-  set(CRT MT)
+  message(FATAL_ERROR "Unknown architecture")
 endif()
 
 # Add Cubism Core.
 # Import as static library.
 add_library(Live2DCubismCore STATIC IMPORTED)
 
-# Find library path.
-set(CORE_LIB_SUFFIX ${CORE_PATH}/lib/windows/${ARCH}/${COMPILER})
-set_target_properties(Live2DCubismCore
-  PROPERTIES
-  IMPORTED_LOCATION_DEBUG
-  ${CORE_LIB_SUFFIX}/Live2DCubismCore_${CRT}d.lib
-  IMPORTED_LOCATION_RELEASE
-  ${CORE_LIB_SUFFIX}/Live2DCubismCore_${CRT}.lib
-  INTERFACE_INCLUDE_DIRECTORIES ${CORE_PATH}/include
-)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  message(NOTICE "Using MSVC")
+
+  if(CORE_CRL_MD)
+    set(CRT MD)
+  else()
+    set(CRT MT)
+  endif()
+
+  set(COMPILER 143)
+  add_definitions(-DUNICODE -D_UNICODE)
+
+  # Find library path.
+  set(CORE_LIB_SUFFIX ${CORE_PATH}/lib/windows/${ARCH}/${COMPILER})
+  set_target_properties(Live2DCubismCore
+    PROPERTIES
+    IMPORTED_LOCATION_DEBUG
+    ${CORE_LIB_SUFFIX}/Live2DCubismCore_${CRT}d.lib
+    IMPORTED_LOCATION_RELEASE
+    ${CORE_LIB_SUFFIX}/Live2DCubismCore_${CRT}.lib
+    INTERFACE_INCLUDE_DIRECTORIES ${CORE_PATH}/include
+  )
+else()
+  # Find library path.
+  set(CORE_LIB_SUFFIX ${CORE_PATH}/dll/windows/${ARCH})
+  set_target_properties(Live2DCubismCore
+    PROPERTIES
+    IMPORTED_LOCATION
+    ${CORE_LIB_SUFFIX}/Live2DCubismCore.lib
+    INTERFACE_INCLUDE_DIRECTORIES ${CORE_PATH}/include
+  )
+endif()
 
 # Add GLEW ,GLFW.
 add_subdirectory(${GLFW_PATH} ${CMAKE_CURRENT_BINARY_DIR}/glfw)
@@ -142,8 +158,9 @@ target_link_libraries(${APP_NAME}
   nlohmann_json::nlohmann_json
   cpr::cpr
   cryptopp::cryptopp
+  croncpp::croncpp
 
-  # Solve the MSVCRT confliction.
+  # Solve the MSVCRT confliction if using MSVC.
   debug -NODEFAULTLIB:libcmtd.lib
   optimized -NODEFAULTLIB:libcmt.lib
 )

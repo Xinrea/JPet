@@ -8,6 +8,19 @@
   };
 
   let currentExp = 0;
+
+  updateProfile();
+  
+  // fetch current status
+  function updateProfile() {
+    fetch("/api/profile")
+      .then((res) => res.json())
+      .then((data) => {
+          currentExp = data.exp;
+          console.log(data);
+          });
+  }
+
   // calculate exp to next level
   const ExpToLevel = (/** @type {number} */ exp) => {
     for (let i = 0; i < 54; i++) {
@@ -33,7 +46,7 @@
   setInterval(() => {
     timeToNextPoint = 60 - new Date().getSeconds();
     if (timeToNextPoint === 60) {
-      currentExp++;
+      updateProfile();
     }
   }, 1000);
 </script>

@@ -9,6 +9,7 @@
     "webview2",
     "nlohmann-json",
     "cpr",
-    "cryptopp"
+    "cryptopp",
+    "croncpp"
   ]
 }

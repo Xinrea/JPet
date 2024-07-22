@@ -35,6 +35,7 @@
 #include "PartStateManager.h"
 #include "StateMessage.hpp"
 #include "TouchManager.hpp"
+#include "TaskScheduler.hpp"
 #include "resource.h"
 
 #define WM_IAWENTRAY WM_USER + 5
@@ -69,9 +70,7 @@ void LAppDelegate::ReleaseInstance() {
 }
 
 bool LAppDelegate::Initialize() {
-  if (DebugLogEnable) {
-    LAppPal::PrintLog("[LAppDelegate]START");
-  }
+  LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]START");
   DataManager *dataManager = DataManager::GetInstance();
   // 设置初始化
   dataManager->GetWindowPos(&_iposX, &_iposY);
@@ -79,8 +78,6 @@ bool LAppDelegate::Initialize() {
   dataManager->GetDisplay(&_scale, &Green, &isLimit);
   dataManager->GetNotify(&_followlist, &DynamicNotify, &LiveNotify,
                          &UpdateNotify);
-  dataManager->AddExp(1);
-  LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]DataManager test exp: %d", dataManager->GetExp());
 
   std::map<std::string, std::string> shortcuts;
   dataManager->GetShortcut(&shortcuts);
@@ -114,7 +111,7 @@ bool LAppDelegate::Initialize() {
   GetModuleFileName(GetModuleHandle(NULL), static_cast<LPWSTR>(curPath),
                     sizeof(curPath));
   _exePath = std::wstring(curPath);
-  if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Get Execute Path");
+  LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]Get Execute Path");
 
   // Windowの生成_
   // 使用GLFW_DECORATED实现边框，会导致1703版本及以前，整个窗口鼠标穿透
@@ -259,6 +256,10 @@ bool LAppDelegate::Initialize() {
   // 用户状态管理初始化
   _us = new UserStateManager(DynamicNotify, LiveNotify);
   _us->Init(_followlist, hwnd);
+
+  // Init task scheduler and basic tasks
+  TaskScheduler *ts = TaskScheduler::GetInstance();
+  ts->AddTask(new ExpTask());
 
   return GL_TRUE;
 }
@@ -718,9 +719,7 @@ std::thread LAppDelegate::MenuThread() {
   return std::thread(&LAppDelegate::Menu, this);
 }
 
-
 void LAppDelegate::ShowPanel() {
   if (_panel) _panel->Show();
   PanelServer::GetInstance()->Notify("123");
 }
-

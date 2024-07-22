@@ -68,8 +68,9 @@ void UserStateManager::CheckThread(const vector<string>& list) {
   std::this_thread::sleep_for(std::chrono::seconds(3));
   _mutex.lock();
   for (auto uid : list) {
-    UserStateWatcher* watcher = new UserStateWatcher(uid, _cookieWindow->cookie,
-                                                     _cookieWindow->userAgent);
+    std::shared_ptr<UserStateWatcher> watcher =
+      std::make_shared<UserStateWatcher>(uid, _cookieWindow->cookie,
+          _cookieWindow->userAgent);
     _watchers.push_back(watcher);
     // sleep for 5s to avoid 799 error
     std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -82,11 +83,12 @@ void UserStateManager::CheckThread(const vector<string>& list) {
     }
     // copy a shadow of _watchers
     _mutex.lock();
-    std::vector<UserStateWatcher*> watchers = _watchers;
+    std::vector<std::shared_ptr<UserStateWatcher>> watchers = _watchers;
     _mutex.unlock();
     LAppPal::PrintLog("[UserStateManager]CheckThread running with %d watchers",
                       watchers.size());
     for (auto watcher : watchers) {
+      if (!_running) return;
       bool cookieValid = watcher->Check(_messageQueue);
       // notify message process
       auto msg = FetchOne();

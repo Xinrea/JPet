@@ -10,6 +10,7 @@
 
 #include <CubismFramework.hpp>
 #include <ICubismAllocator.hpp>
+#include <cstdlib>
 
 /**
  * @brief メモリアロケーションを実装するクラス。

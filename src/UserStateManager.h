@@ -21,13 +21,10 @@ class UserStateManager {
       : _dynamicNotifyEnabled(dynamicNotifyEnabled),
         _liveNotifyEnabled(liveNotifyEnabled) {}
   ~UserStateManager() {
+    _running = false;
     _mutex.lock();
-    for (auto watcher : _watchers) {
-      delete watcher;
-    }
     _watchers.clear();
     _mutex.unlock();
-    _running = false;
   }
   void Init(const std::vector<std::string>& list, HWND parent);
 
@@ -39,8 +36,8 @@ class UserStateManager {
         return;
       }
     }
-    UserStateWatcher* watcher = new UserStateWatcher(uid, _cookieWindow->cookie,
-                                                     _cookieWindow->userAgent);
+    std::shared_ptr<UserStateWatcher> watcher = std::make_shared<UserStateWatcher>(uid, _cookieWindow->cookie,
+        _cookieWindow->userAgent);
     _watchers.push_back(watcher);
     LAppPal::PrintLog("[UserStateManager]Add watcher %s", uid.c_str());
   }
@@ -77,8 +74,8 @@ class UserStateManager {
   }
 
  private:
-  vector<UserStateWatcher*> _watchers;
-  mutable std::mutex _mutex;
+  vector<std::shared_ptr<UserStateWatcher>> _watchers;
+  std::mutex _mutex;
   queue<StateMessage> _messageQueue;
   wstring _exePath;
   const bool& _dynamicNotifyEnabled;

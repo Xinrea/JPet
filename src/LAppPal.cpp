@@ -17,6 +17,7 @@
 #include <iostream>
 #include <mutex>
 #include <codecvt>
+#include <locale>
 
 #include "LAppDefine.hpp"
 

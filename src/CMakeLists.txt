@@ -47,4 +47,6 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/Wbi.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GameData.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GameData.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/TaskScheduler.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/TaskScheduler.cpp
 )

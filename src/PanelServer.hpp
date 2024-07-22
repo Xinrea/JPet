@@ -29,5 +29,8 @@ class PanelServer {
 
   void Notify(const std::string& message);
 
-  ~PanelServer() { delete server; }
+  ~PanelServer() {
+    server->stop();
+    delete server;
+  }
 };
