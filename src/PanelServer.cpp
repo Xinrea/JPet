@@ -27,27 +27,29 @@ void PanelServer::Notify(const std::string& message) {
 
 void PanelServer::initSSE() {
   // client send a request and wait for response
-  // if any message is sent to the client, the client will wait for response again
-  // so we get a connection to notify the client
-  server->Get("/api/sse", [this](const httplib::Request& req, httplib::Response& res) {
-      LAppPal::PrintLog(LogLevel::Debug, "GET /api/sse");
-      res.set_chunked_content_provider("text/event-stream",
-          [&](size_t /*offset*/, httplib::DataSink &sink) {
-            // this will block until server wants to send message
-            DataSinkHandle(sink);
-            return true;
-          });
-      });
+  // if any message is sent to the client, the client will wait for response
+  // again so we get a connection to notify the client
+  server->Get("/api/sse", [this](const httplib::Request& req,
+                                 httplib::Response& res) {
+    LAppPal::PrintLog(LogLevel::Debug, "GET /api/sse");
+    res.set_chunked_content_provider(
+        "text/event-stream", [&](size_t /*offset*/, httplib::DataSink& sink) {
+          // this will block until server wants to send message
+          DataSinkHandle(sink);
+          return true;
+        });
+  });
 }
 
 void PanelServer::doServe() {
   // server->set_base_dir("resources/panel/dist");
-  server->Get("/api/profile", [](const httplib::Request& req, httplib::Response& res) {
-    LAppPal::PrintLog(LogLevel::Debug, "GET /api/profile");
-    auto json = nlohmann::json::object();
-    json["exp"] = DataManager::GetInstance()->GetExp();
-    res.set_content(json.dump(), "application/json");
-  });
+  server->Get("/api/profile",
+              [](const httplib::Request& req, httplib::Response& res) {
+                LAppPal::PrintLog(LogLevel::Debug, "GET /api/profile");
+                auto json = nlohmann::json::object();
+                json["exp"] = DataManager::GetInstance()->GetExp();
+                res.set_content(json.dump(), "application/json");
+              });
   server->Get("/api/config/audio",
               [](const httplib::Request& req, httplib::Response& res) {
                 int volume = LAppDelegate::GetInstance()->GetVolume();
@@ -188,6 +190,7 @@ void PanelServer::doServe() {
   try {
     server->listen("localhost", 8053);
   } catch (const std::exception& e) {
-    LAppPal::PrintLog(LogLevel::Error, "[PanelServer]PanelServer exception: %s", e.what());
+    LAppPal::PrintLog(LogLevel::Error, "[PanelServer]PanelServer exception: %s",
+                      e.what());
   };
 }

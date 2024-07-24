@@ -1,32 +1,57 @@
 <script>
   import "./app.css";
-  import { Tabs, TabItem } from "flowbite-svelte";
   import Profile from "./pages/Profile.svelte";
   import Document from "./pages/Document.svelte";
   import Setting from "./pages/Setting.svelte";
+
+  let activeTab = 0;
+  let tabs = [
+    { name: "总览" },
+    { name: "任务" },
+    { name: "自定义" },
+    { name: "设置" },
+    { name: "说明" },
+  ];
 </script>
 
 <main>
-  <Tabs tabStyle="underline">
-    <TabItem open title="总览">
+  <!-- tab buttons -->
+  <div class="flex flex-row mb-4">
+    {#each tabs as tab, index}
+      <button
+        class="inline-block text-sm font-medium text-center disabled:cursor-not-allowed p-4 border-primary-600 dark:text-primary-500 dark:border-primary-500"
+        class:active={activeTab === index}
+        on:click={() => (activeTab = index)}>{tab.name}</button
+      >
+    {/each}
+  </div>
+  <div class="flex flex-col p-2">
+    <div class:hide={activeTab !== 0}>
       <Profile />
-    </TabItem>
-    <TabItem title="任务"></TabItem>
-    <TabItem title="自定义">
+    </div>
+    <div class:hide={activeTab !== 1}></div>
+    <div class:hide={activeTab !== 2}>
       <p class="text-sm text-gray-500 dark:text-gray-400">
         <b>Dashboard:</b>
         Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
         incididunt ut labore et dolore magna aliqua.
       </p>
-    </TabItem>
-    <TabItem title="设置">
+    </div>
+    <div class:hide={activeTab !== 3}>
       <Setting />
-    </TabItem>
-    <TabItem title="等级说明">
+    </div>
+    <div class:hide={activeTab !== 4}>
       <Document />
-    </TabItem>
-  </Tabs>
+    </div>
+  </div>
 </main>
 
 <style>
+  .hide {
+    display: none;
+  }
+
+  .active {
+    @apply text-primary-600 border-b-2;
+  }
 </style>
