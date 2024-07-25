@@ -42,7 +42,7 @@ void PanelServer::initSSE() {
 }
 
 void PanelServer::doServe() {
-  // server->set_base_dir("resources/panel/dist");
+  server->set_base_dir("resources/panel/dist");
   server->Get("/api/profile",
               [](const httplib::Request& req, httplib::Response& res) {
                 LAppPal::PrintLog(LogLevel::Debug, "GET /api/profile");
@@ -176,21 +176,5 @@ void PanelServer::doServe() {
 
   initSSE();
 
-  server->Get("/(.*)", [](const httplib::Request& req, httplib::Response& res) {
-    httplib::Client cli("localhost", 5173);
-    auto result = cli.Get(req.path);
-    // result content type
-    auto content_type = result->get_header_value("Content-Type");
-    if (result) {
-      res.set_content(result->body, content_type);
-    } else {
-      res.status = 500;
-    }
-  });
-  try {
-    server->listen("localhost", 8053);
-  } catch (const std::exception& e) {
-    LAppPal::PrintLog(LogLevel::Error, "[PanelServer]PanelServer exception: %s",
-                      e.what());
-  };
+  server->listen("localhost", 8053);
 }

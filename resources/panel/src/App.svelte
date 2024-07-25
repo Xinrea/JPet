@@ -1,6 +1,7 @@
 <script>
   import "./app.css";
   import Profile from "./pages/Profile.svelte";
+  import Task from "./pages/Task.svelte";
   import Document from "./pages/Document.svelte";
   import Setting from "./pages/Setting.svelte";
 
@@ -16,7 +17,7 @@
 
 <main>
   <!-- tab buttons -->
-  <div class="flex flex-row mb-4">
+  <div class="flex flex-row">
     {#each tabs as tab, index}
       <button
         class="inline-block text-sm font-medium text-center disabled:cursor-not-allowed p-4 border-primary-600 dark:text-primary-500 dark:border-primary-500"
@@ -25,11 +26,13 @@
       >
     {/each}
   </div>
-  <div class="flex flex-col p-2">
+  <div class="flex flex-col p-2 pt-4 bg-gray-50">
     <div class:hide={activeTab !== 0}>
       <Profile />
     </div>
-    <div class:hide={activeTab !== 1}></div>
+    <div class:hide={activeTab !== 1}>
+      <Task />
+    </div>
     <div class:hide={activeTab !== 2}>
       <p class="text-sm text-gray-500 dark:text-gray-400">
         <b>Dashboard:</b>

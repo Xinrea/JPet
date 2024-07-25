@@ -4,5 +4,5 @@
 
 body {
     /* disable select */
-    /* user-select: none !important; */
+    user-select: none !important;
 }
