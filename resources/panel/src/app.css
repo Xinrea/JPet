@@ -5,4 +5,5 @@
 body {
     /* disable select */
     user-select: none !important;
+    background-color: rgb(249,250,251);
 }

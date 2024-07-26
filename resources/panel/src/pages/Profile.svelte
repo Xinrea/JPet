@@ -1,5 +1,5 @@
 <script>
-  import { Progressbar } from "flowbite-svelte";
+  import { Progressbar, Tooltip } from "flowbite-svelte";
   import { sineOut } from "svelte/easing";
 
   const es = new EventSource("/api/sse");
@@ -27,13 +27,11 @@
     },
   ];
   let attributes = {
-    hp: 100,
-    mp: 100,
-    str: 1,
-    dex: 1,
-    vit: 1,
-    int: 8,
-    mind: 5,
+    speed: 1,
+    endurence: 1,
+    strength: 1,
+    will: 8,
+    intellect: 5,
   };
   let currentTask = {
     id: 1,
@@ -90,22 +88,21 @@
     <!-- table of attributes -->
     <table class="w-full">
       <tr class="at-table">
-        <th>血量</th>
-        <th>魔力</th>
-        <th>力量</th>
-        <th>敏捷</th>
-        <th>体质</th>
-        <th>智力</th>
-        <th>精神</th>
+        <th>
+          <span><img class="icon" src="src/assets/at-sp.png" alt="" />速度</span
+          ><Tooltip>影响经验获取的效率</Tooltip></th
+        >
+        <th> <img class="icon" src="src/assets/at-end.png" alt="" />耐力</th>
+        <th> <img class="icon" src="src/assets/at-str.png" alt="" />力量</th>
+        <th> <img class="icon" src="src/assets/at-will.png" alt="" />毅力</th>
+        <th> <img class="icon" src="src/assets/at-int.png" alt="" />智力</th>
       </tr>
       <tr>
-        <td>{attributes.hp}</td>
-        <td>{attributes.mp}</td>
-        <td>{attributes.str}</td>
-        <td>{attributes.dex}</td>
-        <td>{attributes.vit}</td>
-        <td>{attributes.int}</td>
-        <td>{attributes.mind}</td>
+        <td>{attributes.speed}</td>
+        <td>{attributes.endurence}</td>
+        <td>{attributes.strength}</td>
+        <td>{attributes.will}</td>
+        <td>{attributes.intellect}</td>
       </tr>
     </table>
   </div>
@@ -157,5 +154,12 @@
     padding: 0.2rem;
     text-align: center;
     background-color: rgb(255, 255, 255);
+  }
+
+  .icon {
+    display: inline;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 0.5rem;
   }
 </style>

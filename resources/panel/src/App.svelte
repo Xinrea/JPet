@@ -17,7 +17,7 @@
 
 <main>
   <!-- tab buttons -->
-  <div class="flex flex-row">
+  <div class="flex flex-row bg-white">
     {#each tabs as tab, index}
       <button
         class="inline-block text-sm font-medium text-center disabled:cursor-not-allowed p-4 border-primary-600 dark:text-primary-500 dark:border-primary-500"

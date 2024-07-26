@@ -5,6 +5,9 @@
     desc: "简单的发呆中",
     done: false,
     remain: 60,
+    bonus: {
+      desc: "EXP +1",
+    },
   };
 </script>
 
@@ -19,7 +22,10 @@
       {/if}
     </div>
 
-    <div class="content text-gray-900">{currentTask.desc}</div>
+    <div class="content text-gray-900">
+      {currentTask.desc}
+      <p class="text-gray-500">奖励：{currentTask.bonus.desc}</p>
+    </div>
   </div>
   <div class="task">
     <div class="header">任务列表</div>
@@ -37,6 +43,7 @@
   .task {
     border-radius: 0.25rem;
     border: 1px solid #e2e8f0;
+    background-color: white;
     overflow: hidden;
   }
   .task .header {
@@ -51,6 +58,5 @@
 
   .task .content {
     padding: 8px;
-    background-color: white;
   }
 </style>
