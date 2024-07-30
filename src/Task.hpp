@@ -25,15 +25,7 @@ class ExpTask : public Task {
     next = cron::cron_next(_cron, now);
     return true;
   }
-  void Execute() override {
-    if (_bonus) {
-      DataManager::GetInstance()->AddExp(10);
-    } else {
-      DataManager::GetInstance()->AddExp(1);
-    }
-    LAppPal::PrintLog(LogLevel::Debug, "[ExpTask]Execute add %d",
-                      _bonus ? 10 : 1);
-  }
+  void Execute() override { DataManager::GetInstance()->AddExp(_bonus); }
   bool IsDone() override {
     // ExpTask never done
     return false;

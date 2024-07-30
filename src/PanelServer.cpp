@@ -43,13 +43,20 @@ void PanelServer::initSSE() {
 
 void PanelServer::doServe() {
   server->set_base_dir("resources/panel/dist");
-  server->Get("/api/profile",
-              [](const httplib::Request& req, httplib::Response& res) {
-                LAppPal::PrintLog(LogLevel::Debug, "GET /api/profile");
-                auto json = nlohmann::json::object();
-                json["exp"] = DataManager::GetInstance()->GetExp();
-                res.set_content(json.dump(), "application/json");
-              });
+  server->Get(
+      "/api/profile", [](const httplib::Request& req, httplib::Response& res) {
+        LAppPal::PrintLog(LogLevel::Debug, "GET /api/profile");
+        auto json = nlohmann::json::object();
+        json["exp"] = DataManager::GetInstance()->GetExp();
+        json["attributes"] = nlohmann::json::object();
+        auto attributes = DataManager::GetInstance()->GetAttributeList();
+        json["attributes"]["speed"] = attributes[0];
+        json["attributes"]["endurance"] = attributes[1];
+        json["attributes"]["strength"] = attributes[2];
+        json["attributes"]["will"] = attributes[3];
+        json["attributes"]["intellect"] = attributes[4];
+        res.set_content(json.dump(), "application/json");
+      });
   server->Get("/api/config/audio",
               [](const httplib::Request& req, httplib::Response& res) {
                 int volume = LAppDelegate::GetInstance()->GetVolume();

@@ -37,9 +37,15 @@ class DataManager {
   void GetModalState(std::map<std::string, float>* modalState);
   void UpdateModalState(const std::map<std::string, float>& modalState);
 
-  // GameData related
-  void AddExp(int exp);
+  void AddExp(bool bonus);
   int GetExp();
+
+  /**
+   * @brief   Get the list of attributes.
+   * @return The list of attributes.
+   * [0]speed,[1]endurance,[2]strength,[3]will,[4]intellect
+   */
+  std::vector<int> GetAttributeList();
 
   void Save();
 

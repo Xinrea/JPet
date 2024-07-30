@@ -50,6 +50,6 @@ $$exp(p)=1+99*\frac{s(p)}{100}$$
 
 $$t(x) = T(1-0.9\frac{s(x)}{100})$$
 
-## 耐力 ENDURENCE & 力量 STRENGTH
+## 耐力 ENDURANCE & 力量 STRENGTH
 
 无特殊作用。某些任务会需求这些属性值，不达标任务成功率会下降。

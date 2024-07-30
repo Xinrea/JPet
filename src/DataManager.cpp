@@ -5,6 +5,8 @@
 
 #include <filesystem>
 
+double easeF(int x);
+
 bool DataManager::init() {
   const std::string configPath = LAppDefine::documentPath + "/jpet.toml";
   // check file existence
@@ -177,14 +179,51 @@ void DataManager::Save() {
                     configPath.c_str());
 }
 
-void DataManager::AddExp(int exp) {
+void DataManager::AddExp(bool bonus) {
   int currentExp = 0;
+  int intellect = 0;
   gameData->Get("exp", currentExp);
+  gameData->Get("attr.intellect", intellect);
+  int exp = 1 + ceil(99 * easeF(intellect) / 100);
+  if (bonus) {
+    exp *= 10;
+  }
   gameData->Update("exp", currentExp + exp);
+  LAppPal::PrintLog(LogLevel::Debug, "[DataManager]Added %d exp", exp);
 }
 
 int DataManager::GetExp() {
   int exp = 0;
   gameData->Get("exp", exp);
   return exp;
+}
+
+std::vector<int> DataManager::GetAttributeList() {
+  std::vector<int> attributes;
+  for (const auto& attr :
+       {"speed", "endurance", "strength", "will", "intellect"}) {
+    int value = 0;
+    gameData->Get("attr." + std::string(attr), value);
+    attributes.push_back(value);
+  }
+  return attributes;
+}
+
+/**
+ * @brief Ease function for exp calculation
+ * @param x 0-100
+ * @return 0-100
+ */
+double easeF(int x) {
+  if (x <= 0) {
+    return 0;
+  }
+  if (x >= 100) {
+    return 100;
+  }
+  if (x <= 69) {
+    // 30*(1-(1-0.03x)^3)
+    return 30.0 * (1.0 - pow(1 - 0.03 * double(x), 3));
+  }
+  return 100 * (1 - 0.5 * pow(-0.03 * double(x) + 2.94, 3));
 }

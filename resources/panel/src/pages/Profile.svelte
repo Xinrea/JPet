@@ -1,6 +1,17 @@
 <script>
   import { Progressbar, Tooltip } from "flowbite-svelte";
   import { sineOut } from "svelte/easing";
+  import speedIcon from "../assets/at-sp.png";
+  import enduranceIcon from "../assets/at-end.png";
+  import strengthIcon from "../assets/at-str.png";
+  import willIcon from "../assets/at-will.png";
+  import intellectIcon from "../assets/at-int.png";
+  import imgCloth1 from "../assets/c1.png";
+  import imgCloth2 from "../assets/c2.png";
+  import imgCloth3 from "../assets/c3.png";
+  import Progress from "./Progress.svelte";
+
+  const clothImages = [imgCloth1, imgCloth2, imgCloth3];
 
   const es = new EventSource("/api/sse");
   es.onmessage = (event) => {
@@ -8,7 +19,7 @@
   };
 
   let currentExp = 0;
-  let currentCloth = 1;
+  let currentCloth = 0;
   let clothList = [
     {
       id: 1,
@@ -27,12 +38,18 @@
     },
   ];
   let attributes = {
-    speed: 1,
-    endurence: 1,
-    strength: 1,
-    will: 8,
-    intellect: 5,
+    speed: 0,
+    endurance: 0,
+    strength: 0,
+    will: 0,
+    intellect: 0,
   };
+  $: speed = attributes.speed;
+  $: endurance = attributes.endurance;
+  $: strength = attributes.strength;
+  $: will = attributes.will;
+  $: intellect = attributes.intellect;
+
   let currentTask = {
     id: 1,
     name: "任务1",
@@ -46,8 +63,8 @@
       .then((res) => res.json())
       .then((data) => {
         currentExp = data.exp;
-        currentCloth = data.cloth.active;
-        clothList = data.cloth.list;
+        // currentCloth = data.cloth.active;
+        // clothList = data.cloth.list;
         attributes = data.attributes;
         console.log(data);
       });
@@ -89,50 +106,58 @@
     <table class="w-full">
       <tr class="at-table">
         <th>
-          <span><img class="icon" src="src/assets/at-sp.png" alt="" />速度</span
-          ><Tooltip>影响经验获取的效率</Tooltip></th
+          <span><img class="icon" src={speedIcon} alt="" />速度</span><Tooltip
+            >影响任务完成所需的时间</Tooltip
+          ></th
         >
-        <th> <img class="icon" src="src/assets/at-end.png" alt="" />耐力</th>
-        <th> <img class="icon" src="src/assets/at-str.png" alt="" />力量</th>
-        <th> <img class="icon" src="src/assets/at-will.png" alt="" />毅力</th>
-        <th> <img class="icon" src="src/assets/at-int.png" alt="" />智力</th>
+        <th>
+          <span>
+            <img class="icon" src={enduranceIcon} alt="" />耐力
+          </span><Tooltip>任务所需的基础属性</Tooltip></th
+        >
+        <th>
+          <span>
+            <img class="icon" src={strengthIcon} alt="" />力量
+          </span><Tooltip>任务所需的基础属性</Tooltip></th
+        >
+        <th>
+          <span>
+            <img class="icon" src={willIcon} alt="" />毅力
+          </span><Tooltip>影响任务完成的成功率</Tooltip></th
+        >
+        <th>
+          <span>
+            <img class="icon" src={intellectIcon} alt="" />智力
+          </span><Tooltip>影响经验获取的效率</Tooltip></th
+        >
       </tr>
       <tr>
-        <td>{attributes.speed}</td>
-        <td>{attributes.endurence}</td>
-        <td>{attributes.strength}</td>
-        <td>{attributes.will}</td>
-        <td>{attributes.intellect}</td>
+        <td>{speed}</td>
+        <td>{endurance}</td>
+        <td>{strength}</td>
+        <td>{will}</td>
+        <td>{intellect}</td>
       </tr>
     </table>
   </div>
   <div class="flex items-center justify-center mb-4">
     <div class="w-32 h-64 overflow-hidden">
-      <img src="src/assets/c{currentCloth}.png" alt="avatar" />
+      <img src={clothImages[currentCloth]} alt="avatar" />
+    </div>
+    <div style="height: 128px; width: 128px; margin-left: 2rem;">
+      <Progress max={60} value={60 - timeToNextPoint}>
+        <div
+          style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); text-align: center;"
+        >
+          <span style="border-bottom: 1px solid black; font-size: 1.5rem;"
+            >{currentExp}</span
+          >
+          <div style="font-size: 0.8rem;">EXP</div>
+        </div>
+      </Progress>
     </div>
   </div>
 </div>
-
-<p class="text-sm text-gray-500 dark:text-gray-400 mb-2">
-  当前等级：{ExpToLevel(currentExp).level}
-</p>
-<Progressbar
-  animate
-  tweenDuration={1000}
-  easing={sineOut}
-  progress={(100 * (levelInfo.nextLevelExp - levelInfo.exp)) /
-    levelInfo.nextLevelExp}
-  class="mb-2"
-/>
-<p class="text-sm text-gray-500 dark:text-gray-400">
-  距离下个等级：{ExpToLevel(currentExp).exp}
-</p>
-<p class="text-sm text-gray-500 dark:text-gray-400">
-  总经验：{currentExp}
-</p>
-<p class="text-sm text-gray-500 dark:text-gray-400">
-  距离下次获取经验：{timeToNextPoint} 秒
-</p>
 
 <style>
   .at-table {
