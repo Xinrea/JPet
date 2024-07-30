@@ -23,9 +23,12 @@
 
 设计如下分段函数：
 
-$$s(x)=\begin{cases}30*(1-(1-0.03x)^3)&x\le69\\100*(1-0.5(-0.03x+2.94)^3)&x>69\end{cases}$$
+$$s(x)=30*(1-(1-0.03x)^3)\quad x\le69$$
+$$s(x)=100*(1-0.5(-0.03x+2.94)^3)\quad x>69$$
 
-<iframe src="https://www.desmos.com/calculator/abmzllpxac?embed" width="500" height="500" style="border: 1px solid #ccc" frameborder=0></iframe>
+函数图像可见 [Desmos](https://www.desmos.com/calculator/abmzllpxac)：
+
+![graph](./desmos-graph.png)
 
 那么对于一个速度值 p，可计算其对应的经验获取量：
 
