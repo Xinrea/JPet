@@ -3,8 +3,6 @@
 #include "LAppDelegate.hpp"
 #include "DataManager.hpp"
 
-#include <nlohmann/json.hpp>
-
 void PanelServer::Start() {
   // start thread
   std::thread t(&PanelServer::doServe, this);
@@ -41,13 +39,52 @@ void PanelServer::initSSE() {
   });
 }
 
+nlohmann::json PanelServer::getTaskStatus() {
+  auto tasks = DataManager::GetInstance()->GetTasks();
+  std::shared_ptr<GameTask> currentTask;
+  // find running task
+  for (auto task : tasks) {
+    if (task->start_time > 0 && !task->done) {
+      currentTask = task;
+      break;
+    }
+  }
+  nlohmann::json data = nlohmann::json::object();
+  if (currentTask) {
+    // filter out current task
+    tasks.erase(std::remove(tasks.begin(), tasks.end(), currentTask),
+        tasks.end());
+    data["current"] = {
+      {"id", currentTask->id},
+      {"title", LAppPal::WStringToString(currentTask->title)},
+      {"desc", LAppPal::WStringToString(currentTask->desc)},
+      {"start_time", currentTask->start_time},
+      {"cost", currentTask->cost},
+      {"success", currentTask->success},
+      {"done", currentTask->done},
+      {"requirements", currentTask->requirements},
+      {"rewards", currentTask->rewards},
+    };
+  }
+  nlohmann::json taskList = nlohmann::json::array();
+  for (auto task : tasks) {
+    nlohmann::json taskJson = {
+      {"id", task->id},           {"title", LAppPal::WStringToString(task->title)},
+      {"desc", LAppPal::WStringToString(task->desc)},       {"start_time", task->start_time},
+      {"cost", task->cost},       {"success", task->success},
+      {"done", task->done},       {"requirements", task->requirements},
+      {"rewards", task->rewards}};
+    taskList.push_back(taskJson);
+  }
+  data["list"] = taskList;
+  return data;
+}
+
 void PanelServer::doServe() {
   server->set_base_dir("resources/panel/dist");
   server->Get(
       "/api/profile", [](const httplib::Request& req, httplib::Response& res) {
-        LAppPal::PrintLog(LogLevel::Debug, "GET /api/profile");
         auto json = nlohmann::json::object();
-        json["exp"] = DataManager::GetInstance()->GetExp();
         json["attributes"] = nlohmann::json::object();
         auto attributes = DataManager::GetInstance()->GetAttributeList();
         json["attributes"]["speed"] = attributes[0];
@@ -55,8 +92,62 @@ void PanelServer::doServe() {
         json["attributes"]["strength"] = attributes[2];
         json["attributes"]["will"] = attributes[3];
         json["attributes"]["intellect"] = attributes[4];
+        json["attributes"]["exp"] = attributes[5];
         res.set_content(json.dump(), "application/json");
       });
+  server->Get(
+      "/api/task", [&](const httplib::Request& req, httplib::Response& res) {
+        LAppPal::PrintLog(LogLevel::Debug, "GET /api/task");
+        try {
+          auto data = getTaskStatus();
+          res.set_content(data.dump(), "application/json");
+        } catch (const std::exception& e) {
+          res.status = 500;
+          res.set_content(e.what(), "text/plain");
+          LAppPal::PrintLog(LogLevel::Error, e.what());
+        }
+      });
+  server->Post("/api/task/:id/start",
+               [&](const httplib::Request& req, httplib::Response& res) {
+                 LAppPal::PrintLog(LogLevel::Debug, "POST /api/task/:id/start");
+                 int id = std::stoi(req.path_params.at("id"));
+                 auto tasks = DataManager::GetInstance()->GetTasks();
+                 for (auto task : tasks) {
+                   // cancel current task if it is running
+                   if (task->id != id && task->start_time > 0 && !task->done) {
+                     task->start_time = 0;
+                   }
+                   if (task->id == id) {
+                     // if task is done and success, return 400
+                     if (task->done && task->success) {
+                       res.status = 400;
+                       return;
+                     }
+                     task->start_time = time(nullptr);
+                     task->done = false;
+                     auto data = getTaskStatus();
+                     res.set_content(data.dump(), "application/json");
+                     return;
+                   }
+                 }
+                 res.status = 404;
+               });
+  server->Post("/api/task/:id/cancel",
+               [&](const httplib::Request& req, httplib::Response& res) {
+                 LAppPal::PrintLog(LogLevel::Debug, "POST /api/task/:id/cancel");
+                 int id = std::stoi(req.path_params.at("id"));
+                 auto tasks = DataManager::GetInstance()->GetTasks();
+                 for (auto task : tasks) {
+                   if (task->id == id && !task->success) {
+                     task->start_time = 0;
+                     task->done = false;
+                     auto data = getTaskStatus();
+                     res.set_content(data.dump(), "application/json");
+                     return;
+                   }
+                 }
+                 res.status = 404;
+               });
   server->Get("/api/config/audio",
               [](const httplib::Request& req, httplib::Response& res) {
                 int volume = LAppDelegate::GetInstance()->GetVolume();

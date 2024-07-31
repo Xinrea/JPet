@@ -37,3 +37,30 @@ class ExpTask : public Task {
   bool _bonus = false;
   cron::cronexpr _cron = cron::make_cron("0 * * * * *");
 };
+
+class CheckTask : public Task {
+ public:
+  bool ShouldExecute() override {
+    static std::time_t next = cron::cron_next(_cron, std::time(0));
+    std::time_t now = std::time(0);
+    if (now != next) {
+      return false;
+    }
+    next = cron::cron_next(_cron, now);
+    return true;
+  }
+  void Execute() override {
+    auto gameTasks = DataManager::GetInstance()->GetTasks();
+    for (auto& task : gameTasks) {
+      task->Done();
+    }
+  }
+  bool IsDone() override {
+    return false;
+  }
+  void SetDone() override {
+  }
+
+ private:
+  cron::cronexpr _cron = cron::make_cron("0 * * * * *");
+};

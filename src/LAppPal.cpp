@@ -125,3 +125,8 @@ std::wstring LAppPal::StringToWString(const std::string& str) {
   std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
   return converter.from_bytes(str);
 }
+
+std::string LAppPal::WStringToString(const std::wstring& str) {
+  std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+  return converter.to_bytes(str);
+}

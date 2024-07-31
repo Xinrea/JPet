@@ -6,11 +6,13 @@
 #include <vector>
 
 #include "GameData.hpp"
+#include "GameTask.hpp"
 
 class DataManager {
  private:
   toml::table data;
   std::shared_ptr<GameData> gameData;
+  std::vector<std::shared_ptr<GameTask>> tasks;
   bool init();
   DataManager();
 
@@ -38,14 +40,31 @@ class DataManager {
   void UpdateModalState(const std::map<std::string, float>& modalState);
 
   void AddExp(bool bonus);
-  int GetExp();
 
   /**
    * @brief   Get the list of attributes.
    * @return The list of attributes.
-   * [0]speed,[1]endurance,[2]strength,[3]will,[4]intellect
+   * [0]speed,[1]endurance,[2]strength,[3]will,[4]intellect,[5]exp
    */
   std::vector<int> GetAttributeList();
+
+  int GetAttribute(const std::string& key);
+
+  void AddAttribute(const std::string& key, int value);
+
+  void DumpTask(int id, int start_time, int success, int done);
+
+  /**
+   * @brief   Get task status.
+   * @return  status list. [0]start_time,[1]success,[2]done
+   */
+  std::vector<int> TaskStatus(int id);
+  std::vector<std::shared_ptr<GameTask>> GetTasks() {
+    if (tasks.empty()) {
+      tasks = GameTask::InitTasks();
+    }
+    return tasks;
+  }
 
   void Save();
 

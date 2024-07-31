@@ -13,6 +13,36 @@
     { name: "设置" },
     { name: "说明" },
   ];
+
+  let attributes = {
+    exp: 0,
+    speed: 0,
+    endurance: 0,
+    strength: 0,
+    will: 0,
+    intellect: 0,
+  };
+
+  // fetch current status
+  function updateProfile() {
+    fetch("/api/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        // currentCloth = data.cloth.active;
+        // clothList = data.cloth.list;
+        attributes = data.attributes;
+        console.log(data);
+      });
+  }
+
+  const es = new EventSource("/api/sse");
+  es.onmessage = (event) => {
+    console.log(event);
+  };
+
+  setInterval(() => {
+    updateProfile();
+  }, 1000);
 </script>
 
 <main>
@@ -28,10 +58,10 @@
   </div>
   <div class="flex flex-col p-2 pt-4 bg-gray-50">
     <div class:hide={activeTab !== 0}>
-      <Profile />
+      <Profile {attributes} />
     </div>
     <div class:hide={activeTab !== 1}>
-      <Task />
+      <Task {attributes} />
     </div>
     <div class:hide={activeTab !== 2}>
       <p class="text-sm text-gray-500 dark:text-gray-400">

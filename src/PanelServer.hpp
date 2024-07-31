@@ -1,6 +1,7 @@
 #pragma once
 #include <httplib.h>
 #include <mutex>
+#include <nlohmann/json.hpp>
 
 class PanelServer {
  private:
@@ -18,6 +19,8 @@ class PanelServer {
   void DataSinkHandle(httplib::DataSink& sink);
 
   void doServe();
+
+  nlohmann::json getTaskStatus();
 
  public:
   static PanelServer* GetInstance() {

@@ -180,33 +180,57 @@ void DataManager::Save() {
 }
 
 void DataManager::AddExp(bool bonus) {
-  int currentExp = 0;
-  int intellect = 0;
-  gameData->Get("exp", currentExp);
-  gameData->Get("attr.intellect", intellect);
+  int currentExp = GetAttribute("exp");
+  int intellect = GetAttribute("intellect");
   int exp = 1 + ceil(99 * easeF(intellect) / 100);
   if (bonus) {
     exp *= 10;
   }
-  gameData->Update("exp", currentExp + exp);
+  AddAttribute("exp", exp);
   LAppPal::PrintLog(LogLevel::Debug, "[DataManager]Added %d exp", exp);
-}
-
-int DataManager::GetExp() {
-  int exp = 0;
-  gameData->Get("exp", exp);
-  return exp;
 }
 
 std::vector<int> DataManager::GetAttributeList() {
   std::vector<int> attributes;
   for (const auto& attr :
-       {"speed", "endurance", "strength", "will", "intellect"}) {
+       {"speed", "endurance", "strength", "will", "intellect", "exp"}) {
     int value = 0;
     gameData->Get("attr." + std::string(attr), value);
     attributes.push_back(value);
   }
   return attributes;
+}
+
+int DataManager::GetAttribute(const std::string& key) {
+  int value = 0;
+  gameData->Get("attr." + key, value);
+  return value;
+}
+
+void DataManager::AddAttribute(const std::string& key, int value) {
+  int current = 0;
+  gameData->Get("attr." + key, current);
+  gameData->Update("attr." + key, current + value);
+}
+
+std::vector<int> DataManager::TaskStatus(int id) {
+  std::vector<int> status;
+  int start_time = 0;
+  int success = 0;
+  int done = 0;
+  gameData->Get("task." + std::to_string(id) + ".start_time", start_time);
+  gameData->Get("task." + std::to_string(id) + ".success", success);
+  gameData->Get("task." + std::to_string(id) + ".done", done);
+  status.push_back(start_time);
+  status.push_back(success);
+  status.push_back(done);
+  return status;
+}
+
+void DataManager::DumpTask(int id, int start_time, int success, int done) {
+  gameData->Update("task." + std::to_string(id) + ".start_time", start_time);
+  gameData->Update("task." + std::to_string(id) + ".success", success);
+  gameData->Update("task." + std::to_string(id) + ".done", done);
 }
 
 /**

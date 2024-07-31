@@ -150,8 +150,8 @@ class GameData {
     while (offset < data.size()) {
       Entry entry(data, offset);
       _m.insert({entry.key, entry});
-      LAppPal::PrintLog(LogLevel::Debug, "[GameData]Parse %s", entry.key.c_str());
     }
+    LAppPal::PrintLog(LogLevel::Debug, "[GameData]Parse done");
   }
 
  public:
@@ -187,7 +187,6 @@ class GameData {
     if (file.is_open()) {
       for (auto& kv : _m) {
         auto data = kv.second.serialize();
-        LAppPal::PrintLog(LogLevel::Debug, "[GameData]Dump %s", kv.first.c_str());
         file.write(data.data(), data.size());
       }
       file.close();
@@ -228,7 +227,7 @@ class GameData {
     }
     return false;
   }
-  
+
   bool Get(const std::string& key, bool& value) {
     std::lock_guard<std::mutex> lock(_mutex);
     if (_m.find(key) != _m.end()) {

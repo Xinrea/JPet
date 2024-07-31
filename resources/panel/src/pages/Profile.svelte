@@ -9,16 +9,11 @@
   import imgCloth1 from "../assets/c1.png";
   import imgCloth2 from "../assets/c2.png";
   import imgCloth3 from "../assets/c3.png";
-  import Progress from "./Progress.svelte";
+  import Progress from "../components/Progress.svelte";
 
   const clothImages = [imgCloth1, imgCloth2, imgCloth3];
 
-  const es = new EventSource("/api/sse");
-  es.onmessage = (event) => {
-    console.log(event);
-  };
 
-  let currentExp = 0;
   let currentCloth = 0;
   let clothList = [
     {
@@ -37,66 +32,27 @@
       unlock: false,
     },
   ];
-  let attributes = {
+
+  export let attributes = {
+    exp: 0,
     speed: 0,
     endurance: 0,
     strength: 0,
     will: 0,
     intellect: 0,
   };
+
+  $: currentExp = attributes.exp;
   $: speed = attributes.speed;
   $: endurance = attributes.endurance;
   $: strength = attributes.strength;
   $: will = attributes.will;
   $: intellect = attributes.intellect;
 
-  let currentTask = {
-    id: 1,
-    name: "任务1",
-  };
-
-  updateProfile();
-
-  // fetch current status
-  function updateProfile() {
-    fetch("/api/profile")
-      .then((res) => res.json())
-      .then((data) => {
-        currentExp = data.exp;
-        // currentCloth = data.cloth.active;
-        // clothList = data.cloth.list;
-        attributes = data.attributes;
-        console.log(data);
-      });
-  }
-
-  // calculate exp to next level
-  const ExpToLevel = (/** @type {number} */ exp) => {
-    for (let i = 0; i < 54; i++) {
-      if (exp < levelToExp(i)) {
-        return {
-          level: i,
-          exp: levelToExp(i) - exp,
-          nextLevelExp: levelToExp(i),
-        };
-      }
-      exp -= levelToExp(i);
-    }
-  };
-
-  $: levelInfo = ExpToLevel(currentExp);
-
-  const levelToExp = (/** @type {number} */ level) => {
-    return Math.ceil(level * level + 30);
-  };
-
   // current time to next time point
   let timeToNextPoint = 60 - new Date().getSeconds();
   setInterval(() => {
     timeToNextPoint = 60 - new Date().getSeconds();
-    if (timeToNextPoint === 60) {
-      updateProfile();
-    }
   }, 1000);
 </script>
 

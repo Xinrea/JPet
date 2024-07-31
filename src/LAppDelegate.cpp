@@ -260,6 +260,7 @@ bool LAppDelegate::Initialize() {
   // Init task scheduler and basic tasks
   TaskScheduler *ts = TaskScheduler::GetInstance();
   ts->AddTask(new ExpTask());
+  ts->AddTask(new CheckTask());
 
   return GL_TRUE;
 }

@@ -84,6 +84,8 @@ class LAppPal {
 
   static std::wstring StringToWString(const std::string& s);
 
+  static std::string WStringToString(const std::wstring& str);
+
  private:
   static double s_currentFrame;
   static double s_lastFrame;
