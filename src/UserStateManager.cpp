@@ -39,10 +39,11 @@ void UserStateManager::Notify(const wstring& title, const wstring& content,
   // convert char* to wstring
   templ.setTextField(title, WinToastTemplate::FirstLine);
   templ.setTextField(content, WinToastTemplate::SecondLine);
-  std::wstring img = _exePath + std::wstring(L"resources/imgs/Avatar.png");
+  std::wstring img = LAppDefine::execPath + std::wstring(L"resources/imgs/Avatar.png");
   templ.setImagePath(img);
   WinToast::instance()->showToast(templ, handler, nullptr);
 }
+
 void UserStateManager::Init(const std::vector<std::string>& list, HWND parent) {
   // 通知初始化
   LAppPal::PrintLog(LogLevel::Info, "[LAppDelegate]Notification Init");
@@ -51,10 +52,6 @@ void UserStateManager::Init(const std::vector<std::string>& list, HWND parent) {
       WinToast::configureAUMI(L"JoiGroup", L"JPetProject", L"JPet", WVERSION);
   WinToast::instance()->setAppUserModelId(aumi);
   WinToast::instance()->initialize();
-  wchar_t curPath[256];
-  GetModuleFileName(GetModuleHandle(NULL), static_cast<LPWSTR>(curPath),
-                    sizeof(curPath));
-  _exePath = std::wstring(curPath);
 
   // init cookie window
   _cookieWindow = new CookieWindow(parent, GetModuleHandle(nullptr));

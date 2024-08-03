@@ -7,6 +7,8 @@
 #include <time.h>
 
 #include "LAppPal.hpp"
+#include "wintoastlib.h"
+#include "WinToastEventHandler.h"
 
 using std::map;
 using std::wstring;
@@ -22,6 +24,7 @@ class GameTask {
   time_t start_time;
   time_t end_time;
   int cost;
+  int cost_snapshot;
   wstring title = L"";
   wstring desc = L"";
   bool success;
@@ -37,6 +40,10 @@ class GameTask {
   void Dump();
 
   void TryDone();
+
+  void Notify(const wstring& title, const wstring& content,
+                              WinToastEventHandler* handler);
+  int GetCurrentCost();
 
   static std::vector<std::shared_ptr<GameTask>> InitTasks() {
     std::vector<std::shared_ptr<GameTask>> tasks;
@@ -63,6 +70,18 @@ class GameTask {
     task2->rewards["intellect"] = 30;
     task2->Load();
     tasks.push_back(task2);
+    
+    std::shared_ptr<GameTask> task3 = std::make_shared<GameTask>();
+    task3->id = 3;
+    task3->cost = 30;
+    task3->title = L"跑步 40 km";
+    task3->desc = L"简单跑个 40 km";
+    task3->requirements["strength"] = 2;
+    task3->requirements["endurance"] = 2;
+    task3->rewards["speed"] = 30;
+    task3->Load();
+    tasks.push_back(task3);
+    
     return tasks;
   }
 };

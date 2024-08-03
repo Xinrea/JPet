@@ -93,4 +93,5 @@ const csmChar *dragAudioFile = "resources/audios/drag.mp3";
 const csmChar *endAudioFile = "resources/audios/end.mp3";
 
 std::string documentPath;
+std::wstring execPath;
 }  // namespace LAppDefine

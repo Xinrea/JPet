@@ -62,7 +62,7 @@ nlohmann::json PanelServer::getTaskStatus() {
         {"desc", LAppPal::WStringToString(currentTask->desc)},
         {"start_time", currentTask->start_time},
         {"end_time", currentTask->end_time},
-        {"cost", currentTask->cost},
+        {"cost", currentTask->cost_snapshot},
         {"success", currentTask->success},
         {"status", currentTask->status},
         {"repeatable", currentTask->repeatable},
@@ -77,7 +77,7 @@ nlohmann::json PanelServer::getTaskStatus() {
                                {"desc", LAppPal::WStringToString(task->desc)},
                                {"start_time", task->start_time},
                                {"end_time", task->end_time},
-                               {"cost", task->cost},
+                               {"cost", task->GetCurrentCost()},
                                {"success", task->success},
                                {"status", task->status},
                                {"requirements", task->requirements},
@@ -183,6 +183,7 @@ void PanelServer::doServe() {
         targetTask->start_time = time(nullptr);
         targetTask->success = false;
         targetTask->status = TStatus::RUNNING;
+        targetTask->cost_snapshot = targetTask->GetCurrentCost();
         targetTask->Dump();
         auto data = getTaskStatus();
         res.set_content(data.dump(), "application/json");

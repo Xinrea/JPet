@@ -10,6 +10,9 @@ WinToastEventHandler::WinToastEventHandler(std::string u) { url = u; }
 void WinToastEventHandler::toastActivated() const {
   LAppPal::PrintLog("[WinToastEventHandler]ToastActivated");
   // convert string to wstring
+  if (url.empty()) {
+    return;
+  }
   std::wstring url = std::wstring(this->url.begin(), this->url.end());
   ShellExecute(NULL, L"open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 }

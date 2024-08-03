@@ -1,5 +1,9 @@
-#include "GameTask.hpp"
+﻿#include "GameTask.hpp"
 #include "DataManager.hpp"
+#include "LAppDefine.hpp"
+#include "WinToastEventHandler.h"
+
+using namespace WinToastLib;
 
 void GameTask::Load() {
   auto status_vec = DataManager::GetInstance()->TaskStatus(id);
@@ -13,6 +17,22 @@ void GameTask::Dump() {
   DataManager::GetInstance()->DumpTask(id, start_time, end_time, success, static_cast<int>(status));
 }
 
+int GameTask::GetCurrentCost() {
+  int speed = DataManager::GetInstance()->GetAttribute("speed");
+  return cost * (1 - 0.9 * LAppPal::EaseInOut(speed) / 100);
+}
+
+void GameTask::Notify(const wstring& title, const wstring& content,
+                              WinToastEventHandler* handler) {
+  WinToastTemplate templ = WinToastTemplate(WinToastTemplate::ImageAndText02);
+  // convert char* to wstring
+  templ.setTextField(title, WinToastTemplate::FirstLine);
+  templ.setTextField(content, WinToastTemplate::SecondLine);
+  std::wstring img = LAppDefine::execPath + std::wstring(L"resources/imgs/Avatar.png");
+  templ.setImagePath(img);
+  WinToast::instance()->showToast(templ, handler, nullptr);
+}
+
 void GameTask::TryDone() {
   // task not running now
   if (status != TStatus::RUNNING) {
@@ -20,10 +40,11 @@ void GameTask::TryDone() {
   }
   // compare start time + cost with current time
   time_t current_time = time(NULL);
-  bool state = current_time >= start_time + cost;
+  bool state = current_time >= start_time + cost_snapshot;
   // time's up, set status now
   if (state) {
     status = TStatus::WAIT_SETTLE;
+    Notify(L"任务完成", title, new WinToastEventHandler(""));
     // check success or not
     int lack = 0;
     for (auto it = requirements.begin(); it != requirements.end(); ++it) {

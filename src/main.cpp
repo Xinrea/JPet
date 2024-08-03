@@ -27,6 +27,10 @@ int main() {
   if (!PathFileExistsA(LAppDefine::documentPath.c_str())) {
     CreateDirectoryA(LAppDefine::documentPath.c_str(), NULL);
   }
+  wchar_t curPath[256];
+  GetModuleFileName(GetModuleHandle(NULL), static_cast<LPWSTR>(curPath),
+                    sizeof(curPath));
+  LAppDefine::execPath = std::wstring(curPath);
   // create the application instance
   if (LAppDelegate::GetInstance()->Initialize() == GL_FALSE) {
     return 1;
