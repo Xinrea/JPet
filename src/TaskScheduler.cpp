@@ -52,7 +52,7 @@ void TaskScheduler::tick() {
     if (task->ShouldExecute()) {
       task->Execute();
       task->SetDone();
-      ++it;
     }
+    ++it;
   }
 }

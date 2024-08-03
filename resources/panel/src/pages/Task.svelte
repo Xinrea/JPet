@@ -1,10 +1,11 @@
 <script>
   import AttributeIcon from "../components/AttributeIcon.svelte";
-  import { Button, ButtonGroup, Tooltip } from "flowbite-svelte";
+  import { Button, ButtonGroup, Tooltip, Modal } from "flowbite-svelte";
   import RunIcon from "../assets/run.svg";
   import InfoIcon from "../assets/info.svg";
   import CancelIcon from "../assets/cancel.svg";
   import ClockIcon from "../assets/clock.svg";
+  import DoneIcon from "../assets/done.svg";
 
   export let attributes = {
     exp: 0,
@@ -20,14 +21,14 @@
   let timeRemain = 0;
 
   setInterval(() => {
-    if (currentTask && !currentTask.done && timeRemain > 0) {
+    if (currentTask && timeRemain > 0) {
       timeRemain = Math.max(
         currentTask.cost -
           Math.floor(Date.now() / 1000 - currentTask.start_time),
         0
       );
     }
-    if (timeRemain <= 0 && currentTask) {
+    if (currentTask && timeRemain <= 0 && currentTask.status == 1) {
       // update task status
       updateStatus();
     }
@@ -37,7 +38,7 @@
     {
       cost: 60,
       desc: "拧开可乐的瓶盖",
-      done: false,
+      repeatable: false,
       id: 1,
       requirements: {
         endurance: 10,
@@ -47,14 +48,16 @@
         exp: 100,
       },
       start_time: 0,
+      end_time: 0,
       success: false,
+      status: 0,
       title: "拧瓶盖",
       rate: 0,
     },
     {
       cost: 120,
       desc: "Task 2 description",
-      done: false,
+      repeatable: false,
       id: 2,
       requirements: {
         strength: 10,
@@ -63,8 +66,10 @@
       rewards: {
         intellect: 30,
       },
-      start_time: 0,
-      success: false,
+      start_time: 1722510877,
+      end_time: 0,
+      success: true,
+      status: 0,
       title: "Task 2",
       rate: 0,
     },
@@ -110,6 +115,25 @@
       });
   }
 
+  function confirmTask(task) {
+    const id = task.id;
+    fetch(`/api/task/${id}/confirm`, {
+      method: "POST",
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        currentTask = data.current;
+        taskList = data.list;
+        // show rewards
+        rewardModal = true;
+        rewards = task.rewards;
+      });
+  }
+
+  // reward modal
+  let rewardModal = false;
+  let rewards = null;
+  
   function calcRate(attrs,task) {
     let lack = 0;
     for (const [key, value] of Object.entries(task.requirements)) {
@@ -123,7 +147,11 @@
     lack = lack * 4;
     lack -= attrs.will;
     lack /= 2;
-    return Math.max(80 - lack, 0);
+    return Math.min(Math.max(80 - lack, 0), 100);
+  }
+
+  function formatDate(time) {
+    return new Date(time * 1000).toLocaleString();
   }
 
   updateStatus();
@@ -144,41 +172,47 @@
 <div>
   {#if currentTask}
     <div class="task mb-8">
-      <div class="header">
+      <div class="header items-center">
         <span>当前任务 - [T{currentTask.id}] {currentTask.title}</span>
-        <span>剩余时长：{timeRemain}s</span>
+        {#if currentTask.status == 2}
+          <span class="flex items-center">
+            <span>{currentTask.success ? '任务成功' : '任务失败'}</span>
+            <Button class="!p-2 ml-2" color="alternative" size="sm" on:click={()=>confirmTask(currentTask)}><img src={DoneIcon} width="16px" alt="" /></Button>
+            <Tooltip>确认</Tooltip>
+          </span>
+        {:else}
+          <span class="flex items-center">
+            <span>剩余时长：{timeRemain == 0 ? '⌛' : timeRemain}s</span>
+            <Button class="!p-2 ml-2" color="alternative" size="sm" on:click={()=>cancelTask(currentTask.id)}><img src={CancelIcon} width="16px" alt="" /></Button>
+            <Tooltip>中止</Tooltip>
+          </span>
+        {/if}
       </div>
 
       <div class="content text-gray-600">
         <p class="mb-4 flex justify-between">
           <span>{currentTask.desc}</span>
           <span class="text-end">
-            <ButtonGroup size="sm" class="space-x-px shadow-none">
-              <Button on:click={()=>cancelTask(currentTask.id)}><img src={CancelIcon} width="16px" alt="" /></Button>
-              <Tooltip>中止</Tooltip>
-              <Button><img src={InfoIcon} width="16px" alt="" /></Button>
-              <Tooltip>详情</Tooltip>
-            </ButtonGroup>
           </span>
         </p>
-        <span class="text-gray-500 mb-1 align-middle">
+        <div class="text-gray-500 mb-1 align-middle">
           <span class="badge info">要求</span>
           {#each Object.entries(currentTask.requirements) as [key, value]}
-            <AttributeIcon attribute={key} {value} />
+            <AttributeIcon attribute={key} {value} fullfill={attributes[key] >= value} />
           {/each}
-        </span>
-        <span class="text-gray-500 mb-1 align-middle">
+        </div>
+        <div class="text-gray-500 mb-1 align-middle">
           <span class="badge warn">奖励</span>
           {#each Object.entries(currentTask.rewards) as [key, value]}
             <AttributeIcon attribute={key} {value} fullfill />
           {/each}
-        </span>
-        <span class="text-gray-500 align-middle">
+        </div>
+        <div class="text-gray-500 align-middle">
           <span class="badge other">成功率</span>
           <span style="font-size: 12px;">
             {currentTask.rate}%
           </span>
-        </span>
+        </div>
       </div>
     </div>
   {/if}
@@ -186,35 +220,35 @@
     <div class="header">任务列表</div>
     <div class="content">
       <ul>
-        {#each taskList as task}
+        {#each taskList as task, i}
           <li class="mb-4">
             <div class="text-gray-600">
-              <p class="mb-1 flex justify-between align-middle">
-                <span
+              <p class="mb-1 flex justify-between align-middle items-center">
+                <span class="flex items-center"
                   ><span class="badge info">T{task.id}</span><span class="ml-2">
                     <span>{task.title}</span> <span class="icon"><img class="inline" width=12 height=12 src={ClockIcon} alt=""/>{task.cost}s</span>
                   </span></span
                 >
                 <span class="text-end">
-                  <ButtonGroup size="sm" class="space-x-px shadow-none">
-                    {#if !task.success}
-                    <Button disabled={task.rate == 0} on:click={()=>startTask(task.id)}
-                      ><img src={RunIcon} width="16px" alt="" /></Button
-                    >
-                    <Tooltip>执行</Tooltip>
-                    {/if}
-                    <Button><img src={InfoIcon} width="16px" alt="" /></Button>
-                    <Tooltip>详情</Tooltip>
-                  </ButtonGroup>
+                  {#if task.status != 3}
+                    <ButtonGroup size="sm" class="space-x-px shadow-none">
+                      <Button disabled={task.rate == 0} on:click={()=>startTask(task.id)}
+                        ><img src={RunIcon} width="16px" alt="" /></Button
+                      >
+                      <Tooltip>执行</Tooltip>
+                    </ButtonGroup>
+                  {:else}
+                    <span class="text-sm text-gray-500">{formatDate(task.start_time + task.cost)}</span>
+                  {/if}
                 </span>
               </p>
-              <span class="text-gray-500 mb-1 align-middle">
+              <div class="text-gray-500 mb-1 align-middle">
                 <span class="badge info">要求</span>
                 {#each Object.entries(task.requirements) as [key, value]}
                   <AttributeIcon attribute={key} {value} fullfill={attributes[key] >= value} />
                 {/each}
-              </span>
-              <span class="text-gray-500 mb-1 align-middle">
+              </div>
+              <div class="text-gray-500 mb-1 align-middle">
                 <span
                   class="badge warn
                   ">奖励</span
@@ -222,19 +256,31 @@
                 {#each Object.entries(task.rewards) as [key, value]}
                   <AttributeIcon attribute={key} {value} fullfill />
                 {/each}
-              </span>
-              <span class="text-gray-500 align-middle">
-                <span class="badge other">成功率</span>
-                <span style="font-size: 12px;">
-                  {task.rate}%
-                </span>
-              </span>
+              </div>
+              {#if task.status != 3}
+                <div class="text-gray-500 align-middle">
+                  <span class="badge other">成功率</span>
+                  <span style="font-size: 12px;">
+                    {task.rate}%
+                  </span>
+                </div>
+              {/if}
             </div>
-            <hr class="mt-4" />
+            {#if i < taskList.length - 1}
+              <hr class="mt-4" />
+            {/if}
           </li>
         {/each}
       </ul>
     </div>
+    <Modal title="任务奖励" bind:open={rewardModal} size="xs" autoclose outsideclose>
+      <h3 class="mb-2 font-normal text-gray-500">获得了如下奖励：</h3>
+      <div>
+        {#each Object.entries(rewards) as [key, value]}
+          <AttributeIcon attribute={key} {value} fullfill />
+        {/each}
+      </div>
+    </Modal>
   </div>
 </div>
 
@@ -263,8 +309,6 @@
   .badge {
     padding: 4px 8px;
     width: 36px;
-    height: 22px;
-    line-height: 22px;
     border-radius: 4px;
     color: #fff;
     text-align: center;

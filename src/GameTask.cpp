@@ -2,28 +2,28 @@
 #include "DataManager.hpp"
 
 void GameTask::Load() {
-  auto status = DataManager::GetInstance()->TaskStatus(id);
-  start_time = status[0];
-  success = status[1] == 1;
-  done = status[2] == 1;
+  auto status_vec = DataManager::GetInstance()->TaskStatus(id);
+  start_time = status_vec[0];
+  end_time = status_vec[1];
+  success = status_vec[2] == 1;
+  status = static_cast<TStatus>(status_vec[3]);
 }
 
-bool GameTask::Done() {
-  // not even started
-  if (start_time == 0) {
-    return false;
-  }
-  if (success) {
-    return true;
+void GameTask::Dump() {
+  DataManager::GetInstance()->DumpTask(id, start_time, end_time, success, static_cast<int>(status));
+}
+
+void GameTask::TryDone() {
+  // task not running now
+  if (status != TStatus::RUNNING) {
+    return;
   }
   // compare start time + cost with current time
   time_t current_time = time(NULL);
-  if (done) {
-    return true;
-  }
   bool state = current_time >= start_time + cost;
+  // time's up, set status now
   if (state) {
-    done = true;
+    status = TStatus::WAIT_SETTLE;
     // check success or not
     int lack = 0;
     for (auto it = requirements.begin(); it != requirements.end(); ++it) {
@@ -38,6 +38,7 @@ bool GameTask::Done() {
     if (lack >= 20) {
       // immediately fail
       success = false;
+      LAppPal::PrintLog(LogLevel::Debug, "[GameTask]Task %d failed by attrlack", id);
     } else {
       // get willpower
       int will = DataManager::GetInstance()->GetAttribute("will");
@@ -55,14 +56,9 @@ bool GameTask::Done() {
         LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d failed", id);
       } else {
         success = true;
-        // update attribute
-        for (auto it = rewards.begin(); it != rewards.end(); ++it) {
-          DataManager::GetInstance()->AddAttribute(it->first, it->second);
-        }
         LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d success", id);
       }
     }
-    DataManager::GetInstance()->DumpTask(id, start_time, success, done);
+    Dump();
   }
-  return done;
 }

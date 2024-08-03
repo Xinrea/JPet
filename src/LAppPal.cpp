@@ -130,3 +130,17 @@ std::string LAppPal::WStringToString(const std::wstring& str) {
   std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
   return converter.to_bytes(str);
 }
+
+double LAppPal::EaseInOut(int x) {
+  if (x <= 0) {
+    return 0;
+  }
+  if (x >= 100) {
+    return 100;
+  }
+  if (x <= 69) {
+    // 30*(1-(1-0.03x)^3)
+    return 30.0 * (1.0 - pow(1 - 0.03 * double(x), 3));
+  }
+  return 100 * (1 - 0.5 * pow(-0.03 * double(x) + 2.94, 3));
+}

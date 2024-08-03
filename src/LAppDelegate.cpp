@@ -451,7 +451,7 @@ void LAppDelegate::SaveSettings() {
                             UpdateNotify);
 
   dataManager->Save();
-  if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]Setting Saved");
+  LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]Setting Saved");
 }
 
 LAppDelegate::LAppDelegate()

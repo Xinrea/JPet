@@ -86,6 +86,13 @@ class LAppPal {
 
   static std::string WStringToString(const std::wstring& str);
 
+  /**
+   * @brief ease function
+   * @param x [0,100]
+   * @return [0,100]
+   */
+  static double EaseInOut(int x);
+
  private:
   static double s_currentFrame;
   static double s_lastFrame;

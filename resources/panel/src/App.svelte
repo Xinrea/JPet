@@ -15,13 +15,14 @@
   ];
 
   let attributes = {
-    exp: 0,
+    exp: 100,
     speed: 0,
     endurance: 0,
     strength: 0,
     will: 0,
     intellect: 0,
   };
+  let expdiff = 0;
 
   // fetch current status
   function updateProfile() {
@@ -31,6 +32,7 @@
         // currentCloth = data.cloth.active;
         // clothList = data.cloth.list;
         attributes = data.attributes;
+        expdiff = data.expdiff;
         console.log(data);
       });
   }
@@ -58,7 +60,7 @@
   </div>
   <div class="flex flex-col p-2 pt-4 bg-gray-50">
     <div class:hide={activeTab !== 0}>
-      <Profile {attributes} />
+      <Profile {attributes} {expdiff} />
     </div>
     <div class:hide={activeTab !== 1}>
       <Task {attributes} />

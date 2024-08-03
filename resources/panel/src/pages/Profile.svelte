@@ -1,11 +1,12 @@
 <script>
-  import { Progressbar, Tooltip } from "flowbite-svelte";
-  import { sineOut } from "svelte/easing";
+  import { Tooltip, Button, Modal } from "flowbite-svelte";
   import speedIcon from "../assets/at-sp.png";
   import enduranceIcon from "../assets/at-end.png";
   import strengthIcon from "../assets/at-str.png";
   import willIcon from "../assets/at-will.png";
   import intellectIcon from "../assets/at-int.png";
+  import addIcon from "../assets/add.svg";
+  import minusIcon from "../assets/minus.svg";
   import imgCloth1 from "../assets/c1.png";
   import imgCloth2 from "../assets/c2.png";
   import imgCloth3 from "../assets/c3.png";
@@ -40,7 +41,9 @@
     strength: 0,
     will: 0,
     intellect: 0,
+    buycnt: 0,
   };
+  export let expdiff = 0;
 
   $: currentExp = attributes.exp;
   $: speed = attributes.speed;
@@ -48,12 +51,39 @@
   $: strength = attributes.strength;
   $: will = attributes.will;
   $: intellect = attributes.intellect;
+  $: buycost = Math.floor(10 * Math.pow(1.5, attributes.buycnt));
+  $: revertgain = Math.floor(10 * Math.pow(1.5, Math.max(attributes.buycnt - 1, 0)) / 2);
 
   // current time to next time point
   let timeToNextPoint = 60 - new Date().getSeconds();
   setInterval(() => {
     timeToNextPoint = 60 - new Date().getSeconds();
   }, 1000);
+
+  // modal
+  let addModal = false;
+  let revertModal = false;
+  let targetAttr = "speed";
+  function attrHandle() {
+    if (currentExp < buycost) {
+      return;
+    }
+    fetch(`/api/attr/${targetAttr}`, { method: "POST" })
+      .then(res => res.json())    
+      .then(data => {
+        console.log(data);
+      });
+  }
+  function revertHandle() {
+    if (attributes[targetAttr] <= 0) {
+      alert("属性值不足");
+    }
+    fetch(`/api/attr/${targetAttr}`, { method: "DELETE" })
+      .then(res => res.json())
+      .then(data => {
+        console.log(data);
+      });
+  }
 </script>
 
 <div>
@@ -88,13 +118,43 @@
         >
       </tr>
       <tr>
-        <td>{speed}</td>
-        <td>{endurance}</td>
-        <td>{strength}</td>
-        <td>{will}</td>
-        <td>{intellect}</td>
+        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "speed"; }}/> <span>{speed}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
+            addModal = true;
+            targetAttr = "speed";
+          }
+        } /></span></td>
+        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "endurance"; }}/><span>{endurance}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
+            addModal = true;
+            targetAttr = "endurance";
+          }
+        } /></span></td>
+        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "strength"; }}/><span>{strength}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
+            addModal = true;
+            targetAttr = "strength";
+          }
+        } /></span></td>
+        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "will"; }}/><span>{will}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
+            addModal = true;
+            targetAttr = "will";
+          }
+        } /></span></td>
+        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "intellect"; }}/><span>{intellect}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
+            addModal = true;
+            targetAttr = "intellect";
+          }
+        } /></span></td>
       </tr>
     </table>
+    <Modal title="属性加点确认" bind:open={addModal} size="xs" autoclose>
+      <h3 class="mb-5 text-lg font-normal text-gray-500">此次操作需要消耗 {buycost} EXP，确认加点吗？</h3>
+      <Button disabled={currentExp < buycost} on:click={attrHandle}>确认</Button>
+      <Button color="alternative">取消</Button>
+    </Modal>
+    <Modal title="属性撤销确认" bind:open={revertModal} size="xs" autoclose>
+      <h3 class="mb-5 text-lg font-normal text-gray-500">此次操作会返还 {revertgain} EXP，确认撤销吗？</h3>
+      <Button on:click={revertHandle}>确认</Button>
+      <Button color="alternative">取消</Button>
+    </Modal>
   </div>
   <div class="flex items-center justify-center mb-4">
     <div class="w-32 h-64 overflow-hidden">
@@ -111,6 +171,7 @@
           <div style="font-size: 0.8rem;">EXP</div>
         </div>
       </Progress>
+      <Tooltip>下次增加{expdiff}点经验</Tooltip>
     </div>
   </div>
 </div>
@@ -123,6 +184,7 @@
   }
 
   .at-table th {
+    font-size: 0.8rem;
     padding: 0.5rem;
   }
 
@@ -135,12 +197,23 @@
     padding: 0.2rem;
     text-align: center;
     background-color: rgb(255, 255, 255);
+    font-size: 0.8rem;
   }
 
   .icon {
     display: inline;
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.2rem;
+    height: 1.2rem;
     margin-right: 0.5rem;
+  }
+
+  .icon-button {
+    visibility: hidden;
+    width: 1.2rem;
+    cursor: pointer;
+  }
+
+  td:hover .icon-button {
+    visibility: visible;
   }
 </style>

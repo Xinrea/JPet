@@ -17,7 +17,9 @@ class DataManager {
   DataManager();
 
  public:
-  ~DataManager() = default;
+  ~DataManager() {
+    Save();
+  };
 
   void GetWindowPos(int* x, int* y);
   void UpdateWindowPos(int x, int y);
@@ -44,7 +46,7 @@ class DataManager {
   /**
    * @brief   Get the list of attributes.
    * @return The list of attributes.
-   * [0]speed,[1]endurance,[2]strength,[3]will,[4]intellect,[5]exp
+   * [0]speed,[1]endurance,[2]strength,[3]will,[4]intellect,[5]exp,[6]buycnt
    */
   std::vector<int> GetAttributeList();
 
@@ -52,11 +54,11 @@ class DataManager {
 
   void AddAttribute(const std::string& key, int value);
 
-  void DumpTask(int id, int start_time, int success, int done);
+  void DumpTask(int id, int start_time, int end_time, int success, int status);
 
   /**
    * @brief   Get task status.
-   * @return  status list. [0]start_time,[1]success,[2]done
+   * @return  status list. [0]start_time, [1]end_time, [2]success, [3]status
    */
   std::vector<int> TaskStatus(int id);
   std::vector<std::shared_ptr<GameTask>> GetTasks() {

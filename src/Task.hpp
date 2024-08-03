@@ -52,7 +52,7 @@ class CheckTask : public Task {
   void Execute() override {
     auto gameTasks = DataManager::GetInstance()->GetTasks();
     for (auto& task : gameTasks) {
-      task->Done();
+      task->TryDone();
     }
   }
   bool IsDone() override {
@@ -62,5 +62,5 @@ class CheckTask : public Task {
   }
 
  private:
-  cron::cronexpr _cron = cron::make_cron("0 * * * * *");
+  cron::cronexpr _cron = cron::make_cron("* * * * * *");
 };

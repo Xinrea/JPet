@@ -5,8 +5,6 @@
 
 #include <filesystem>
 
-double easeF(int x);
-
 bool DataManager::init() {
   const std::string configPath = LAppDefine::documentPath + "/jpet.toml";
   // check file existence
@@ -182,7 +180,7 @@ void DataManager::Save() {
 void DataManager::AddExp(bool bonus) {
   int currentExp = GetAttribute("exp");
   int intellect = GetAttribute("intellect");
-  int exp = 1 + ceil(99 * easeF(intellect) / 100);
+  int exp = 1 + ceil(99 * LAppPal::EaseInOut(intellect) / 100);
   if (bonus) {
     exp *= 10;
   }
@@ -193,7 +191,7 @@ void DataManager::AddExp(bool bonus) {
 std::vector<int> DataManager::GetAttributeList() {
   std::vector<int> attributes;
   for (const auto& attr :
-       {"speed", "endurance", "strength", "will", "intellect", "exp"}) {
+       {"speed", "endurance", "strength", "will", "intellect", "exp", "buycnt"}) {
     int value = 0;
     gameData->Get("attr." + std::string(attr), value);
     attributes.push_back(value);
@@ -214,40 +212,26 @@ void DataManager::AddAttribute(const std::string& key, int value) {
 }
 
 std::vector<int> DataManager::TaskStatus(int id) {
-  std::vector<int> status;
+  std::vector<int> status_vec;
   int start_time = 0;
+  int end_time = 0;
   int success = 0;
-  int done = 0;
+  int status = 0;
   gameData->Get("task." + std::to_string(id) + ".start_time", start_time);
+  gameData->Get("task." + std::to_string(id) + ".end_time", end_time);
   gameData->Get("task." + std::to_string(id) + ".success", success);
-  gameData->Get("task." + std::to_string(id) + ".done", done);
-  status.push_back(start_time);
-  status.push_back(success);
-  status.push_back(done);
-  return status;
+  gameData->Get("task." + std::to_string(id) + ".status", status);
+  status_vec.push_back(start_time);
+  status_vec.push_back(end_time);
+  status_vec.push_back(success);
+  status_vec.push_back(status);
+  return status_vec;
 }
 
-void DataManager::DumpTask(int id, int start_time, int success, int done) {
+void DataManager::DumpTask(int id, int start_time, int end_time, int success, int status) {
   gameData->Update("task." + std::to_string(id) + ".start_time", start_time);
+  gameData->Update("task." + std::to_string(id) + ".end_time", end_time);
   gameData->Update("task." + std::to_string(id) + ".success", success);
-  gameData->Update("task." + std::to_string(id) + ".done", done);
+  gameData->Update("task." + std::to_string(id) + ".status", status);
 }
 
-/**
- * @brief Ease function for exp calculation
- * @param x 0-100
- * @return 0-100
- */
-double easeF(int x) {
-  if (x <= 0) {
-    return 0;
-  }
-  if (x >= 100) {
-    return 100;
-  }
-  if (x <= 69) {
-    // 30*(1-(1-0.03x)^3)
-    return 30.0 * (1.0 - pow(1 - 0.03 * double(x), 3));
-  }
-  return 100 * (1 - 0.5 * pow(-0.03 * double(x) + 2.94, 3));
-}
