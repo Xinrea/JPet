@@ -7,19 +7,19 @@
   import intellectIcon from "../assets/at-int.png";
   import addIcon from "../assets/add.svg";
   import minusIcon from "../assets/minus.svg";
-  import imgCloth1 from "../assets/c1.png";
-  import imgCloth2 from "../assets/c2.png";
-  import imgCloth3 from "../assets/c3.png";
+  import imgClothes1 from "../assets/c1.png";
+  import imgClothes2 from "../assets/c2.png";
+  import imgClothes3 from "../assets/c3.png";
   import Progress from "../components/Progress.svelte";
 
-  const clothImages = [imgCloth1, imgCloth2, imgCloth3];
+  const clothesImages = [imgClothes1, imgClothes2, imgClothes3];
 
-  export let cloth = {
+  export let clothes = {
     current: 0,
     unlock: [true, false, false]
   };
   
-  let clothList = [
+  let clothesList = [
     {
       id: 0,
       name: "绿色",
@@ -85,9 +85,12 @@
       });
   }
 
-  function changeCloth(id) {
-    cloth.current = id;
-    fetch(`/api/cloth/${id}`, { method: "POST" });
+  function changeClothes(id) {
+    if (!clothes.unlock[id]) {
+      return;
+    }
+    clothes.current = id;
+    fetch(`/api/clothes/${id}`, { method: "POST" });
   }
 </script>
 
@@ -163,7 +166,7 @@
   </div>
   <div class="flex items-center justify-center mb-4">
     <div class="w-32 h-64 overflow-hidden">
-      <img src={clothImages[cloth.current]} alt="avatar" />
+      <img src={clothesImages[clothes.current]} alt="avatar" />
     </div>
     <div style="height: 128px; width: 128px; margin-left: 2rem;">
       <Progress max={60} value={60 - timeToNextPoint}>
@@ -180,10 +183,10 @@
     </div>
   </div>
   <div class="flex justify-center w-full mt-8 fixed bottom-8">
-    {#each clothList as c, i}
-      <div role="button" on:click={() => changeCloth(i)} class="choice-item" class:disabled={!cloth.unlock[i]} style="background-image: url({clothImages[i]});">
+    {#each clothesList as c, i}
+      <div role="button" on:click={() => changeClothes(i)} class="choice-item" class:disabled={!clothes.unlock[i]} style="background-image: url({clothesImages[i]});">
       </div>
-      {#if !cloth.unlock[i]}
+      {#if !clothes.unlock[i]}
         <Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>
       {/if}
     {/each}

@@ -23,7 +23,7 @@
     intellect: 0,
   };
   let expdiff = 0;
-  let cloth = {
+  let clothes = {
     current: 0,
     unlock: [true, false, false],
   };
@@ -33,7 +33,7 @@
     fetch("/api/profile")
       .then((res) => res.json())
       .then((data) => {
-        cloth = data.cloth;
+        clothes = data.clothes;
         attributes = data.attributes;
         expdiff = data.expdiff;
         console.log(data);
@@ -65,7 +65,7 @@
   </div>
   <div class="flex flex-col p-2 pt-4 bg-gray-50 z-10">
     <div class:hide={activeTab !== 0}>
-      <Profile {attributes} {expdiff} {cloth} />
+      <Profile {attributes} {expdiff} {clothes} />
     </div>
     <div class:hide={activeTab !== 1}>
       <Task {attributes} />

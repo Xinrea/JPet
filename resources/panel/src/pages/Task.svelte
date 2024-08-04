@@ -66,6 +66,10 @@
       rewards: {
         intellect: 30,
       },
+      special: {
+        title: "新衣装2",
+        desc: "解锁新衣装，解锁后可在总览页面切换",
+      },
       start_time: 1722510877,
       end_time: 0,
       success: true,
@@ -126,13 +130,13 @@
         taskList = data.list;
         // show rewards
         rewardModal = true;
-        rewards = task.rewards;
+        rewardTask = task;
       });
   }
 
   // reward modal
   let rewardModal = false;
-  let rewards = null;
+  let rewardTask = null;
   
   function calcRate(attrs,task) {
     let lack = 0;
@@ -207,6 +211,16 @@
             <AttributeIcon attribute={key} {value} fullfill />
           {/each}
         </div>
+        {#if currentTask.special}
+          <div class="text-gray-500 mb-1 align-middle">
+            <span
+              class="badge warn
+              ">特殊奖励</span
+            >
+            <span style="font-size: 12px;">{currentTask.special.title}</span>
+            <Tooltip>{currentTask.special.desc}</Tooltip>
+          </div>
+        {/if}
         <div class="text-gray-500 align-middle">
           <span class="badge other">成功率</span>
           <span style="font-size: 12px;">
@@ -221,7 +235,7 @@
     <div class="content">
       <ul>
         {#each taskList as task, i}
-          <li class="mb-4">
+          <li class="mb-4" class:archived={task.status == 3}>
             <div class="text-gray-600">
               <p class="mb-1 flex justify-between align-middle items-center">
                 <span class="flex items-center"
@@ -255,6 +269,16 @@
                   <AttributeIcon attribute={key} {value} fullfill />
                 {/each}
               </div>
+              {#if task.special}
+                <div class="text-gray-500 mb-1 align-middle">
+                  <span
+                    class="badge warn
+                    ">特殊奖励</span
+                  >
+                  <span style="font-size: 12px;">{task.special.title}</span>
+                  <Tooltip>{task.special.desc}</Tooltip>
+                </div>
+              {/if}
               {#if task.status != 3}
                 <div class="text-gray-500 align-middle">
                   <span class="badge other">成功率</span>
@@ -274,10 +298,16 @@
     <Modal title="任务奖励" bind:open={rewardModal} size="xs" autoclose outsideclose>
       <h3 class="mb-2 font-normal text-gray-500">获得了如下奖励：</h3>
       <div>
-        {#each Object.entries(rewards) as [key, value]}
+        {#each Object.entries(rewardTask.rewards) as [key, value]}
           <AttributeIcon attribute={key} {value} fullfill />
         {/each}
       </div>
+      {#if rewardTask.special}
+        <div>
+          <span>{rewardTask.special.title}</span>
+          <Tooltip>{rewardTask.special.desc}</Tooltip>
+        </div>
+      {/if}
     </Modal>
   </div>
 </div>
@@ -329,5 +359,9 @@
   .icon {
     vertical-align: super;
     font-size: 12px;
+  }
+
+  .archived {
+    opacity: 0.5;
   }
 </style>

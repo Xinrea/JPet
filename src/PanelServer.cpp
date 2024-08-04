@@ -69,6 +69,11 @@ nlohmann::json PanelServer::getTaskStatus() {
         {"requirements", currentTask->requirements},
         {"rewards", currentTask->rewards},
     };
+    if (currentTask->special) {
+      data["current"]["special"] = nlohmann::json::object();
+      data["current"]["special"]["title"] = LAppPal::WStringToString(currentTask->special->title);
+      data["current"]["special"]["desc"] = LAppPal::WStringToString(currentTask->special->desc);
+    }
   }
   nlohmann::json taskList = nlohmann::json::array();
   for (auto task : tasks) {
@@ -83,6 +88,11 @@ nlohmann::json PanelServer::getTaskStatus() {
                                {"requirements", task->requirements},
                                {"rewards", task->rewards},
                                {"repeatable", task->repeatable}};
+    if (task->special) {
+      taskJson["special"] = nlohmann::json::object();
+      taskJson["special"]["title"] = LAppPal::WStringToString(task->special->title);
+      taskJson["special"]["desc"] = LAppPal::WStringToString(task->special->desc);
+    }
     taskList.push_back(taskJson);
   }
   data["list"] = taskList;
@@ -139,20 +149,34 @@ void PanelServer::doServe() {
     json["attributes"]["intellect"] = attributes[4];
     json["attributes"]["exp"] = attributes[5];
     json["attributes"]["buycnt"] = attributes[6];
-    json["cloth"]["current"] = dataManager->GetRaw("cloth.current");
-    json["cloth"]["unlock"] =
-        nlohmann::json::array({true, dataManager->GetRaw("cloth.1.active") == 1,
-                               dataManager->GetRaw("cloth.2.active") == 1});
+    json["clothes"]["current"] = dataManager->GetRaw("clothes.current");
+    json["clothes"]["unlock"] =
+        nlohmann::json::array({true, dataManager->GetRaw("clothes.1.active") == 1,
+                               dataManager->GetRaw("clothes.2.active") == 1});
     json["expdiff"] =
         int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4]) / 100));
     res.set_content(json.dump(), "application/json");
   });
-  server->Post("/api/cloth/:id", [](const httplib::Request &req,
+  server->Post("/api/clothes/:id", [](const httplib::Request &req,
                                     httplib::Response &res) {
     int id = std::stoi(req.path_params.at("id"));
-    LAppPal::PrintLog(LogLevel::Debug, "POST /api/cloth/%d", id);
-    // TODO check id valid
-    DataManager::GetInstance()->SetRaw("cloth.current", id);
+    LAppPal::PrintLog(LogLevel::Debug, "POST /api/clothes/%d", id);
+    if (id < 0 || id > 2) {
+        LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Invalid clothes id");
+        res.status = 400;
+        return;
+    }
+    // check id valid, 0 is actived by default
+    bool unlock = true;
+    if (id > 0) {
+      unlock = DataManager::GetInstance()->GetRaw("clothes."+ std::to_string(id) + ".active") == 1;
+    }
+    if (!unlock) {
+      LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Clothes id not active");
+      res.status = 400;
+      return;
+    }
+    DataManager::GetInstance()->SetRaw("clothes.current", id);
   });
   server->Get("/api/task",
               [&](const httplib::Request &req, httplib::Response &res) {
@@ -221,6 +245,10 @@ void PanelServer::doServe() {
           for (auto it = task->rewards.begin(); it != task->rewards.end();
                ++it) {
             DataManager::GetInstance()->AddAttribute(it->first, it->second);
+          }
+          // if with special, update related key
+          if (task->special) {
+            DataManager::GetInstance()->SetRaw(task->special->linked_key, 1);
           }
         }
         if (task->repeatable) {

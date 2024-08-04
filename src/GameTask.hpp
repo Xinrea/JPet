@@ -18,8 +18,18 @@ enum class TStatus {
   IDLE, RUNNING, WAIT_SETTLE, ARCHIVED
 };
 
+struct SpecialReward {
+  wstring title;
+  wstring desc;
+  string linked_key;
+
+  SpecialReward(const std::wstring &title, const std::wstring &desc,
+                const std::string &key)
+      : title(title), desc(desc), linked_key(key) {}
+};
+
 class GameTask {
- public:
+public:
   int id;
   time_t start_time;
   time_t end_time;
@@ -32,6 +42,7 @@ class GameTask {
   TStatus status;
   map<string, int> requirements;
   map<string, int> rewards;
+  std::shared_ptr<SpecialReward> special;
 
   GameTask() = default;
 
@@ -84,12 +95,15 @@ class GameTask {
     
     std::shared_ptr<GameTask> task4 = std::make_shared<GameTask>();
     task4->id = 4;
-    task4->cost = 30;
-    task4->title = L"跑步 40 km";
-    task4->desc = L"简单跑个 40 km";
-    task4->requirements["strength"] = 2;
-    task4->requirements["endurance"] = 2;
-    task4->rewards["speed"] = 30;
+    task4->cost = 60;
+    task4->title = L"举办演唱会";
+    task4->desc = L"演唱会";
+    task4->requirements["strength"] = 20;
+    task4->requirements["endurance"] = 30;
+    task4->requirements["intellect"] = 10;
+    task4->rewards["exp"] = 300;
+    task4->special = std::make_shared<SpecialReward>(L"礼服", L"解锁礼服衣装",
+                                                     "clothes.1.active");
     task4->Load();
     tasks.push_back(task4);
     
