@@ -82,6 +82,17 @@ class GameTask {
     task3->Load();
     tasks.push_back(task3);
     
+    std::shared_ptr<GameTask> task4 = std::make_shared<GameTask>();
+    task4->id = 4;
+    task4->cost = 30;
+    task4->title = L"跑步 40 km";
+    task4->desc = L"简单跑个 40 km";
+    task4->requirements["strength"] = 2;
+    task4->requirements["endurance"] = 2;
+    task4->rewards["speed"] = 30;
+    task4->Load();
+    tasks.push_back(task4);
+    
     return tasks;
   }
 };

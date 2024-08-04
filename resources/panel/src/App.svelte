@@ -23,14 +23,17 @@
     intellect: 0,
   };
   let expdiff = 0;
+  let cloth = {
+    current: 0,
+    unlock: [true, false, false],
+  };
 
   // fetch current status
   function updateProfile() {
     fetch("/api/profile")
       .then((res) => res.json())
       .then((data) => {
-        // currentCloth = data.cloth.active;
-        // clothList = data.cloth.list;
+        cloth = data.cloth;
         attributes = data.attributes;
         expdiff = data.expdiff;
         console.log(data);
@@ -49,7 +52,7 @@
 
 <main>
   <!-- tab buttons -->
-  <div class="flex flex-row bg-white">
+  <div class="flex flex-row bg-white sticky top-0 z-20 shadow-md">
     {#each tabs as tab, index}
       <button
         class="inline-block text-sm font-medium text-center disabled:cursor-not-allowed p-4 border-primary-600 dark:text-primary-500 dark:border-primary-500"
@@ -58,9 +61,9 @@
       >
     {/each}
   </div>
-  <div class="flex flex-col p-2 pt-4 bg-gray-50">
+  <div class="flex flex-col p-2 pt-4 bg-gray-50 z-10">
     <div class:hide={activeTab !== 0}>
-      <Profile {attributes} {expdiff} />
+      <Profile {attributes} {expdiff} {cloth} />
     </div>
     <div class:hide={activeTab !== 1}>
       <Task {attributes} />

@@ -192,23 +192,38 @@ std::vector<int> DataManager::GetAttributeList() {
   std::vector<int> attributes;
   for (const auto& attr :
        {"speed", "endurance", "strength", "will", "intellect", "exp", "buycnt"}) {
-    int value = 0;
-    gameData->Get("attr." + std::string(attr), value);
+    int value = GetAttribute(attr);
     attributes.push_back(value);
   }
   return attributes;
 }
 
+void DataManager::SetRaw(const std::string& key, int value) {
+  gameData->Update(key, value);
+}
+
+int DataManager::GetRaw(const std::string& key) {
+  int value = 0;
+  gameData->Get(key, value);
+  return value;
+}
+
 int DataManager::GetAttribute(const std::string& key) {
   int value = 0;
-  gameData->Get("attr." + key, value);
+  try {
+    gameData->Get("attr." + key, value);
+  } catch (const std::exception &e) {
+    LAppPal::PrintLog(LogLevel::Error, "[DataManager]Get Attribute failed %s: %s reset to 0", key, e.what());
+    gameData->Update("attr." + key, 0);
+  }
   return value;
 }
 
 void DataManager::AddAttribute(const std::string& key, int value) {
   int current = 0;
   gameData->Get("attr." + key, current);
-  gameData->Update("attr." + key, current + value);
+  // WARN not support negative value yet
+  gameData->Update("attr." + key, max(current + value, 0));
 }
 
 std::vector<int> DataManager::TaskStatus(int id) {

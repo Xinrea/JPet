@@ -41,6 +41,9 @@ class DataManager {
   void GetModalState(std::map<std::string, float>* modalState);
   void UpdateModalState(const std::map<std::string, float>& modalState);
 
+  void SetRaw(const std::string& key, int value);
+  int GetRaw(const std::string& key);
+
   void AddExp(bool bonus);
 
   /**

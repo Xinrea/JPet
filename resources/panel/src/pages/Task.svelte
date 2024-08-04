@@ -178,13 +178,13 @@
           <span class="flex items-center">
             <span>{currentTask.success ? '任务成功' : '任务失败'}</span>
             <Button class="!p-2 ml-2" color="alternative" size="sm" on:click={()=>confirmTask(currentTask)}><img src={DoneIcon} width="16px" alt="" /></Button>
-            <Tooltip>确认</Tooltip>
+            <Tooltip class="z-30">确认</Tooltip>
           </span>
         {:else}
           <span class="flex items-center">
             <span>剩余时长：{timeRemain == 0 ? '⌛' : timeRemain}s</span>
             <Button class="!p-2 ml-2" color="alternative" size="sm" on:click={()=>cancelTask(currentTask.id)}><img src={CancelIcon} width="16px" alt="" /></Button>
-            <Tooltip>中止</Tooltip>
+            <Tooltip class="z-30">中止</Tooltip>
           </span>
         {/if}
       </div>
@@ -231,12 +231,10 @@
                 >
                 <span class="text-end">
                   {#if task.status != 3}
-                    <ButtonGroup size="sm" class="space-x-px shadow-none">
-                      <Button disabled={task.rate == 0} on:click={()=>startTask(task.id)}
-                        ><img src={RunIcon} width="16px" alt="" /></Button
-                      >
-                      <Tooltip>执行</Tooltip>
-                    </ButtonGroup>
+                    <Button color="alternative" size="sm" disabled={task.rate == 0} on:click={()=>startTask(task.id)}
+                      ><img src={RunIcon} width="16px" alt="" /></Button
+                    >
+                    <Tooltip class="z-30">执行</Tooltip>
                   {:else}
                     <span class="text-sm text-gray-500">{formatDate(task.start_time + task.cost)}</span>
                   {/if}

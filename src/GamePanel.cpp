@@ -1,7 +1,9 @@
 #include "GamePanel.hpp"
 #include "LAppDefine.hpp"
+#include "resource.h"
 
 #include <stdexcept>
+#include <winuser.h>
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam,
                          LPARAM lParam) {
@@ -44,20 +46,20 @@ void GamePanel::WindowProc() {
   wcex.cbClsExtra = 0;
   wcex.cbWndExtra = 0;
   wcex.hInstance = _instance;
-  wcex.hIcon = LoadIcon(_instance, IDI_APPLICATION);
+  wcex.hIcon = LoadIcon(_instance, MAKEINTRESOURCE(IDI_ICON1));
   wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
   wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
   wcex.lpszMenuName = NULL;
   wcex.lpszClassName = L"GamePanel";
-  wcex.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION);
+  wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_ICON1));
 
   if (!RegisterClassEx(&wcex)) {
     LAppPal::PrintLog("Failed to register window class");
     return;
   }
 
-  _window = CreateWindow(L"GamePanel", L"GamePanel", WS_OVERLAPPEDWINDOW,
-                         CW_USEDEFAULT, CW_USEDEFAULT, 820, 1200, NULL, NULL,
+  _window = CreateWindow(L"GamePanel", L"GamePanel", WS_OVERLAPPED | WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU,
+                         CW_USEDEFAULT, CW_USEDEFAULT, 800, 1300, NULL, NULL,
                          _instance, NULL);
 
   if (!_window) {

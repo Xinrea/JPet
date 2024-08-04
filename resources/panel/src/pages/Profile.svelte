@@ -14,23 +14,23 @@
 
   const clothImages = [imgCloth1, imgCloth2, imgCloth3];
 
-
-  let currentCloth = 0;
+  export let cloth = {
+    current: 0,
+    unlock: [true, false, false]
+  };
+  
   let clothList = [
     {
-      id: 1,
+      id: 0,
       name: "绿色",
-      unlock: true,
+    },
+    {
+      id: 1,
+      name: "粉色",
     },
     {
       id: 2,
-      name: "粉色",
-      unlock: false,
-    },
-    {
-      id: 3,
       name: "冬装",
-      unlock: false,
     },
   ];
 
@@ -84,6 +84,11 @@
         console.log(data);
       });
   }
+
+  function changeCloth(id) {
+    cloth.current = id;
+    fetch(`/api/cloth/${id}`, { method: "POST" });
+  }
 </script>
 
 <div>
@@ -93,28 +98,28 @@
       <tr class="at-table">
         <th>
           <span><img class="icon" src={speedIcon} alt="" />速度</span><Tooltip
-            >影响任务完成所需的时间</Tooltip
+            class="z-30">影响任务完成所需的时间</Tooltip
           ></th
         >
         <th>
           <span>
             <img class="icon" src={enduranceIcon} alt="" />耐力
-          </span><Tooltip>任务所需的基础属性</Tooltip></th
+          </span><Tooltip class="z-30">任务所需的基础属性</Tooltip></th
         >
         <th>
           <span>
             <img class="icon" src={strengthIcon} alt="" />力量
-          </span><Tooltip>任务所需的基础属性</Tooltip></th
+          </span><Tooltip class="z-30">任务所需的基础属性</Tooltip></th
         >
         <th>
           <span>
             <img class="icon" src={willIcon} alt="" />毅力
-          </span><Tooltip>影响任务完成的成功率</Tooltip></th
+          </span><Tooltip class="z-30">影响任务完成的成功率</Tooltip></th
         >
         <th>
           <span>
             <img class="icon" src={intellectIcon} alt="" />智力
-          </span><Tooltip>影响经验获取的效率</Tooltip></th
+          </span><Tooltip class="z-30">影响经验获取的效率</Tooltip></th
         >
       </tr>
       <tr>
@@ -145,12 +150,12 @@
         } /></span></td>
       </tr>
     </table>
-    <Modal title="属性加点确认" bind:open={addModal} size="xs" autoclose>
-      <h3 class="mb-5 text-lg font-normal text-gray-500">此次操作需要消耗 {buycost} EXP，确认加点吗？</h3>
+    <Modal title="属性加点" bind:open={addModal} size="xs" autoclose>
+      <h3 class="mb-5 text-lg font-normal text-gray-500">此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？</h3>
       <Button disabled={currentExp < buycost} on:click={attrHandle}>确认</Button>
       <Button color="alternative">取消</Button>
     </Modal>
-    <Modal title="属性撤销确认" bind:open={revertModal} size="xs" autoclose>
+    <Modal title="属性撤销" bind:open={revertModal} size="xs" autoclose>
       <h3 class="mb-5 text-lg font-normal text-gray-500">此次操作会返还 {revertgain} EXP，确认撤销吗？</h3>
       <Button on:click={revertHandle}>确认</Button>
       <Button color="alternative">取消</Button>
@@ -158,7 +163,7 @@
   </div>
   <div class="flex items-center justify-center mb-4">
     <div class="w-32 h-64 overflow-hidden">
-      <img src={clothImages[currentCloth]} alt="avatar" />
+      <img src={clothImages[cloth.current]} alt="avatar" />
     </div>
     <div style="height: 128px; width: 128px; margin-left: 2rem;">
       <Progress max={60} value={60 - timeToNextPoint}>
@@ -173,6 +178,15 @@
       </Progress>
       <Tooltip>下次增加{expdiff}点经验</Tooltip>
     </div>
+  </div>
+  <div class="flex justify-center w-full mt-8 fixed bottom-8">
+    {#each clothList as c, i}
+      <div role="button" on:click={() => changeCloth(i)} class="choice-item" class:disabled={!cloth.unlock[i]} style="background-image: url({clothImages[i]});">
+      </div>
+      {#if !cloth.unlock[i]}
+        <Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>
+      {/if}
+    {/each}
   </div>
 </div>
 
@@ -216,4 +230,30 @@
   td:hover .icon-button {
     visibility: visible;
   }
+
+  .choice-item {
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    margin-right: 16px;
+    opacity: 0.5;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+    background-size: cover;
+  }
+
+  .choice-item.disabled {
+    filter: grayscale(100%);
+  }
+
+  .choice-item:hover {
+    opacity: 1;
+    margin-left: 24px;
+    margin-right: 24px;
+  }
+
+  .choice-item:last-child {
+    margin-right: 0;
+  }
+
 </style>

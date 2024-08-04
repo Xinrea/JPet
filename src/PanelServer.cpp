@@ -126,22 +126,34 @@ void PanelServer::doServe() {
                    dataManager->AddAttribute("exp", revertCost);
                    dataManager->AddAttribute("buycnt", -1);
                  });
-  server->Get(
-      "/api/profile", [](const httplib::Request &req, httplib::Response &res) {
-        auto json = nlohmann::json::object();
-        json["attributes"] = nlohmann::json::object();
-        auto attributes = DataManager::GetInstance()->GetAttributeList();
-        json["attributes"]["speed"] = attributes[0];
-        json["attributes"]["endurance"] = attributes[1];
-        json["attributes"]["strength"] = attributes[2];
-        json["attributes"]["will"] = attributes[3];
-        json["attributes"]["intellect"] = attributes[4];
-        json["attributes"]["exp"] = attributes[5];
-        json["attributes"]["buycnt"] = attributes[6];
-        json["expdiff"] =
-            int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4]) / 100));
-        res.set_content(json.dump(), "application/json");
-      });
+  server->Get("/api/profile", [](const httplib::Request &req,
+                                 httplib::Response &res) {
+    auto json = nlohmann::json::object();
+    json["attributes"] = nlohmann::json::object();
+    auto dataManager = DataManager::GetInstance();
+    auto attributes = dataManager->GetAttributeList();
+    json["attributes"]["speed"] = attributes[0];
+    json["attributes"]["endurance"] = attributes[1];
+    json["attributes"]["strength"] = attributes[2];
+    json["attributes"]["will"] = attributes[3];
+    json["attributes"]["intellect"] = attributes[4];
+    json["attributes"]["exp"] = attributes[5];
+    json["attributes"]["buycnt"] = attributes[6];
+    json["cloth"]["current"] = dataManager->GetRaw("cloth.current");
+    json["cloth"]["unlock"] =
+        nlohmann::json::array({true, dataManager->GetRaw("cloth.1.active") == 1,
+                               dataManager->GetRaw("cloth.2.active") == 1});
+    json["expdiff"] =
+        int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4]) / 100));
+    res.set_content(json.dump(), "application/json");
+  });
+  server->Post("/api/cloth/:id", [](const httplib::Request &req,
+                                    httplib::Response &res) {
+    int id = std::stoi(req.path_params.at("id"));
+    LAppPal::PrintLog(LogLevel::Debug, "POST /api/cloth/%d", id);
+    // TODO check id valid
+    DataManager::GetInstance()->SetRaw("cloth.current", id);
+  });
   server->Get("/api/task",
               [&](const httplib::Request &req, httplib::Response &res) {
                 LAppPal::PrintLog(LogLevel::Debug, "GET /api/task");
