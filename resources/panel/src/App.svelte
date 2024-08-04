@@ -45,6 +45,8 @@
     console.log(event);
   };
 
+  updateProfile();
+
   setInterval(() => {
     updateProfile();
   }, 1000);
