@@ -134,6 +134,15 @@
       });
   }
 
+  function formatRemain(s) {
+    let str = "";
+    if (s >= 60) {
+      str += Math.floor(s / 60) + "m";
+    }
+    str += s % 60 + "s";
+    return str;
+  }
+
   // reward modal
   let rewardModal = false;
   let rewardTask = null;
@@ -177,7 +186,7 @@
   {#if currentTask}
     <div class="task mb-8">
       <div class="header items-center">
-        <span>当前任务 - [T{currentTask.id}] {currentTask.title}</span>
+        <span>[T{currentTask.id}] {currentTask.title}</span>
         {#if currentTask.status == 2}
           <span class="flex items-center">
             <span>{currentTask.success ? '任务成功' : '任务失败'}</span>
@@ -186,7 +195,7 @@
           </span>
         {:else}
           <span class="flex items-center">
-            <span>剩余时长：{timeRemain == 0 ? '⌛' : timeRemain}s</span>
+            <span>剩余时长：{timeRemain == 0 ? '⌛' : formatRemain(timeRemain)}</span>
             <Button class="!p-2 ml-2" color="alternative" size="sm" on:click={()=>cancelTask(currentTask.id)}><img src={CancelIcon} width="16px" alt="" /></Button>
             <Tooltip class="z-30">中止</Tooltip>
           </span>
@@ -195,9 +204,7 @@
 
       <div class="content text-gray-600">
         <p class="mb-4 flex justify-between">
-          <span>{currentTask.desc}</span>
-          <span class="text-end">
-          </span>
+          <span class="text-sm">{currentTask.desc}</span>
         </p>
         <div class="text-gray-500 mb-1 align-middle">
           <span class="badge info">要求</span>
@@ -240,7 +247,7 @@
               <p class="mb-1 flex justify-between align-middle items-center">
                 <span class="flex items-center"
                   ><span class="badge info">T{task.id}</span><span class="ml-2">
-                    <span>{task.title}</span> <span class="icon"><img class="inline" width=12 height=12 src={ClockIcon} alt=""/>{task.cost}s</span>
+                    <span>{task.title}</span> <span class="icon"><img class="inline" width=12 height=12 src={ClockIcon} alt=""/>{formatRemain(task.cost)}</span>
                   </span></span
                 >
                 <span class="text-end">
@@ -304,7 +311,7 @@
       </div>
       {#if rewardTask.special}
         <div>
-          <span>{rewardTask.special.title}</span>
+          <span class="text-sm">{rewardTask.special.title}</span>
           <Tooltip>{rewardTask.special.desc}</Tooltip>
         </div>
       {/if}
