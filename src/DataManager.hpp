@@ -59,7 +59,7 @@ class DataManager {
 
   void AddAttribute(const std::string& key, int value);
 
-  void DumpTask(int id, int start_time, int end_time, int success, int status);
+  void DumpTask(int id, int start_time, int end_time, int success, int status, int cost_snapshot);
 
   /**
    * @brief   Get task status.

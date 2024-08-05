@@ -63,7 +63,7 @@ public:
     task1->id = 1;
     task1->cost = 10;
     task1->title = L"拧瓶盖";
-    task1->desc = L"使用全身力气拧开瓶盖";
+    task1->desc = L"「我真的能办到吗...」";
     task1->requirements["strength"] = 1;
     task1->rewards["will"] = 10;
     task1->rewards["strength"] = 1;
@@ -95,17 +95,49 @@ public:
     
     std::shared_ptr<GameTask> task4 = std::make_shared<GameTask>();
     task4->id = 4;
-    task4->cost = 60;
-    task4->title = L"举办演唱会";
-    task4->desc = L"演唱会";
+    task4->cost = 3600;
+    task4->title = L"个人演唱会";
+    task4->desc = L"举办轴伊的首次个人演唱会";
+    task4->requirements["speed"] = 20;
+    task4->requirements["endurance"] = 20;
     task4->requirements["strength"] = 20;
-    task4->requirements["endurance"] = 30;
-    task4->requirements["intellect"] = 10;
-    task4->rewards["exp"] = 300;
-    task4->special = std::make_shared<SpecialReward>(L"礼服", L"解锁礼服衣装",
+    task4->requirements["will"] = 20;
+    task4->requirements["intellect"] = 20;
+    task4->rewards["exp"] = 5000;
+    task4->special = std::make_shared<SpecialReward>(L"礼服", L"解锁礼服",
                                                      "clothes.1.active");
     task4->Load();
     tasks.push_back(task4);
+    
+    std::shared_ptr<GameTask> task5 = std::make_shared<GameTask>();
+    task5->id = 5;
+    task5->cost = 7200;
+    task5->title = L"圣诞节约会";
+    task5->desc = L"「今、今天、是约定好的日子呢……！」";
+    task5->requirements["speed"] = 50;
+    task5->requirements["endurance"] = 50;
+    task5->requirements["strength"] = 50;
+    task5->requirements["will"] = 50;
+    task5->requirements["intellect"] = 50;
+    task5->rewards["exp"] = 10000;
+    task5->special = std::make_shared<SpecialReward>(L"冬装", L"解锁冬装",
+                                                     "clothes.2.active");
+    task5->Load();
+    tasks.push_back(task5);
+    
+    std::shared_ptr<GameTask> task6 = std::make_shared<GameTask>();
+    task6->id = 6;
+    task6->cost = 3600;
+    task6->title = L"全能之主";
+    task6->desc = L"所有属性达到 100 点";
+    task6->requirements["speed"] = 100;
+    task6->requirements["endurance"] = 100;
+    task6->requirements["strength"] = 100;
+    task6->requirements["will"] = 100;
+    task6->requirements["intellect"] = 100;
+    task6->rewards["exp"] = 50000;
+    task6->Load();
+    tasks.push_back(task6);
     
     return tasks;
   }

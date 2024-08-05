@@ -11,10 +11,11 @@ void GameTask::Load() {
   end_time = status_vec[1];
   success = status_vec[2] == 1;
   status = static_cast<TStatus>(status_vec[3]);
+  cost_snapshot = status_vec[4];
 }
 
 void GameTask::Dump() {
-  DataManager::GetInstance()->DumpTask(id, start_time, end_time, success, static_cast<int>(status));
+  DataManager::GetInstance()->DumpTask(id, start_time, end_time, success, static_cast<int>(status), cost_snapshot);
 }
 
 int GameTask::GetCurrentCost() {

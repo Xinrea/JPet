@@ -241,21 +241,25 @@ std::vector<int> DataManager::TaskStatus(int id) {
   int end_time = 0;
   int success = 0;
   int status = 0;
+  int cost_snapshot = 0;
   gameData->Get("task." + std::to_string(id) + ".start_time", start_time);
   gameData->Get("task." + std::to_string(id) + ".end_time", end_time);
   gameData->Get("task." + std::to_string(id) + ".success", success);
   gameData->Get("task." + std::to_string(id) + ".status", status);
+  gameData->Get("task." + std::to_string(id) + ".cost_snapshot", cost_snapshot);
   status_vec.push_back(start_time);
   status_vec.push_back(end_time);
   status_vec.push_back(success);
   status_vec.push_back(status);
+  status_vec.push_back(cost_snapshot);
   return status_vec;
 }
 
-void DataManager::DumpTask(int id, int start_time, int end_time, int success, int status) {
+void DataManager::DumpTask(int id, int start_time, int end_time, int success, int status, int cost_snapshot) {
   gameData->Update("task." + std::to_string(id) + ".start_time", start_time);
   gameData->Update("task." + std::to_string(id) + ".end_time", end_time);
   gameData->Update("task." + std::to_string(id) + ".success", success);
   gameData->Update("task." + std::to_string(id) + ".status", status);
+  gameData->Update("task." + std::to_string(id) + ".cost_snapshot", cost_snapshot);
 }
 
