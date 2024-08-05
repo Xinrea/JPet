@@ -537,15 +537,12 @@ void LAppModel::SetDraggingState(bool state) {
 
 void LAppModel::SetExpression(const csmChar* expressionID) {
   ACubismMotion* motion = _expressions[expressionID];
-  if (_debugMode) {
-    LAppPal::PrintLog("[APP]expression: [%s]", expressionID);
-  }
+  LAppPal::PrintLog(LogLevel::Debug, "[Model]Expression: [%s]", expressionID);
 
   if (motion != NULL) {
     _expressionManager->StartMotionPriority(motion, false, PriorityForce);
   } else {
-    if (_debugMode)
-      LAppPal::PrintLog("[APP]expression[%s] is null ", expressionID);
+    LAppPal::PrintLog(LogLevel::Debug, "[Model]Expression[%s] is null ", expressionID);
   }
 }
 

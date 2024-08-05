@@ -46,6 +46,11 @@ class LAppLive2DManager {
   LAppModel* GetModel(Csm::csmUint32 no) const;
 
   /**
+   * @brief Switch clothes by no.
+   */
+  void SwitchClothes(int no);
+
+  /**
    * @brief   現在のシーンで保持しているすべてのモデルを解放する
    *
    */

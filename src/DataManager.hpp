@@ -16,6 +16,8 @@ class DataManager {
   bool init();
   DataManager();
 
+  void PostProcess(const std::string& key, int value);
+
  public:
   ~DataManager() {
     Save();

@@ -86,7 +86,7 @@
   }
 
   function changeClothes(id) {
-    if (!clothes.unlock[id]) {
+    if (!clothes.unlock[id] || id == clothes.current) {
       return;
     }
     clothes.current = id;

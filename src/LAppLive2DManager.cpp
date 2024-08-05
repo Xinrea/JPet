@@ -81,6 +81,12 @@ LAppModel* LAppLive2DManager::GetModel(csmUint32 no) const {
   return NULL;
 }
 
+void LAppLive2DManager::SwitchClothes(int no) {
+  auto currentModel = _models[0];
+  std::string expressionSwitch = "sw_clothes_" + std::to_string(no);
+  currentModel->SetExpression(expressionSwitch.c_str());
+}
+
 void LAppLive2DManager::OnDrag(csmFloat32 x, csmFloat32 y) const {
   // if |x| or |y| > 1, should make it in range [-1,1] to make model looks
   // natural

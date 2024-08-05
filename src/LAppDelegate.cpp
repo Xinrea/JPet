@@ -408,7 +408,7 @@ void LAppDelegate::Run() {
   SaveSettings();
 
   Shell_NotifyIcon(NIM_DELETE, &nid);
-  if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]TrayICON Delete");
+  LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]TrayICON Delete");
   Release();
 
   LAppDelegate::ReleaseInstance();

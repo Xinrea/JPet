@@ -2,6 +2,7 @@
 
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
+#include "LAppLive2DManager.hpp"
 
 #include <filesystem>
 
@@ -200,12 +201,20 @@ std::vector<int> DataManager::GetAttributeList() {
 
 void DataManager::SetRaw(const std::string& key, int value) {
   gameData->Update(key, value);
+  PostProcess(key, value);
 }
 
 int DataManager::GetRaw(const std::string& key) {
   int value = 0;
   gameData->Get(key, value);
   return value;
+}
+
+void DataManager::PostProcess(const std::string& key, int value) {
+  // change clothes
+  if (key == "clothes.current") {
+    LAppLive2DManager::GetInstance()->SwitchClothes(value);
+  }
 }
 
 int DataManager::GetAttribute(const std::string& key) {
