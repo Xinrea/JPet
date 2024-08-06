@@ -1,3 +1,0 @@
-[[language]]
-name = "cpp"
-language-servers = [{name="clangd", except-features = ["diagnostics"]}]

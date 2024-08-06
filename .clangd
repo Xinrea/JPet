@@ -1,0 +1,18 @@
+CompileFlags:
+	Add:
+		- "-std=c++17"
+		- "-I"
+		- "../build/vcpkg_installed/x64-windows/include"
+		- "-I"
+		- "../thirdparty/glfw/include"
+		- "-I"
+		- "../thirdparty/fmod/core/inc"
+		- "-I"
+		- "../thirdparty/CubismSdkForNative/Framework/src"
+		- "-I"
+		- "../thirdparty/CubismSdkForNative/Core/include"
+		- "-D"
+		- "FRAMEWORK_SOURCE=OpenGL"
+		- "-D"
+		- "CSM_TARGET_WIN_GL"
+
