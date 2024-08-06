@@ -6,6 +6,7 @@
   import CancelIcon from "../assets/cancel.svg";
   import ClockIcon from "../assets/clock.svg";
   import DoneIcon from "../assets/done.svg";
+  import ClothesIcon from "../assets/clothes.svg";
 
   export let attributes = {
     exp: 0,
@@ -282,7 +283,7 @@
                     class="badge warn
                     ">特殊奖励</span
                   >
-                  <span style="font-size: 12px;">{task.special.title}</span>
+                  <span style="font-size: 12px;"><img class="inline" width="16px" src={ClothesIcon} alt="" />{task.special.title}</span>
                   <Tooltip>{task.special.desc}</Tooltip>
                 </div>
               {/if}
@@ -311,7 +312,7 @@
       </div>
       {#if rewardTask.special}
         <div>
-          <span class="text-sm">{rewardTask.special.title}</span>
+          <span style="font-size: 12px;"><img class="inline" width="16px" src={ClothesIcon} alt="" />{rewardTask.special.title}</span>
           <Tooltip>{rewardTask.special.desc}</Tooltip>
         </div>
       {/if}
@@ -343,7 +344,6 @@
 
   .badge {
     padding: 4px 8px;
-    width: 36px;
     border-radius: 4px;
     color: #fff;
     text-align: center;

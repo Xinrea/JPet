@@ -4,6 +4,7 @@
   import Task from "./pages/Task.svelte";
   import Document from "./pages/Document.svelte";
   import Setting from "./pages/Setting.svelte";
+  import Custom from "./pages/Custom.svelte";
 
   let activeTab = 0;
   let tabs = [
@@ -71,11 +72,7 @@
       <Task {attributes} />
     </div>
     <div class:hide={activeTab !== 2}>
-      <p class="text-sm text-gray-500 dark:text-gray-400">
-        <b>Dashboard:</b>
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-        incididunt ut labore et dolore magna aliqua.
-      </p>
+      <Custom />
     </div>
     <div class:hide={activeTab !== 3}>
       <Setting />

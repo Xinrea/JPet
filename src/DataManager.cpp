@@ -145,26 +145,6 @@ void DataManager::UpdateNotify(const std::vector<std::string>& followList,
                                               {"followList", followListArray}});
 }
 
-void DataManager::GetModalState(std::map<std::string, float>* modalState) {
-  // get modalState from data
-  if (data.contains("modalState")) {
-    auto modalStateTable = data.at("modalState").as_table();
-    for (const auto& [key, value] : *modalStateTable) {
-      modalState->emplace(key, value.as_floating_point()->get());
-    }
-  }
-}
-
-void DataManager::UpdateModalState(
-    const std::map<std::string, float>& modalState) {
-  // update modalState in data
-  data.insert_or_assign("modalState", toml::table{});
-  auto modalStateTable = data.at("modalState").as_table();
-  for (const auto& [key, value] : modalState) {
-    modalStateTable->insert_or_assign(key, value);
-  }
-}
-
 void DataManager::Save() {
   const std::string configPath = LAppDefine::documentPath + "/jpet.toml";
   std::ofstream file(configPath);
@@ -191,8 +171,8 @@ void DataManager::AddExp(bool bonus) {
 
 std::vector<int> DataManager::GetAttributeList() {
   std::vector<int> attributes;
-  for (const auto& attr :
-       {"speed", "endurance", "strength", "will", "intellect", "exp", "buycnt"}) {
+  for (const auto& attr : {"speed", "endurance", "strength", "will",
+                           "intellect", "exp", "buycnt"}) {
     int value = GetAttribute(attr);
     attributes.push_back(value);
   }
@@ -204,10 +184,30 @@ void DataManager::SetRaw(const std::string& key, int value) {
   PostProcess(key, value);
 }
 
+void DataManager::SetRaw(const std::string& key, float value) {
+  gameData->Update(key, value);
+}
+
 int DataManager::GetRaw(const std::string& key) {
   int value = 0;
   gameData->Get(key, value);
   return value;
+}
+
+int DataManager::GetWithDefault(const std::string& key, int default) {
+  int value = 0;
+  if (gameData->Get(key, value)) {
+    return value;
+  }
+  return default;
+}
+
+float DataManager::GetWithDefault(const std::string& key, float default) {
+  float value = 0;
+  if (gameData->Get(key, value)) {
+    return value;
+  }
+  return default;
 }
 
 void DataManager::PostProcess(const std::string& key, int value) {
@@ -221,8 +221,10 @@ int DataManager::GetAttribute(const std::string& key) {
   int value = 0;
   try {
     gameData->Get("attr." + key, value);
-  } catch (const std::exception &e) {
-    LAppPal::PrintLog(LogLevel::Error, "[DataManager]Get Attribute failed %s: %s reset to 0", key, e.what());
+  } catch (const std::exception& e) {
+    LAppPal::PrintLog(LogLevel::Error,
+                      "[DataManager]Get Attribute failed %s: %s reset to 0",
+                      key, e.what());
     gameData->Update("attr." + key, 0);
   }
   return value;
@@ -255,11 +257,12 @@ std::vector<int> DataManager::TaskStatus(int id) {
   return status_vec;
 }
 
-void DataManager::DumpTask(int id, int start_time, int end_time, int success, int status, int cost_snapshot) {
+void DataManager::DumpTask(int id, int start_time, int end_time, int success,
+                           int status, int cost_snapshot) {
   gameData->Update("task." + std::to_string(id) + ".start_time", start_time);
   gameData->Update("task." + std::to_string(id) + ".end_time", end_time);
   gameData->Update("task." + std::to_string(id) + ".success", success);
   gameData->Update("task." + std::to_string(id) + ".status", status);
-  gameData->Update("task." + std::to_string(id) + ".cost_snapshot", cost_snapshot);
+  gameData->Update("task." + std::to_string(id) + ".cost_snapshot",
+                   cost_snapshot);
 }
-

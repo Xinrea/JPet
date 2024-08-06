@@ -9,10 +9,13 @@
 #pragma once
 
 #include <CubismFramework.hpp>
+#include <Motion/CubismMotion.hpp>
 #include <ICubismModelSetting.hpp>
 #include <Model/CubismUserModel.hpp>
 #include <Rendering/OpenGL/CubismOffscreenSurface_OpenGLES2.hpp>
 #include <Type/csmRectF.hpp>
+
+using namespace Live2D::Cubism::Framework;
 
 /**
  * @brief ユーザーが実際に使用するモデルの実装クラス<br>
@@ -98,6 +101,7 @@ class LAppModel : public Csm::CubismUserModel {
    */
   void SetExpression(const Csm::csmChar* expressionID);
 
+  void SetExpression(ACubismMotion* expression);
   /**
    * @brief   ランダムに選ばれた表情モーションをセットする
    *

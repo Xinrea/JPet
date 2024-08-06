@@ -38,7 +38,7 @@ void FinishedMotion(ACubismMotion* self) {
 void PartFinishedMotion(ACubismMotion* self) {
   LAppDelegate::GetInstance()->InMotion = false;
   LAppPal::PrintLog("Part Change Finished: %x", self);
-  PartStateManager::GetInstance()->SaveState();
+  PartStateManager::GetInstance()->SnapshotState();
 }
 }  // namespace
 
@@ -82,9 +82,9 @@ LAppModel* LAppLive2DManager::GetModel(csmUint32 no) const {
 }
 
 void LAppLive2DManager::SwitchClothes(int no) {
-  auto currentModel = _models[0];
-  std::string expressionSwitch = "sw_clothes_" + std::to_string(no);
-  currentModel->SetExpression(expressionSwitch.c_str());
+  LAppPal::PrintLog(LogLevel::Debug, "[Live2DManager]Switch clothes %d", no + 1);
+  PartStateManager::GetInstance()->Toggle("ParamCloth" + std::to_string(no + 1),
+                                          true);
 }
 
 void LAppLive2DManager::OnDrag(csmFloat32 x, csmFloat32 y) const {
@@ -106,10 +106,7 @@ void LAppLive2DManager::OnDrag(csmFloat32 x, csmFloat32 y) const {
 }
 
 void LAppLive2DManager::OnFollow() {
-  if (DebugLogEnable) {
-    LAppPal::PrintLog("[APP]New Follow");
-  }
-  _models[0]->StartRandomMotion(PriorityForce, FinishedMotion);
+  LAppPal::PrintLog(LogLevel::Debug, "[Live2DManager]New Follow");
 }
 
 void LAppLive2DManager::PlayTouchAudio(string filename) {

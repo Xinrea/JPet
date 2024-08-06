@@ -134,12 +134,12 @@
 		{
 			"Id": "ParamCloth1",
 			"GroupId": "ParamGroup3",
-			"Name": "粉"
+			"Name": "绿"
 		},
 		{
 			"Id": "ParamCloth2",
 			"GroupId": "ParamGroup3",
-			"Name": "绿"
+			"Name": "粉"
 		},
 		{
 			"Id": "ParamCloth3",
@@ -162,9 +162,9 @@
 			"Name": "汗"
 		},
 		{
-			"Id": "ParamGun",
+			"Id": "ParamGunShow",
 			"GroupId": "ParamGroup3",
-			"Name": "枪"
+			"Name": "枪展示"
 		},
 		{
 			"Id": "ParamDrag",
@@ -177,9 +177,44 @@
 			"Name": "?"
 		},
 		{
-			"Id": "ParamEars",
+			"Id": "ParamREars",
 			"GroupId": "ParamGroup3",
-			"Name": "耳朵"
+			"Name": "右耳"
+		},
+		{
+			"Id": "ParamLEars",
+			"GroupId": "ParamGroup3",
+			"Name": "左耳"
+		},
+		{
+			"Id": "ParamHat",
+			"GroupId": "ParamGroup3",
+			"Name": "贝雷帽"
+		},
+		{
+			"Id": "ParamGun",
+			"GroupId": "ParamGroup3",
+			"Name": "枪"
+		},
+		{
+			"Id": "ParamGlasses",
+			"GroupId": "ParamGroup3",
+			"Name": "眼镜"
+		},
+		{
+			"Id": "ParamShoes",
+			"GroupId": "ParamGroup3",
+			"Name": "鞋子"
+		},
+		{
+			"Id": "ParamLegs",
+			"GroupId": "ParamGroup3",
+			"Name": "腿饰"
+		},
+		{
+			"Id": "ParamTail",
+			"GroupId": "ParamGroup3",
+			"Name": "尾巴"
 		},
 		{
 			"Id": "Param_Angle_Rotation_1_ArtMesh76",
@@ -499,5 +534,15 @@
 			"Id": "Part66",
 			"Name": "裙子"
 		}
+	],
+	"CombinedParameters": [
+		[
+			"ParamAngleX",
+			"ParamAngleY"
+		],
+		[
+			"Param5",
+			"Param6"
+		]
 	]
 }

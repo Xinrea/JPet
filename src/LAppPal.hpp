@@ -86,6 +86,13 @@ class LAppPal {
 
   static std::string WStringToString(const std::wstring& str);
 
+  static bool StartWith(const std::string& str, const std::string& prefix) {
+    if (str.length() >= prefix.length()) {
+      return str.compare(0, prefix.length(), prefix) == 0;
+    }
+    return false;
+  }
+
   /**
    * @brief ease function
    * @param x [0,100]

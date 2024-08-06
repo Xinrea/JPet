@@ -139,6 +139,21 @@ public:
     task6->Load();
     tasks.push_back(task6);
     
+    std::shared_ptr<GameTask> taskDebug = std::make_shared<GameTask>();
+    taskDebug->id = 999;
+    taskDebug->cost = 10;
+    taskDebug->title = L"白给";
+    taskDebug->desc = L"";
+    taskDebug->requirements["speed"] = 0;
+    taskDebug->rewards["speed"] = 100;
+    taskDebug->rewards["endurance"] = 100;
+    taskDebug->rewards["strength"] = 100;
+    taskDebug->rewards["will"] = 100;
+    taskDebug->rewards["intellect"] = 100;
+    taskDebug->rewards["exp"] = 500000;
+    taskDebug->Load();
+    tasks.push_back(taskDebug);
+    
     return tasks;
   }
 };

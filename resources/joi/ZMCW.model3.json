@@ -9,48 +9,20 @@
 			"ZMCW.1024/texture_03.png"
 		],
 		"Physics": "ZMCW.physics3.json",
-		"DisplayInfo": "ZMCW.cdi3.json",
-		"Expressions": [
-			{
-				"Name": "sw_clothes_0",
-				"File": "switch/clothes/sw_clothes_0.exp3.json"
-			},
-			{
-				"Name": "sw_clothes_1",
-				"File": "switch/clothes/sw_clothes_1.exp3.json"
-			},
-			{
-				"Name": "sw_clothes_2",
-				"File": "switch/clothes/sw_clothes_2.exp3.json"
-			}
-		]
+		"DisplayInfo": "ZMCW.cdi3.json"
 	},
 	"Groups": [
-		{
-			"Target": "Parameter",
-			"Name": "LipSync",
-			"Ids": []
-		},
 		{
 			"Target": "Parameter",
 			"Name": "EyeBlink",
 			"Ids": [
 				"ParamEyeLOpen"
 			]
-		}
-	],
-	"HitAreas": [
-		{
-			"Id": "HitAreaHat",
-			"Name": "HitAreaHat"
 		},
 		{
-			"Id": "HitAreaEar",
-			"Name": "HitAreaHair"
-		},
-		{
-			"Id": "HitAreaHairBall",
-			"Name": "HitAreaHairBall"
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
 		}
 	]
 }

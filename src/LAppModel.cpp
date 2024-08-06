@@ -11,7 +11,6 @@
 #include <CubismDefaultParameterId.hpp>
 #include <CubismModelSettingJson.hpp>
 #include <Id/CubismIdManager.hpp>
-#include <Motion/CubismMotion.hpp>
 #include <Motion/CubismMotionQueueEntry.hpp>
 #include <Physics/CubismPhysics.hpp>
 #include <Rendering/OpenGL/CubismRenderer_OpenGLES2.hpp>
@@ -45,8 +44,7 @@ void DeleteBuffer(csmByte* buffer, const csmChar* path = "") {
 
 void FinishedMotion(ACubismMotion* self) {
   LAppDelegate::GetInstance()->InMotion = false;
-  LAppPal::PrintLog("[App]Recover Part Setting");
-  PartStateManager::GetInstance()->SetState();
+  PartStateManager::GetInstance()->SnapshotState();
 }
 }  // namespace
 
@@ -227,6 +225,8 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
   _modelSetting->GetLayoutMap(layout);
   _modelMatrix->SetupFromLayout(layout);
 
+  PartStateManager::GetInstance()->BindModel(_model);
+  PartStateManager::GetInstance()->ApplyState();
   _model->SaveParameters();
 
   LAppPal::PrintLog("[APP]Model motions count: %d, groups: %d",
@@ -241,7 +241,6 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
 
   _updating = false;
   _initialized = true;
-  PartStateManager::GetInstance()->SetModel(_model);
 }
 
 void LAppModel::SetupPresets() {
@@ -347,10 +346,9 @@ void LAppModel::Update() {
   //-----------------------------------------------------------------
   _model->LoadParameters();  // 前回セーブされた状態をロード
   if (firstUpdate) {
-    PartStateManager::GetInstance()->SetState();
     firstUpdate = false;
   }
-  // _model->SaveParameters();  // 状態を保存
+
   //-----------------------------------------------------------------
 
   // まばたき
@@ -470,9 +468,7 @@ CubismMotionQueueEntryHandle LAppModel::StartMotion(
     AudioManager::GetInstance()->Play3dSound(path.GetRawString());
   }
 
-  if (_debugMode) {
-    LAppPal::PrintLog("[APP]start motion: [%s_%d]", "All", no);
-  }
+  LAppPal::PrintLog(LogLevel::Debug, "[Model]Start motion: [%s_%d]", "All", no);
   return _motionManager->StartMotionPriority(motion, autoDelete, priority);
 }
 
@@ -540,10 +536,18 @@ void LAppModel::SetExpression(const csmChar* expressionID) {
   LAppPal::PrintLog(LogLevel::Debug, "[Model]Expression: [%s]", expressionID);
 
   if (motion != NULL) {
-    _expressionManager->StartMotionPriority(motion, false, PriorityForce);
+    SetExpression(motion);
   } else {
-    LAppPal::PrintLog(LogLevel::Debug, "[Model]Expression[%s] is null ", expressionID);
+    LAppPal::PrintLog(LogLevel::Debug, "[Model]Expression[%s] is null ",
+                      expressionID);
   }
+}
+
+void LAppModel::SetExpression(ACubismMotion* motion) {
+  if (motion == nullptr) {
+    LAppPal::PrintLog(LogLevel::Debug, "[Model]Expression is null ");
+  }
+  _expressionManager->StartMotionPriority(motion, true, PriorityForce);
 }
 
 void LAppModel::SetRandomExpression() {

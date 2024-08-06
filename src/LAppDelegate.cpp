@@ -235,12 +235,6 @@ bool LAppDelegate::Initialize() {
   // Cubism SDK 初始化
   InitializeCubism();
 
-  // 初始化模型参数
-  map<string, float> initState;
-  dataManager->GetModalState(&initState);
-  PartStateManager::GetInstance()->ImportState(initState);
-  PartStateManager::GetInstance()->SetState();
-
   srand(time(NULL));
 
   // 随机播放启动语音
@@ -433,9 +427,7 @@ void LAppDelegate::SaveSettings() {
   dataManager->UpdateDisplay(_scale, Green, isLimit);
 
   // update model part states
-  PartStateManager::GetInstance()->SaveState();
-  auto modelState = PartStateManager::GetInstance()->GetAllState();
-  dataManager->UpdateModalState(modelState);
+  PartStateManager::GetInstance()->SnapshotState();
 
   // get follow list
   std::vector<WatchTarget> watchList;

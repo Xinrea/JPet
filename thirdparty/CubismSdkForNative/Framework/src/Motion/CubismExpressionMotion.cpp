@@ -47,17 +47,32 @@ CubismExpressionMotion* CubismExpressionMotion::Create(const csmByte* buffer,
 }
 
 CubismExpressionMotion* CubismExpressionMotion::Create(
-    const csmChar* paramID, csmFloat32 value, csmFloat32 fadeInTime,
+    const csmChar* paramId, csmFloat32 value, csmFloat32 fadeInTime,
+    csmFloat32 fadeOutTime, ExpressionBlendType type) {
+  CubismIdHandle id = CubismFramework::GetIdManager()->GetId(paramId);
+  return Create(id, value, fadeInTime, fadeOutTime, type);
+};
+
+CubismExpressionMotion* CubismExpressionMotion::Create(
+    const CubismIdHandle paramId, csmFloat32 value, csmFloat32 fadeInTime,
     csmFloat32 fadeOutTime, ExpressionBlendType type) {
   CubismExpressionMotion* expression = CSM_NEW CubismExpressionMotion();
   expression->SetFadeInTime(fadeInTime);
   expression->SetFadeOutTime(fadeOutTime);
-  const CubismIdHandle parameterId =
-      CubismFramework::GetIdManager()->GetId(paramID);
-  expression->_parameters.PushBack(
-      ExpressionParameter{parameterId, type, value});
+  expression->_parameters.PushBack(ExpressionParameter{paramId, type, value});
   return expression;
 };
+
+CubismExpressionMotion* CubismExpressionMotion::Create(
+    const csmVector<CubismExpressionMotion::ExpressionParameter>& parameters,
+    csmFloat32 fadeInTime, csmFloat32 fadeOutTime) {
+  CubismExpressionMotion* expression = CSM_NEW CubismExpressionMotion();
+  expression->SetFadeInTime(fadeInTime);
+  expression->SetFadeOutTime(fadeOutTime);
+  expression->_parameters = parameters;
+  return expression;
+};
+
 void CubismExpressionMotion::DoUpdateParameters(
     CubismModel* model, csmFloat32 userTimeSeconds, csmFloat32 weight,
     CubismMotionQueueEntry* motionQueueEntry) {

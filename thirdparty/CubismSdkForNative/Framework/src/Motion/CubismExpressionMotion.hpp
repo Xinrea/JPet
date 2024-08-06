@@ -60,7 +60,15 @@ class CubismExpressionMotion : public ACubismMotion {
                                         csmFloat32 fadeInTime = 1.0f,
                                         csmFloat32 fadeOutTime = 1.0f,
                                         ExpressionBlendType type = Additive);
+  static CubismExpressionMotion* Create(const CubismIdHandle paramID,
+                                        csmFloat32 value,
+                                        csmFloat32 fadeInTime = 1.0f,
+                                        csmFloat32 fadeOutTime = 1.0f,
+                                        ExpressionBlendType type = Additive);
 
+  static CubismExpressionMotion* Create(
+      const csmVector<CubismExpressionMotion::ExpressionParameter>& parameters,
+      csmFloat32 fadeInTime = 1.0f, csmFloat32 fadeOutTime = 1.0f);
   /**
    * @brief モデルのパラメータの更新の実行
    *

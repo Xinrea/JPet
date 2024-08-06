@@ -19,9 +19,7 @@ class DataManager {
   void PostProcess(const std::string& key, int value);
 
  public:
-  ~DataManager() {
-    Save();
-  };
+  ~DataManager() { Save(); };
 
   void GetWindowPos(int* x, int* y);
   void UpdateWindowPos(int x, int y);
@@ -40,11 +38,11 @@ class DataManager {
   void UpdateNotify(const std::vector<std::string>& followList, bool dynamic,
                     bool live, bool update);
 
-  void GetModalState(std::map<std::string, float>* modalState);
-  void UpdateModalState(const std::map<std::string, float>& modalState);
-
   void SetRaw(const std::string& key, int value);
+  void SetRaw(const std::string& key, float value);
   int GetRaw(const std::string& key);
+  int GetWithDefault(const std::string& key, int default);
+  float GetWithDefault(const std::string& key, float default);
 
   void AddExp(bool bonus);
 
@@ -59,7 +57,8 @@ class DataManager {
 
   void AddAttribute(const std::string& key, int value);
 
-  void DumpTask(int id, int start_time, int end_time, int success, int status, int cost_snapshot);
+  void DumpTask(int id, int start_time, int end_time, int success, int status,
+                int cost_snapshot);
 
   /**
    * @brief   Get task status.
