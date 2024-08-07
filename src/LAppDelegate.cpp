@@ -91,7 +91,7 @@ bool LAppDelegate::Initialize() {
   _au->Initialize();
   _au->SetMute(_mute);
   _au->SetVolume(static_cast<float>(_volume) / 10);
-  if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate]AudioManager Init");
+  LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]AudioManager Init");
 
   // GLFWの初期化
   if (glfwInit() == GL_FALSE) {
@@ -126,9 +126,7 @@ bool LAppDelegate::Initialize() {
                              NULL, NULL);
 
   if (_window == NULL) {
-    if (DebugLogEnable) {
-      LAppPal::PrintLog("[LAppDelegate]Can't create GLFW window.");
-    }
+    LAppPal::PrintLog(LogLevel::Error, "[LAppDelegate]Can't create GLFW window.");
     glfwTerminate();
     return GL_FALSE;
   }
@@ -179,15 +177,14 @@ bool LAppDelegate::Initialize() {
 
   // Windowのコンテキストをカレントに設定
   glfwMakeContextCurrent(_window);
-  if (isLimit)
+  if (isLimit) {
     glfwSwapInterval(2);
-  else
+  } else {
     glfwSwapInterval(1);
+  }
 
   if (glewInit() != GLEW_OK) {
-    if (DebugLogEnable) {
-      LAppPal::PrintLog("[LAppDelegate]Can't Initilize Glew.");
-    }
+    LAppPal::PrintLog(LogLevel::Error, "[LAppDelegate]Can't Initilize Glew.");
     glfwTerminate();
     return GL_FALSE;
   }
@@ -253,8 +250,10 @@ bool LAppDelegate::Initialize() {
 
   // Init task scheduler and basic tasks
   TaskScheduler *ts = TaskScheduler::GetInstance();
-  ts->AddTask(new ExpTask());
-  ts->AddTask(new CheckTask());
+  auto expTask = std::make_shared<ExpTask>();
+  auto checkTask = std::make_shared<CheckTask>();
+  ts->AddTask(expTask);
+  ts->AddTask(checkTask);
 
   return GL_TRUE;
 }

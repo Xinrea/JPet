@@ -1,5 +1,6 @@
 #include "TaskScheduler.hpp"
 #include "LAppPal.hpp"
+#include <memory>
 
 TaskScheduler::TaskScheduler() {
   _worker = std::thread(&TaskScheduler::doRun, this);
@@ -9,23 +10,19 @@ TaskScheduler::TaskScheduler() {
 TaskScheduler::~TaskScheduler() {
   _running = false;
   std::lock_guard<std::mutex> lock(_mutex);
-  for (auto task : _tasks) {
-    delete task;
-  }
   _tasks.clear();
 }
 
-void TaskScheduler::AddTask(Task* task) {
+void TaskScheduler::AddTask(std::shared_ptr<Task> task) {
   std::lock_guard<std::mutex> lock(_mutex);
   _tasks.push_back(task);
 }
 
-void TaskScheduler::RemoveTask(Task* task) {
+void TaskScheduler::RemoveTask(std::shared_ptr<Task> task) {
   std::lock_guard<std::mutex> lock(_mutex);
   auto it = std::find(_tasks.begin(), _tasks.end(), task);
   if (it != _tasks.end()) {
     _tasks.erase(it);
-    delete task;
   }
 }
 
@@ -43,10 +40,9 @@ void TaskScheduler::tick() {
     if (!_running) {
       break;
     }
-    Task* task = *it;
+    std::shared_ptr<Task> task = *it;
     if (task->IsDone()) {
       it = _tasks.erase(it);
-      delete task;
       continue;
     }
     if (task->ShouldExecute()) {

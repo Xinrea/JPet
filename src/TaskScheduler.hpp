@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <mutex>
 
 #include "Task.hpp"
@@ -18,12 +19,12 @@ class TaskScheduler {
       return &instance;
     }
 
-    void AddTask(Task* task);
-    void RemoveTask(Task* task);
+    void AddTask(std::shared_ptr<Task> task);
+    void RemoveTask(std::shared_ptr<Task> task);
 
   private:
     TaskScheduler();
-    std::vector<Task*> _tasks;
+    std::vector<std::shared_ptr<Task>> _tasks;
     std::mutex _mutex;
     std::thread _worker;
     bool _running = true;
