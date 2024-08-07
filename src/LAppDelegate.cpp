@@ -76,8 +76,8 @@ bool LAppDelegate::Initialize() {
   dataManager->GetWindowPos(&_iposX, &_iposY);
   dataManager->GetAudio(&_volume, &_mute);
   dataManager->GetDisplay(&_scale, &Green, &isLimit);
-  dataManager->GetNotify(&_followlist, &DynamicNotify, &LiveNotify,
-                         &UpdateNotify);
+  _followlist = dataManager->GetFollowList();
+  dataManager->GetNotify(&DynamicNotify, &LiveNotify, &UpdateNotify);
 
   std::map<std::string, std::string> shortcuts;
   dataManager->GetShortcut(&shortcuts);
@@ -428,18 +428,8 @@ void LAppDelegate::SaveSettings() {
   // update model part states
   PartStateManager::GetInstance()->SnapshotState();
 
-  // get follow list
-  std::vector<WatchTarget> watchList;
-  _us->GetTargetList(watchList);
-  // transform watch list to string list
-  std::vector<std::string> watchListStr;
-  for (auto &target : watchList) {
-    watchListStr.push_back(target.uid);
-  }
-
   // update notify settings
-  dataManager->UpdateNotify(watchListStr, DynamicNotify, LiveNotify,
-                            UpdateNotify);
+  dataManager->UpdateNotify(DynamicNotify, LiveNotify, UpdateNotify);
 
   dataManager->Save();
   LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]Setting Saved");

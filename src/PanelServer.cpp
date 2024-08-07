@@ -356,19 +356,17 @@ void PanelServer::doServe() {
                });
   server->Get("/api/config/notify", [](const httplib::Request &req,
                                        httplib::Response &res) {
-    bool dynamic = LAppDelegate::GetInstance()->DynamicNotify;
-    bool live = LAppDelegate::GetInstance()->LiveNotify;
-    bool update = LAppDelegate::GetInstance()->UpdateNotify;
-    auto userStateWatcher = LAppDelegate::GetInstance()->GetUserStateManager();
-    vector<WatchTarget> followList;
-    if (userStateWatcher) {
-      userStateWatcher->GetTargetList(followList);
-    }
+    bool dynamic, live, update;
+    vector<string> followList = DataManager::GetInstance()->GetFollowList();
+    DataManager::GetInstance()->GetNotify(&dynamic, &live, &update);
+      
+    map<string, WatchTarget> targetList;
+    LAppDelegate::GetInstance()->GetUserStateManager()->GetTargetList(targetList);
     nlohmann::json followListJson;
     for (auto target : followList) {
       followListJson.push_back({
-          {"uid", target.uid},
-          {"uname", target.uname},
+          {"uid", target},
+          {"uname", targetList[target].uname},
       });
     }
     nlohmann::json resp = {{"dynamic", dynamic},
@@ -380,10 +378,10 @@ void PanelServer::doServe() {
   server->Post("/api/config/notify", [](const httplib::Request &req,
                                         httplib::Response &res) {
     nlohmann::json json = nlohmann::json::parse(req.body);
+    DataManager::GetInstance()->UpdateNotify(json.at("live"), json.at("dynamic"), json.at("update"));
     LAppDelegate::GetInstance()->LiveNotify = json.at("live");
     LAppDelegate::GetInstance()->DynamicNotify = json.at("dynamic");
     LAppDelegate::GetInstance()->UpdateNotify = json.at("update");
-    LAppDelegate::GetInstance()->SaveSettings();
   });
   server->Put("/api/config/notify", [](const httplib::Request &req,
                                        httplib::Response &res) {
@@ -394,17 +392,17 @@ void PanelServer::doServe() {
       res.status = 400;
     } else {
       LAppDelegate::GetInstance()->GetUserStateManager()->AddWatcher(uid);
-      LAppDelegate::GetInstance()->SaveSettings();
+      DataManager::GetInstance()->AddFollow(uid);
     }
     // response with updated follow list
-    vector<WatchTarget> followList;
+    map<string, WatchTarget> followList;
     LAppDelegate::GetInstance()->GetUserStateManager()->GetTargetList(
         followList);
     nlohmann::json followListJson;
     for (auto target : followList) {
       followListJson.push_back({
-          {"uid", target.uid},
-          {"uname", target.uname},
+          {"uid", target.second.uid},
+          {"uname", target.second.uname},
       });
     }
     nlohmann::json resp = {{"watch_list", followListJson}};
@@ -415,16 +413,16 @@ void PanelServer::doServe() {
     auto json = nlohmann::json::parse(req.body);
     std::string uid = json.at("uid");
     LAppDelegate::GetInstance()->GetUserStateManager()->RemoveWatcher(uid);
-    LAppDelegate::GetInstance()->SaveSettings();
+    DataManager::GetInstance()->RemoveFollow(uid);
     // response with updated follow list
-    vector<WatchTarget> followList;
+    map<string, WatchTarget> followList;
     LAppDelegate::GetInstance()->GetUserStateManager()->GetTargetList(
         followList);
     nlohmann::json followListJson;
     for (auto target : followList) {
       followListJson.push_back({
-          {"uid", target.uid},
-          {"uname", target.uname},
+          {"uid", target.second.uid},
+          {"uname", target.second.uname},
       });
     }
     nlohmann::json resp = {{"watch_list", followListJson}};

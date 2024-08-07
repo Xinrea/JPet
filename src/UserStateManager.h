@@ -3,6 +3,7 @@
 #include <queue>
 #include <thread>
 #include <optional>
+#include <map>
 #include <mutex>
 
 #include "StateMessage.hpp"
@@ -53,10 +54,11 @@ class UserStateManager {
     LAppPal::PrintLog("[UserStateManager]Remove watcher %s", uid.c_str());
   }
 
-  void GetTargetList(std::vector<WatchTarget>& list) {
+  void GetTargetList(std::map<string, WatchTarget>& mtarget) {
     std::lock_guard<std::mutex> lock(_mutex);
     for (auto watcher : _watchers) {
-      list.push_back(watcher->target);
+      auto target = watcher->target;
+      mtarget.insert(std::pair<string, WatchTarget>(target.uid, target));
     }
   }
 

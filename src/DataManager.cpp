@@ -125,32 +125,65 @@ void DataManager::UpdateDisplay(float scale, bool green, bool rateLimit) {
                                                {"rateLimit", rateLimit}});
 }
 
-void DataManager::GetNotify(std::vector<std::string>* followList, bool* dynamic,
-                            bool* live, bool* update) {
+void DataManager::GetNotify(bool *dynamic, bool *live, bool *update) {
   // get followList, dynamic, live, update from data
   if (data.contains("notify")) {
     auto notifyTable = data.at("notify").as_table();
     *dynamic = notifyTable->at("dynamic").value_or(false);
     *live = notifyTable->at("live").value_or(false);
     *update = notifyTable->at("update").value_or(false);
-    auto followListArray = notifyTable->at("followList").as_array();
-    for (const auto& follow : *followListArray) {
-      followList->push_back(follow.as_string()->get());
-    }
   }
 }
 
-void DataManager::UpdateNotify(const std::vector<std::string>& followList,
+void DataManager::UpdateNotify(
                                bool dynamic, bool live, bool update) {
   // update followList, dynamic, live, update in data
-  toml::array followListArray;
-  for (const auto& follow : followList) {
-    followListArray.push_back(follow);
+  if (!data.contains("notify")) {
+    data.insert("notify", toml::table{});
   }
-  data.insert_or_assign("notify", toml::table{{"dynamic", dynamic},
-                                              {"live", live},
-                                              {"update", update},
-                                              {"followList", followListArray}});
+  auto notifyTable = data.at("notify").as_table();
+  notifyTable->insert_or_assign("dynamic", dynamic);
+  notifyTable->insert_or_assign("live", live);
+  notifyTable->insert_or_assign("update", update);
+}
+
+std::vector<std::string> DataManager::GetFollowList() {
+  std::vector<std::string> ret;
+  if (!data.contains("notify")) {
+    data.insert("notify", toml::table{});
+    data["notify"].as_table()->insert("followList", toml::array{});
+  }
+  auto notifyTable = data.at("notify").as_table();
+  auto& followListArray = *notifyTable->get_as<toml::array>("followList");
+  for (const auto& follow : followListArray) {
+    ret.push_back(follow.as_string()->get());
+  }
+  return ret;
+}
+
+void DataManager::AddFollow(const std::string& uid) {
+  auto notifyTable = data.at("notify").as_table();
+  auto& followListArray = *notifyTable->get_as<toml::array>("followList");
+  // check exist
+  for (const auto& follow : followListArray) {
+    if (follow.as_string()->get() == uid) {
+      return;
+    }
+  }
+  followListArray.push_back(uid);
+}
+
+void DataManager::RemoveFollow(const std::string& uid) {
+  auto notifyTable = data.at("notify").as_table();
+  auto& followListArray = *notifyTable->get_as<toml::array>("followList");
+  auto iter = followListArray.cbegin();
+  for (;iter != followListArray.cend();) {
+    if (iter->as_string()->get() == uid) {
+      iter = followListArray.erase(iter);
+    } else {
+      iter++;
+    }
+  }
 }
 
 void DataManager::Save() {

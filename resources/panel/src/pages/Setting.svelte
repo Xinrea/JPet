@@ -115,6 +115,7 @@
       .then((res) => res.json())
       .then((data) => {
         _watch_list = data.watch_list;
+        _uid = "";
         console.log(_watch_list);
       });
   }

@@ -33,10 +33,12 @@ class DataManager {
   void GetDisplay(float* scale, bool* green, bool* rateLimit);
   void UpdateDisplay(float scale, bool green, bool rateLimit);
 
-  void GetNotify(std::vector<std::string>* followList, bool* dynamic,
-                 bool* live, bool* update);
-  void UpdateNotify(const std::vector<std::string>& followList, bool dynamic,
-                    bool live, bool update);
+  void GetNotify(bool *dynamic, bool *live, bool *update);
+  void UpdateNotify(bool dynamic, bool live, bool update);
+  
+  std::vector<std::string> GetFollowList();
+  void RemoveFollow(const std::string &uid);
+  void AddFollow(const std::string &uid);
 
   void SetRaw(const std::string& key, int value);
   void SetRaw(const std::string& key, float value);
