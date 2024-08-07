@@ -158,6 +158,9 @@ void PanelServer::doServe() {
         int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4]) / 100));
     res.set_content(json.dump(), "application/json");
   });
+  server->Post("/api/data/reset", [](const httplib::Request &req, httplib::Response &res) {
+    DataManager::GetInstance()->SetResetMark();
+  });
   server->Get("/api/parts", [](const httplib::Request& req, httplib::Response& res){
     const map<string, bool> part_status = PartStateManager::GetInstance()->GetStatus();
     auto json = nlohmann::json::object();

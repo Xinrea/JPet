@@ -11,7 +11,7 @@
 namespace Live2D { namespace Cubism { namespace Framework {
 
 CubismMotionQueueEntry::CubismMotionQueueEntry()
-    : _autoDelete(false)
+   : _autoDelete(false)
     , _motion(NULL)
     , _available(true)
     , _finished(false)

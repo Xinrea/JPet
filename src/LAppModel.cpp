@@ -39,6 +39,7 @@ void DeleteBuffer(csmByte* buffer, const csmChar* path = "") {
 void FinishedMotion(ACubismMotion* self) {
   LAppDelegate::GetInstance()->InMotion = false;
   PartStateManager::GetInstance()->SnapshotState();
+  LAppPal::PrintLog(LogLevel::Debug, "[Model]Motion finished");
 }
 }  // namespace
 
@@ -338,6 +339,7 @@ void LAppModel::Update() {
   csmBool motionUpdated = false;
 
   //-----------------------------------------------------------------
+  // Motion changes should be saved
   _model->LoadParameters();  // 前回セーブされた状態をロード
   motionUpdated = _motionManager->UpdateMotion(_model, deltaTimeSeconds);  
   _model->SaveParameters();
@@ -351,6 +353,7 @@ void LAppModel::Update() {
     }
   }
 
+  // Expression changes are temporary
   if (_expressionManager != NULL) {
     _expressionManager->UpdateMotion(
         _model, deltaTimeSeconds);  // 表情でパラメータ更新（相対変化）
@@ -514,6 +517,10 @@ csmBool LAppModel::HitTest(const csmChar* hitAreaName, csmFloat32 x,
 }
 
 void LAppModel::SetDraggingState(bool state) {
+  if (_dragging == state) {
+    return;
+  }
+  LAppPal::PrintLog(LogLevel::Debug, "[Model]Set dragging state %d", state);
   if (state) {
     _expressionManager->StartMotionPriority(_presets["drag_on"], false,
                                             PriorityForce);

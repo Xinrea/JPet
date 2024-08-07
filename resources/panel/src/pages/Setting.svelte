@@ -9,6 +9,7 @@
     ButtonGroup,
     Button,
     Tooltip,
+    Modal,
   } from "flowbite-svelte";
   // audio
   let _volume = "20";
@@ -23,7 +24,6 @@
   let _dynamic = true;
   let _live = true;
   let _update = true;
-  let _reset = false;
   function init() {
     // get from server
     fetch("/api/config/audio")
@@ -118,8 +118,11 @@
         console.log(_watch_list);
       });
   }
+  let _reset = false;
+  let resetModal = false;
   function resetData() {
     _reset = true;
+    fetch("/api/data/reset", { method: "POST" });
   }
   init();
 </script>
@@ -181,5 +184,23 @@
 >
 <Hr />
 <P class="mb-4">游戏数据设置</P>
-<Button color="red" disabled={_reset} on:click={()=>resetData()}>{!_reset ? '重置数据':'已标记重置'}</Button>
+<Button
+  color="red"
+  disabled={_reset}
+  on:click={() => {
+    resetModal = true;
+  }}>{!_reset ? "重置数据" : "已标记重置"}</Button
+>
 <Tooltip placement="right">数据将会在重启后清除</Tooltip>
+<Modal title="确认重置" bind:open={resetModal} size="xs" autoclose>
+  <h3 class="mb-5 text-lg font-normal text-gray-500">
+    此次操作无法取消，确认要进行吗？
+  </h3>
+  <Button
+    color="red"
+    on:click={() => {
+      resetData();
+    }}>确认</Button
+  >
+  <Button color="alternative">取消</Button>
+</Modal>

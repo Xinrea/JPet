@@ -74,5 +74,9 @@ class DataManager {
 
   void Save();
 
+  void SetResetMark();
+
+  bool IsResetMarked();
+
   static DataManager* GetInstance();
 };

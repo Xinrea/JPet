@@ -100,6 +100,16 @@ void CubismExpressionMotion::DoUpdateParameters(
         break;
     }
   }
+  csmFloat32 timeOffsetSeconds = userTimeSeconds - motionQueueEntry->GetStartTime();
+  if (timeOffsetSeconds < 0.0f) {
+    timeOffsetSeconds = 0.0f;
+  }
+  if (timeOffsetSeconds >= this->_fadeInSeconds) {
+    if (this->_onFinishedMotion != nullptr) {
+      this->_onFinishedMotion(this);
+    }
+    motionQueueEntry->IsFinished(true);
+  }
 }
 
 void CubismExpressionMotion::CalculateExpressionParameters(
