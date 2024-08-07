@@ -1,9 +1,11 @@
 #include "CookieWindow.hpp"
 #include "LAppPal.hpp"
 #include "LAppDefine.hpp"
+#include "resource.h"
 
 #include <stdexcept>
 #include <thread>
+#include <winuser.h>
 
 LRESULT CALLBACK CookieWndProc(HWND hWnd, UINT message, WPARAM wParam,
                                LPARAM lParam) {
@@ -50,10 +52,10 @@ void CookieWindow::WindowProc() {
   wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
   wcex.lpszMenuName = NULL;
   wcex.lpszClassName = L"CookieWindow";
-  wcex.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION);
+  wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_ICON1));
 
   if (!RegisterClassEx(&wcex)) {
-    LAppPal::PrintLog("Failed to register window class");
+    LAppPal::PrintLog(LogLevel::Error, "Failed to register window class");
     return;
   }
 
@@ -62,7 +64,7 @@ void CookieWindow::WindowProc() {
                          _instance, NULL);
 
   if (!_window) {
-    LAppPal::PrintLog("Failed to create window");
+    LAppPal::PrintLog(LogLevel::Error, "Failed to create window");
     return;
   }
 
@@ -87,7 +89,7 @@ void CookieWindow::WindowProc() {
                 Microsoft::WRL::Callback<
                     ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
                     [this](HRESULT result,
-                           ICoreWebView2Controller* controller) -> HRESULT {
+                           ICoreWebView2Controller *controller) -> HRESULT {
                       if (controller != nullptr) {
                         webviewController = controller;
                         webviewController->get_CoreWebView2(&webview);
@@ -156,6 +158,9 @@ void CookieWindow::WindowProc() {
                       webview->Navigate(
                           L"https://space.bilibili.com/61639371/dynamic");
 
+                      // fix webview not render in hidden-created window
+                      webviewController->put_IsVisible(true);
+          
                       return S_OK;
                     })
                     .Get());

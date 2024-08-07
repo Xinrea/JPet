@@ -73,7 +73,7 @@ void GamePanel::WindowProc() {
 
   SetWindowLongPtr(_window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
-  ShowWindow(_window, SW_SHOWNORMAL);
+  ShowWindow(_window, SW_HIDE);
   UpdateWindow(_window);
   // <-- WebView2 sample code starts here -->
   // Step 3 - Create a single WebView within the parent window
@@ -113,6 +113,9 @@ void GamePanel::WindowProc() {
 
                         // webview->Navigate(L"https://www.bilibili.com/");
                         webview->Navigate(L"http://localhost:8053/index.html");
+
+                        // fix webview not render in hidden-created window
+                        webviewController->put_IsVisible(true);
 
                         return S_OK;
                       })
