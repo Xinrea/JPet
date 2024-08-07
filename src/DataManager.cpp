@@ -109,11 +109,11 @@ void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
     // update scale, green, rateLimit in data
     data.insert_or_assign(
         "display",
-        toml::table{{"scale", 1}, {"green", false}, {"rateLimit", false}});
+        toml::table{{"scale", 1.0f}, {"green", false}, {"rateLimit", false}});
     return;
   }
   // get scale, green, rateLimit from data
-  *scale = data.at("display").as_table()->at("scale").value_or(1);
+  *scale = data.at("display").as_table()->at("scale").value_or(1.0f);
   *green = data.at("display").as_table()->at("green").value_or(false);
   *rateLimit = data.at("display").as_table()->at("rateLimit").value_or(false);
 }
