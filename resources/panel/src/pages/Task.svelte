@@ -26,7 +26,7 @@
       timeRemain = Math.max(
         currentTask.cost -
           Math.floor(Date.now() / 1000 - currentTask.start_time),
-        0
+        0,
       );
     }
     if (currentTask && timeRemain <= 0 && currentTask.status == 1) {
@@ -92,13 +92,14 @@
           timeRemain = Math.max(
             currentTask.cost -
               Math.floor(Date.now() / 1000 - currentTask.start_time),
-            0
+            0,
           );
         }
       });
   }
 
   function startTask(id) {
+    backToTop();
     fetch(`/api/task/${id}/start`, {
       method: "POST",
     })
@@ -140,15 +141,15 @@
     if (s >= 60) {
       str += Math.floor(s / 60) + "m";
     }
-    str += s % 60 + "s";
+    str += (s % 60) + "s";
     return str;
   }
 
   // reward modal
   let rewardModal = false;
   let rewardTask = null;
-  
-  function calcRate(attrs,task) {
+
+  function calcRate(attrs, task) {
     let lack = 0;
     for (const [key, value] of Object.entries(task.requirements)) {
       if (attrs[key] < value) {
@@ -166,6 +167,13 @@
 
   function formatDate(time) {
     return new Date(time * 1000).toLocaleString();
+  }
+
+  function backToTop() {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   updateStatus();
@@ -190,14 +198,30 @@
         <span>[T{currentTask.id}] {currentTask.title}</span>
         {#if currentTask.status == 2}
           <span class="flex items-center">
-            <span>{currentTask.success ? '任务成功' : '任务失败'}</span>
-            <Button class="!p-2 ml-2" color="alternative" size="sm" on:click={()=>confirmTask(currentTask)}><img src={DoneIcon} width="16px" alt="" /></Button>
+            <span>{currentTask.success ? "任务成功" : "任务失败"}</span>
+            <Button
+              class="!p-2 ml-2"
+              color="alternative"
+              size="sm"
+              on:click={() => confirmTask(currentTask)}
+              ><img src={DoneIcon} width="16px" alt="" /></Button
+            >
             <Tooltip class="z-30">确认</Tooltip>
           </span>
         {:else}
           <span class="flex items-center">
-            <span>剩余时长：{timeRemain == 0 ? '⌛' : formatRemain(timeRemain)}</span>
-            <Button class="!p-2 ml-2" color="alternative" size="sm" on:click={()=>cancelTask(currentTask.id)}><img src={CancelIcon} width="16px" alt="" /></Button>
+            <span
+              >剩余时长：{timeRemain == 0
+                ? "⌛"
+                : formatRemain(timeRemain)}</span
+            >
+            <Button
+              class="!p-2 ml-2"
+              color="alternative"
+              size="sm"
+              on:click={() => cancelTask(currentTask.id)}
+              ><img src={CancelIcon} width="16px" alt="" /></Button
+            >
             <Tooltip class="z-30">中止</Tooltip>
           </span>
         {/if}
@@ -210,7 +234,11 @@
         <div class="text-gray-500 mb-1 align-middle">
           <span class="badge info">要求</span>
           {#each Object.entries(currentTask.requirements) as [key, value]}
-            <AttributeIcon attribute={key} {value} fullfill={attributes[key] >= value} />
+            <AttributeIcon
+              attribute={key}
+              {value}
+              fullfill={attributes[key] >= value}
+            />
           {/each}
         </div>
         <div class="text-gray-500 mb-1 align-middle">
@@ -248,24 +276,43 @@
               <p class="mb-1 flex justify-between align-middle items-center">
                 <span class="flex items-center"
                   ><span class="badge info">T{task.id}</span><span class="ml-2">
-                    <span>{task.title}</span> <span class="icon"><img class="inline" width=12 height=12 src={ClockIcon} alt=""/>{formatRemain(task.cost)}</span>
+                    <span>{task.title}</span>
+                    <span class="icon"
+                      ><img
+                        class="inline"
+                        width="12"
+                        height="12"
+                        src={ClockIcon}
+                        alt=""
+                      />{formatRemain(task.cost)}</span
+                    >
                   </span></span
                 >
                 <span class="text-end">
                   {#if task.status != 3}
-                    <Button color="alternative" size="sm" disabled={task.rate == 0} on:click={()=>startTask(task.id)}
+                    <Button
+                      color="alternative"
+                      size="sm"
+                      disabled={task.rate == 0}
+                      on:click={() => startTask(task.id)}
                       ><img src={RunIcon} width="16px" alt="" /></Button
                     >
                     <Tooltip class="z-30">执行</Tooltip>
                   {:else}
-                    <span class="text-sm text-gray-500">{formatDate(task.start_time + task.cost)}</span>
+                    <span class="text-sm text-gray-500"
+                      >{formatDate(task.start_time + task.cost)}</span
+                    >
                   {/if}
                 </span>
               </p>
               <div class="text-gray-500 mb-1 align-middle">
                 <span class="badge info">要求</span>
                 {#each Object.entries(task.requirements) as [key, value]}
-                  <AttributeIcon attribute={key} {value} fullfill={attributes[key] >= value} />
+                  <AttributeIcon
+                    attribute={key}
+                    {value}
+                    fullfill={attributes[key] >= value}
+                  />
                 {/each}
               </div>
               <div class="text-gray-500 mb-1 align-middle">
@@ -283,7 +330,14 @@
                     class="badge warn
                     ">特殊奖励</span
                   >
-                  <span style="font-size: 12px;"><img class="inline" width="16px" src={ClothesIcon} alt="" />{task.special.title}</span>
+                  <span style="font-size: 12px;"
+                    ><img
+                      class="inline"
+                      width="16px"
+                      src={ClothesIcon}
+                      alt=""
+                    />{task.special.title}</span
+                  >
                   <Tooltip>{task.special.desc}</Tooltip>
                 </div>
               {/if}
@@ -303,7 +357,13 @@
         {/each}
       </ul>
     </div>
-    <Modal title="任务奖励" bind:open={rewardModal} size="xs" autoclose outsideclose>
+    <Modal
+      title="任务奖励"
+      bind:open={rewardModal}
+      size="xs"
+      autoclose
+      outsideclose
+    >
       <h3 class="mb-2 font-normal text-gray-500">获得了如下奖励：</h3>
       <div>
         {#each Object.entries(rewardTask.rewards) as [key, value]}
@@ -312,7 +372,14 @@
       </div>
       {#if rewardTask.special}
         <div>
-          <span style="font-size: 12px;"><img class="inline" width="16px" src={ClothesIcon} alt="" />{rewardTask.special.title}</span>
+          <span style="font-size: 12px;"
+            ><img
+              class="inline"
+              width="16px"
+              src={ClothesIcon}
+              alt=""
+            />{rewardTask.special.title}</span
+          >
           <Tooltip>{rewardTask.special.desc}</Tooltip>
         </div>
       {/if}
