@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "Motion/ACubismMotion.hpp"
 #include <CubismFramework.hpp>
 #include <Motion/CubismMotion.hpp>
 #include <ICubismModelSetting.hpp>
@@ -78,6 +79,8 @@ class LAppModel : public Csm::CubismUserModel {
       Csm::ACubismMotion::FinishedMotionCallback onFinishedMotionHandler = NULL,
       bool IsIdle = false);
 
+  void StartMotion(ACubismMotion* motion);
+
   /**
    * @brief   ランダムに選ばれたモーションの再生を開始する。
    *
@@ -102,6 +105,7 @@ class LAppModel : public Csm::CubismUserModel {
   void SetExpression(const Csm::csmChar* expressionID);
 
   void SetExpression(ACubismMotion* expression);
+  
   /**
    * @brief   ランダムに選ばれた表情モーションをセットする
    *

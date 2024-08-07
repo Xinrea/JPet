@@ -53,7 +53,7 @@ void PartStateManager::Toggle(const std::string& key, bool enable) {
     return;
   }
   LAppModel* current = LAppLive2DManager::GetInstance()->GetModel(0);
-  auto& it = param_map_.find(key);
+  auto it = param_map_.find(key);
   if (it == param_map_.end()) {
     return;
   }
@@ -68,10 +68,6 @@ void PartStateManager::Toggle(const std::string& key, bool enable) {
   if (LAppPal::StartWith(entry.key, "ParamCloth")) {
     // create special expression that makes this key to 30 but others to 0
     const vector<string> keys = {"ParamCloth1", "ParamCloth2", "ParamCloth3"};
-    for (const string& key : keys) {
-      LAppPal::PrintLog(LogLevel::Debug, "[PartStateManager]Cloth %s %f",
-                        key.c_str(), param_map_[key].getValue(model));
-    }
     csmVector<CubismExpressionMotion::ExpressionParameter> parameters;
     for (const string& key : keys) {
       if (key == entry.key) {
@@ -92,11 +88,19 @@ void PartStateManager::Toggle(const std::string& key, bool enable) {
       parameters.PushBack(param);
     }
 
-    auto expression = CubismExpressionMotion::Create(parameters);
-    current->SetExpression(expression);
+    auto motion = CubismExpressionMotion::Create(parameters, 0.5f, 0.5f);
+    current->StartMotion(motion);
     return;
   }
-  auto expression = CubismExpressionMotion::Create(entry.id, enable ? 30 : -30);
-  current->SetExpression(expression);
+  auto motion = CubismExpressionMotion::Create(entry.id, enable ? 30 : -30, 0.5f, 0.5f);
+  current->StartMotion(motion);
   return;
+}
+
+map<string, bool> PartStateManager::GetStatus() {
+  map<string, bool> ret;
+  for (const auto& [_, entry] : param_map_) {
+    ret[entry.key] = (entry.getValue(model) > 0);
+  }
+  return ret;
 }

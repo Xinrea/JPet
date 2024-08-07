@@ -15,18 +15,12 @@
 #include <Physics/CubismPhysics.hpp>
 #include <Rendering/OpenGL/CubismRenderer_OpenGLES2.hpp>
 #include <Utils/CubismString.hpp>
-#include <fstream>
-#include <functional>
-#include <random>
-#include <string>
-#include <vector>
 
 #include "AudioManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppDelegate.hpp"
 #include "LAppPal.hpp"
 #include "LAppTextureManager.hpp"
-#include "ModelManager.hpp"
 #include "PartStateManager.h"
 
 using namespace Live2D::Cubism::Framework;
@@ -227,7 +221,6 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
 
   PartStateManager::GetInstance()->BindModel(_model);
   PartStateManager::GetInstance()->ApplyState();
-  _model->SaveParameters();
 
   LAppPal::PrintLog("[APP]Model motions count: %d, groups: %d",
                     _modelSetting->GetMotionCount("All"),
@@ -239,6 +232,8 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
 
   _motionManager->StopAllMotions();
 
+  _model->SaveParameters();
+  
   _updating = false;
   _initialized = true;
 }
@@ -332,7 +327,6 @@ void LAppModel::ReleaseExpressions() {
 }
 
 void LAppModel::Update() {
-  static bool firstUpdate = true;
   const csmFloat32 deltaTimeSeconds = LAppPal::GetDeltaTime();
   _userTimeSeconds += deltaTimeSeconds;
 
@@ -345,10 +339,8 @@ void LAppModel::Update() {
 
   //-----------------------------------------------------------------
   _model->LoadParameters();  // 前回セーブされた状態をロード
-  if (firstUpdate) {
-    firstUpdate = false;
-  }
-
+  motionUpdated = _motionManager->UpdateMotion(_model, deltaTimeSeconds);  
+  _model->SaveParameters();
   //-----------------------------------------------------------------
 
   // まばたき
@@ -363,6 +355,7 @@ void LAppModel::Update() {
     _expressionManager->UpdateMotion(
         _model, deltaTimeSeconds);  // 表情でパラメータ更新（相対変化）
   }
+
 
   // ドラッグによる変化
   // ドラッグによる顔の向きの調整
@@ -548,6 +541,15 @@ void LAppModel::SetExpression(ACubismMotion* motion) {
     LAppPal::PrintLog(LogLevel::Debug, "[Model]Expression is null ");
   }
   _expressionManager->StartMotionPriority(motion, true, PriorityForce);
+}
+
+void LAppModel::StartMotion(ACubismMotion* motion) {
+  if (motion == nullptr) {
+    return;
+  }
+  motion->SetFinishedMotionHandler(FinishedMotion);
+  LAppDelegate::GetInstance()->InMotion = true;
+  _motionManager->StartMotionPriority(motion, true, PriorityForce);
 }
 
 void LAppModel::SetRandomExpression() {

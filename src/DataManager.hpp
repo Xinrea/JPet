@@ -41,8 +41,8 @@ class DataManager {
   void SetRaw(const std::string& key, int value);
   void SetRaw(const std::string& key, float value);
   int GetRaw(const std::string& key);
-  int GetWithDefault(const std::string& key, int default);
-  float GetWithDefault(const std::string& key, float default);
+  int GetWithDefault(const std::string& key, int default_value);
+  float GetWithDefault(const std::string& key, float default_value);
 
   void AddExp(bool bonus);
 

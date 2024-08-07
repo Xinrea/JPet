@@ -3,6 +3,7 @@
 #include "GameTask.hpp"
 #include "LAppDelegate.hpp"
 #include "LAppPal.hpp"
+#include "PartStateManager.h"
 
 void PanelServer::Start() {
   // start thread
@@ -157,14 +158,31 @@ void PanelServer::doServe() {
         int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4]) / 100));
     res.set_content(json.dump(), "application/json");
   });
+  server->Get("/api/parts", [](const httplib::Request& req, httplib::Response& res){
+    const map<string, bool> part_status = PartStateManager::GetInstance()->GetStatus();
+    auto json = nlohmann::json::object();
+    for (const auto& [key, status] : part_status) {
+      json[key] = status;
+    }
+    res.set_content(json.dump(), "application/json");
+  });
+  server->Post("/api/parts",
+               [](const httplib::Request &req, httplib::Response &res) {
+                 auto json = nlohmann::json::parse(req.body);
+                 LAppPal::PrintLog(LogLevel::Debug, "POST /api/parts [%s]%d",
+                                   json["param"].get<string>().c_str(),
+                                   json["enable"].get<bool>());
+                 PartStateManager::GetInstance()->Toggle(
+                     json["param"].get<string>(), json["enable"].get<bool>());
+               });
   server->Post("/api/clothes/:id", [](const httplib::Request &req,
-                                    httplib::Response &res) {
+                                      httplib::Response &res) {
     int id = std::stoi(req.path_params.at("id"));
     LAppPal::PrintLog(LogLevel::Debug, "POST /api/clothes/%d", id);
     if (id < 0 || id > 2) {
-        LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Invalid clothes id");
-        res.status = 400;
-        return;
+      LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Invalid clothes id");
+      res.status = 400;
+      return;
     }
     // check id valid, 0 is actived by default
     bool unlock = true;

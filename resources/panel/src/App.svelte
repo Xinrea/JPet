@@ -10,7 +10,7 @@
   let tabs = [
     { name: "总览" },
     { name: "任务" },
-    { name: "自定义" },
+    { name: "装扮" },
     { name: "设置" },
     { name: "说明" },
   ];
@@ -22,6 +22,7 @@
     strength: 0,
     will: 0,
     intellect: 0,
+    buycnt: 0,
   };
   let expdiff = 0;
   let clothes = {
@@ -64,7 +65,7 @@
       >
     {/each}
   </div>
-  <div class="flex flex-col p-2 pt-4 bg-gray-50 z-10">
+  <div class="flex flex-col p-4 pt-4 bg-gray-50 z-10">
     <div class:hide={activeTab !== 0}>
       <Profile {attributes} {expdiff} {clothes} />
     </div>
@@ -72,7 +73,7 @@
       <Task {attributes} />
     </div>
     <div class:hide={activeTab !== 2}>
-      <Custom />
+      <Custom current={clothes.current} />
     </div>
     <div class:hide={activeTab !== 3}>
       <Setting />

@@ -194,20 +194,20 @@ int DataManager::GetRaw(const std::string& key) {
   return value;
 }
 
-int DataManager::GetWithDefault(const std::string& key, int default) {
+int DataManager::GetWithDefault(const std::string& key, int default_value) {
   int value = 0;
   if (gameData->Get(key, value)) {
     return value;
   }
-  return default;
+  return default_value;
 }
 
-float DataManager::GetWithDefault(const std::string& key, float default) {
+float DataManager::GetWithDefault(const std::string& key, float default_value) {
   float value = 0;
   if (gameData->Get(key, value)) {
     return value;
   }
-  return default;
+  return default_value;
 }
 
 void DataManager::PostProcess(const std::string& key, int value) {
@@ -224,7 +224,7 @@ int DataManager::GetAttribute(const std::string& key) {
   } catch (const std::exception& e) {
     LAppPal::PrintLog(LogLevel::Error,
                       "[DataManager]Get Attribute failed %s: %s reset to 0",
-                      key, e.what());
+                      key.c_str(), e.what());
     gameData->Update("attr." + key, 0);
   }
   return value;

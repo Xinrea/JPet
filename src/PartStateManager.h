@@ -16,7 +16,7 @@ struct ParamEntry {
   string key;
   CubismIdHandle id;
   float value;
-  float getValue(CubismModel *model) { return model->GetParameterValue(id); }
+  float getValue(CubismModel *model) const { return model->GetParameterValue(id); }
 };
 
 class PartStateManager {
@@ -30,7 +30,7 @@ class PartStateManager {
       {"ParamMouth4", {"ParamMouth4", nullptr, 0}},
       {"ParamMouth5", {"ParamMouth5", nullptr, 0}},
       {"ParamMouth6", {"ParamMouth6", nullptr, 0}},
-      {"ParamEyeStart", {"ParamEyeStar", nullptr, 0}},
+      {"ParamEyeStar", {"ParamEyeStar", nullptr, 0}},
       {"ParamHair", {"ParamHair", nullptr, 0}},
       {"ParamCloth1", {"ParamCloth1", nullptr, 30}},
       {"ParamCloth2", {"ParamCloth2", nullptr, 0}},
@@ -41,11 +41,11 @@ class PartStateManager {
       {"ParamDizzy", {"ParamDizzy", nullptr, 0}},
       {"ParamREars", {"ParamREars", nullptr, 0}},
       {"ParamLEars", {"ParamLEars", nullptr, 0}},
-      {"ParamHat", {"ParamHat", nullptr, 0}},
+      {"ParamHat", {"ParamHat", nullptr, 30}},
       {"ParamGun", {"ParamGun", nullptr, 0}},
       {"ParamGlasses", {"ParamGlasses", nullptr, 0}},
-      {"ParamShoes", {"ParamShoes", nullptr, 0}},
-      {"ParamLegs", {"ParamLegs", nullptr, 0}},
+      {"ParamShoes", {"ParamShoes", nullptr, 30}},
+      {"ParamLegs", {"ParamLegs", nullptr, 30}},
       {"ParamTail", {"ParamTail", nullptr, 0}}};
 
   const std::string prefix_ = "part.";
@@ -55,5 +55,6 @@ class PartStateManager {
   void BindModel(CubismModel *m);
   void SnapshotState();
   void ApplyState();
+  map<string, bool> GetStatus();
   void Toggle(const string &key, bool enable);
 };

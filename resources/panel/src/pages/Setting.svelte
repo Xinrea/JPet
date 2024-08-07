@@ -8,6 +8,7 @@
     Badge,
     ButtonGroup,
     Button,
+    Tooltip,
   } from "flowbite-svelte";
   // audio
   let _volume = "20";
@@ -22,6 +23,7 @@
   let _dynamic = true;
   let _live = true;
   let _update = true;
+  let _reset = false;
   function init() {
     // get from server
     fetch("/api/config/audio")
@@ -116,6 +118,9 @@
         console.log(_watch_list);
       });
   }
+  function resetData() {
+    _reset = true;
+  }
   init();
 </script>
 
@@ -174,3 +179,7 @@
 <Toggle class="mb-2" bind:checked={_update} on:change={updateNotify}
   >软件更新提醒</Toggle
 >
+<Hr />
+<P class="mb-4">游戏数据设置</P>
+<Button color="red" disabled={_reset} on:click={()=>resetData()}>{!_reset ? '重置数据':'已标记重置'}</Button>
+<Tooltip placement="right">数据将会在重启后清除</Tooltip>
