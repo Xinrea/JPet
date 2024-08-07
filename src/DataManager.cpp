@@ -125,6 +125,27 @@ void DataManager::UpdateDisplay(float scale, bool green, bool rateLimit) {
                                                {"rateLimit", rateLimit}});
 }
 
+bool DataManager::IsTracking() {
+  if (!data.contains("other")) {
+    data.insert_or_assign("other", toml::table{});
+    return true;
+  }
+  auto other = data.at("other").as_table();
+  if (!other->contains("track")) {
+    other->insert("track", true);
+    return true;
+  }
+  return data.at("other").as_table()->at("track").value_or(true);
+}
+
+void DataManager::IsTracking(bool enable) {
+  if (!data.contains("other")) {
+    data.insert_or_assign("other", toml::table{});
+  }
+  auto other = data.at("other").as_table();
+  other->insert_or_assign("track", enable);
+}
+
 void DataManager::GetNotify(bool *dynamic, bool *live, bool *update) {
   // get followList, dynamic, live, update from data
   if (data.contains("notify")) {

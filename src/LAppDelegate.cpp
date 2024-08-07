@@ -343,8 +343,9 @@ void LAppDelegate::Run() {
     if (noskip) {
       glfwGetCursorPos(_window, &cx, &cy);
       // 非拖动状态下，跟随鼠标位置；拖动状态下，通过OnTouchMoved模拟物理效果
-      if (!_captured && !InMotion)
+      if (!_captured && !InMotion && DataManager::GetInstance()->IsTracking()) {
         _view->OnTouchesMoved(static_cast<float>(cx), static_cast<float>(cy));
+      }
     }
 
     // 画面の初期化

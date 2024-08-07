@@ -24,6 +24,8 @@
   let _dynamic = true;
   let _live = true;
   let _update = true;
+  // other
+  let _track = true;
   function init() {
     // get from server
     fetch("/api/config/audio")
@@ -47,6 +49,11 @@
         _dynamic = data.dynamic;
         _live = data.live;
         _update = data.update;
+      });
+    fetch("/api/config/other")
+      .then((res) => res.json())
+      .then((data) => {
+        _track = data.track;
       });
   }
   function updateAudio() {
@@ -84,6 +91,18 @@
         dynamic: _dynamic,
         live: _live,
         update: _update,
+      }),
+    });
+  }
+  function updateOther() {
+    // post to server
+    fetch("/api/config/other", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        track: _track,
       }),
     });
   }
@@ -182,6 +201,11 @@
 >
 <Toggle class="mb-2" bind:checked={_update} on:change={updateNotify}
   >软件更新提醒</Toggle
+>
+<Hr />
+<P class="mb-4">其它设置</P>
+<Toggle class="mb-2" bind:checked={_track} on:change={updateOther}
+  >鼠标追踪</Toggle
 >
 <Hr />
 <P class="mb-4">游戏数据设置</P>

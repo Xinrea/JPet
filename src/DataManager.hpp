@@ -35,6 +35,9 @@ class DataManager {
 
   void GetNotify(bool *dynamic, bool *live, bool *update);
   void UpdateNotify(bool dynamic, bool live, bool update);
+
+  bool IsTracking();
+  void IsTracking(bool enable);
   
   std::vector<std::string> GetFollowList();
   void RemoveFollow(const std::string &uid);
