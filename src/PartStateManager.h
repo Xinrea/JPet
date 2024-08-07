@@ -49,6 +49,10 @@ class PartStateManager {
       {"ParamTail", {"ParamTail", nullptr, 0}}};
 
   const std::string prefix_ = "part.";
+  const vector<string> clothes_keys_ = {"ParamCloth1", "ParamCloth2", "ParamCloth3"};
+  const vector<string> mouth_keys_ = {"ParamMouth1", "ParamMouth2",
+                                      "ParamMouth3", "ParamMouth4",
+                                      "ParamMouth5", "ParamMouth6"};
   static PartStateManager *GetInstance();
 
   PartStateManager();

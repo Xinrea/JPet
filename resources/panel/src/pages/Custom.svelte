@@ -18,6 +18,12 @@
     ParamShoes: false,
     ParamTail: false,
     ParamGun: false,
+    ParamMouth1: false,
+    ParamMouth2: false,
+    ParamMouth3: false,
+    ParamMouth4: false,
+    ParamMouth5: false,
+    ParamMouth6: false,
   };
 
   $: shorthair = !parts_status.ParamHair;
@@ -45,6 +51,27 @@
       }),
     });
     parts_status[param] = !parts_status[param];
+  }
+
+  function toggleMouth(param) {
+    fetch("/api/parts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        param: param,
+        enable: true,
+      }),
+    });
+    parts_status[param] = true;
+    for (let i = 1; i <= 6; i++) {
+      let current = "ParamMouth" + String(i);
+      // set other mouth to false
+      if (current != param) {
+        parts_status[current] = false;
+      }
+    }
   }
 
   updatePartStatus();
@@ -109,7 +136,7 @@
     }}>眼镜</CheckboxButton
   >
 </ButtonGroup>
-<Label class="mt-4 mb-2">面部</Label>
+<Label class="mt-4 mb-2">脸颊</Label>
 <ButtonGroup>
   <CheckboxButton
     bind:checked={parts_status.ParamSweat}
@@ -128,6 +155,45 @@
     on:click={() => {
       toggleParts("ParamRedFace");
     }}>脸红</CheckboxButton
+  >
+</ButtonGroup>
+<Label class="mt-4 mb-2">嘴型</Label>
+<ButtonGroup>
+  <CheckboxButton
+    bind:checked={parts_status.ParamMouth1}
+    on:click={() => {
+      toggleMouth("ParamMouth1");
+    }}>嘴1</CheckboxButton
+  >
+  <CheckboxButton
+    bind:checked={parts_status.ParamMouth2}
+    on:click={() => {
+      toggleMouth("ParamMouth2");
+    }}>嘴2</CheckboxButton
+  >
+  <CheckboxButton
+    bind:checked={parts_status.ParamMouth3}
+    on:click={() => {
+      toggleMouth("ParamMouth3");
+    }}>嘴3</CheckboxButton
+  >
+  <CheckboxButton
+    bind:checked={parts_status.ParamMouth4}
+    on:click={() => {
+      toggleMouth("ParamMouth4");
+    }}>嘴4</CheckboxButton
+  >
+  <CheckboxButton
+    bind:checked={parts_status.ParamMouth5}
+    on:click={() => {
+      toggleMouth("ParamMouth5");
+    }}>嘴5</CheckboxButton
+  >
+  <CheckboxButton
+    bind:checked={parts_status.ParamMouth6}
+    on:click={() => {
+      toggleMouth("ParamMouth6");
+    }}>嘴6</CheckboxButton
   >
 </ButtonGroup>
 <Label class="mt-4 mb-2">下身</Label>

@@ -67,27 +67,50 @@ void PartStateManager::Toggle(const std::string& key, bool enable) {
   // construct expresion
   if (LAppPal::StartWith(entry.key, "ParamCloth")) {
     // create special expression that makes this key to 30 but others to 0
-    const vector<string> keys = {"ParamCloth1", "ParamCloth2", "ParamCloth3"};
     csmVector<CubismExpressionMotion::ExpressionParameter> parameters;
-    for (const string& key : keys) {
-      if (key == entry.key) {
+    for (const string& ckey : clothes_keys_) {
+      if (ckey == entry.key) {
         if (entry.getValue(model) == 30) {
           continue;
         }
         CubismExpressionMotion::ExpressionParameter param;
-        param.ParameterId = param_map_[key].id;
+        param.ParameterId = param_map_[ckey].id;
         param.BlendType = CubismExpressionMotion::ExpressionBlendType::Additive;
         param.Value = 30;
         parameters.PushBack(param);
         continue;
       }
       CubismExpressionMotion::ExpressionParameter param;
-      param.ParameterId = param_map_[key].id;
+      param.ParameterId = param_map_[ckey].id;
       param.BlendType = CubismExpressionMotion::ExpressionBlendType::Additive;
       param.Value = -30;
       parameters.PushBack(param);
     }
 
+    auto motion = CubismExpressionMotion::Create(parameters, 0.5f, 0.5f);
+    current->StartMotion(motion);
+    return;
+  }
+  if (LAppPal::StartWith(entry.key, "ParamMouth")) {
+    csmVector<CubismExpressionMotion::ExpressionParameter> parameters;
+    for (const string& mkey : mouth_keys_) {
+      if (mkey == entry.key) {
+        if (entry.getValue(model) == 30) {
+          continue;
+        }
+        CubismExpressionMotion::ExpressionParameter param;
+        param.ParameterId = param_map_[mkey].id;
+        param.BlendType = CubismExpressionMotion::ExpressionBlendType::Additive;
+        param.Value = 30;
+        parameters.PushBack(param);
+        continue;
+      }
+      CubismExpressionMotion::ExpressionParameter param;
+      param.ParameterId = param_map_[mkey].id;
+      param.BlendType = CubismExpressionMotion::ExpressionBlendType::Additive;
+      param.Value = -30;
+      parameters.PushBack(param);
+    }
     auto motion = CubismExpressionMotion::Create(parameters, 0.5f, 0.5f);
     current->StartMotion(motion);
     return;
