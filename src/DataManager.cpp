@@ -7,7 +7,7 @@
 #include <filesystem>
 
 bool DataManager::init() {
-  const std::string configPath = LAppDefine::documentPath + "/jpet.toml";
+  const std::wstring configPath = LAppDefine::documentPath + L"/jpet.toml";
   // check file existence
   if (!std::filesystem::exists(std::filesystem::path(configPath))) {
     // create a new config file
@@ -29,8 +29,8 @@ bool DataManager::init() {
   }
 
   // check reset marker
-  const std::string markerPath = LAppDefine::documentPath + "/.reset";
-  const std::string dataPath = LAppDefine::documentPath + "/jpet.dat";
+  const std::wstring markerPath = LAppDefine::documentPath + L"/.reset";
+  const std::wstring dataPath = LAppDefine::documentPath + L"/jpet.dat";
   if (IsResetMarked()) {
     std::filesystem::remove(std::filesystem::path(markerPath));
     std::filesystem::remove(std::filesystem::path(dataPath));
@@ -213,7 +213,7 @@ void DataManager::RemoveFollow(const std::string& uid) {
 }
 
 void DataManager::Save() {
-  const std::string configPath = LAppDefine::documentPath + "/jpet.toml";
+  const std::wstring configPath = LAppDefine::documentPath + L"/jpet.toml";
   std::ofstream file(configPath);
   if (!file.is_open()) {
     LAppPal::PrintLog("Failed to open config file for writing");
@@ -335,7 +335,7 @@ void DataManager::DumpTask(int id, int start_time, int end_time, int success,
 }
 
 void DataManager::SetResetMark() {
-  const std::string markerPath = LAppDefine::documentPath + "/.reset";
+  const std::wstring markerPath = LAppDefine::documentPath + L"/.reset";
   // check file existence
   if (!std::filesystem::exists(std::filesystem::path(markerPath))) {
     // create a new config file
@@ -351,7 +351,7 @@ void DataManager::SetResetMark() {
 }
 
 bool DataManager::IsResetMarked() {
-  const std::string markerPath = LAppDefine::documentPath + "/.reset";
+  const std::wstring markerPath = LAppDefine::documentPath + L"/.reset";
   // check file existence
   return std::filesystem::exists(std::filesystem::path(markerPath));
 }

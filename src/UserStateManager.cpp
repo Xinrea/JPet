@@ -82,8 +82,6 @@ void UserStateManager::CheckThread(const vector<string>& list) {
     _mutex.lock();
     std::vector<std::shared_ptr<UserStateWatcher>> watchers = _watchers;
     _mutex.unlock();
-    LAppPal::PrintLog("[UserStateManager]CheckThread running with %d watchers",
-                      watchers.size());
     for (auto watcher : watchers) {
       if (!_running) return;
       bool cookieValid = watcher->Check(_messageQueue);

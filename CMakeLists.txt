@@ -159,6 +159,7 @@ target_link_libraries(${APP_NAME}
   cpr::cpr
   cryptopp::cryptopp
   croncpp::croncpp
+  Dbghelp
 
   # Solve the MSVCRT confliction if using MSVC.
   debug -NODEFAULTLIB:libcmtd.lib

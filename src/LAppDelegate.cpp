@@ -715,7 +715,7 @@ void LAppDelegate::Snapshot() {
   std::unique_lock<std::mutex> lock(_mtx);
   _cv.wait(lock, [&]{return !_need_snapshot.load();});
 
-  const string filepath = LAppDefine::documentPath + "/snapshot.png";
+  const wstring filepath = LAppDefine::documentPath + L"/snapshot.png";
   OPENFILENAME ofn; // Common dialog box structure
   wchar_t szFile[260] = L"snapshot.png\0"; // Buffer for file name
 
@@ -735,13 +735,13 @@ void LAppDelegate::Snapshot() {
 
   if (GetSaveFileName(&ofn) == TRUE) {
     // Use ofn.lpstrFile here to open the file for writing
-    CopyFile(LAppPal::StringToWString(filepath).c_str(), ofn.lpstrFile, TRUE);
+    CopyFile(filepath.c_str(), ofn.lpstrFile, TRUE);
   }
 }
 
 void LAppDelegate::doSnapshot() {
   LAppPal::PrintLog(LogLevel::Info, "[LAppDelegate]Do snapshot");
-  const string filepath = LAppDefine::documentPath + "/snapshot.png";
+  const wstring filepath = LAppDefine::documentPath + L"/snapshot.png";
   int width, height;
   glfwGetFramebufferSize(_window, &width, &height);
   GLsizei nrChannels = 4;
@@ -753,7 +753,7 @@ void LAppDelegate::doSnapshot() {
   glReadBuffer(GL_FRONT);
   glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
   stbi_flip_vertically_on_write(true);
-  stbi_write_png(filepath.c_str(), width, height, nrChannels, buffer.data(), stride);
+  stbi_write_png(LAppPal::WStringToString(filepath).c_str(), width, height, nrChannels, buffer.data(), stride);
   _need_snapshot.store(false);
   _cv.notify_one();
 }

@@ -117,6 +117,6 @@ extern const csmChar *startAudioFile;
 extern const csmChar *dragAudioFile;
 extern const csmChar *endAudioFile;
 
-extern std::string documentPath;
+extern std::wstring documentPath;
 extern std::wstring execPath;
 }  // namespace LAppDefine

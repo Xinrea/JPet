@@ -35,50 +35,7 @@
     }
   }, 1000);
 
-  let taskList = [
-    {
-      cost: 60,
-      desc: "拧开可乐的瓶盖",
-      repeatable: false,
-      id: 1,
-      requirements: {
-        endurance: 10,
-        speed: 10,
-      },
-      rewards: {
-        exp: 100,
-      },
-      start_time: 0,
-      end_time: 0,
-      success: false,
-      status: 0,
-      title: "拧瓶盖",
-      rate: 0,
-    },
-    {
-      cost: 120,
-      desc: "Task 2 description",
-      repeatable: false,
-      id: 2,
-      requirements: {
-        strength: 10,
-        will: 10,
-      },
-      rewards: {
-        intellect: 30,
-      },
-      special: {
-        title: "新衣装2",
-        desc: "解锁新衣装，解锁后可在总览页面切换",
-      },
-      start_time: 1722510877,
-      end_time: 0,
-      success: true,
-      status: 0,
-      title: "Task 2",
-      rate: 0,
-    },
-  ];
+  let taskList = [];
 
   function updateStatus() {
     fetch("/api/task")
@@ -122,6 +79,7 @@
   }
 
   function confirmTask(task) {
+    let should_reward = task.success;
     const id = task.id;
     fetch(`/api/task/${id}/confirm`, {
       method: "POST",
@@ -131,8 +89,10 @@
         currentTask = data.current;
         taskList = data.list;
         // show rewards
-        rewardModal = true;
-        rewardTask = task;
+        if (should_reward) {
+          rewardModal = true;
+          rewardTask = task;
+        }
       });
   }
 

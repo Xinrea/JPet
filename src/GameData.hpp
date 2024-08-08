@@ -140,7 +140,7 @@ class Entry {
  */
 class GameData {
  private:
-  std::string _path;
+  std::wstring _path;
   std::unordered_map<std::string, Entry> _m;
   std::mutex _mutex;
 
@@ -155,7 +155,7 @@ class GameData {
   }
 
  public:
-  GameData(const std::string& path) : _path(path) {
+  GameData(const std::wstring& path) : _path(path) {
     // load data from file, if file not exist, create one
     if (!std::filesystem::exists(std::filesystem::path(_path))) {
       std::ofstream file(_path);
