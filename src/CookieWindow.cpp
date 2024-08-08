@@ -123,12 +123,9 @@ void CookieWindow::WindowProc() {
                                 std::string str(wstr.begin(), wstr.end());
                                 if (str[0] == 'C') {
                                   cookie = str.substr(1);
+                                  LAppPal::PrintLog(LogLevel::Info, "[CookieWindow]New cookie received");
                                 } else if (str[0] == 'U') {
                                   userAgent = str.substr(1);
-                                }
-                                if (_visible) {
-                                  ShowWindow(_window, SW_HIDE);
-                                  _visible = false;
                                 }
                                 return S_OK;
                               })
@@ -156,7 +153,7 @@ void CookieWindow::WindowProc() {
                               .Get(),
                           &token);
                       webview->Navigate(
-                          L"https://space.bilibili.com/61639371/dynamic");
+                          L"https://space.bilibili.com/475210/dynamic");
 
                       // fix webview not render in hidden-created window
                       webviewController->put_IsVisible(true);
@@ -171,8 +168,8 @@ void CookieWindow::WindowProc() {
 
 void CookieWindow::Show() {
   if (_window) {
+    webview->Reload();
     ShowWindow(_window, SW_SHOWNORMAL);
-    _visible = true;
   }
 }
 
