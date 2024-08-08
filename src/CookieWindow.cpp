@@ -70,6 +70,7 @@ void CookieWindow::WindowProc() {
 
   LAppPal::PrintLog(LogLevel::Debug, "[CookieWindow]Window: %p", _window);
 
+  SetWindowPos(_window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
   SetWindowLongPtr(_window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
   ShowWindow(_window, SW_HIDE);
