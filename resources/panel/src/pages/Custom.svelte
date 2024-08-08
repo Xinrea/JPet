@@ -1,5 +1,12 @@
 <script>
-  import { Label, ButtonGroup, CheckboxButton } from "flowbite-svelte";
+  import {
+    Label,
+    ButtonGroup,
+    Tooltip,
+    Button,
+    CheckboxButton,
+  } from "flowbite-svelte";
+  import PhotoIcon from "../assets/photo.svg";
 
   export let current = 0;
 
@@ -27,6 +34,12 @@
   };
 
   $: shorthair = !parts_status.ParamHair;
+
+  function snapshot() {
+    fetch("/api/snapshot", {
+      method: "POST",
+    });
+  }
 
   function updatePartStatus() {
     fetch("/api/parts")
@@ -226,3 +239,12 @@
     }}>枪</CheckboxButton
   >
 </ButtonGroup>
+
+<div class="flex justify-center w-full mt-8 fixed bottom-8">
+  <Button on:click={snapshot}
+    ><img src={PhotoIcon} height="24px" width="24px" alt="" /><span class="ml-2"
+      >拍张照</span
+    ></Button
+  >
+  <Tooltip>获取一张 PNG 截图</Tooltip>
+</div>

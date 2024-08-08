@@ -18,6 +18,8 @@ class DataManager {
 
   void PostProcess(const std::string& key, int value);
 
+  void initNotifySection();
+
  public:
   ~DataManager() { Save(); };
 

@@ -1,9 +1,8 @@
-﻿
-#ifndef WINHANDLER_H
-#define WINHANDLER_H
+﻿#pragma once
+
 #include <string>
 
-#include "wintoastlib.h"
+#include <wintoastlib.h>
 
 // WinToastEventHandler only handles the toast events to open none-unicode URLs
 class WinToastEventHandler : public WinToastLib::IWinToastHandler {
@@ -17,5 +16,3 @@ class WinToastEventHandler : public WinToastLib::IWinToastHandler {
   void toastDismissed(WinToastDismissalReason state) const;
   void toastFailed() const;
 };
-
-#endif

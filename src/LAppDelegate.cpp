@@ -10,17 +10,18 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <mutex>
+#include <winbase.h>
 
-#include <fstream>
-#include <iostream>
-#include <queue>
-#include <sstream>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <CommCtrl.h>
+#include <commdlg.h>
 #include <GLFW/glfw3native.h>
 #include <VersionHelpers.h>
-#include <WinUser.h>
-#include <windows.h>
+
+#define STBI_MSC_SECURE_CRT
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 
 #include "DataManager.hpp"
 #include "LAppDefine.hpp"
@@ -33,8 +34,6 @@
 #include "ModelManager.hpp"
 #include "PanelServer.hpp"
 #include "PartStateManager.h"
-#include "StateMessage.hpp"
-#include "TouchManager.hpp"
 #include "TaskScheduler.hpp"
 #include "resource.h"
 
@@ -365,6 +364,10 @@ void LAppDelegate::Run() {
 
     // バッファの入れ替え
     glfwSwapBuffers(_window);
+
+    if (_need_snapshot.load()) {
+      doSnapshot();
+    }
 
     // Poll for and process events
     glfwPollEvents();
@@ -705,4 +708,52 @@ std::thread LAppDelegate::MenuThread() {
 void LAppDelegate::ShowPanel() {
   if (_panel) _panel->Show();
   PanelServer::GetInstance()->Notify("123");
+}
+
+void LAppDelegate::Snapshot() {
+  _need_snapshot.store(true);
+  std::unique_lock<std::mutex> lock(_mtx);
+  _cv.wait(lock, [&]{return !_need_snapshot.load();});
+
+  const string filepath = LAppDefine::documentPath + "/snapshot.png";
+  OPENFILENAME ofn; // Common dialog box structure
+  wchar_t szFile[260] = L"snapshot.png\0"; // Buffer for file name
+
+  HWND hwnd = glfwGetWin32Window(_window);
+
+  ZeroMemory(&ofn, sizeof(ofn));
+  ofn.lStructSize = sizeof(ofn);
+  ofn.hwndOwner = hwnd;
+  ofn.lpstrFile = szFile;
+  ofn.nMaxFile = sizeof(szFile);
+  ofn.lpstrFilter = L"PNG Files (*.png)\0*.png\0";
+  ofn.nFilterIndex = 1;
+  ofn.lpstrFileTitle = NULL;
+  ofn.nMaxFileTitle = 0;
+  ofn.lpstrInitialDir = NULL;
+  ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+  if (GetSaveFileName(&ofn) == TRUE) {
+    // Use ofn.lpstrFile here to open the file for writing
+    CopyFile(LAppPal::StringToWString(filepath).c_str(), ofn.lpstrFile, TRUE);
+  }
+}
+
+void LAppDelegate::doSnapshot() {
+  LAppPal::PrintLog(LogLevel::Info, "[LAppDelegate]Do snapshot");
+  const string filepath = LAppDefine::documentPath + "/snapshot.png";
+  int width, height;
+  glfwGetFramebufferSize(_window, &width, &height);
+  GLsizei nrChannels = 4;
+  GLsizei stride = nrChannels * width;
+  stride += (stride % 4) ? (4 - stride % 4) : 0;
+  GLsizei bufferSize = stride * height;
+  std::vector<char> buffer(bufferSize);
+  glPixelStorei(GL_PACK_ALIGNMENT, 4);
+  glReadBuffer(GL_FRONT);
+  glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
+  stbi_flip_vertically_on_write(true);
+  stbi_write_png(filepath.c_str(), width, height, nrChannels, buffer.data(), stride);
+  _need_snapshot.store(false);
+  _cv.notify_one();
 }

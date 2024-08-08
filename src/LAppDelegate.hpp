@@ -12,6 +12,8 @@
 #include <GLFW/glfw3.h>
 #include <Windows.h>
 #include <shellapi.h>
+#include <atomic>
+#include <condition_variable>
 
 #include <string>
 
@@ -19,6 +21,7 @@
 #include "GamePanel.hpp"
 #include "LAppAllocator.hpp"
 #include "UserStateManager.h"
+
 
 class LAppView;
 class LAppTextureManager;
@@ -175,6 +178,11 @@ class LAppDelegate {
   void AppEnd() { _isEnd = true; }
 
   LAppTextureManager *GetTextureManager() { return _textureManager; }
+  
+  /**
+   * @brief take a snapshot
+   */
+  void Snapshot();
 
  private:
   /**
@@ -198,7 +206,11 @@ class LAppDelegate {
   bool CheckShader(GLuint shaderId);
 
   void Menu();
+  
   std::thread MenuThread();
+
+  
+  void doSnapshot();
 
   LAppAllocator _cubismAllocator;              ///< Cubism SDK Allocator
   Csm::CubismFramework::Option _cubismOption;  ///< Cubism SDK Option
@@ -241,6 +253,10 @@ class LAppDelegate {
   int _windowHeight;  ///< Initialize関数で設定したウィンドウ高さ
 
   HICON appIcon;
+
+  atomic_bool _need_snapshot;
+  std::mutex _mtx;
+  std::condition_variable _cv;
 };
 
 class EventHandler {

@@ -6,8 +6,6 @@
 #include <map>
 #include <time.h>
 
-#include "LAppPal.hpp"
-#include "wintoastlib.h"
 #include "WinToastEventHandler.h"
 
 using std::map;

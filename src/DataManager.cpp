@@ -146,22 +146,30 @@ void DataManager::IsTracking(bool enable) {
   other->insert_or_assign("track", enable);
 }
 
-void DataManager::GetNotify(bool *dynamic, bool *live, bool *update) {
-  // get followList, dynamic, live, update from data
-  if (data.contains("notify")) {
+void DataManager::initNotifySection() {
+  if (!data.contains("notify")) {
+    data.insert("notify", toml::table{});
     auto notifyTable = data.at("notify").as_table();
-    *dynamic = notifyTable->at("dynamic").value_or(false);
-    *live = notifyTable->at("live").value_or(false);
-    *update = notifyTable->at("update").value_or(false);
+    notifyTable->insert("followList", toml::array{});
+    notifyTable->insert("dynamic", true);
+    notifyTable->insert("live", true);
+    notifyTable->insert("update", true);
   }
+}
+
+void DataManager::GetNotify(bool *dynamic, bool *live, bool *update) {
+  initNotifySection();
+  // get followList, dynamic, live, update from data
+  auto notifyTable = data.at("notify").as_table();
+  *dynamic = notifyTable->at("dynamic").value_or(true);
+  *live = notifyTable->at("live").value_or(true);
+  *update = notifyTable->at("update").value_or(true);
 }
 
 void DataManager::UpdateNotify(
                                bool dynamic, bool live, bool update) {
   // update followList, dynamic, live, update in data
-  if (!data.contains("notify")) {
-    data.insert("notify", toml::table{});
-  }
+  initNotifySection();
   auto notifyTable = data.at("notify").as_table();
   notifyTable->insert_or_assign("dynamic", dynamic);
   notifyTable->insert_or_assign("live", live);
@@ -170,10 +178,7 @@ void DataManager::UpdateNotify(
 
 std::vector<std::string> DataManager::GetFollowList() {
   std::vector<std::string> ret;
-  if (!data.contains("notify")) {
-    data.insert("notify", toml::table{});
-    data["notify"].as_table()->insert("followList", toml::array{});
-  }
+  initNotifySection();
   auto notifyTable = data.at("notify").as_table();
   auto& followListArray = *notifyTable->get_as<toml::array>("followList");
   for (const auto& follow : followListArray) {

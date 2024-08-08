@@ -1,9 +1,10 @@
 #include "PanelServer.hpp"
 #include "DataManager.hpp"
 #include "GameTask.hpp"
-#include "LAppDelegate.hpp"
+#include "LAppDefine.hpp"
 #include "LAppPal.hpp"
 #include "PartStateManager.h"
+#include "LAppDelegate.hpp"
 
 void PanelServer::Start() {
   // start thread
@@ -435,6 +436,10 @@ void PanelServer::doServe() {
     }
     nlohmann::json resp = {{"watch_list", followListJson}};
     res.set_content(resp.dump(), "application/json");
+  });
+  server->Post("/api/snapshot", [](const httplib::Request &req,
+                                          httplib::Response &res) {
+      LAppDelegate::GetInstance()->Snapshot();
   });
 
   initSSE();
