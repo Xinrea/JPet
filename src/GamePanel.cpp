@@ -58,7 +58,7 @@ void GamePanel::WindowProc() {
     return;
   }
 
-  _window = CreateWindow(L"GamePanel", L"GamePanel", WS_OVERLAPPED | WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU,
+  _window = CreateWindow(L"GamePanel", L"设置面板", WS_OVERLAPPED | WS_CAPTION | WS_MINIMIZEBOX | WS_SYSMENU,
                          CW_USEDEFAULT, CW_USEDEFAULT, 800, 1300, NULL, NULL,
                          _instance, NULL);
 
