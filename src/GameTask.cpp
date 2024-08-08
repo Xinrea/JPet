@@ -55,6 +55,7 @@ void GameTask::TryDone() {
         lack += it->second - value;
       }
     }
+    srand(time(NULL));
     // if lack attribute for 20 or more
     if (lack >= 20) {
       // immediately fail
@@ -66,6 +67,8 @@ void GameTask::TryDone() {
       // every lack of attribute will reduce 2% -> 4
       // every will will increase 0.5% -> 1
       lack *= 4;
+      // if lack is 0, the full rate is 80%
+      lack += 40;
       lack -= will;
       if (lack < 0) {
         lack = 0;
