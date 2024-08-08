@@ -15,4 +15,9 @@ CompileFlags:
 		- "FRAMEWORK_SOURCE=OpenGL"
 		- "-D"
 		- "CSM_TARGET_WIN_GL"
-
+		- "-D"
+		- "CPPHTTPLIB_OPENSSL_SUPPORT"
+		- "-D"
+		- "WIN32_LEAN_AND_MEAN"
+		- "D"
+		- "_HAS_STD_BYTE=0"

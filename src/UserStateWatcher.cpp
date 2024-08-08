@@ -8,8 +8,6 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
-#include <iostream>
-
 #include "LAppDefine.hpp"
 using namespace LAppDefine;
 
@@ -167,12 +165,12 @@ bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
                              .at("text")
                              .get<string>();
         }
-        // if (lastTime != 0) {
-        if (latest > lastTime) {
-          messageQueue.push(StateMessage(MessageType::DynamicMessage, target,
-                                         dynamic_id, dynamic_desc));
+        if (lastTime != 0) {
+          if (latest > lastTime) {
+            messageQueue.push(StateMessage(MessageType::DynamicMessage, target,
+                                           dynamic_id, dynamic_desc));
+          }
         }
-        // }
         lastTime = latest;
       } else {
         LAppPal::PrintLog("[UserStateWatcher][%s]Fetch dynamic failed %d",
