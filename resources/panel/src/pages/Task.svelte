@@ -201,12 +201,14 @@
             />
           {/each}
         </div>
+        {#if Object.entries(currentTask.rewards).length > 0}
         <div class="text-gray-500 mb-1 align-middle">
           <span class="badge warn">奖励</span>
           {#each Object.entries(currentTask.rewards) as [key, value]}
             <AttributeIcon attribute={key} {value} fullfill />
           {/each}
         </div>
+        {/if}
         {#if currentTask.special}
           <div class="text-gray-500 mb-1 align-middle">
             <span
@@ -275,6 +277,7 @@
                   />
                 {/each}
               </div>
+              {#if Object.entries(task.rewards).length > 0}
               <div class="text-gray-500 mb-1 align-middle">
                 <span
                   class="badge warn
@@ -284,6 +287,7 @@
                   <AttributeIcon attribute={key} {value} fullfill />
                 {/each}
               </div>
+              {/if}
               {#if task.special}
                 <div class="text-gray-500 mb-1 align-middle">
                   <span
