@@ -13,12 +13,13 @@
   import Progress from "../components/Progress.svelte";
 
   const clothesImages = [imgClothes1, imgClothes2, imgClothes3];
+  const attributeArray = ["speed", "endurance", "strength", "will", "intellect"];
 
   export let clothes = {
     current: 0,
-    unlock: [true, false, false]
+    unlock: [true, false, false],
   };
-  
+
   let clothesList = [
     {
       id: 0,
@@ -52,7 +53,9 @@
   $: will = attributes.will;
   $: intellect = attributes.intellect;
   $: buycost = Math.floor(10 * Math.pow(1.5, attributes.buycnt));
-  $: revertgain = Math.floor(10 * Math.pow(1.5, Math.max(attributes.buycnt - 1, 0)) / 2);
+  $: revertgain = Math.floor(
+    (10 * Math.pow(1.5, Math.max(attributes.buycnt - 1, 0))) / 2,
+  );
 
   // current time to next time point
   let timeToNextPoint = 60 - new Date().getSeconds();
@@ -69,8 +72,8 @@
       return;
     }
     fetch(`/api/attr/${targetAttr}`, { method: "POST" })
-      .then(res => res.json())    
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         console.log(data);
       });
   }
@@ -79,8 +82,8 @@
       alert("属性值不足");
     }
     fetch(`/api/attr/${targetAttr}`, { method: "DELETE" })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         console.log(data);
       });
   }
@@ -126,40 +129,39 @@
         >
       </tr>
       <tr>
-        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "speed"; }}/> <span>{speed}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
-            addModal = true;
-            targetAttr = "speed";
-          }
-        } /></span></td>
-        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "endurance"; }}/><span>{endurance}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
-            addModal = true;
-            targetAttr = "endurance";
-          }
-        } /></span></td>
-        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "strength"; }}/><span>{strength}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
-            addModal = true;
-            targetAttr = "strength";
-          }
-        } /></span></td>
-        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "will"; }}/><span>{will}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
-            addModal = true;
-            targetAttr = "will";
-          }
-        } /></span></td>
-        <td><span class="flex justify-center align-middle"><img class="icon-button mr-2" src={minusIcon} alt="" on:click={()=>{ revertModal = true; targetAttr = "intellect"; }}/><span>{intellect}</span><img class="icon-button ml-2" src={addIcon} alt="" on:click={()=> {
-            addModal = true;
-            targetAttr = "intellect";
-          }
-        } /></span></td>
+        {#each attributeArray as attr}
+        <td
+          ><span class="flex justify-center align-middle"
+            ><button
+              on:click={() => {
+                revertModal = true;
+                targetAttr = attr;
+              }}><img class="icon-button mr-2" src={minusIcon} alt="" /></button
+            >
+            <span>{attributes[attr]}</span>
+            <button
+              on:click={() => {
+                addModal = true;
+                targetAttr = attr;
+              }}><img class="icon-button ml-2" src={addIcon} alt="" /></button
+            ></span
+          ></td
+        >
+        {/each}
       </tr>
     </table>
     <Modal title="属性加点" bind:open={addModal} size="xs" autoclose>
-      <h3 class="mb-5 text-lg font-normal text-gray-500">此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？</h3>
-      <Button disabled={currentExp < buycost} on:click={attrHandle}>确认</Button>
+      <h3 class="mb-5 text-lg font-normal text-gray-500">
+        此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？
+      </h3>
+      <Button disabled={currentExp < buycost} on:click={attrHandle}>确认</Button
+      >
       <Button color="alternative">取消</Button>
     </Modal>
     <Modal title="属性撤销" bind:open={revertModal} size="xs" autoclose>
-      <h3 class="mb-5 text-lg font-normal text-gray-500">此次操作会返还 {revertgain} EXP，确认撤销吗？</h3>
+      <h3 class="mb-5 text-lg font-normal text-gray-500">
+        此次操作会返还 {revertgain} EXP，确认撤销吗？
+      </h3>
       <Button on:click={revertHandle}>确认</Button>
       <Button color="alternative">取消</Button>
     </Modal>
@@ -184,8 +186,15 @@
   </div>
   <div class="flex justify-center w-full mt-8 fixed bottom-8">
     {#each clothesList as c, i}
-      <div role="button" on:click={() => changeClothes(i)} class="choice-item" class:disabled={!clothes.unlock[i]} style="background-image: url({clothesImages[i]});">
-      </div>
+      <div
+        tabindex={i}
+        on:keypress={()=>{}}
+        role="button"
+        on:click={() => changeClothes(i)}
+        class="choice-item"
+        class:disabled={!clothes.unlock[i]}
+        style="background-image: url({clothesImages[i]});"
+      ></div>
       {#if !clothes.unlock[i]}
         <Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>
       {/if}
@@ -258,5 +267,4 @@
   .choice-item:last-child {
     margin-right: 0;
   }
-
 </style>
