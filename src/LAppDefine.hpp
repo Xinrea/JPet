@@ -48,10 +48,6 @@ extern const csmChar
                   ///< ディレクトリ名とmodel3.jsonの名前を一致させておく.
 extern const csmInt32 ModelDirSize;  ///< モデルディレクトリ配列のサイズ
 
-extern const csmInt32 StartAudioNum;
-extern const csmInt32 IdleAudioNum;
-extern const csmInt32 TouchAudioNum;
-
 // 外部定義ファイル(json)と合わせる
 extern const csmChar
     *MotionGroupIdle;  ///< アイドリング時に再生するモーションのリスト

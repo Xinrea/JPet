@@ -86,10 +86,6 @@ class LAppLive2DManager {
    */
   void InitScene();
 
-  void PlayTouchAudio(std::string filename);
-
-  void PlayRandomTouchAudio();
-
   /**
    * @brief   モデル個数を得る
    * @return  所持モデル個数

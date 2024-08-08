@@ -7,6 +7,7 @@
  */
 
 #include "LAppDelegate.hpp"
+#include "AudioManager.hpp"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -234,8 +235,7 @@ bool LAppDelegate::Initialize() {
   srand(time(NULL));
 
   // 随机播放启动语音
-  _au->Play3dSound("resources/audios/s0" +
-                   to_string(rand() % StartAudioNum + 1) + ".mp3");
+  _au->Play3dSound(AudioType::START, rand());
 
   // Start panel server
   auto panelServer = PanelServer::GetInstance();
@@ -299,6 +299,7 @@ void LAppDelegate::Release() {
 }
 
 void LAppDelegate::Run() {
+  static double initial_audio_idle_time = glfwGetTime();
   // メインループ
   bool noskip = false;
   while (glfwWindowShouldClose(_window) == GL_FALSE && !_isEnd) {
@@ -371,6 +372,13 @@ void LAppDelegate::Run() {
 
     // Poll for and process events
     glfwPollEvents();
+
+    if (glfwGetTime() - initial_audio_idle_time > 30.0f) {
+      initial_audio_idle_time = glfwGetTime();
+      if (rand() % 100 >= 90) {
+        _au->Play3dSound(AudioType::IDLE);
+      }
+    }
 
     static float scale = _scale;
     static bool isShowing = false;
@@ -505,6 +513,7 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
       _captured = true;
       glfwGetCursorPos(window, &_cX, &_cY);
       _view->OnTouchesBegan(_mouseX, _mouseY);
+      _au->Play3dSound(AudioType::CLICK);
       // set expression
     } else if (GLFW_RELEASE == action) {
       if (_captured) {

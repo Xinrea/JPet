@@ -109,27 +109,6 @@ void LAppLive2DManager::OnFollow() {
   LAppPal::PrintLog(LogLevel::Debug, "[Live2DManager]New Follow");
 }
 
-void LAppLive2DManager::PlayTouchAudio(string filename) {
-  std::random_device rd;
-  std::mt19937 generator(rd());
-  std::uniform_int_distribution<int> d1(1, 100);
-  if (d1(generator) > 70) {
-    // 播放特定语音
-    AudioManager::GetInstance()->Play3dSound("resources/audios/" + filename);
-  } else {
-    // 播放一般语音
-    PlayRandomTouchAudio();
-  }
-}
-
-void LAppLive2DManager::PlayRandomTouchAudio() {
-  std::random_device rd;
-  std::mt19937 generator(rd());
-  std::uniform_int_distribution<int> d(1, TouchAudioNum);
-  AudioManager::GetInstance()->Play3dSound("resources/audios/r0" +
-                                           to_string(d(generator)) + ".mp3");
-}
-
 void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
   // TODO: 添加动作表情和声音
   LAppPal::PrintLog(LogLevel::Debug,

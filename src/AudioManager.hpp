@@ -1,10 +1,16 @@
 ﻿#include <map>
+#include <vector>
 #include <string>
 
 #include "fmod.hpp"
 #pragma once
 using std::map;
-using std::string;
+using std::vector;
+using std::wstring;
+
+enum class AudioType {
+ START, IDLE, CLICK
+};
 
 class AudioManager {
  public:
@@ -14,7 +20,9 @@ class AudioManager {
   static void ReleaseInstance();
   bool Initialize();
   bool IsPlay();
-  void Play3dSound(const string &audioFile);
+  void Play3dSound(AudioType t, int no);
+  void Play3dSound(AudioType t);
+  void Play3dSound(const wstring& file);
   void SetVolume(float v) { _volume = v; }
   float GetVolume() const { return _volume; }
   void SetMute(bool m) { _mute = m; }
@@ -25,7 +33,10 @@ class AudioManager {
  private:
   FMOD::System *_system;
   FMOD::Channel *_channel;
-  map<string, FMOD::Sound *> sounds;
+  map<wstring, FMOD::Sound *> sounds;
+  vector<wstring> start_audios_;
+  vector<wstring> idle_audios_;
+  vector<wstring> click_audios_;
   float _volume = 5.0f;
   bool _mute = false;
 };

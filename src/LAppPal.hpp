@@ -10,6 +10,7 @@
 
 #include <CubismFramework.hpp>
 #include <fstream>
+#include <vector>
 #include <string>
 
 enum class LogLevel { Debug, Info, Warn, Error };
@@ -65,6 +66,8 @@ class LAppPal {
    */
   static void PrintLog(const Csm::csmChar* format, ...);
 
+  static void PrintLog(LogLevel level, const wchar_t* format, ...);
+
   static void PrintLog(LogLevel level, const Csm::csmChar* format, ...);
 
   /**
@@ -93,6 +96,15 @@ class LAppPal {
     return false;
   }
 
+  static bool StartWith(const std::wstring& str, const std::wstring& prefix) {
+    if (str.length() >= prefix.length()) {
+      return str.compare(0, prefix.length(), prefix) == 0;
+    }
+    return false;
+  }
+
+  static std::vector<std::wstring> ListFolder(const std::wstring& folder_path);
+
   /**
    * @brief ease function
    * @param x [0,100]
@@ -104,5 +116,5 @@ class LAppPal {
   static double s_currentFrame;
   static double s_lastFrame;
   static double s_deltaTime;
-  static std::fstream s_logFile;
+  static std::wfstream s_logFile;
 };

@@ -13,15 +13,13 @@
 
 #include <Model/CubismMoc.hpp>
 #include <cstdarg>
-#include <cstdio>
 #include <iostream>
-#include <mutex>
 #include <codecvt>
 #include <locale>
+#include <windows.h>
 
 #include "LAppDefine.hpp"
 
-using std::endl;
 using namespace Csm;
 using namespace std;
 using namespace LAppDefine;
@@ -29,7 +27,7 @@ using namespace LAppDefine;
 double LAppPal::s_currentFrame = 0.0;
 double LAppPal::s_lastFrame = 0.0;
 double LAppPal::s_deltaTime = 0.0;
-std::fstream LAppPal::s_logFile(documentPath + L"/jpet.log",
+std::wfstream LAppPal::s_logFile(documentPath + L"/jpet.log",
                                 std::ios::out | std::ios::app);
 
 csmByte* LAppPal::LoadFileAsBytes(const string& filePath, csmSizeInt* outSize) {
@@ -85,9 +83,33 @@ void LAppPal::PrintLog(const csmChar* format, ...) {
   struct tm* pnow = localtime(&now);
   char timebuf[32];
   strftime(timebuf, sizeof(timebuf), "[%Y-%m-%d %H:%M:%S]", pnow);
-  s_logFile << timebuf << "[INFO]" << buf << std::endl;
-  std::cerr << timebuf << "[INFO]" << buf << std::endl;
+  wstring output = StringToWString(string(timebuf) + "[INFO]" + buf);
+  s_logFile << output << std::endl;
+  std::wcerr << output << std::endl;
 #endif
+  va_end(args);
+}
+
+void LAppPal::PrintLog(LogLevel level, const wchar_t* format, ...) {
+  if (!DebugLogEnable && level == LogLevel::Debug) {
+    return;
+  }
+  va_list args;
+  wchar_t buf[4096];
+  va_start(args, format);
+  vswprintf_s(buf, sizeof(buf) / sizeof(wchar_t), format, args);  // 標準出力でレンダリング
+  // add time info
+  time_t now = time(nullptr);
+  struct tm* pnow = localtime(&now);
+  wchar_t timebuf[64];
+  wcsftime(timebuf, sizeof(timebuf), L"[%Y-%m-%d %H:%M:%S]", pnow);
+  wstring levelStr = L"[INFO]";
+  if (level == LogLevel::Debug) levelStr = L"[DEBUG]";
+  if (level == LogLevel::Info) levelStr = L"[INFO]";
+  if (level == LogLevel::Warn) levelStr = L"[WARN]";
+  if (level == LogLevel::Error) levelStr = L"[ERROR]";
+  s_logFile << timebuf << levelStr << buf << std::endl;
+  std::wcerr << timebuf << levelStr << buf << std::endl;
   va_end(args);
 }
 
@@ -113,8 +135,9 @@ void LAppPal::PrintLog(LogLevel level, const csmChar* format, ...) {
   if (level == LogLevel::Info) levelStr = "[INFO]";
   if (level == LogLevel::Warn) levelStr = "[WARN]";
   if (level == LogLevel::Error) levelStr = "[ERROR]";
-  s_logFile << timebuf << levelStr << buf << std::endl;
-  std::cerr << timebuf << levelStr << buf << std::endl;
+  wstring output = StringToWString(timebuf + levelStr + buf);
+  s_logFile << output << std::endl;
+  std::wcerr << output << std::endl;
 #endif
   va_end(args);
 }
@@ -143,4 +166,25 @@ double LAppPal::EaseInOut(int x) {
     return 30.0 * (1.0 - pow(1 - 0.03 * double(x), 3));
   }
   return 100 * (1 - 0.5 * pow(-0.03 * double(x) + 2.94, 3));
+}
+
+
+std::vector<std::wstring> LAppPal::ListFolder(const std::wstring& folder_path) {
+    std::vector<std::wstring> ret;
+    std::wstring searchPath = folder_path + L"\\*.mp3";
+    WIN32_FIND_DATAW findData;
+    HANDLE hFind = FindFirstFileW(searchPath.c_str(), &findData);
+
+    if (hFind != INVALID_HANDLE_VALUE) {
+        do {
+            // 检查是不是目录，如果不是目录则输出文件名
+            if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+                ret.push_back(std::wstring(findData.cFileName));
+            }
+        } while (FindNextFileW(hFind, &findData));
+        FindClose(hFind);
+    } else {
+        std::wcout << L"Failed to read directory." << std::endl;
+    }
+  return ret;
 }

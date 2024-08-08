@@ -35,10 +35,6 @@ const csmChar *OptionImg = "imgs/message.png";
 // モデルを配置したディレクトリ名の配列
 // ディレクトリ名とmodel3.jsonの名前を一致させておくこと
 
-const csmInt32 StartAudioNum = 9;
-const csmInt32 IdleAudioNum = 7;
-const csmInt32 TouchAudioNum = 5;
-
 // 外部定義ファイル(json)と合わせる
 const csmChar *HitAreaSetting = "HitAreaHairBall";
 const csmChar *HitAreaNameHead = "AreaHead";

@@ -37,7 +37,6 @@ void DeleteBuffer(csmByte* buffer, const csmChar* path = "") {
 }
 
 void FinishedMotion(ACubismMotion* self) {
-  LAppDelegate::GetInstance()->InMotion = false;
   PartStateManager::GetInstance()->SnapshotState();
   LAppPal::PrintLog(LogLevel::Debug, "[Model]Motion finished");
 }
@@ -458,11 +457,6 @@ CubismMotionQueueEntryHandle LAppModel::StartMotion(
 
   // voice
   csmString voice = _modelSetting->GetMotionSoundFileName("All", no);
-  if (strcmp(voice.GetRawString(), "") != 0) {
-    csmString path = voice;
-    path = _modelHomeDir + path;
-    AudioManager::GetInstance()->Play3dSound(path.GetRawString());
-  }
 
   LAppPal::PrintLog(LogLevel::Debug, "[Model]Start motion: [%s_%d]", "All", no);
   return _motionManager->StartMotionPriority(motion, autoDelete, priority);
@@ -555,7 +549,6 @@ void LAppModel::StartMotion(ACubismMotion* motion) {
     return;
   }
   motion->SetFinishedMotionHandler(FinishedMotion);
-  LAppDelegate::GetInstance()->InMotion = true;
   _motionManager->StartMotionPriority(motion, true, PriorityForce);
 }
 
