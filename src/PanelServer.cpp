@@ -276,7 +276,7 @@ void PanelServer::doServe() {
         if (task->repeatable) {
             task->status = TStatus::IDLE;
         } else {
-            task->status = TStatus::ARCHIVED;
+            task->status = task->success ? TStatus::ARCHIVED : TStatus::IDLE;
         }
         task->Dump();
         auto data = getTaskStatus();
