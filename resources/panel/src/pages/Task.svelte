@@ -99,7 +99,11 @@
   function formatRemain(s) {
     let str = "";
     if (s >= 60) {
-      str += Math.floor(s / 60) + "m";
+      let minutes = Math.floor(s / 60);
+      if (minutes >= 60) {
+        str += Math.floor(minutes / 60) + "h";
+      }
+      str += (minutes % 60) + "m";
     }
     str += (s % 60) + "s";
     return str;
@@ -171,7 +175,7 @@
         {:else}
           <span class="flex items-center">
             <span
-              >剩余时长：{timeRemain == 0
+              >{timeRemain == 0
                 ? "⌛"
                 : formatRemain(timeRemain)}</span
             >
