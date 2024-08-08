@@ -109,7 +109,7 @@ void UserStateManager::CheckThread(const vector<string>& list) {
       // sleep for 3 second
       std::this_thread::sleep_for(std::chrono::seconds(3));
       if (!cookieValid) {
-        MessageBox(nullptr, L"获取动态信息失败，请在出现的窗口中点击完成验证码，随后关闭窗口即可",
+        MessageBox(nullptr, L"获取动态信息失败，请在出现的窗口中 > 右键刷新 < ，并点击完成验证码，随后关闭窗口",
                    L"Error", MB_OK);
         _cookieWindow->Show();
         goto skip;
