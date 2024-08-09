@@ -55,6 +55,17 @@
       .then((data) => {
         _track = data.track;
       });
+    const es = new EventSource("/api/sse");
+    es.onmessage = (event) => {
+      if (event.data == "NOTIFY_UPDATE") {
+        fetch("/api/config/notify")
+          .then((res) => res.json())
+          .then((data) => {
+            console.log(data);
+            _watch_list = data.watch_list ? data.watch_list : [];
+          });
+      }
+    };
   }
   function updateAudio() {
     // post to server
@@ -202,6 +213,7 @@
 <Toggle class="mb-2" bind:checked={_update} on:change={updateNotify}
   >软件更新提醒</Toggle
 >
+<p class="text-xs">*由于 B 站风控政策，不保证能够及时提醒。</p>
 <Hr />
 <P class="mb-4">其它设置</P>
 <Toggle class="mb-2" bind:checked={_track} on:change={updateOther}

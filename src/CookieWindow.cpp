@@ -1,11 +1,10 @@
 #include "CookieWindow.hpp"
 #include "LAppPal.hpp"
-#include "LAppDefine.hpp"
 #include "resource.h"
 
-#include <stdexcept>
-#include <thread>
 #include <winuser.h>
+
+#define WM_RELOAD (WM_USER + 2) 
 
 LRESULT CALLBACK CookieWndProc(HWND hWnd, UINT message, WPARAM wParam,
                                LPARAM lParam) {
@@ -22,6 +21,9 @@ LRESULT CALLBACK CookieWndProc(HWND hWnd, UINT message, WPARAM wParam,
     case WM_CLOSE:
       // just hide window
       ShowWindow(hWnd, SW_HIDE);
+      break;
+    case WM_RELOAD:
+      cookieWindow->doReload();
       break;
     default:
       return DefWindowProc(hWnd, message, wParam, lParam);
@@ -167,9 +169,17 @@ void CookieWindow::WindowProc() {
           .Get());
 }
 
+void CookieWindow::doReload() {
+  webview->Reload();
+}
+
+void CookieWindow::Reload() {
+  PostMessage(_window, WM_RELOAD, 0, 0);
+}
+
 void CookieWindow::Show() {
   if (_window) {
-    webview->Reload();
+    Reload();
     ShowWindow(_window, SW_SHOWNORMAL);
   }
 }
@@ -180,9 +190,7 @@ void CookieWindow::UpdateCookie() {
     return;
   }
   LAppPal::PrintLog("[CookieWindow]Try update cookies");
-  webview->ExecuteScript(
-      L"window.chrome.webview.postMessage('C'+window.document.cookie)",
-      nullptr);
+  Reload();
 }
 
 CookieWindow::~CookieWindow() {

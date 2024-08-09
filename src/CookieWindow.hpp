@@ -33,6 +33,11 @@ class CookieWindow {
    */
   void Navigate(const std::string& url);
 
+  void Reload();
+
+  // Only use in message proc
+  void doReload();
+
   /**
    * @brief Resize the panel
    *

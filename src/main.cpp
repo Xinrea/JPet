@@ -18,7 +18,7 @@
 #pragma comment(lib, "comctl32.lib")
 
 LONG WINAPI unhandled_handler(EXCEPTION_POINTERS* e) {
-    const wstring dumpfile = L"minidump.dmp";
+    const wstring dumpfile = LAppDefine::documentPath + L"\\minidump.dmp";
     HANDLE hFile = CreateFile(dumpfile.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile && (hFile != INVALID_HANDLE_VALUE)) {
         MINIDUMP_EXCEPTION_INFORMATION mdei;

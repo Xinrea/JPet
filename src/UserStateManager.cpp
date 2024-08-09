@@ -69,10 +69,9 @@ void UserStateManager::CheckThread(const vector<string>& list) {
       std::make_shared<UserStateWatcher>(uid, _cookieWindow->cookie,
           _cookieWindow->userAgent);
     _watchers.push_back(watcher);
-    // sleep for 5s to avoid 799 error
-    std::this_thread::sleep_for(std::chrono::seconds(5));
   }
   _mutex.unlock();
+  int check_delay = 3;
   while (_running) {
     // check cookie
     if (_cookieWindow->cookie.empty()) {
@@ -84,7 +83,7 @@ void UserStateManager::CheckThread(const vector<string>& list) {
     _mutex.unlock();
     for (auto watcher : watchers) {
       if (!_running) return;
-      bool cookieValid = watcher->Check(_messageQueue);
+      CheckStatus status = watcher->Check(_messageQueue);
       // notify message process
       auto msg = FetchOne();
       if (msg.has_value()) {
@@ -106,17 +105,27 @@ void UserStateManager::CheckThread(const vector<string>& list) {
                                           messageInfo.extra1));
         }
       }
-      // sleep for 3 second
-      std::this_thread::sleep_for(std::chrono::seconds(3));
-      if (!cookieValid) {
-        MessageBox(nullptr, L"获取动态信息失败，请在出现的窗口中 > 右键刷新 < ，并点击完成验证码，随后关闭窗口",
+      if (status != CheckStatus::SUCCESS) {
+        check_delay *= 2;
+        LAppPal::PrintLog(LogLevel::Warn, "[UserStateManager]API failure make delay updated to %d", check_delay);
+        if (status == CheckStatus::RESTRICT) {
+          _cookieWindow->UpdateCookie();
+        }
+      } else {
+        if (check_delay >= 12) {
+          check_delay /= 3;
+        } 
+      }
+      if (check_delay >= 60) {
+        MessageBox(nullptr, L"获取动态信息失败，请在出现的窗口中 >右键刷新< ，并点击完成可能出现的验证码，随后关闭窗口",
                    L"Error", MB_OK);
         _cookieWindow->Show();
         goto skip;
       }
+      std::this_thread::sleep_for(std::chrono::seconds(check_delay));
     }
   skip:
     // sleep for 10 seconds
-    std::this_thread::sleep_for(std::chrono::seconds(15));
+    std::this_thread::sleep_for(std::chrono::seconds(check_delay));
   }
 }

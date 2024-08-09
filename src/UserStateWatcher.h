@@ -8,7 +8,10 @@
 
 using std::queue;
 using std::string;
-using std::vector;
+
+enum class CheckStatus {
+ SUCCESS, FAST, RESTRICT
+};
 
 class UserStateWatcher {
  public:
@@ -17,7 +20,7 @@ class UserStateWatcher {
   long long lastTime = 0;
   UserStateWatcher(const string& uid, const string& cookies,
                    const string& userAgent);
-  bool Check(queue<StateMessage>& messageQueue);
+  CheckStatus Check(queue<StateMessage>& messageQueue);
 
  private:
   bool _initialized = false;

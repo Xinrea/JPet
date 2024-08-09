@@ -42,10 +42,6 @@
       });
   }
 
-  const es = new EventSource("/api/sse");
-  es.onmessage = (event) => {
-    console.log(event);
-  };
 
   updateProfile();
 

@@ -1,4 +1,6 @@
 ﻿#include "UserStateWatcher.h"
+#include "LAppPal.hpp"
+#include "PanelServer.hpp"
 #include "Wbi.hpp"
 
 #ifndef CPPHTTPLIB_OPENSSL_SUPPORT
@@ -19,8 +21,6 @@ UserStateWatcher::UserStateWatcher(const string& uid, const string& cookies,
   auto p = Wbi::Get_wbi_key();
   img_key = p.first;
   sub_key = p.second;
-
-  initBasicInfo();
 }
 
 void UserStateWatcher::initBasicInfo() {
@@ -53,6 +53,7 @@ void UserStateWatcher::initBasicInfo() {
               json.at("data").at("live_room").at("roomid").get<int>());
         }
         _initialized = true;
+        PanelServer::GetInstance()->Notify("NOTIFY_UPDATE");
       } else {
         LAppPal::PrintLog("[UserStateWatcher][%s]BasicInfo Failed with code %d",
                           target.uid.c_str(), json.at("code").get<int>());
@@ -67,13 +68,13 @@ void UserStateWatcher::initBasicInfo() {
   }
 }
 
-bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
+CheckStatus UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
   if (!_initialized) {
     initBasicInfo();
   }
 
   if (!_initialized) {
-    return true;
+    return CheckStatus::FAST;
   }
 
   httplib::Headers headers = {{"cookie", _cookies}, {"User-Agent", _userAgent}};
@@ -134,7 +135,7 @@ bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
                             "[UserStateWatcher][%s]No valid dynamic",
                             target.uid.c_str());
           lastTime = latest;
-          return true;
+          return CheckStatus::SUCCESS;
         }
         string dynamic_id = json.at("data")
                                 .at("items")
@@ -177,7 +178,7 @@ bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
                           target.uid.c_str(), json.at("code").get<int>());
         // if code is -352
         if (json.at("code").get<int>() == -352) {
-          return false;
+          return CheckStatus::RESTRICT;
         }
       }
     } catch (const std::exception& e) {
@@ -191,7 +192,7 @@ bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
 
   if (target.roomid.empty()) {
     LAppPal::PrintLog("[UserStateWatcher][%s]No room id", target.uid.c_str());
-    return true;
+    return CheckStatus::SUCCESS;
   }
   httplib::SSLClient liveCli("api.live.bilibili.com", 443);
   liveCli.set_connection_timeout(std::chrono::seconds(1));
@@ -224,9 +225,8 @@ bool UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
                         e.what());
     }
   } else {
-    if (DebugLogEnable) {
-      LAppPal::PrintLog("[UserStateWatcher]Fetch room info failed");
-    }
+    LAppPal::PrintLog(LogLevel::Debug,
+                      "[UserStateWatcher]Fetch room info failed");
   }
-  return true;
+  return CheckStatus::SUCCESS;
 }
