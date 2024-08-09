@@ -2,7 +2,6 @@
 #include "LAppDefine.hpp"
 #include "resource.h"
 
-#include <stdexcept>
 #include <winuser.h>
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam,
@@ -80,7 +79,7 @@ void GamePanel::WindowProc() {
   // Locate the browser and set up the environment for WebView
   try {
     CreateCoreWebView2EnvironmentWithOptions(
-        nullptr, nullptr, nullptr,
+        nullptr, (LAppDefine::documentPath + L"\\GamePanelData").c_str(), nullptr,
         Microsoft::WRL::Callback<
             ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
             [this](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {

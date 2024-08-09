@@ -37,3 +37,4 @@ _deps
 *.can3
 
 build/
+build-scripts/Output

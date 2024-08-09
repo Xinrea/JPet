@@ -48,6 +48,9 @@ int main() {
   if (!PathFileExists(LAppDefine::documentPath.c_str())) {
     CreateDirectory(LAppDefine::documentPath.c_str(), NULL);
   }
+
+  LAppPal::Init();
+  
   wchar_t curPath[256];
   GetModuleFileName(GetModuleHandle(NULL), static_cast<LPWSTR>(curPath),
                     sizeof(curPath));

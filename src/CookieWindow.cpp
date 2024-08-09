@@ -1,5 +1,6 @@
 #include "CookieWindow.hpp"
 #include "LAppPal.hpp"
+#include "LAppDefine.hpp"
 #include "resource.h"
 
 #include <winuser.h>
@@ -81,7 +82,7 @@ void CookieWindow::WindowProc() {
   // Step 3 - Create a single WebView within the parent window
   // Locate the browser and set up the environment for WebView
   CreateCoreWebView2EnvironmentWithOptions(
-      nullptr, nullptr, nullptr,
+      nullptr, (LAppDefine::documentPath + L"\\CookieWindowData").c_str(), nullptr,
       Microsoft::WRL::Callback<
           ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
           [this](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {

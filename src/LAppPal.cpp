@@ -9,6 +9,7 @@
 #include "LAppPal.hpp"
 
 #include <GLFW/glfw3.h>
+#include <fstream>
 #include <sys/stat.h>
 
 #include <Model/CubismMoc.hpp>
@@ -27,8 +28,11 @@ using namespace LAppDefine;
 double LAppPal::s_currentFrame = 0.0;
 double LAppPal::s_lastFrame = 0.0;
 double LAppPal::s_deltaTime = 0.0;
-std::wfstream LAppPal::s_logFile(documentPath + L"/jpet.log",
-                                std::ios::out | std::ios::app);
+std::wfstream LAppPal::s_logFile;
+
+void LAppPal::Init() {
+  LAppPal::s_logFile = std::wfstream(documentPath + L"\\jpet.log", std::ios::out | std::ios::app);
+}
 
 csmByte* LAppPal::LoadFileAsBytes(const string& filePath, csmSizeInt* outSize) {
   // filePath;//

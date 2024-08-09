@@ -24,6 +24,8 @@ enum class LogLevel { Debug, Info, Warn, Error };
  */
 class LAppPal {
  public:
+
+  static void Init();
   /**
    * @brief ファイルをバイトデータとして読み込む
    *
