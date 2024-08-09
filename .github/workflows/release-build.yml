@@ -33,17 +33,17 @@ jobs:
         token: ${{ github.token }}
         github-binarycache: true
 
-    - name: Configure CMake For Release
-      run: $version = (Get-Date).ToString("yyyyMMdd") && cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DJVERSION="$version" -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+    - name: Build For Release
+      run: |
+        $version = (Get-Date).ToString("yyyyMMdd")
+        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DJVERSION="$version" -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake --build ${{github.workspace}}/build --config Release --target ALL_BUILD
 
-    - name: Build JPet
-      run: cmake --build ${{github.workspace}}/build --config Release --target ALL_BUILD
-
-    - name: Configure CMake For Debug
-      run: $version = (Get-Date).ToString("yyyyMMdd") && cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug -DJVERSION="$version" -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-    - name: Build JPet
-      run: cmake --build ${{github.workspace}}/build --config Debug --target ALL_BUILD
+    - name: Build For Debug
+      run: |
+        $version = (Get-Date).ToString("yyyyMMdd")
+        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug -DJVERSION="$version" -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake --build ${{github.workspace}}/build --config Debug --target ALL_BUILD
 
     - name: Upload a Release Artifact
       uses: actions/upload-artifact@v4.3.6
