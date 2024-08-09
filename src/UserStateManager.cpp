@@ -117,7 +117,7 @@ void UserStateManager::CheckThread(const vector<string>& list) {
         } 
       }
       if (check_delay >= 60) {
-        MessageBox(nullptr, L"获取动态信息失败，请在出现的窗口中 >右键刷新< ，并点击完成可能出现的验证码，随后关闭窗口",
+        MessageBox(nullptr, L"获取动态信息失败，请在出现的窗口中点击完成可能出现的验证码，随后关闭窗口",
                    L"Error", MB_OK);
         _cookieWindow->Show();
         goto skip;
