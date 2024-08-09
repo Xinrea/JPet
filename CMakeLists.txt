@@ -8,7 +8,13 @@ option(
 
 # Set app name.
 set(APP_NAME JPet)
-set(JVERSION -1 "JPet version number")
+
+# JVERSION can be set by -D option.
+if(NOT DEFINED JVERSION)
+  set(JVERSION -1)
+endif()
+
+message(STATUS "JPet version: ${JVERSION}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -137,7 +143,12 @@ target_link_libraries(Framework Live2DCubismCore GLEW::GLEW)
 find_package(OpenGL REQUIRED)
 
 # Make executable app.
-add_executable(${APP_NAME})
+# if Release, should use WIN32 to hide console window.
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  add_executable(${APP_NAME} WIN32)
+else()
+  add_executable(${APP_NAME})
+endif()
 
 # Add source files.
 add_subdirectory(src)
@@ -171,14 +182,40 @@ target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/ 
 # Build in multi-process.
 target_compile_options(${APP_NAME} PRIVATE /MP)
 
-# Copy resource directory to build directory.
+# Copy resource directory to build directory, except for panel
+
+make_directory(${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/resources/panel)
+
 add_custom_command(
   TARGET ${APP_NAME}
   POST_BUILD
-  COMMAND
-  ${CMAKE_COMMAND} -E
-  copy_directory ${RES_PATH} $<TARGET_FILE_DIR:${APP_NAME}>/resources
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RES_PATH}/logo.ico $<TARGET_FILE_DIR:${APP_NAME}>/resources/logo.ico
 )
+
+add_custom_command(
+  TARGET ${APP_NAME}
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/audios $<TARGET_FILE_DIR:${APP_NAME}>/resources/audios
+)
+
+add_custom_command(
+  TARGET ${APP_NAME}
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/imgs $<TARGET_FILE_DIR:${APP_NAME}>/resources/imgs
+)
+
+add_custom_command(
+  TARGET ${APP_NAME}
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/joi $<TARGET_FILE_DIR:${APP_NAME}>/resources/joi
+)
+
+add_custom_command(
+  TARGET ${APP_NAME}
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/panel/dist $<TARGET_FILE_DIR:${APP_NAME}>/resources/panel/dist
+)
+
 
 add_custom_command(TARGET ${APP_NAME} POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -202,9 +239,6 @@ set_target_properties(${APP_NAME} PROPERTIES
 #
 # INFO: USE_RENDER_TARGET has higher priority than USE_MODEL_RENDER_TARGET.
 #
-
-# echo version
-message(STATUS "JPet version: ${JVERSION}")
 
 target_compile_definitions(${APP_NAME}
   PRIVATE
