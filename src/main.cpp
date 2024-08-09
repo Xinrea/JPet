@@ -35,6 +35,20 @@ LONG WINAPI unhandled_handler(EXCEPTION_POINTERS* e) {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
+bool CheckWebView2Runtime() {
+    LPWSTR versionInfo;
+    HRESULT hr = GetAvailableCoreWebView2BrowserVersionString(nullptr, &versionInfo);
+    if (hr == S_OK && versionInfo != nullptr) {
+        LAppPal::PrintLog(LogLevel::Info, L"WebView2 Runtime is installed. Version: %ls", versionInfo);
+        CoTaskMemFree(versionInfo);
+        return true;
+    } else {
+        LAppPal::PrintLog(LogLevel::Error, L"WebView2 Runtime is not installed.");
+        return false;
+    }
+}
+
+
 int main() {
   SetUnhandledExceptionFilter(unhandled_handler);
   INITCOMMONCONTROLSEX icce;
@@ -50,6 +64,16 @@ int main() {
   }
 
   LAppPal::Init();
+
+  // check WebView2 runtime
+  if (!CheckWebView2Runtime()) {
+    MessageBox(nullptr, L"请安装 WebView2 Runtime 后再运行 JPet", L"错误",
+               MB_OK);
+    ShellExecute(nullptr, L"open",
+                 L"https://go.microsoft.com/fwlink/p/?LinkId=2124703",
+                 nullptr, nullptr, SW_SHOWNORMAL);
+    return 1;
+  }
   
   wchar_t curPath[256];
   GetModuleFileName(GetModuleHandle(NULL), static_cast<LPWSTR>(curPath),
