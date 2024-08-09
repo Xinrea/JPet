@@ -32,7 +32,6 @@
 #include "LAppTextureManager.hpp"
 #include "LAppView.hpp"
 #include "LUtils.hpp"
-#include "ModelManager.hpp"
 #include "PanelServer.hpp"
 #include "PartStateManager.h"
 #include "TaskScheduler.hpp"
@@ -225,9 +224,6 @@ bool LAppDelegate::Initialize() {
 
   // AppView 初始化
   _view->Initialize();
-
-  // Model Manager 初始化
-  ModelManager::GetInstance();
 
   // Cubism SDK 初始化
   InitializeCubism();
@@ -745,6 +741,7 @@ void LAppDelegate::Snapshot() {
   if (GetSaveFileName(&ofn) == TRUE) {
     // Use ofn.lpstrFile here to open the file for writing
     CopyFile(filepath.c_str(), ofn.lpstrFile, TRUE);
+    DeleteFile(filepath.c_str());
   }
 }
 

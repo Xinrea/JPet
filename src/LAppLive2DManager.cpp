@@ -21,7 +21,6 @@
 #include "LAppModel.hpp"
 #include "LAppPal.hpp"
 #include "LAppView.hpp"
-#include "ModelManager.hpp"
 #include "PartStateManager.h"
 
 using namespace Csm;
@@ -152,9 +151,8 @@ void LAppLive2DManager::InitScene() {
   // ModelDir[]に保持したディレクトリ名から
   // model3.jsonのパスを決定する.
   // ディレクトリ名とmodel3.jsonの名前を一致させておくこと.
-  const ModelManager* modelManager = ModelManager::GetInstance();
-  std::string modelPath = ResourcesPath + modelManager->modelName + "/";
-  std::string modelJsonName = modelManager->modelFileName;
+  std::string modelPath = std::string(ResourcesPath) + "/joi/";
+  std::string modelJsonName = "zmcw.model3.json";
 
   ReleaseAllModel();
   _models.PushBack(new LAppModel());
