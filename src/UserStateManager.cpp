@@ -1,5 +1,6 @@
 ﻿#include "UserStateManager.h"
 #include "LAppDefine.hpp"
+#include "LAppPal.hpp"
 
 #ifndef CPPHTTPLIB_OPENSSL_SUPPORT
 #define CPPHTTPLIB_OPENSSL_SUPPORT
@@ -15,11 +16,16 @@ void UserStateManager::CheckUpdate() {
   liveCli.set_connection_timeout(std::chrono::seconds(1));
   auto res = liveCli.Get("/version.txt");
   if (res && res->status == 200) {
-    if (LAppDefine::DebugLogEnable)
-      LAppPal::PrintLog(
-          (std::string("[UserStateWatcher]Check Update Latest: ") + res->body)
-              .c_str());
-    int now = _wtoi(WVERSION);
+    LAppPal::PrintLog(
+        LogLevel::Debug,
+        (std::string("[UserStateWatcher]Check Update Latest: ") + res->body)
+            .c_str());
+    if (VERSION == -1) {
+      LAppPal::PrintLog(LogLevel::Info,
+                        "[UserStateManager]Skip CheckUpdate in debug version");
+      return;
+    }
+    int now = VERSION;
     int latest = atoi(res->body.c_str());
     if (now < latest) {
       LAppPal::PrintLog("[UserStateWatcher]Need Update: %s -> %s ", VERSION,
@@ -49,7 +55,7 @@ void UserStateManager::Init(const std::vector<std::string>& list, HWND parent) {
   LAppPal::PrintLog(LogLevel::Info, "[LAppDelegate]Notification Init");
   WinToast::instance()->setAppName(L"JPet");
   const auto aumi =
-      WinToast::configureAUMI(L"JoiGroup", L"JPetProject", L"JPet", WVERSION);
+      WinToast::configureAUMI(L"JoiGroup", L"JPetProject", L"JPet", std::to_wstring(VERSION));
   WinToast::instance()->setAppUserModelId(aumi);
   WinToast::instance()->initialize();
 

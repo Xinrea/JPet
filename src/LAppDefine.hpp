@@ -15,8 +15,9 @@
  *
  */
 
-#define WVERSION L"201224"
-#define VERSION "201224"
+#ifndef VERSION
+#define VERSION -1
+#endif
 
 namespace LAppDefine {
 

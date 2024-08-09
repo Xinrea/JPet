@@ -10,7 +10,7 @@ try {
 
     # 配置 CMake 项目
     Write-Host "Configuring CMake project ..." -ForegroundColor Green
-    cmake . -Bbuild
+    cmake . -Bbuild -DVERSION=20240809
 
     # 构建项目
     Write-Host "Building project ..." -ForegroundColor Green

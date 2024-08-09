@@ -12,7 +12,9 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <mutex>
+#include <shellapi.h>
 #include <winbase.h>
+#include <winuser.h>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <CommCtrl.h>
@@ -585,6 +587,7 @@ void LAppDelegate::OnWindowPosCallBack(GLFWwindow *window, int x, int y) {}
 #define IDM_SET 2001
 #define IDM_RESET 2002
 #define IDM_EXIT 2003
+#define IDM_PROJECT 2005
 
 void LAppDelegate::OnTrayClickCallBack(GLFWwindow *window, int b, unsigned w) {
   if (b == 2) {
@@ -610,6 +613,10 @@ void LAppDelegate::OnTrayClickCallBack(GLFWwindow *window, int b, unsigned w) {
       }
       case IDM_RESET: {
         glfwSetWindowPos(window, 0, 0);
+        break;
+      }
+      case IDM_PROJECT: {
+        ShellExecute(NULL, L"open", L"https://pet.vjoi.cn", NULL, NULL, SW_SHOWNORMAL);
         break;
       }
       default:
@@ -693,6 +700,9 @@ void LAppDelegate::Menu() {
   GetCursorPos(&p);
   HMENU hMenu;
   hMenu = CreatePopupMenu();
+  AppendMenu(hMenu, MF_STRING | MF_GRAYED, 0, (L"Version." + std::to_wstring(VERSION)).c_str());
+  AppendMenu(hMenu, MF_STRING, IDM_PROJECT, TEXT("前往项目主页"));
+  AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
   if (_isShowing) {
     AppendMenu(hMenu, MF_STRING, IDM_HIDE, TEXT("隐藏"));
   } else {
