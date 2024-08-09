@@ -1,16 +1,12 @@
 # This starter workflow is for a CMake project running on a single platform. There is a different starter workflow if you need cross-platform coverage.
 # See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-multi-platform.yml
-name: jpet-release-build
+name: jpet-build
 
 on:
   push:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-
-env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: Release
 
 jobs:
   build:
@@ -37,21 +33,32 @@ jobs:
         token: ${{ github.token }}
         github-binarycache: true
 
-    - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: $version = (Get-Date).ToString("yyyyMMdd") && cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DVERSION="$version" -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+    - name: Build For Release
+      run: |
+        $version = (Get-Date).ToString("yyyyMMdd")
+        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DJVERSION="$version" -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake --build ${{github.workspace}}/build --config Release --target ALL_BUILD
 
-    - name: Build JPet
-      # Build your program with the given configuration
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --target ALL_BUILD
+    - name: Build For Debug
+      run: |
+        $version = (Get-Date).ToString("yyyyMMdd")
+        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug -DJVERSION="$version" -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake --build ${{github.workspace}}/build --config Debug --target ALL_BUILD
 
-    - name: Upload a Build Artifact
+    - name: Upload a Release Artifact
       uses: actions/upload-artifact@v4.3.6
       with:
         # Artifact name
-        name: jpet-artifact
+        name: jpet-artifact-release
         # A file, directory or wildcard pattern that describes what to upload
-        path: ${{github.workspace}}/build/bin/JPet/${{env.BUILD_TYPE}}/
+        path: ${{github.workspace}}/build/bin/JPet/Release/
         # The desired behavior if no files are found using the provided path.
           
+    - name: Upload a Debug Artifact
+      uses: actions/upload-artifact@v4.3.6
+      with:
+        # Artifact name
+        name: jpet-artifact-debug
+        # A file, directory or wildcard pattern that describes what to upload
+        path: ${{github.workspace}}/build/bin/JPet/Debug/
+        # The desired behavior if no files are found using the provided path.
