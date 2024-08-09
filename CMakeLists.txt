@@ -8,6 +8,7 @@ option(
 
 # Set app name.
 set(APP_NAME JPet)
+set(JVERSION -1 "JPet version number")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -201,14 +202,17 @@ set_target_properties(${APP_NAME} PROPERTIES
 #
 # INFO: USE_RENDER_TARGET has higher priority than USE_MODEL_RENDER_TARGET.
 #
+
+# echo version
+message(STATUS "JPet version: ${JVERSION}")
+
 target_compile_definitions(${APP_NAME}
   PRIVATE
   CPPHTTPLIB_OPENSSL_SUPPORT
   WIN32_LEAN_AND_MEAN
   _HAS_STD_BYTE=0
-  VERSION=${VERSION}
+  VERSION=${JVERSION}
 )
-
 # if build Debug, add debug definition.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_definitions(${APP_NAME} PRIVATE JPET_DEBUG)
