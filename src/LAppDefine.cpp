@@ -65,7 +65,11 @@ const csmInt32 PriorityNormal = 2;
 const csmInt32 PriorityForce = 3;
 
 // デバッグ用ログの表示オプション
+#ifdef JPET_DEBUG
 const csmBool DebugLogEnable = true;
+#else
+const csmBool DebugLogEnable = false;
+#endif
 const csmBool DebugTouchLogEnable = false;
 
 // Frameworkから出力するログのレベル設定

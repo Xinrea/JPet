@@ -11,9 +11,6 @@ set(APP_NAME JPet)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_TOOLCHAIN_FILE "D:/vcpkg/scripts/buildsystems/vcpkg.cmake")
-list(APPEND CMAKE_PREFIX_PATH "D:/vcpkg/installed/x64-windows")
-
 # Set directory paths.
 set(RES_PATH ${CMAKE_CURRENT_SOURCE_DIR}/resources)
 set(THIRD_PARTY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
@@ -211,3 +208,8 @@ target_compile_definitions(${APP_NAME}
   _HAS_STD_BYTE=0
   VERSION=${VERSION}
 )
+
+# if build Debug, add debug definition.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  target_compile_definitions(${APP_NAME} PRIVATE JPET_DEBUG)
+endif()
