@@ -186,8 +186,8 @@ CheckStatus UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
                         target.uid.c_str(), e.what());
     }
   } else {
-    LAppPal::PrintLog("[UserStateWatcher][%s]Fetch Dynamic Failed: %s",
-                      target.uid.c_str(), dres->body.c_str());
+    LAppPal::PrintLog("[UserStateWatcher][%s]Fetch Dynamic Failed",
+                      target.uid.c_str());
   }
 
   if (target.roomid.empty()) {
