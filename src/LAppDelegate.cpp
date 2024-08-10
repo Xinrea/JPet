@@ -585,7 +585,7 @@ void LAppDelegate::OnWindowPosCallBack(GLFWwindow *window, int x, int y) {}
 #define IDM_EXIT 2003
 #define IDM_PROJECT 2005
 
-void LAppDelegate::OnTrayClickCallBack(GLFWwindow *window, int b, unsigned w) {
+void LAppDelegate::OnTrayClickCallBack(GLFWwindow *window, int b, WPARAM w) {
   if (b == 2) {
     Menu();
   } else {

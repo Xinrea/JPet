@@ -420,7 +420,7 @@ void _glfwInputJoystickHat(_GLFWjoystick* js, int hat, char value) {
   js->hats[hat] = value;
 }
 
-void _glfwInputTray(_GLFWwindow* window, int b, unsigned w) {
+void _glfwInputTray(_GLFWwindow* window, int b, uintptr_t w) {
   assert(window != NULL);
 
   if (window->callbacks.tray) window->callbacks.tray((GLFWwindow*)window, b, w);

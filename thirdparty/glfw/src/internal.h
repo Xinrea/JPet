@@ -929,7 +929,7 @@ void _glfwInputJoystickHat(_GLFWjoystick* js, int hat, char value);
 void _glfwInputMonitor(_GLFWmonitor* monitor, int action, int placement);
 void _glfwInputMonitorWindow(_GLFWmonitor* monitor, _GLFWwindow* window);
 
-void _glfwInputTray(_GLFWwindow* window, int button, unsigned elem);
+void _glfwInputTray(_GLFWwindow* window, int button, WPARAM elem);
 
 #if defined(__GNUC__)
 void _glfwInputError(int code, const char* format, ...)

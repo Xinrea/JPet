@@ -86,7 +86,7 @@ class LAppDelegate {
   void OnWindowPosCallBack(GLFWwindow *window, int x, int y);
 
   // 修改glfw添加的新CallBack，用于响应托盘事件
-  void OnTrayClickCallBack(GLFWwindow *window, int b, unsigned w);
+  void OnTrayClickCallBack(GLFWwindow *window, int b, WPARAM w);
 
   /**
    * @brief シェーダーを登録する。
@@ -271,7 +271,7 @@ class EventHandler {
   static void OnWindowPosCallBack(GLFWwindow *window, int x, int y) {
     LAppDelegate::GetInstance()->OnWindowPosCallBack(window, x, y);
   }
-  static void OnTrayClickCallBack(GLFWwindow *window, int b, unsigned w) {
+  static void OnTrayClickCallBack(GLFWwindow *window, int b, WPARAM w) {
     LAppDelegate::GetInstance()->OnTrayClickCallBack(window, b, w);
   }
 };

@@ -1609,7 +1609,7 @@ typedef void (*GLFWerrorfun)(int error_code, const char* description);
 typedef void (*GLFWwindowposfun)(GLFWwindow* window, int xpos, int ypos);
 
 typedef void (*GLFWwindowtrayfun)(GLFWwindow* window, int button,
-                                  unsigned elem);
+                                  uintptr_t elem);
 
 /*! @brief The function pointer type for window size callbacks.
  *
@@ -1975,7 +1975,7 @@ typedef void (*GLFWcharmodsfun)(GLFWwindow* window, unsigned int codepoint,
 typedef void (*GLFWdropfun)(GLFWwindow* window, int path_count,
                             const char* paths[]);
 
-typedef void (*GLFWtrayfun)(GLFWwindow* window, int button, unsigned elem);
+typedef void (*GLFWtrayfun)(GLFWwindow* window, int button, uintptr_t elem);
 
 /*! @brief The function pointer type for monitor configuration callbacks.
  *
