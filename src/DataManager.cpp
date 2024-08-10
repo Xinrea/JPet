@@ -37,7 +37,15 @@ bool DataManager::init() {
     LAppPal::PrintLog(LogLevel::Info, "[DataManager]Data reseted due to marker");
   }
   // initialize game data
+  bool firstData = !std::filesystem::exists(std::filesystem::path(dataPath));
   gameData = std::make_shared<GameData>(dataPath);
+  if (firstData) {
+    AddAttribute("speed", 2);
+    AddAttribute("strength", 1);
+    AddAttribute("endurance", 1);
+    AddAttribute("will", 3);
+    AddAttribute("intellect", 4);
+  }
   return true;
 }
 
@@ -233,7 +241,7 @@ void DataManager::Save() {
 void DataManager::AddExp(bool bonus) {
   int currentExp = GetAttribute("exp");
   int intellect = GetAttribute("intellect");
-  int exp = 1 + ceil(99 * LAppPal::EaseInOut(intellect) / 100);
+  int exp = 1 + ceil(99 * LAppPal::EaseInOut(intellect - 4) / 100);
   if (bonus) {
     exp *= 10;
   }

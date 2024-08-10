@@ -19,7 +19,7 @@ void GameTask::Dump() {
 
 int GameTask::GetCurrentCost() {
   int speed = DataManager::GetInstance()->GetAttribute("speed");
-  return cost * (1 - 0.9 * LAppPal::EaseInOut(speed) / 100);
+  return cost * (1 - 0.9 * LAppPal::EaseInOut(speed - 2) / 100);
 }
 
 void GameTask::Notify(const wstring& title, const wstring& content,
@@ -56,19 +56,18 @@ void GameTask::TryDone() {
       }
     }
     srand(time(NULL));
-    // if lack attribute for 20 or more
-    if (lack >= 20) {
-      // immediately fail
+
+    // get willpower
+    int will = DataManager::GetInstance()->GetAttribute("will");
+    // every lack of attribute will reduce 3% -> 6
+    // every will will increase 0.5% -> 1
+    lack *= 6;
+    // if lack is 0, the full rate is 70%
+    lack += 60;
+    if (lack >= 200) {
       success = false;
-      LAppPal::PrintLog(LogLevel::Debug, "[GameTask]Task %d failed by attrlack", id);
+      LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d failed before will takes effect", id);
     } else {
-      // get willpower
-      int will = DataManager::GetInstance()->GetAttribute("will");
-      // every lack of attribute will reduce 2% -> 4
-      // every will will increase 0.5% -> 1
-      lack *= 4;
-      // if lack is 0, the full rate is 80%
-      lack += 40;
       lack -= will;
       if (lack < 0) {
         lack = 0;
@@ -83,6 +82,7 @@ void GameTask::TryDone() {
         LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d success", id);
       }
     }
+
     Dump();
   }
 }

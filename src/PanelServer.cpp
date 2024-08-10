@@ -156,7 +156,7 @@ void PanelServer::doServe() {
         nlohmann::json::array({true, dataManager->GetRaw("clothes.1.active") == 1,
                                dataManager->GetRaw("clothes.2.active") == 1});
     json["expdiff"] =
-        int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4]) / 100));
+        int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4] - 4) / 100));
     res.set_content(json.dump(), "application/json");
   });
   server->Post("/api/data/reset", [](const httplib::Request &req, httplib::Response &res) {
