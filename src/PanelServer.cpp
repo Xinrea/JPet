@@ -5,6 +5,8 @@
 #include "LAppPal.hpp"
 #include "PartStateManager.h"
 #include "LAppDelegate.hpp"
+#include <shellapi.h>
+#include <winuser.h>
 
 void PanelServer::Start() {
   // start thread
@@ -307,6 +309,9 @@ void PanelServer::doServe() {
       }
     }
     res.status = 404;
+  });
+  server->Post("/api/config/folder", [](const httplib::Request &req, httplib::Response &res) {
+    ShellExecute(NULL, L"open", LAppDefine::documentPath.c_str(), NULL, NULL, SW_SHOWDEFAULT);
   });
   server->Get("/api/config/audio",
               [](const httplib::Request &req, httplib::Response &res) {
