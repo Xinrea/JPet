@@ -20,8 +20,8 @@ void WinToastEventHandler::toastActivated() const {
     PanelServer::GetInstance()->Notify("TASK_COMPLETE");
     return;
   }
-  std::wstring url = std::wstring(this->url.begin(), this->url.end());
-  ShellExecute(NULL, L"open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+  std::wstring w_url = LAppPal::StringToWString(url);
+  ShellExecute(NULL, L"open", w_url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 }
 
 void WinToastEventHandler::toastActivated(int actionIndex) const {}

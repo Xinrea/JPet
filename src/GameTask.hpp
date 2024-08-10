@@ -59,7 +59,7 @@ public:
                               WinToastEventHandler* handler);
   int GetCurrentCost();
 
-  static inline const wstring ctasks = reinterpret_cast<const wchar_t*>(uR"(
+  static inline const wstring ctasks = LR"(
   [
       {
         "id": 1,
@@ -267,7 +267,7 @@ public:
         "repeatable": false
       }
   ]
-)");
+)";
 
   static std::vector<std::shared_ptr<GameTask>> InitTasks() {
     std::vector<std::shared_ptr<GameTask>> tasks;
