@@ -12,8 +12,9 @@
     Tooltip,
     Modal,
   } from "flowbite-svelte";
-  import QRCode from 'qrcode';
+  import QRCode from "qrcode";
   import fanAvatar from "../assets/fan.png";
+  import { sse } from "../sse.js";
   // audio
   let _volume = "20";
   let _mute = false;
@@ -62,18 +63,20 @@
       .then((data) => {
         _track = data.track;
       });
-    fetch("/api/account").then(res=>res.json()).then(data=>{
-      account_info = data;
-    });
-    setInterval(async ()=>{
+    fetch("/api/account")
+      .then((res) => res.json())
+      .then((data) => {
+        account_info = data;
+      });
+    setInterval(async () => {
       const res = await fetch("/api/account");
       if (res.status == 200) {
         account_info = await res.json();
       }
     }, 10 * 1000);
-    const es = new EventSource("/api/sse");
-    es.onmessage = (event) => {
-      if (event.data == "NOTIFY_UPDATE") {
+    sse.subscribe((e) => {
+      console.log("SSE:", e);
+      if (e == "NOTIFY_UPDATE") {
         fetch("/api/config/notify")
           .then((res) => res.json())
           .then((data) => {
@@ -81,7 +84,7 @@
             _watch_list = data.watch_list ? data.watch_list : [];
           });
       }
-    };
+    });
   }
   function updateAudio() {
     // post to server
@@ -94,7 +97,7 @@
         volume: parseInt(_volume),
         mute: _mute,
         idle_audio: _idle_audio,
-        touch_audio: _touch_audio
+        touch_audio: _touch_audio,
       }),
     });
   }
@@ -182,22 +185,24 @@
   async function doLogin() {
     const qr_info = await (await fetch("/api/account/qr")).json();
     var canvas = document.getElementById("qrcode");
-    QRCode.toCanvas(canvas, qr_info.url, (e)=>{
+    QRCode.toCanvas(canvas, qr_info.url, (e) => {
       if (e) {
         console.error("Create QRCode failed", e);
       } else {
         console.log("QRCode updated");
       }
     });
-    const status_checker = setInterval(async ()=>{
+    const status_checker = setInterval(async () => {
       const res = await (await fetch("/api/account/qr-status")).json();
       if (res.success) {
         clearInterval(status_checker);
         account_modal = false;
         console.log("account confirmed");
-        fetch("/api/account").then(res=>res.json()).then(data=>{
-          account_info = data;
-        });
+        fetch("/api/account")
+          .then((res) => res.json())
+          .then((data) => {
+            account_info = data;
+          });
       }
     }, 2000);
   }
@@ -214,30 +219,41 @@
 </Modal>
 <P class="mb-4">账号设置</P>
 {#if account_info && account_info.login}
-<div class="flex items-center space-x-4 rtl:space-x-reverse">
-  <Avatar src={fanAvatar} rounded size="lg"/>
-  <div class="space-y-1 font-medium dark:text-white">
-    <div>{account_info.info.uname}</div>
-    <div class="text-sm text-gray-500 dark:text-gray-400">轴芯等级：{account_info.info.level}</div>
-    <Tooltip placement="right">等级能起到与智力类似的效果</Tooltip>
-    <a href={"#"} on:click={logout} class="underline text-gray-500 decoration-green-500 decoration-2 text-sm">注销登录</a>
+  <div class="flex items-center space-x-4 rtl:space-x-reverse">
+    <Avatar src={fanAvatar} rounded size="lg" />
+    <div class="space-y-1 font-medium dark:text-white">
+      <div>{account_info.info.uname}</div>
+      <div class="text-sm text-gray-500 dark:text-gray-400">
+        轴芯等级：{account_info.info.level}
+      </div>
+      <Tooltip placement="right">等级能起到与智力类似的效果</Tooltip>
+      <a
+        href={"#"}
+        on:click={logout}
+        class="underline text-gray-500 decoration-green-500 decoration-2 text-sm"
+        >注销登录</a
+      >
+    </div>
   </div>
-</div>
 {:else if account_info && !account_info.login}
-<Button on:click={()=>{account_modal = true}}>Bilibili 登录</Button>
+  <Button
+    on:click={() => {
+      account_modal = true;
+    }}>Bilibili 登录</Button
+  >
 {:else}
-<div class="text-sm text-gray-500 dark:text-gray-400">加载中</div>
+  <div class="text-sm text-gray-500 dark:text-gray-400">加载中</div>
 {/if}
 <Hr />
 <P class="mb-4">音频设置</P>
 <Toggle class="mb-2" bind:checked={_mute} on:change={updateAudio}>静音</Toggle>
 {#if !_mute}
-<Toggle class="mb-2" bind:checked={_touch_audio} on:change={updateAudio}
-  >互动语音</Toggle
->
-<Toggle class="mb-2" bind:checked={_idle_audio} on:change={updateAudio}
-  >闲置语音</Toggle
->
+  <Toggle class="mb-2" bind:checked={_touch_audio} on:change={updateAudio}
+    >互动语音</Toggle
+  >
+  <Toggle class="mb-2" bind:checked={_idle_audio} on:change={updateAudio}
+    >闲置语音</Toggle
+  >
 {/if}
 <Label for="volume">音量</Label>
 <Input

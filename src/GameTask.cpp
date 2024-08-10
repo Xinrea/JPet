@@ -44,7 +44,7 @@ void GameTask::TryDone() {
   // time's up, set status now
   if (state) {
     status = TStatus::WAIT_SETTLE;
-    Notify(L"任务完成", title, new WinToastEventHandler(""));
+    Notify(L"任务完成", title, new WinToastEventHandler("TASK_COMPLETE"));
     // check success or not
     int lack = 0;
     for (auto it = requirements.begin(); it != requirements.end(); ++it) {

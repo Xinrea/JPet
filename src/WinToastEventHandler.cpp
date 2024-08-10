@@ -4,6 +4,8 @@
 #include <shellapi.h>
 
 #include "LAppPal.hpp"
+#include "LAppDelegate.hpp"
+#include "PanelServer.hpp"
 
 WinToastEventHandler::WinToastEventHandler(std::string u) { url = u; }
 
@@ -11,6 +13,11 @@ void WinToastEventHandler::toastActivated() const {
   LAppPal::PrintLog("[WinToastEventHandler]ToastActivated");
   // convert string to wstring
   if (url.empty()) {
+    return;
+  }
+  if (url == "TASK_COMPLETE") {
+    LAppDelegate::GetInstance()->ShowPanel();
+    PanelServer::GetInstance()->Notify("TASK_COMPLETE");
     return;
   }
   std::wstring url = std::wstring(this->url.begin(), this->url.end());

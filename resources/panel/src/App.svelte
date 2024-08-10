@@ -5,6 +5,7 @@
   import Document from "./pages/Document.svelte";
   import Setting from "./pages/Setting.svelte";
   import Custom from "./pages/Custom.svelte";
+  import { sse } from "./sse.js"
 
   let activeTab = 0;
   let tabs = [
@@ -48,6 +49,14 @@
   setInterval(() => {
     updateProfile();
   }, 1000);
+  
+  sse.subscribe(e=>{
+    console.log("SSE:", e);
+    if (e == "TASK_COMPLETE") {
+      activeTab = 1;
+      console.log("task complete");
+    }
+  });
 </script>
 
 <main>
