@@ -1,5 +1,6 @@
 ﻿#include "AudioManager.hpp"
 
+#include "DataManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
 using namespace LAppDefine;
@@ -60,7 +61,6 @@ void AudioManager::Play3dSound(AudioType t) {
 
 void AudioManager::Play3dSound(AudioType t, int no) {
   LAppPal::PrintLog(LogLevel::Debug, "[AudioManager]Play Sound: %d %d", t, no);
-  if (_mute) return;
   wstring target_audio_file;
   switch (t) {
     case AudioType::START: {
@@ -93,6 +93,9 @@ void AudioManager::Play3dSound(AudioType t, int no) {
 
 void AudioManager::Play3dSound(const wstring& target_audio_file) {
   LAppPal::PrintLog(LogLevel::Debug, L"[AudioManager]Play Sound: %ls", target_audio_file.c_str());
+  if (DataManager::GetInstance()->GetConfig<bool>("audio", "mute", false)) {
+    return;
+  }
   bool isPlay;
   FMOD::Sound *sound;
   // find in cache
@@ -102,18 +105,18 @@ void AudioManager::Play3dSound(const wstring& target_audio_file) {
   } else {
     sound = iter->second;
   }
-
+  float volume = float(DataManager::GetInstance()->GetConfig<int>("audio", "volume", 20)) / 10;
   if (_channel) {
     _channel->isPlaying(&isPlay);
     if (!isPlay) {
       _system->playSound(sound, 0, true, &_channel);
-      _channel->setVolume(_volume);
+      _channel->setVolume(volume);
       _channel->setPaused(false);
     }
   } else {
     isPlay = false;
     _system->playSound(sound, 0, true, &_channel);
-    _channel->setVolume(_volume);
+    _channel->setVolume(volume);
     _channel->setPaused(false);
   }
 }

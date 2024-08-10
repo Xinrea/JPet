@@ -23,11 +23,21 @@ class DataManager {
  public:
   ~DataManager() { Save(); };
 
-  void GetWindowPos(int* x, int* y);
+  template <typename T> T GetConfig(const string &section, const string &key, T dvalue) {
+    T ret;
+    try {
+      ret = data.at(section).as_table()->at(key).value_or(dvalue);
+      return ret;
+    } catch(const std::exception& e) {
+      return dvalue;
+    }
+  }
+  
+  void GetWindowPos(int *x, int *y);
   void UpdateWindowPos(int x, int y);
 
-  void GetAudio(int* volume, bool* mute);
-  void UpdateAudio(int volume, bool mute);
+  void GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touch_audio);
+  void UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio);
 
   void GetShortcut(std::map<std::string, std::string>* shortcuts);
   void UpdateShortcut(const std::string& key, const std::string& value);

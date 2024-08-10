@@ -14,6 +14,8 @@
   // audio
   let _volume = "20";
   let _mute = false;
+  let _touch_audio = false;
+  let _idle_audio = false;
   // display
   let _green = false;
   let _limit = false;
@@ -33,6 +35,8 @@
       .then((data) => {
         _volume = data.volume;
         _mute = data.mute;
+        _touch_audio = data.touch_audio;
+        _idle_audio = data.idle_audio;
       });
     fetch("/api/config/display")
       .then((res) => res.json())
@@ -74,7 +78,12 @@
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ volume: parseInt(_volume), mute: _mute }),
+      body: JSON.stringify({
+        volume: parseInt(_volume),
+        mute: _mute,
+        idle_audio: _idle_audio,
+        touch_audio: _touch_audio
+      }),
     });
   }
   function updateDisplay() {
@@ -160,6 +169,14 @@
 
 <P class="mb-4">音频设置</P>
 <Toggle class="mb-2" bind:checked={_mute} on:change={updateAudio}>静音</Toggle>
+{#if !_mute}
+<Toggle class="mb-2" bind:checked={_touch_audio} on:change={updateAudio}
+  >互动语音</Toggle
+>
+<Toggle class="mb-2" bind:checked={_idle_audio} on:change={updateAudio}
+  >闲置语音</Toggle
+>
+{/if}
 <Label for="volume">音量</Label>
 <Input
   id="volume"

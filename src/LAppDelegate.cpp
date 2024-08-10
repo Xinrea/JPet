@@ -75,7 +75,6 @@ bool LAppDelegate::Initialize() {
   DataManager *dataManager = DataManager::GetInstance();
   // 设置初始化
   dataManager->GetWindowPos(&_iposX, &_iposY);
-  dataManager->GetAudio(&_volume, &_mute);
   dataManager->GetDisplay(&_scale, &Green, &isLimit);
   _followlist = dataManager->GetFollowList();
   dataManager->GetNotify(&DynamicNotify, &LiveNotify, &UpdateNotify);
@@ -90,8 +89,6 @@ bool LAppDelegate::Initialize() {
   // 音频初始化
   _au = AudioManager::GetInstance();
   _au->Initialize();
-  _au->SetMute(_mute);
-  _au->SetVolume(static_cast<float>(_volume) / 10);
   LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]AudioManager Init");
 
   // GLFWの初期化
@@ -298,6 +295,7 @@ void LAppDelegate::Release() {
 
 void LAppDelegate::Run() {
   static double initial_audio_idle_time = glfwGetTime();
+  DataManager* dataManager = DataManager::GetInstance();
   // メインループ
   bool noskip = false;
   while (glfwWindowShouldClose(_window) == GL_FALSE && !_isEnd) {
@@ -371,10 +369,12 @@ void LAppDelegate::Run() {
     // Poll for and process events
     glfwPollEvents();
 
-    if (glfwGetTime() - initial_audio_idle_time > 30.0f) {
-      initial_audio_idle_time = glfwGetTime();
-      if (rand() % 100 >= 90) {
-        _au->Play3dSound(AudioType::IDLE);
+    if (dataManager->GetConfig<bool>("audio", "idle_audio", true)) {
+      if (glfwGetTime() - initial_audio_idle_time > 30.0f) {
+        initial_audio_idle_time = glfwGetTime();
+        if (rand() % 100 >= 90) {
+          _au->Play3dSound(AudioType::IDLE);
+        }
       }
     }
 
@@ -403,9 +403,6 @@ void LAppDelegate::Run() {
       glfwSetWindowSize(_window, RenderTargetWidth, RenderTargetHeight);
       if (DebugLogEnable) LAppPal::PrintLog("[LAppDelegate] New Window Size");
     }
-
-    _au->SetVolume(static_cast<float>(_volume) / 10);
-    _au->SetMute(_mute);
   }
   // Release前保存配置
   SaveSettings();
@@ -423,9 +420,6 @@ void LAppDelegate::SaveSettings() {
   glfwGetWindowPos(_window, &x, &y);
   DataManager *dataManager = DataManager::GetInstance();
   dataManager->UpdateWindowPos(x, y);
-
-  // update audio settings
-  dataManager->UpdateAudio(_volume, _mute);
 
   // update shortcuts settings
   dataManager->UpdateShortcut("left", _leftUrl);
@@ -470,8 +464,6 @@ LAppDelegate::LAppDelegate()
       _isSetting(false),
       _timeSetting(1),
       _holdTime(0),
-      _volume(20),
-      _mute(false),
       _windowWidth(0),
       _windowHeight(0) {
   _view = new LAppView();
@@ -511,7 +503,9 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
       _captured = true;
       glfwGetCursorPos(window, &_cX, &_cY);
       _view->OnTouchesBegan(_mouseX, _mouseY);
-      _au->Play3dSound(AudioType::CLICK);
+      if (DataManager::GetInstance()->GetConfig<bool>("audio", "touch_audio", true)) {
+        _au->Play3dSound(AudioType::CLICK);
+      }
       // set expression
     } else if (GLFW_RELEASE == action) {
       if (_captured) {

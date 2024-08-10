@@ -114,13 +114,6 @@ class LAppDelegate {
 
   UserStateManager *GetUserStateManager() { return _us; }
 
-  // 设置窗口交互
-  bool GetMute() { return _mute; }
-  void SetMute(bool m) { _mute = m; }
-
-  int GetVolume() { return _volume; }
-  void SetVolume(int v) { _volume = v; }
-
   float GetScale() { return _scale; }
   void SetScale(float s) { _scale = s; }
 
@@ -245,8 +238,6 @@ class LAppDelegate {
   bool _isSetting;
   float _timeSetting;
   double _holdTime;
-  int _volume;
-  bool _mute;
   float _scale = 1.0f;
 
   int _windowWidth;   ///< Initialize関数で設定したウィンドウ幅

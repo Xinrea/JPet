@@ -68,20 +68,27 @@ void DataManager::UpdateWindowPos(int x, int y) {
   data.insert_or_assign("window", toml::table{{"x", x}, {"y", y}});
 }
 
-void DataManager::GetAudio(int* volume, bool* mute) {
+void DataManager::GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touch_audio) {
   // if audio doesn't exist, create it
   if (!data.contains("audio")) {
-    data.insert("audio", toml::table{{"volume", 20}, {"mute", false}});
+    data.insert("audio", toml::table{{"volume", 20},
+                                     {"mute", false},
+                                     {"idle_audio", false},
+                                     {"touch_audio", false}});
   }
   // get volume, mute from data
   *volume = data.at("audio").as_table()->at("volume").value_or(20);
   *mute = data.at("audio").as_table()->at("mute").value_or(false);
+  *idle_audio = data.at("audio").as_table()->at("idle_audio").value_or(false);
+  *touch_audio = data.at("audio").as_table()->at("touch_audio").value_or(false);
 }
 
-void DataManager::UpdateAudio(int volume, bool mute) {
+void DataManager::UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio) {
   // update volume in data
-  data.insert_or_assign("audio",
-                        toml::table{{"volume", volume}, {"mute", mute}});
+  data.insert_or_assign("audio", toml::table{{"volume", volume},
+                                             {"mute", mute},
+                                             {"idle_audio", idle_audio},
+                                             {"touch_audio", touch_audio}});
 }
 
 void DataManager::GetShortcut(std::map<std::string, std::string>* shortcuts) {
@@ -213,7 +220,7 @@ void DataManager::RemoveFollow(const std::string& uid) {
 }
 
 void DataManager::Save() {
-  const std::wstring configPath = LAppDefine::documentPath + L"/jpet.toml";
+  const std::wstring configPath = LAppDefine::documentPath + L"\\jpet.toml";
   std::ofstream file(configPath);
   if (!file.is_open()) {
     LAppPal::PrintLog("Failed to open config file for writing");
@@ -221,8 +228,6 @@ void DataManager::Save() {
   }
   file << data;
   file.close();
-  LAppPal::PrintLog(LogLevel::Info, L"[DataManager]Saved config file: %ls",
-                    configPath.c_str());
 }
 
 void DataManager::AddExp(bool bonus) {

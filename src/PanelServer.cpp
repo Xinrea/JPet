@@ -310,11 +310,15 @@ void PanelServer::doServe() {
   });
   server->Get("/api/config/audio",
               [](const httplib::Request &req, httplib::Response &res) {
-                int volume = LAppDelegate::GetInstance()->GetVolume();
-                bool mute = LAppDelegate::GetInstance()->GetMute();
+                bool mute;
+                int volume;
+                bool idle_audio, touch_audio;
+                DataManager::GetInstance()->GetAudio(&volume, &mute, &idle_audio, &touch_audio);
                 auto json = nlohmann::json::object();
                 json["volume"] = volume;
                 json["mute"] = mute;
+                json["idle_audio"] = idle_audio;
+                json["touch_audio"] = touch_audio;
                 res.set_content(json.dump(), "application/json");
               });
   server->Post("/api/config/audio",
@@ -322,9 +326,10 @@ void PanelServer::doServe() {
                  LAppPal::PrintLog("POST /api/config/audio");
                  try {
                    auto json = nlohmann::json::parse(req.body);
-                   LAppDelegate::GetInstance()->SetMute(json.at("mute"));
-                   LAppDelegate::GetInstance()->SetVolume(json.at("volume"));
-                   LAppDelegate::GetInstance()->SaveSettings();
+                   DataManager::GetInstance()->UpdateAudio(
+                       json.at("volume"), json.at("mute"),
+                       json.at("idle_audio"), json.at("touch_audio"));
+                   DataManager::GetInstance()->Save();
                    res.status = 200;
                  } catch (nlohmann::json::exception &e) {
                    LAppPal::PrintLog("json parse error: %s", e.what());

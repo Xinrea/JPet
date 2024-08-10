@@ -23,10 +23,6 @@ class AudioManager {
   void Play3dSound(AudioType t, int no);
   void Play3dSound(AudioType t);
   void Play3dSound(const wstring& file);
-  void SetVolume(float v) { _volume = v; }
-  float GetVolume() const { return _volume; }
-  void SetMute(bool m) { _mute = m; }
-  bool GetMute() const { return _mute; }
   void Update(int x, int y, int w, int h, int mw, int mh);
   void Release();
 
@@ -37,6 +33,4 @@ class AudioManager {
   vector<wstring> start_audios_;
   vector<wstring> idle_audios_;
   vector<wstring> click_audios_;
-  float _volume = 5.0f;
-  bool _mute = false;
 };
