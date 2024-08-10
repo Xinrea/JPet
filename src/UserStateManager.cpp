@@ -1,7 +1,6 @@
 ﻿#include "UserStateManager.h"
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
-#include "DataManager.hpp"
 #include "Wbi.hpp"
 
 #ifndef CPPHTTPLIB_OPENSSL_SUPPORT
@@ -9,35 +8,41 @@
 #endif
 
 #include <httplib.h>
+#include <semver.hpp>
 
 using namespace WinToastLib;
 
 void UserStateManager::CheckUpdate() {
-  httplib::SSLClient liveCli("pet.vjoi.cn", 443);
-  liveCli.set_follow_location(true);
-  liveCli.set_connection_timeout(std::chrono::seconds(1));
-  auto res = liveCli.Get("/version.txt");
+  httplib::SSLClient live_cli("pet.vjoi.cn", 443);
+  live_cli.set_follow_location(true);
+  live_cli.set_connection_timeout(std::chrono::seconds(1));
+  auto res = live_cli.Get("/version.txt");
   if (res && res->status == 200) {
     LAppPal::PrintLog(
         LogLevel::Debug,
         (std::string("[UserStateWatcher]Check Update Latest: ") + res->body)
             .c_str());
-    if (VERSION == -1) {
-      LAppPal::PrintLog(LogLevel::Info,
-                        "[UserStateManager]Skip CheckUpdate in debug version");
+    bool need_check = true;
+    try {
+      semver::version latest_version{res->body};
+    } catch (const std::exception& e) {
+      LAppPal::PrintLog(LogLevel::Warn, "[UserStateManager]Latest version is not formatted");
+      need_check = false;
+    }
+    if (!need_check) {
       return;
     }
-    int now = VERSION;
-    int latest = atoi(res->body.c_str());
-    if (now < latest) {
+    semver::version latest_version{res->body};
+    semver::version local_version{(VERSION)};
+    
+    if (local_version < latest_version) {
       LAppPal::PrintLog("[UserStateWatcher]Need Update: %s -> %s ", VERSION,
                         res->body.c_str());
-      Notify(L"检测到新版本", L"请前往下载",
+      Notify(L"检测到新版本", L"请前往项目页面下载",
              new WinToastEventHandler("https://pet.vjoi.cn"));
     }
   } else {
     LAppPal::PrintLog(LogLevel::Error, "[UserStateWatcher]Check Update Failed");
-    if (res) LAppPal::PrintLog(res->body.c_str());
   }
 }
 
@@ -57,7 +62,7 @@ void UserStateManager::Init(const std::vector<std::string>& list, HWND parent) {
   LAppPal::PrintLog(LogLevel::Info, "[LAppDelegate]Notification Init");
   WinToast::instance()->setAppName(L"JPet");
   const auto aumi =
-      WinToast::configureAUMI(L"JoiGroup", L"JPetProject", L"JPet", std::to_wstring(VERSION));
+      WinToast::configureAUMI(L"JoiGroup", L"JPetProject", L"JPet", LAppPal::StringToWString(VERSION));
   WinToast::instance()->setAppUserModelId(aumi);
   WinToast::instance()->initialize();
 

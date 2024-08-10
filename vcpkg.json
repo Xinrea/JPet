@@ -10,6 +10,7 @@
     "nlohmann-json",
     "cpr",
     "cryptopp",
-    "croncpp"
+    "croncpp",
+    "neargye-semver"
   ]
 }

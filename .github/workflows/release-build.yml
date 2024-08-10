@@ -4,9 +4,7 @@ name: jpet-build
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+    tags: '*'
 
 jobs:
   build:
@@ -32,21 +30,16 @@ jobs:
         token: ${{ github.token }}
         github-binarycache: true
 
-    - name: Generate Version'
-      run: |
-        $version = (Get-Date).ToString("yyyyMMdd")
-        echo "JVERSION=$version" | Out-File -FilePath $Env:GITHUB_ENV -Append -Encoding utf8
-
     - name: Build For Release
       run: |
-        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DJVERSION=${{ env.JVERSION }} -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DJVERSION="${{ github.ref_name }}" -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
         cmake --build ${{github.workspace}}/build --config Release --target ALL_BUILD
 
     - name: Update Version in iss 
       run: |
           $issPath = "${{ github.workspace }}/build-scripts/jpet_setup.iss"
           $pattern = '#define MyAppVersion "[^"]*"'
-          $replacement = '#define MyAppVersion "${{ env.JVERSION }}"'
+          $replacement = '#define MyAppVersion "${{ github.ref_name }}"'
           (Get-Content $issPath) -replace $pattern, $replacement | Set-Content $issPath
 
     - name: Pack with Inno Setup
@@ -59,7 +52,7 @@ jobs:
       uses: actions/upload-artifact@v4.3.6
       with:
         # Artifact name
-        name: jpet
+        name: jpet-${{ github.ref_name }}
         # A file, directory or wildcard pattern that describes what to upload
         path: ${{github.workspace}}/build/bin/JPet/Release/
 
@@ -67,6 +60,6 @@ jobs:
       uses: actions/upload-artifact@v4.3.6
       with:
         # Artifact name
-        name: jpet-setup
+        name: jpet-setup-${{ github.ref_name }}
         # A file, directory or wildcard pattern that describes what to upload
         path: ${{github.workspace}}/build-scripts/Output/JPetSetup.exe

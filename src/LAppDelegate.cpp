@@ -696,7 +696,7 @@ void LAppDelegate::Menu() {
   GetCursorPos(&p);
   HMENU hMenu;
   hMenu = CreatePopupMenu();
-  AppendMenu(hMenu, MF_STRING | MF_GRAYED, 0, (L"Version." + std::to_wstring(VERSION)).c_str());
+  AppendMenu(hMenu, MF_STRING | MF_GRAYED, 0, (L"Version " + LAppPal::StringToWString((VERSION))).c_str());
   AppendMenu(hMenu, MF_STRING, IDM_PROJECT, TEXT("前往项目主页"));
   AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
   if (_isShowing) {

@@ -11,7 +11,7 @@ set(APP_NAME JPet)
 
 # JVERSION can be set by -D option.
 if(NOT DEFINED JVERSION)
-  set(JVERSION -1)
+  set(JVERSION "2.0.0-alpha")
 endif()
 
 message(STATUS "JPet version: ${JVERSION}")
@@ -43,6 +43,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(cpr CONFIG REQUIRED)
 find_package(cryptopp CONFIG REQUIRED)
 find_package(croncpp CONFIG REQUIRED)
+find_package(semver CONFIG REQUIRED)
 
 # Set Visual Studio startup project.
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${APP_NAME})
@@ -168,6 +169,7 @@ target_link_libraries(${APP_NAME}
   cpr::cpr
   cryptopp::cryptopp
   croncpp::croncpp
+  semver::semver
   Dbghelp
 
   # Solve the MSVCRT confliction if using MSVC.
@@ -245,7 +247,7 @@ target_compile_definitions(${APP_NAME}
   CPPHTTPLIB_OPENSSL_SUPPORT
   WIN32_LEAN_AND_MEAN
   _HAS_STD_BYTE=0
-  VERSION=${JVERSION}
+  VERSION="${JVERSION}"
 )
 # if build Debug, add debug definition.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

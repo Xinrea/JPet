@@ -10,7 +10,7 @@ try {
 
     # 配置 CMake 项目
     Write-Host "Configuring CMake project ..." -ForegroundColor Green
-    cmake . -Bbuild -DJVERSION=20000000 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=D:\vcpkg\scripts\buildsystems\vcpkg.cmake
+    cmake . -Bbuild -DJVERSION="2.0.0-alpha" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_TOOLCHAIN_FILE=D:\vcpkg\scripts\buildsystems\vcpkg.cmake
 
     # 构建项目
     Write-Host "Building project ..." -ForegroundColor Green
