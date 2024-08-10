@@ -520,34 +520,34 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
       }
     }
   }
-  if (GLFW_MOUSE_BUTTON_RIGHT == button) {
-    SetNotIdle();
-    if (GLFW_PRESS == action) {
-      _holdTime = glfwGetTime();
-      _isMsg = true;
-      _pX = _mouseX;
-      _pY = _mouseY;
-    } else if (GLFW_RELEASE == action) {
-      float dx = fabs(_mouseX - _pX);
-      float dy = fabs(_mouseY - _pY);
-      if (dx < 60 && dy < 60) {
-        // 鼠标小范围移动
-        double now = glfwGetTime();
-        if (now - _holdTime > _timeSetting) _isSetting = true;
-      } else if (_mouseX > _pX && dx > dy)
-        LUtils::OpenURL(_rightUrl);  // 向右滑动
-      else if (_mouseX < _pX && dx > dy)
-        LUtils::OpenURL(_leftUrl);  // 向左滑动
-      else if (_mouseY < _pY && dy > dx)
-        LUtils::OpenURL(_upUrl);  // 向上滑动
-      else if (_mouseY > _pY && dy > dx) {
-        _isShowing = false;  // 向下滑动
-        glfwHideWindow(_window);
-      }
+  // if (GLFW_MOUSE_BUTTON_RIGHT == button) {
+  //   SetNotIdle();
+  //   if (GLFW_PRESS == action) {
+  //     _holdTime = glfwGetTime();
+  //     _isMsg = true;
+  //     _pX = _mouseX;
+  //     _pY = _mouseY;
+  //   } else if (GLFW_RELEASE == action) {
+  //     float dx = fabs(_mouseX - _pX);
+  //     float dy = fabs(_mouseY - _pY);
+  //     if (dx < 60 && dy < 60) {
+  //       // 鼠标小范围移动
+  //       double now = glfwGetTime();
+  //       if (now - _holdTime > _timeSetting) _isSetting = true;
+  //     } else if (_mouseX > _pX && dx > dy)
+  //       LUtils::OpenURL(_rightUrl);  // 向右滑动
+  //     else if (_mouseX < _pX && dx > dy)
+  //       LUtils::OpenURL(_leftUrl);  // 向左滑动
+  //     else if (_mouseY < _pY && dy > dx)
+  //       LUtils::OpenURL(_upUrl);  // 向上滑动
+  //     else if (_mouseY > _pY && dy > dx) {
+  //       _isShowing = false;  // 向下滑动
+  //       glfwHideWindow(_window);
+  //     }
 
-      _isMsg = false;
-    }
-  }
+  //     _isMsg = false;
+  //   }
+  // }
   return;
 }
 
