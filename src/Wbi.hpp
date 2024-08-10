@@ -1,7 +1,9 @@
-﻿#include <array>   // std::array
+﻿#pragma once
+#include <array>   // std::array
 #include <locale>  // std::locale
 
 /// thrid party libraries
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
 #include <cpr/cpr.h>
 #include <cryptopp/md5.h>
 #include <cryptopp/hex.h>

@@ -15,5 +15,7 @@
   <p class="font-medium text-lg mt-4">配置文件与游戏数据</p>
   <p class="font-medium text-sm">本程序配置文件与游戏数据均在本地存储，位于用户文档目录下，点击 <a class="underline decoration-green-500 decoration-2 font-bold" href={"#"} on:click={()=>openDataFolder()}>此处</a> 打开目录。</p>
   <p class="font-medium text-lg mt-4">动态与直播提醒</p>
-  <p class="font-medium text-sm">由于 B 站风控机制的限制，添加太多监控目标会导致状态更新不及时。</p>
+  <p class="font-medium text-sm">由于 B 站风控机制的限制，添加太多监控目标会导致状态更新不及时，请尽量登录使用</p>
+  <p class="font-medium text-lg mt-4">轴芯等级</p>
+  <p class="font-medium text-sm">轴伊直播间粉丝勋章等级，需主动佩戴才可生效。</p>
 </div>

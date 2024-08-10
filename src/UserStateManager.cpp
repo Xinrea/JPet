@@ -1,6 +1,8 @@
 ﻿#include "UserStateManager.h"
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
+#include "DataManager.hpp"
+#include "Wbi.hpp"
 
 #ifndef CPPHTTPLIB_OPENSSL_SUPPORT
 #define CPPHTTPLIB_OPENSSL_SUPPORT
@@ -59,6 +61,10 @@ void UserStateManager::Init(const std::vector<std::string>& list, HWND parent) {
   WinToast::instance()->setAppUserModelId(aumi);
   WinToast::instance()->initialize();
 
+  auto p = Wbi::Get_wbi_key();
+  img_key = p.first;
+  sub_key = p.second;
+
   // init cookie window
   _cookieWindow = new CookieWindow(parent, GetModuleHandle(nullptr));
   // running check thread
@@ -72,24 +78,21 @@ void UserStateManager::CheckThread(const vector<string>& list) {
   _mutex.lock();
   for (auto uid : list) {
     std::shared_ptr<UserStateWatcher> watcher =
-      std::make_shared<UserStateWatcher>(uid, _cookieWindow->cookie,
-          _cookieWindow->userAgent);
+      std::make_shared<UserStateWatcher>(uid,
+          _cookieWindow->userAgent, img_key, sub_key);
     _watchers.push_back(watcher);
   }
   _mutex.unlock();
   int check_delay = 3;
   while (_running) {
-    // check cookie
-    if (_cookieWindow->cookie.empty()) {
-      _cookieWindow->UpdateCookie();
-    }
     // copy a shadow of _watchers
     _mutex.lock();
     std::vector<std::shared_ptr<UserStateWatcher>> watchers = _watchers;
     _mutex.unlock();
     for (auto watcher : watchers) {
       if (!_running) return;
-      CheckStatus status = watcher->Check(_messageQueue);
+      
+      CheckStatus status = watcher->Check(_messageQueue, FetchCookies());
       // notify message process
       auto msg = FetchOne();
       if (msg.has_value()) {

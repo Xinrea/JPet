@@ -241,7 +241,8 @@ void DataManager::Save() {
 void DataManager::AddExp(bool bonus) {
   int currentExp = GetAttribute("exp");
   int intellect = GetAttribute("intellect");
-  int exp = 1 + ceil(99 * LAppPal::EaseInOut(intellect - 4) / 100);
+  int medal = GetWithDefault("medal_level", 0);
+  int exp = 1 + ceil(99 * LAppPal::EaseInOut(intellect + medal - 4) / 100);
   if (bonus) {
     exp *= 10;
   }
@@ -257,21 +258,6 @@ std::vector<int> DataManager::GetAttributeList() {
     attributes.push_back(value);
   }
   return attributes;
-}
-
-void DataManager::SetRaw(const std::string& key, int value) {
-  gameData->Update(key, value);
-  PostProcess(key, value);
-}
-
-void DataManager::SetRaw(const std::string& key, float value) {
-  gameData->Update(key, value);
-}
-
-int DataManager::GetRaw(const std::string& key) {
-  int value = 0;
-  gameData->Get(key, value);
-  return value;
 }
 
 int DataManager::GetWithDefault(const std::string& key, int default_value) {

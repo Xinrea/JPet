@@ -13,18 +13,15 @@
 #include "LAppDefine.hpp"
 using namespace LAppDefine;
 
-UserStateWatcher::UserStateWatcher(const string& uid, const string& cookies,
-                                   const string& userAgent)
-    : _cookies(cookies), _userAgent(userAgent) {
+UserStateWatcher::UserStateWatcher(const string& uid,
+                                   const string& userAgent, const string& img_key, const string& sub_key)
+    : _userAgent(userAgent), img_key(img_key), sub_key(sub_key) {
   target.uid = uid;
 
-  auto p = Wbi::Get_wbi_key();
-  img_key = p.first;
-  sub_key = p.second;
 }
 
-void UserStateWatcher::initBasicInfo() {
-  httplib::Headers headers = {{"cookie", _cookies}, {"User-Agent", _userAgent}};
+void UserStateWatcher::initBasicInfo(const string& cookies) {
+  httplib::Headers headers = {{"cookie", cookies}, {"User-Agent", _userAgent}};
 
   // change client host
   httplib::SSLClient client = httplib::SSLClient("api.bilibili.com", 443);
@@ -36,7 +33,7 @@ void UserStateWatcher::initBasicInfo() {
   const auto w_rid = Wbi::Calc_sign(Params, mixin_key);
 
   auto res =
-      client.Get(("/x/space/acc/info?" + Wbi::Json_to_url_encode_str(Params) +
+      client.Get(("/x/space/wbi/acc/info?" + Wbi::Json_to_url_encode_str(Params) +
                   "&w_rid=" + w_rid)
                      .c_str(),
                  headers);
@@ -68,16 +65,16 @@ void UserStateWatcher::initBasicInfo() {
   }
 }
 
-CheckStatus UserStateWatcher::Check(queue<StateMessage>& messageQueue) {
+CheckStatus UserStateWatcher::Check(queue<StateMessage>& messageQueue, const string& cookies) {
   if (!_initialized) {
-    initBasicInfo();
+    initBasicInfo(cookies);
   }
 
   if (!_initialized) {
     return CheckStatus::FAST;
   }
 
-  httplib::Headers headers = {{"cookie", _cookies}, {"User-Agent", _userAgent}};
+  httplib::Headers headers = {{"cookie", cookies}, {"User-Agent", _userAgent}};
 
   httplib::SSLClient dynamicCli("api.bilibili.com", 443);
   dynamicCli.set_connection_timeout(std::chrono::seconds(1));

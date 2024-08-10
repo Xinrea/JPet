@@ -1,5 +1,6 @@
 <script>
   import {
+    Avatar,
     Label,
     P,
     Toggle,
@@ -11,6 +12,8 @@
     Tooltip,
     Modal,
   } from "flowbite-svelte";
+  import QRCode from 'qrcode';
+  import fanAvatar from "../assets/fan.png";
   // audio
   let _volume = "20";
   let _mute = false;
@@ -59,6 +62,15 @@
       .then((data) => {
         _track = data.track;
       });
+    fetch("/api/account").then(res=>res.json()).then(data=>{
+      account_info = data;
+    });
+    setInterval(async ()=>{
+      const res = await fetch("/api/account");
+      if (res.status == 200) {
+        account_info = await res.json();
+      }
+    }, 10 * 1000);
     const es = new EventSource("/api/sse");
     es.onmessage = (event) => {
       if (event.data == "NOTIFY_UPDATE") {
@@ -164,9 +176,59 @@
     _reset = true;
     fetch("/api/data/reset", { method: "POST" });
   }
+  // acount
+  let account_info = null;
+  let account_modal = false;
+  async function doLogin() {
+    const qr_info = await (await fetch("/api/account/qr")).json();
+    var canvas = document.getElementById("qrcode");
+    QRCode.toCanvas(canvas, qr_info.url, (e)=>{
+      if (e) {
+        console.error("Create QRCode failed", e);
+      } else {
+        console.log("QRCode updated");
+      }
+    });
+    const status_checker = setInterval(async ()=>{
+      const res = await (await fetch("/api/account/qr-status")).json();
+      if (res.success) {
+        clearInterval(status_checker);
+        account_modal = false;
+        console.log("account confirmed");
+        fetch("/api/account").then(res=>res.json()).then(data=>{
+          account_info = data;
+        });
+      }
+    }, 2000);
+  }
+  async function logout() {
+    fetch("/api/account", { method: "DELETE" });
+  }
   init();
 </script>
 
+<Modal bind:open={account_modal} on:open={doLogin}>
+  <div class="flex justify-center">
+    <canvas id="qrcode" />
+  </div>
+</Modal>
+<P class="mb-4">账号设置</P>
+{#if account_info && account_info.login}
+<div class="flex items-center space-x-4 rtl:space-x-reverse">
+  <Avatar src={fanAvatar} rounded size="lg"/>
+  <div class="space-y-1 font-medium dark:text-white">
+    <div>{account_info.info.uname}</div>
+    <div class="text-sm text-gray-500 dark:text-gray-400">轴芯等级：{account_info.info.level}</div>
+    <Tooltip placement="right">等级能起到与智力类似的效果</Tooltip>
+    <a href={"#"} on:click={logout} class="underline text-gray-500 decoration-green-500 decoration-2 text-sm">注销登录</a>
+  </div>
+</div>
+{:else if account_info && !account_info.login}
+<Button on:click={()=>{account_modal = true}}>Bilibili 登录</Button>
+{:else}
+<div class="text-sm text-gray-500 dark:text-gray-400">加载中</div>
+{/if}
+<Hr />
 <P class="mb-4">音频设置</P>
 <Toggle class="mb-2" bind:checked={_mute} on:change={updateAudio}>静音</Toggle>
 {#if !_mute}
@@ -230,7 +292,7 @@
 <Toggle class="mb-2" bind:checked={_update} on:change={updateNotify}
   >软件更新提醒</Toggle
 >
-<p class="text-xs">*由于 B 站风控政策，不保证能够及时提醒。</p>
+<p class="text-xs">*由于 B 站风控政策，非登录状态不保证能够及时提醒。</p>
 <Hr />
 <P class="mb-4">其它设置</P>
 <Toggle class="mb-2" bind:checked={_track} on:change={updateOther}

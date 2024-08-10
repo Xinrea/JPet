@@ -5,6 +5,8 @@
 #include "LAppPal.hpp"
 #include "PartStateManager.h"
 #include "LAppDelegate.hpp"
+#include "Wbi.hpp"
+
 #include <shellapi.h>
 #include <winuser.h>
 
@@ -153,12 +155,13 @@ void PanelServer::doServe() {
     json["attributes"]["intellect"] = attributes[4];
     json["attributes"]["exp"] = attributes[5];
     json["attributes"]["buycnt"] = attributes[6];
-    json["clothes"]["current"] = dataManager->GetRaw("clothes.current");
+    json["clothes"]["current"] = dataManager->GetRaw<int>("clothes.current");
     json["clothes"]["unlock"] =
-        nlohmann::json::array({true, dataManager->GetRaw("clothes.1.active") == 1,
-                               dataManager->GetRaw("clothes.2.active") == 1});
+        nlohmann::json::array({true, dataManager->GetRaw<int>("clothes.1.active") == 1,
+                               dataManager->GetRaw<int>("clothes.2.active") == 1});
+    int medal = dataManager->GetWithDefault("medal_level", 0);
     json["expdiff"] =
-        int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4] - 4) / 100));
+        int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4] + medal - 4) / 100));
     res.set_content(json.dump(), "application/json");
   });
   server->Post("/api/data/reset", [](const httplib::Request &req, httplib::Response &res) {
@@ -193,7 +196,7 @@ void PanelServer::doServe() {
     // check id valid, 0 is actived by default
     bool unlock = true;
     if (id > 0) {
-      unlock = DataManager::GetInstance()->GetRaw("clothes."+ std::to_string(id) + ".active") == 1;
+      unlock = DataManager::GetInstance()->GetRaw<int>("clothes."+ std::to_string(id) + ".active") == 1;
     }
     if (!unlock) {
       LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Clothes id not active");
@@ -450,6 +453,124 @@ void PanelServer::doServe() {
   server->Post("/api/snapshot", [](const httplib::Request &req,
                                           httplib::Response &res) {
       LAppDelegate::GetInstance()->Snapshot();
+  });
+
+  httplib::SSLClient login_cli("passport.bilibili.com", 443);
+  login_cli.set_follow_location(true);
+  login_cli.enable_server_certificate_verification(false);
+  login_cli.set_connection_timeout(std::chrono::seconds(1));
+  std::string oauth_key;
+
+  server->Delete("/api/account", [](const httplib::Request &req,
+                                 httplib::Response &res) {
+      DataManager::GetInstance()->SetRaw("cookies", string(""));
+      DataManager::GetInstance()->SetRaw("medal_level", 0);
+  });
+  
+  server->Get("/api/account", [](const httplib::Request &req,
+                                 httplib::Response &res) {
+    string cookies = DataManager::GetInstance()->GetRaw<string>("cookies");
+    nlohmann::json resp_json = {};
+    if (cookies.empty()) {
+      resp_json["login"] = false;
+      res.set_content(resp_json.dump(), "application/json");
+      return;
+    }
+    resp_json["login"] = true;
+    resp_json["info"] = nlohmann::json::object();
+
+    httplib::Headers headers = {{"cookie", cookies}};
+    httplib::SSLClient client = httplib::SSLClient("api.bilibili.com", 443);
+    client.set_connection_timeout(std::chrono::seconds(1));
+
+    // get uid from cookies string, find DedeUserID
+    std::regex pattern("DedeUserID=([0-9]+)");
+    std::smatch match;
+    std::regex_search(cookies, match, pattern);
+    if (match.size() < 2) {
+      resp_json["login"] = false;
+      res.set_content(resp_json.dump(), "application/json");
+      return;
+    }
+    string uid = match[1];
+
+    nlohmann::json Params;
+    Params["mid"] = uid;
+
+    auto [img_key, sub_key] = LAppDelegate::GetInstance()->GetUserStateManager()->GetWbiKey();
+    const auto mixin_key = Wbi::Get_mixin_key(img_key, sub_key);
+    const auto w_rid = Wbi::Calc_sign(Params, mixin_key);
+
+    auto resp = client.Get(
+        ("/x/space/wbi/acc/info?" + Wbi::Json_to_url_encode_str(Params) + "&w_rid=" + w_rid).c_str(),
+        headers);
+    if (resp && resp->status == 200) {
+      auto json = nlohmann::json::parse(resp->body);
+      if (json.at("code") == 0 && json.contains("data")) {
+        try {
+          resp_json["info"]["uname"] =
+              json.at("data").at("name").get<std::string>();
+          resp_json["info"]["level"] = 0;
+          if (json["data"].contains("fans_medal")) {
+              if (!json["data"]["fans_medal"]["medal"].is_null()) {
+                auto medal = json["data"]["fans_medal"]["medal"];
+                if (medal["target_id"].get<int>() == 61639371) {
+                  resp_json["info"]["level"] = medal["level"];
+                  DataManager::GetInstance()->SetRaw("medal_level", medal["level"].get<int>());
+                }
+              }
+          }
+        } catch (const std::exception &e) {
+          LAppPal::PrintLog("[PanelServer]Exception: %s", e.what());
+        }
+        res.set_content(resp_json.dump(), "application/json");
+        return;
+      } else {
+        res.status = 500;
+        LAppPal::PrintLog("[PanelServer]Fetch account info failed with code %d",
+                          json.at("code").get<int>());
+      }
+    } else {
+      res.status = 500;
+      LAppPal::PrintLog("[PanelServer]Fetch account info failed");
+    }
+  });
+
+  server->Get("/api/account/qr", [&](const httplib::Request &req,
+                                          httplib::Response &res) {
+      auto resp = login_cli.Get("/x/passport-login/web/qrcode/generate");
+      if (resp && resp->status == 200) {
+        auto json = nlohmann::json::parse(resp->body);
+        oauth_key = json["data"]["qrcode_key"];
+        LAppPal::PrintLog(LogLevel::Debug, "[PanelServer]Get QrCode oauth %s", oauth_key.c_str());
+        nlohmann::json resp_json = {};
+        resp_json["url"] = json["data"]["url"];
+        res.set_content(resp_json.dump(), "application/json");
+        return;
+      }
+      if (resp) {
+        LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Get QrCode failed %d", resp->status);
+      } else {
+        LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Get QrCode failed");
+      }
+  });
+  server->Get("/api/account/qr-status", [&](const httplib::Request &req,
+                                          httplib::Response &res) {
+      auto resp = login_cli.Get("/x/passport-login/web/qrcode/poll?qrcode_key=" + oauth_key);
+      auto json = nlohmann::json::parse(resp->body);
+      auto resp_json = nlohmann::json::object();
+      if (json["data"]["code"] == 0) {
+        resp_json["success"] = true;
+        // get cookies from url param
+        std::string url = json["data"]["url"].get<std::string>();
+        std::string queryString = url.substr(url.find('?') + 1);
+        // replace & as ;
+        queryString = std::regex_replace(queryString, std::regex("&"), ";");
+        DataManager::GetInstance()->SetRaw("cookies", queryString);
+      } else {
+        resp_json["success"] = false;
+      }
+      res.set_content(resp_json.dump(), "application/json");
   });
 
   initSSE();

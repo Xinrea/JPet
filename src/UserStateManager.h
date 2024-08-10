@@ -10,6 +10,7 @@
 #include "UserStateWatcher.h"
 #include "CookieWindow.hpp"
 #include "LAppDefine.hpp"
+#include "DataManager.hpp"
 #include "wintoastlib.h"
 #include "WinToastEventHandler.h"
 
@@ -37,8 +38,8 @@ class UserStateManager {
         return;
       }
     }
-    std::shared_ptr<UserStateWatcher> watcher = std::make_shared<UserStateWatcher>(uid, _cookieWindow->cookie,
-        _cookieWindow->userAgent);
+    std::shared_ptr<UserStateWatcher> watcher = std::make_shared<UserStateWatcher>(uid,
+        _cookieWindow->userAgent, img_key, sub_key);
     _watchers.push_back(watcher);
     LAppPal::PrintLog("[UserStateManager]Add watcher %s", uid.c_str());
   }
@@ -75,6 +76,18 @@ class UserStateManager {
     return std::nullopt;
   }
 
+  string FetchCookies() {
+    auto cookies = DataManager::GetInstance()->GetRaw<string>("cookies");
+    if (cookies.empty()) {
+      cookies = _cookieWindow->cookie;
+    }
+    return cookies;
+  }
+
+  std::pair<string, string> GetWbiKey() {
+    return std::pair<string, string>(img_key, sub_key);
+  }
+
  private:
   vector<std::shared_ptr<UserStateWatcher>> _watchers;
   std::mutex _mutex;
@@ -82,6 +95,8 @@ class UserStateManager {
   wstring _exePath;
   const bool& _dynamicNotifyEnabled;
   const bool& _liveNotifyEnabled;
+
+  string img_key, sub_key;
 
   CookieWindow* _cookieWindow = nullptr;
 

@@ -55,9 +55,23 @@ class DataManager {
   void RemoveFollow(const std::string &uid);
   void AddFollow(const std::string &uid);
 
-  void SetRaw(const std::string& key, int value);
-  void SetRaw(const std::string& key, float value);
-  int GetRaw(const std::string& key);
+  template <typename T>
+  void SetRaw(const std::string& key, T value) {
+    gameData->Update(key, value);
+  }
+
+  void SetRaw(const std::string& key, int value) {
+    gameData->Update(key, value);
+    PostProcess(key, value);
+  }
+
+  template <typename T>
+  T GetRaw(const std::string& key) {
+    T value;
+    gameData->Get(key, value);
+    return value;
+  }
+
   int GetWithDefault(const std::string& key, int default_value);
   float GetWithDefault(const std::string& key, float default_value);
 
