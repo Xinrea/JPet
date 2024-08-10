@@ -117,6 +117,7 @@ bool LAppDelegate::Initialize() {
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
   glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
   glfwWindowHint(GLFW_ICONIFIED, GL_FALSE);
+  glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
   glfwWindowHint(GLFW_FLOATING, GL_TRUE);
   glfwWindowHint(GLFW_DEPTH_BITS, 16);
   glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
@@ -130,7 +131,7 @@ bool LAppDelegate::Initialize() {
   }
 
   // 为了避免1703版本前鼠标穿透的问题，在窗口创建完成后再修改为无边框
-  glfwSetWindowAttrib(_window, GLFW_DECORATED, GLFW_FALSE);
+  // glfwSetWindowAttrib(_window, GLFW_DECORATED, GLFW_FALSE);
 
   GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
   glfwSetCursor(_window, cursor);
@@ -229,9 +230,6 @@ bool LAppDelegate::Initialize() {
 
   srand(time(NULL));
 
-  // 随机播放启动语音
-  _au->Play3dSound(AudioType::START, rand());
-
   // Start panel server
   auto panelServer = PanelServer::GetInstance();
   panelServer->Start();
@@ -296,6 +294,10 @@ void LAppDelegate::Release() {
 void LAppDelegate::Run() {
   static double initial_audio_idle_time = glfwGetTime();
   DataManager* dataManager = DataManager::GetInstance();
+  
+  // 随机播放启动语音
+  _au->Play3dSound(AudioType::START, rand());
+
   // メインループ
   bool noskip = false;
   while (glfwWindowShouldClose(_window) == GL_FALSE && !_isEnd) {
