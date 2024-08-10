@@ -276,6 +276,14 @@ float DataManager::GetWithDefault(const std::string& key, float default_value) {
   return default_value;
 }
 
+string DataManager::GetWithDefault(const std::string& key, const string& default_value) {
+  string value = default_value;
+  if (gameData->Get(key, value)) {
+    return value;
+  }
+  return default_value;
+}
+
 void DataManager::PostProcess(const std::string& key, int value) {
   // change clothes
   if (key == "clothes.current") {

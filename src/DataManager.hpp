@@ -65,14 +65,8 @@ class DataManager {
     PostProcess(key, value);
   }
 
-  template <typename T>
-  T GetRaw(const std::string& key) {
-    T value;
-    gameData->Get(key, value);
-    return value;
-  }
-
   int GetWithDefault(const std::string& key, int default_value);
+  string GetWithDefault(const std::string& key, const string& default_value);
   float GetWithDefault(const std::string& key, float default_value);
 
   void AddExp(bool bonus);

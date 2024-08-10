@@ -77,7 +77,7 @@ class UserStateManager {
   }
 
   string FetchCookies() {
-    auto cookies = DataManager::GetInstance()->GetRaw<string>("cookies");
+    auto cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
     if (cookies.empty()) {
       cookies = _cookieWindow->cookie;
     }

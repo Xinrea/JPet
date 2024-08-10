@@ -155,10 +155,10 @@ void PanelServer::doServe() {
     json["attributes"]["intellect"] = attributes[4];
     json["attributes"]["exp"] = attributes[5];
     json["attributes"]["buycnt"] = attributes[6];
-    json["clothes"]["current"] = dataManager->GetRaw<int>("clothes.current");
+    json["clothes"]["current"] = dataManager->GetWithDefault("clothes.current", 0);
     json["clothes"]["unlock"] =
-        nlohmann::json::array({true, dataManager->GetRaw<int>("clothes.1.active") == 1,
-                               dataManager->GetRaw<int>("clothes.2.active") == 1});
+        nlohmann::json::array({true, dataManager->GetWithDefault("clothes.1.active", 0) == 1,
+                               dataManager->GetWithDefault("clothes.2.active", 0) == 1});
     int medal = dataManager->GetWithDefault("medal_level", 0);
     json["expdiff"] =
         int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4] + medal - 4) / 100));
@@ -196,7 +196,7 @@ void PanelServer::doServe() {
     // check id valid, 0 is actived by default
     bool unlock = true;
     if (id > 0) {
-      unlock = DataManager::GetInstance()->GetRaw<int>("clothes."+ std::to_string(id) + ".active") == 1;
+      unlock = DataManager::GetInstance()->GetWithDefault("clothes."+ std::to_string(id) + ".active", 0) == 1;
     }
     if (!unlock) {
       LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Clothes id not active");
@@ -469,7 +469,7 @@ void PanelServer::doServe() {
   
   server->Get("/api/account", [](const httplib::Request &req,
                                  httplib::Response &res) {
-    string cookies = DataManager::GetInstance()->GetRaw<string>("cookies");
+    string cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
     nlohmann::json resp_json = {};
     if (cookies.empty()) {
       resp_json["login"] = false;
