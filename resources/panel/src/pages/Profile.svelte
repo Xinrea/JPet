@@ -1,5 +1,5 @@
 <script>
-  import { Tooltip, Button, Modal } from "flowbite-svelte";
+  import { Tooltip, Button, Modal, Alert} from "flowbite-svelte";
   import speedIcon from "../assets/at-sp.png";
   import enduranceIcon from "../assets/at-end.png";
   import strengthIcon from "../assets/at-str.png";
@@ -47,11 +47,6 @@
   export let expdiff = 0;
 
   $: currentExp = attributes.exp;
-  $: speed = attributes.speed;
-  $: endurance = attributes.endurance;
-  $: strength = attributes.strength;
-  $: will = attributes.will;
-  $: intellect = attributes.intellect;
   $: buycost = Math.floor(10 * Math.pow(1.5, attributes.buycnt));
   $: revertgain = Math.floor(
     (10 * Math.pow(1.5, Math.max(attributes.buycnt - 1, 0))) / 2,
@@ -95,6 +90,21 @@
     clothes.current = id;
     fetch(`/api/clothes/${id}`, { method: "POST" });
   }
+
+  const tooltips = [
+    "前期智力对经验值的加成非常可观",
+    "一些任务是可重复完成的",
+    "就算我没有在运行，任务倒计时也是在进行的",
+    "我的头围是 53cm",
+    "经验值可用于加点，但加点的消耗会越来越多",
+    "装扮完可以试试给我拍张照",
+    "设置里可以重置游戏数据",
+    "没有毅力的话，任务的成功率最高为 80%"
+  ];
+  let cur_tip = 0;
+  setInterval(()=>{
+    cur_tip = Math.floor(Math.random() * tooltips.length);
+  }, 10000);
 </script>
 
 <div>
@@ -184,7 +194,14 @@
       <Tooltip>下次增加{expdiff}点经验</Tooltip>
     </div>
   </div>
-  <div class="flex justify-center w-full mt-8 fixed bottom-8">
+  <div class="flex flex-col justify-center w-full -ml-4 fixed bottom-8">
+    <div class="flex justify-center w-full mb-8 px-2">
+      <Alert border color="green" dismissable>
+        <span class="font-medium">小提示：</span>
+          {tooltips[cur_tip]}
+      </Alert>
+    </div>
+    <div class="flex justify-center w-full">
     {#each clothesList as c, i}
       <div
         tabindex={i}
@@ -199,6 +216,7 @@
         <Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>
       {/if}
     {/each}
+    </div>
   </div>
 </div>
 
