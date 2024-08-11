@@ -182,6 +182,7 @@
   // acount
   let account_info = null;
   let account_modal = false;
+  let status_checker = null;
   async function doLogin() {
     const qr_info = await (await fetch("/api/account/qr")).json();
     var canvas = document.getElementById("qrcode");
@@ -192,7 +193,11 @@
         console.log("QRCode updated");
       }
     });
-    const status_checker = setInterval(async () => {
+    // release previous checker
+    if (status_checker) {
+      clearInterval(status_checker);
+    }
+    status_checker = setInterval(async () => {
       const res = await (await fetch("/api/account/qr-status")).json();
       if (res.success) {
         clearInterval(status_checker);
@@ -203,6 +208,11 @@
           .then((data) => {
             account_info = data;
           });
+        return;
+      }
+      // if qrcode is closed, there is no need to check
+      if (!account_modal) {
+        clearInterval(status_checker);
       }
     }, 2000);
   }
