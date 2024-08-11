@@ -2,6 +2,7 @@
 
 #include <croncpp.h>
 
+#include "BuffManager.hpp"
 #include "DataManager.hpp"
 #include "LAppPal.hpp"
 
@@ -25,16 +26,14 @@ class ExpTask : public Task {
     next = cron::cron_next(_cron, now);
     return true;
   }
-  void Execute() override { DataManager::GetInstance()->AddExp(_bonus); }
+  void Execute() override { DataManager::GetInstance()->AddExp(); }
   bool IsDone() override {
     // ExpTask never done
     return false;
   }
   void SetDone() override {}
-  void SetBonus(bool bonus) { _bonus = bonus; }
 
  private:
-  bool _bonus = false;
   cron::cronexpr _cron = cron::make_cron("0 * * * * *");
 };
 
@@ -63,4 +62,25 @@ class CheckTask : public Task {
 
  private:
   cron::cronexpr _cron = cron::make_cron("* * * * * *");
+};
+
+class BuffTask : public Task {
+ public:
+  bool ShouldExecute() override {
+    static std::time_t last = std::time(0);
+    std::time_t now = std::time(0);
+    if (now - last >= 10) {
+      last = now;
+      return true;
+    }
+    return false;
+  }
+  void Execute() override {
+    BuffManager::GetInstance()->Update();
+  }
+  bool IsDone() override {
+    return false;
+  }
+  void SetDone() override {
+  }
 };

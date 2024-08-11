@@ -11,6 +11,7 @@
   import imgClothes2 from "../assets/c2.png";
   import imgClothes3 from "../assets/c3.png";
   import Progress from "../components/Progress.svelte";
+    import BuffIcon from "../components/BuffIcon.svelte";
 
   const clothesImages = [imgClothes1, imgClothes2, imgClothes3];
   const attributeArray = ["speed", "endurance", "strength", "will", "intellect"];
@@ -44,7 +45,12 @@
     intellect: 0,
     buycnt: 0,
   };
+  
   export let expdiff = 0;
+
+  export let buffs = [
+    "live", "dynamic", "guard"
+  ];
 
   $: currentExp = attributes.exp;
   $: buycost = Math.floor(10 * Math.pow(1.5, attributes.buycnt));
@@ -102,7 +108,7 @@
     "没有毅力的话，任务的成功率最高为 80%",
     "点击发团可以快速打开面板",
     "登录账号后，轴芯等级也可提升经验获取量",
-    "获得轴芯等级需要在 B 站账号主页佩戴粉丝牌"
+    "轴伊的一些活动可以触发经验加成"
   ];
   let cur_tip = 0;
   setInterval(()=>{
@@ -179,7 +185,7 @@
       <Button color="alternative">取消</Button>
     </Modal>
   </div>
-  <div class="flex items-center justify-center mb-4">
+  <div class="flex relative items-center justify-center mb-4">
     <div class="w-32 h-64 overflow-hidden">
       <img src={clothesImages[clothes.current]} alt="avatar" />
     </div>
@@ -195,6 +201,11 @@
         </div>
       </Progress>
       <Tooltip>下次增加{expdiff}点经验</Tooltip>
+      <div class="flex justify-center mt-8">
+        {#each buffs as buff}
+          <BuffIcon type={buff} />
+        {/each}
+      </div>
     </div>
   </div>
   <div class="flex flex-col justify-center w-full -ml-4 fixed bottom-8">

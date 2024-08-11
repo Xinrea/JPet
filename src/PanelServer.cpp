@@ -1,4 +1,5 @@
 #include "PanelServer.hpp"
+#include "BuffManager.hpp"
 #include "DataManager.hpp"
 #include "GameTask.hpp"
 #include "LAppDefine.hpp"
@@ -159,9 +160,12 @@ void PanelServer::doServe() {
     json["clothes"]["unlock"] =
         nlohmann::json::array({true, dataManager->GetWithDefault("clothes.1.active", 0) == 1,
                                dataManager->GetWithDefault("clothes.2.active", 0) == 1});
-    int medal = dataManager->GetWithDefault("medal_level", 0);
-    json["expdiff"] =
-        int(1 + ceil(99 * LAppPal::EaseInOut(attributes[4] + medal - 4) / 100));
+    json["expdiff"] = dataManager->CurrentExpDiff();
+    json["buffs"] = nlohmann::json::array();
+    auto buffs_array = BuffManager::GetInstance()->GetBuffList();
+    for (const auto& buff : buffs_array) {
+      json["buffs"].push_back(buff);
+    }
     res.set_content(json.dump(), "application/json");
   });
   server->Post("/api/data/reset", [](const httplib::Request &req, httplib::Response &res) {
@@ -464,7 +468,6 @@ void PanelServer::doServe() {
   server->Delete("/api/account", [](const httplib::Request &req,
                                  httplib::Response &res) {
       DataManager::GetInstance()->SetRaw("cookies", string(""));
-      DataManager::GetInstance()->SetRaw("medal_level", 0);
   });
   
   server->Get("/api/account", [](const httplib::Request &req,
@@ -478,6 +481,7 @@ void PanelServer::doServe() {
     }
     resp_json["login"] = true;
     resp_json["info"] = nlohmann::json::object();
+    resp_json["info"]["level"] = BuffManager::GetInstance()->MedalLevel();
 
     httplib::Headers headers = {{"cookie", cookies}};
     httplib::SSLClient client = httplib::SSLClient("api.bilibili.com", 443);
@@ -493,6 +497,8 @@ void PanelServer::doServe() {
       return;
     }
     string uid = match[1];
+
+    DataManager::GetInstance()->SetRaw("uid", uid);
 
     nlohmann::json Params;
     Params["mid"] = uid;
@@ -510,16 +516,6 @@ void PanelServer::doServe() {
         try {
           resp_json["info"]["uname"] =
               json.at("data").at("name").get<std::string>();
-          resp_json["info"]["level"] = 0;
-          if (json["data"].contains("fans_medal")) {
-              if (!json["data"]["fans_medal"]["medal"].is_null()) {
-                auto medal = json["data"]["fans_medal"]["medal"];
-                if (medal["target_id"].get<int>() == 61639371) {
-                  resp_json["info"]["level"] = medal["level"];
-                  DataManager::GetInstance()->SetRaw("medal_level", medal["level"].get<int>());
-                }
-              }
-          }
         } catch (const std::exception &e) {
           LAppPal::PrintLog("[PanelServer]Exception: %s", e.what());
         }

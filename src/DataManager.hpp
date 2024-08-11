@@ -69,7 +69,8 @@ class DataManager {
   string GetWithDefault(const std::string& key, const string& default_value);
   float GetWithDefault(const std::string& key, float default_value);
 
-  void AddExp(bool bonus);
+  void AddExp();
+  int CurrentExpDiff();
 
   /**
    * @brief   Get the list of attributes.

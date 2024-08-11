@@ -1,4 +1,5 @@
 #include "CookieWindow.hpp"
+#include "DataManager.hpp"
 #include "LAppPal.hpp"
 #include "LAppDefine.hpp"
 #include "resource.h"
@@ -130,6 +131,7 @@ void CookieWindow::WindowProc() {
                                   LAppPal::PrintLog(LogLevel::Info, "[CookieWindow]New cookie received");
                                 } else if (str[0] == 'U') {
                                   userAgent = str.substr(1);
+                                  DataManager::GetInstance()->SetRaw("user-agent", userAgent);
                                 }
                                 return S_OK;
                               })

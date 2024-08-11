@@ -249,8 +249,11 @@ bool LAppDelegate::Initialize() {
   TaskScheduler *ts = TaskScheduler::GetInstance();
   auto expTask = std::make_shared<ExpTask>();
   auto checkTask = std::make_shared<CheckTask>();
+  auto buffTask = std::make_shared<BuffTask>();
+  buffTask->Execute();
   ts->AddTask(expTask);
   ts->AddTask(checkTask);
+  ts->AddTask(buffTask);
 
   return GL_TRUE;
 }

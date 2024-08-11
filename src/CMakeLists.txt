@@ -49,4 +49,6 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/TaskScheduler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GameTask.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GameTask.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/BuffManager.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/BuffManager.cpp
 )

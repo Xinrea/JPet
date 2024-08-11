@@ -1,5 +1,6 @@
 #include "DataManager.hpp"
 
+#include "BuffManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
 #include "LAppLive2DManager.hpp"
@@ -237,16 +238,28 @@ void DataManager::Save() {
   file.close();
 }
 
-void DataManager::AddExp(bool bonus) {
+int DataManager::CurrentExpDiff() {
   int currentExp = GetAttribute("exp");
   int intellect = GetAttribute("intellect");
   int medal = GetWithDefault("medal_level", 0);
   int exp = 1 + ceil(99 * LAppPal::EaseInOut(intellect + medal - 4) / 100);
-  if (bonus) {
-    exp *= 10;
+  BuffManager* bf = BuffManager::GetInstance();
+  if (bf->IsDynamic()) {
+    exp *= 2;
   }
-  AddAttribute("exp", exp);
-  LAppPal::PrintLog(LogLevel::Debug, "[DataManager]Added %d exp", exp);
+  if (bf->IsLive()) {
+    exp *= 3;
+  }
+  if (bf->IsGuard()) {
+    exp *= 1.5f;
+  }
+  return exp;
+}
+
+void DataManager::AddExp() {
+  int diff = CurrentExpDiff();
+  AddAttribute("exp", diff);
+  LAppPal::PrintLog(LogLevel::Debug, "[DataManager]Added %d exp", diff);
 }
 
 std::vector<int> DataManager::GetAttributeList() {

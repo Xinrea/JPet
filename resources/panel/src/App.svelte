@@ -30,6 +30,7 @@
     current: 0,
     unlock: [true, false, false],
   };
+  let buffs = [];
 
   // fetch current status
   function updateProfile() {
@@ -39,6 +40,7 @@
         clothes = data.clothes;
         attributes = data.attributes;
         expdiff = data.expdiff;
+        buffs = data.buffs;
         console.log(data);
       });
   }
@@ -72,7 +74,7 @@
   </div>
   <div class="flex flex-col p-4 pt-4 bg-gray-50 z-10">
     <div class:hide={activeTab !== 0}>
-      <Profile {attributes} {expdiff} {clothes} />
+      <Profile {attributes} {expdiff} {clothes} {buffs} />
     </div>
     <div class:hide={activeTab !== 1}>
       <Task {attributes} />
