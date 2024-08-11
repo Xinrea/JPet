@@ -465,11 +465,40 @@ void PanelServer::doServe() {
   login_cli.set_connection_timeout(std::chrono::seconds(1));
   std::string oauth_key;
 
-  server->Delete("/api/account", [](const httplib::Request &req,
-                                 httplib::Response &res) {
-      DataManager::GetInstance()->SetRaw("cookies", string(""));
+  server->Delete("/api/account", [&](const httplib::Request &req,
+                                     httplib::Response &res) {
+    string cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
+    httplib::Headers headers = {{"cookie", cookies}};
+    // extract bili_jct from cookies
+    
+    std::regex pattern("bili_jct=([a-z0-9]+)");
+    std::smatch match;
+    std::regex_search(cookies, match, pattern);
+    if (match.size() < 2) {
+      LAppPal::PrintLog(LogLevel::Error, "[PanelServer]bili_jct not found");
+      return;
+    }
+    string bili_jct = match[1];
+
+    auto resp = login_cli.Post("/login/exit/v2", headers, "biliCSRF=" + bili_jct, "application/x-www-form-urlencoded");
+    if (resp && resp->status == 200) {
+      try {
+        auto json = nlohmann::json::parse(resp->body);
+        int code = json["code"].get<int>();
+        if (code == 0) {
+          LAppPal::PrintLog(LogLevel::Info, "[PanelServer]Logout successed");
+        } else {
+          LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Logout failed but still reset cookies");
+        }
+      } catch (const std::exception &e) {
+        LAppPal::PrintLog(LogLevel::Error,
+                          "[PanelServer]Parse logout failed: %s",
+                          resp->body.c_str());
+      }
+    }
+    DataManager::GetInstance()->SetRaw("cookies", string(""));
   });
-  
+
   server->Get("/api/account", [](const httplib::Request &req,
                                  httplib::Response &res) {
     string cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
