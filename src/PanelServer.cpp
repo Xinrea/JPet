@@ -563,6 +563,7 @@ void PanelServer::doServe() {
         // replace & as ;
         queryString = std::regex_replace(queryString, std::regex("&"), ";");
         DataManager::GetInstance()->SetRaw("cookies", queryString);
+        BuffManager::GetInstance()->Update();
       } else {
         resp_json["success"] = false;
       }
