@@ -309,6 +309,9 @@ void LAppDelegate::Run() {
   // メインループ
   bool noskip = false;
   while (glfwWindowShouldClose(_window) == GL_FALSE && !_isEnd) {
+    if (!_isShowing) {
+      goto render_end;
+    }
     noskip = !noskip;
     int width, height;
     glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &width,
@@ -376,6 +379,7 @@ void LAppDelegate::Run() {
       doSnapshot();
     }
 
+  render_end:
     // Poll for and process events
     glfwPollEvents();
 
