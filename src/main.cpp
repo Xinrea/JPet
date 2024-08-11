@@ -94,18 +94,17 @@ int main() {
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = nullptr;
     ofn.lpstrFile = szFile;
-    ofn.nMaxFile = sizeof(szFile);
-    ofn.lpstrFilter = L"Dump Files (*.dmp)\0*.dmp\0";
+    ofn.nMaxFile = sizeof(szFile) / sizeof(wchar_t);
+    ofn.lpstrFilter = L"Dump Files\0*.dmp\0";
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
     ofn.lpstrInitialDir = NULL;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
 
     if (GetSaveFileName(&ofn) == TRUE) {
-      // Use ofn.lpstrFile here to open the file for writing
-      CopyFile(filepath.c_str(), ofn.lpstrFile, TRUE);
-      DeleteFile(filepath.c_str());
+       CopyFile(filepath.c_str(), ofn.lpstrFile, TRUE);
+       DeleteFile(filepath.c_str());
     }
   }
 

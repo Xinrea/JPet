@@ -744,13 +744,13 @@ void LAppDelegate::Snapshot() {
   ofn.lStructSize = sizeof(ofn);
   ofn.hwndOwner = hwnd;
   ofn.lpstrFile = szFile;
-  ofn.nMaxFile = sizeof(szFile);
+  ofn.nMaxFile = sizeof(szFile) / sizeof(wchar_t);
   ofn.lpstrFilter = L"PNG Files (*.png)\0*.png\0";
   ofn.nFilterIndex = 1;
   ofn.lpstrFileTitle = NULL;
   ofn.nMaxFileTitle = 0;
   ofn.lpstrInitialDir = NULL;
-  ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+  ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
 
   if (GetSaveFileName(&ofn) == TRUE) {
     // Use ofn.lpstrFile here to open the file for writing

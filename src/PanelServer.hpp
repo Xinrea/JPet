@@ -25,8 +25,8 @@ class PanelServer {
 
  public:
   static PanelServer* GetInstance() {
-    static PanelServer instance;
-    return &instance;
+    static PanelServer* instance = new PanelServer();
+    return instance;
   }
 
   void Start();
