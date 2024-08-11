@@ -33,11 +33,12 @@
 #include "LAppPal.hpp"
 #include "LAppTextureManager.hpp"
 #include "LAppView.hpp"
-#include "LUtils.hpp"
 #include "PanelServer.hpp"
 #include "PartStateManager.h"
 #include "TaskScheduler.hpp"
 #include "resource.h"
+
+#include <wintoastlib.h>
 
 #define WM_IAWENTRAY WM_USER + 5
 
@@ -72,6 +73,7 @@ void LAppDelegate::ReleaseInstance() {
 
 bool LAppDelegate::Initialize() {
   LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]START");
+  WinToastLib::WinToast::instance()->setShortcutPolicy(WinToastLib::WinToast::SHORTCUT_POLICY_IGNORE);
   DataManager *dataManager = DataManager::GetInstance();
   // 设置初始化
   dataManager->GetWindowPos(&_iposX, &_iposY);
