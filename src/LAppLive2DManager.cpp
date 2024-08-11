@@ -141,7 +141,7 @@ void LAppLive2DManager::OnUpdate() const {
   for (csmUint32 i = 0; i < modelCount; ++i) {
     LAppModel* model = GetModel(i);
     projection = saveProjection;
-    projection.Scale(1, 1);
+    projection.Scale(0.9, 0.9);
     model->Update();
     model->Draw(projection);  ///< 参照渡しなのでprojectionは変質する
   }
