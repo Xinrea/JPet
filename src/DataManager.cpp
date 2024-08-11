@@ -67,8 +67,8 @@ void DataManager::GetWindowPos(int* x, int* y) {
     data.insert_or_assign("window", toml::table{{"x", 0}, {"y", 0}});
     return;
   }
-  *x = data.at("window").as_table()->at("x").value_or(0);
-  *y = data.at("window").as_table()->at("y").value_or(0);
+  *x = GetConfig("window", "x", 0);
+  *y = GetConfig("window", "y", 0);
 }
 
 void DataManager::UpdateWindowPos(int x, int y) {
@@ -85,10 +85,10 @@ void DataManager::GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touc
                                      {"touch_audio", true}});
   }
   // get volume, mute from data
-  *volume = data.at("audio").as_table()->at("volume").value_or(20);
-  *mute = data.at("audio").as_table()->at("mute").value_or(false);
-  *idle_audio = data.at("audio").as_table()->at("idle_audio").value_or(true);
-  *touch_audio = data.at("audio").as_table()->at("touch_audio").value_or(true);
+  *volume = GetConfig("audio", "volume", 20);
+  *mute = GetConfig("audio", "mute", false);
+  *idle_audio = GetConfig("audio", "idle_audio", true);
+  *touch_audio = GetConfig("audio", "touch_audio", true);
 }
 
 void DataManager::UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio) {
@@ -128,9 +128,9 @@ void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
     return;
   }
   // get scale, green, rateLimit from data
-  *scale = data.at("display").as_table()->at("scale").value_or(1.0f);
-  *green = data.at("display").as_table()->at("green").value_or(false);
-  *rateLimit = data.at("display").as_table()->at("rateLimit").value_or(false);
+  *scale = GetConfig("display", "scale", 1.0f);
+  *green = GetConfig("display", "green", false);
+  *rateLimit = GetConfig("display", "rateLimit", false);
 }
 
 void DataManager::UpdateDisplay(float scale, bool green, bool rateLimit) {
@@ -150,7 +150,7 @@ bool DataManager::IsTracking() {
     other->insert("track", true);
     return true;
   }
-  return data.at("other").as_table()->at("track").value_or(true);
+  return GetConfig("other", "track", true);
 }
 
 void DataManager::IsTracking(bool enable) {
@@ -175,10 +175,9 @@ void DataManager::initNotifySection() {
 void DataManager::GetNotify(bool *dynamic, bool *live, bool *update) {
   initNotifySection();
   // get followList, dynamic, live, update from data
-  auto notifyTable = data.at("notify").as_table();
-  *dynamic = notifyTable->at("dynamic").value_or(true);
-  *live = notifyTable->at("live").value_or(true);
-  *update = notifyTable->at("update").value_or(true);
+  *dynamic = GetConfig("notify", "dynamic", true);
+  *live = GetConfig("notify", "live", true);
+  *update = GetConfig("notify", "update", true);
 }
 
 void DataManager::UpdateNotify(
