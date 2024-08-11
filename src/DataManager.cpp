@@ -81,14 +81,14 @@ void DataManager::GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touc
   if (!data.contains("audio")) {
     data.insert("audio", toml::table{{"volume", 20},
                                      {"mute", false},
-                                     {"idle_audio", false},
-                                     {"touch_audio", false}});
+                                     {"idle_audio", true},
+                                     {"touch_audio", true}});
   }
   // get volume, mute from data
   *volume = data.at("audio").as_table()->at("volume").value_or(20);
   *mute = data.at("audio").as_table()->at("mute").value_or(false);
-  *idle_audio = data.at("audio").as_table()->at("idle_audio").value_or(false);
-  *touch_audio = data.at("audio").as_table()->at("touch_audio").value_or(false);
+  *idle_audio = data.at("audio").as_table()->at("idle_audio").value_or(true);
+  *touch_audio = data.at("audio").as_table()->at("touch_audio").value_or(true);
 }
 
 void DataManager::UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio) {
