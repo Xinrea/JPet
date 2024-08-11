@@ -124,9 +124,9 @@ void LAppView::OnTouchesBegan(float px, float py) const {
   {
     // TODO 为什么乘以 2 没搞懂，总之可以用
     float x = _deviceToScreen->TransformX(_touchManager->GetX()) *
-              2;  // 論理座標変換した座標を取得。
+              2 / 0.9;  // 論理座標変換した座標を取得。
     float y = _deviceToScreen->TransformY(_touchManager->GetY()) *
-              2;  // 論理座標変換した座標を取得。
+              2 / 0.9;  // 論理座標変換した座標を取得。
     LAppLive2DManager* live2DManager = LAppLive2DManager::GetInstance();
     live2DManager->OnTap(x, y);
   }
