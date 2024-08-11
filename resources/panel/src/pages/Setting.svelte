@@ -63,11 +63,13 @@
       .then((data) => {
         _track = data.track;
       });
-    fetch("/api/account")
-      .then((res) => res.json())
-      .then((data) => {
-        account_info = data;
-      });
+    setTimeout(() => {
+      fetch("/api/account")
+        .then((res) => res.json())
+        .then((data) => {
+          account_info = data;
+        });
+    }, 1000);
     setInterval(async () => {
       const res = await fetch("/api/account");
       if (res.status == 200) {

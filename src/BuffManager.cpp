@@ -19,6 +19,7 @@ void BuffManager::thread() {
 }
 
 void BuffManager::Update() {
+  auto start_time = std::chrono::high_resolution_clock::now();
   DataManager* dm = DataManager::GetInstance();
   auto cookies = dm->GetWithDefault("cookies", "");
   auto user_agent = dm->GetWithDefault("user-agent", "");
@@ -30,6 +31,9 @@ void BuffManager::Update() {
   updateDynamic(headers);
   updateLive(headers);
   updateGuard(headers);
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  LAppPal::PrintLog(LogLevel::Info, "[BuffManager]Update buffs status cost=%dms", duration.count());
 }
 
 void BuffManager::updateDynamic(const httplib::Headers& headers) {
