@@ -242,6 +242,9 @@ bool LAppDelegate::Initialize() {
   _us = new UserStateManager(DynamicNotify, LiveNotify);
   _us->Init(_followlist, hwnd);
 
+  // check update
+  _us->CheckUpdate();
+
   // Init task scheduler and basic tasks
   TaskScheduler *ts = TaskScheduler::GetInstance();
   auto expTask = std::make_shared<ExpTask>();

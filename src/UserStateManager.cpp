@@ -23,16 +23,21 @@ void UserStateManager::CheckUpdate() {
         (std::string("[UserStateWatcher]Check Update Latest: ") + res->body)
             .c_str());
     bool need_check = true;
+    string version_str = string(res->body);
+    size_t endpos = version_str.find_last_not_of('\n');
+    if (endpos != std::string::npos) {
+      version_str = version_str.substr(0, endpos + 1);
+    }
     try {
-      semver::version latest_version{res->body};
+      semver::version latest_version{version_str};
     } catch (const std::exception& e) {
-      LAppPal::PrintLog(LogLevel::Warn, "[UserStateManager]Latest version is not formatted");
+      LAppPal::PrintLog(LogLevel::Warn, "[UserStateManager]Latest version is not formatted %s", e.what());
       need_check = false;
     }
     if (!need_check) {
       return;
     }
-    semver::version latest_version{res->body};
+    semver::version latest_version{version_str};
     semver::version local_version{(VERSION)};
     
     if (local_version < latest_version) {
