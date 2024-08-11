@@ -13,8 +13,8 @@
 
 void PanelServer::Start() {
   // start thread
-  std::thread t(&PanelServer::doServe, this);
-  t.detach();
+  worker_ = std::thread(&PanelServer::doServe, this);
+  worker_.detach();
 }
 
 void PanelServer::DataSinkHandle(httplib::DataSink &sink) {
@@ -600,6 +600,6 @@ void PanelServer::doServe() {
   });
 
   initSSE();
-
   server->listen("localhost", 8053);
+  LAppPal::PrintLog(LogLevel::Info, "[PanelServer]Worker exit");
 }

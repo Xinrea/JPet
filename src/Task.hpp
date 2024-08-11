@@ -20,7 +20,7 @@ class ExpTask : public Task {
   bool ShouldExecute() override {
     static std::time_t next = cron::cron_next(_cron, std::time(0));
     std::time_t now = std::time(0);
-    if (now != next) {
+    if (now < next) {
       return false;
     }
     next = cron::cron_next(_cron, now);
@@ -40,43 +40,19 @@ class ExpTask : public Task {
 class CheckTask : public Task {
  public:
   bool ShouldExecute() override {
-    static std::time_t next = cron::cron_next(_cron, std::time(0));
-    std::time_t now = std::time(0);
-    if (now != next) {
-      return false;
-    }
-    next = cron::cron_next(_cron, now);
-    return true;
-  }
-  void Execute() override {
-    auto gameTasks = DataManager::GetInstance()->GetTasks();
-    for (auto& task : gameTasks) {
-      task->TryDone();
-    }
-  }
-  bool IsDone() override {
-    return false;
-  }
-  void SetDone() override {
-  }
-
- private:
-  cron::cronexpr _cron = cron::make_cron("* * * * * *");
-};
-
-class BuffTask : public Task {
- public:
-  bool ShouldExecute() override {
     static std::time_t last = std::time(0);
     std::time_t now = std::time(0);
-    if (now - last >= 10) {
+    if (now - last >= 1) {
       last = now;
       return true;
     }
     return false;
   }
   void Execute() override {
-    BuffManager::GetInstance()->Update();
+    auto gameTasks = DataManager::GetInstance()->GetTasks();
+    for (auto& task : gameTasks) {
+      task->TryDone();
+    }
   }
   bool IsDone() override {
     return false;

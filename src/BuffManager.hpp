@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 
+#include "LAppPal.hpp"
 #include "httplib.h"
 
 // BuffManager manages buff status. buffs are stored in memory, no need to persist.
@@ -13,14 +14,26 @@ private:
   bool is_guard_ = false;
   int medal_level_ = 0;
 
+  bool running_ = true;
+  std::thread worker_;
+
   void updateDynamic(const httplib::Headers& headers);
   void updateLive(const httplib::Headers& headers);
   void updateGuard(const httplib::Headers& headers);
+
+  void thread();
   
 public:
   static BuffManager* GetInstance() {
-    static BuffManager* instance = new BuffManager();
-    return instance;
+    static BuffManager instance;
+    return &instance;
+  }
+
+  BuffManager() { worker_ = std::thread(&BuffManager::thread, this); }
+
+  ~BuffManager() {
+    running_ = false;
+    worker_.join();
   }
 
   std::vector<std::string> GetBuffList() {

@@ -5,6 +5,19 @@
 
 #include <httplib.h>
 
+void BuffManager::thread() {
+  time_t last = 0;
+  while(running_) {
+    time_t now = time(nullptr);
+    if (now - last >= 10) {
+      last = now;
+      Update();
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+  LAppPal::PrintLog(LogLevel::Info, "[BuffManager]Worker exit");
+}
+
 void BuffManager::Update() {
   DataManager* dm = DataManager::GetInstance();
   auto cookies = dm->GetWithDefault("cookies", "");

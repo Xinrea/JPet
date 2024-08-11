@@ -10,6 +10,7 @@ class PanelServer {
   std::string _message;
   std::condition_variable _cv;
   std::atomic_int _messageId = 0;
+  std::thread worker_;
 
 
   PanelServer() { server = new httplib::Server(); };
@@ -31,9 +32,4 @@ class PanelServer {
   void Start();
 
   void Notify(const std::string& message);
-
-  ~PanelServer() {
-    server->stop();
-    delete server;
-  }
 };

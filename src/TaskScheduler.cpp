@@ -4,13 +4,15 @@
 
 TaskScheduler::TaskScheduler() {
   _worker = std::thread(&TaskScheduler::doRun, this);
-  _worker.detach();
 }
 
 TaskScheduler::~TaskScheduler() {
   _running = false;
-  std::lock_guard<std::mutex> lock(_mutex);
+  _mutex.lock();
   _tasks.clear();
+  _mutex.unlock();
+  // wait for worker thread
+  _worker.join();
 }
 
 void TaskScheduler::AddTask(std::shared_ptr<Task> task) {
@@ -32,6 +34,7 @@ void TaskScheduler::doRun() {
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     tick();
   }
+  LAppPal::PrintLog(LogLevel::Info, "[TaskScheduler]Worker exit");
 }
 
 void TaskScheduler::tick() {
