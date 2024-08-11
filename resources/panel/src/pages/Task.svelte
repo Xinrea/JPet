@@ -101,11 +101,20 @@
     if (s >= 60) {
       let minutes = Math.floor(s / 60);
       if (minutes >= 60) {
-        str += Math.floor(minutes / 60) + "h";
+        let hours = Math.floor(minutes / 60);
+        if (hours > 0) {
+          str += hours + "h";
+        }
       }
-      str += (minutes % 60) + "m";
+      minutes = minutes % 60;
+      if (minutes > 0) {
+        str += minutes + "m";
+      }
     }
-    str += (s % 60) + "s";
+    let seconds = s % 60;
+    if (str == "" || seconds > 0) {
+      str += seconds + "s";
+    }
     return str;
   }
 
