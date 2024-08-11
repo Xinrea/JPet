@@ -287,6 +287,7 @@ void LAppDelegate::Release() {
   delete _view;
   _au->Release();
   _au->ReleaseInstance();
+  _panel->Close();
   // リソースを解放
   LAppLive2DManager::ReleaseInstance();
 
@@ -417,7 +418,6 @@ void LAppDelegate::Run() {
   }
   // Release前保存配置
   SaveSettings();
-
   Shell_NotifyIcon(NIM_DELETE, &nid);
   LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]TrayICON Delete");
   Release();

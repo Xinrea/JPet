@@ -29,6 +29,11 @@ class PanelServer {
     return instance;
   }
 
+  ~PanelServer() {
+    server->stop();
+    delete server;
+  }
+
   void Start();
 
   void Notify(const std::string& message);

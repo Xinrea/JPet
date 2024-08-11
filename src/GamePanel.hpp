@@ -5,8 +5,6 @@
 #include <webview2.h>
 #include <string>
 
-#include "LAppPal.hpp"
-
 /**
  * @brief A simple wrapper for webview of game info
  */
@@ -43,6 +41,10 @@ class GamePanel {
    * @brief Show the panel
    */
   void Show() { ShowWindow(_window, SW_SHOWNORMAL); }
+
+  void Close() {
+    webviewController->Close();
+  }
 
   wil::com_ptr<ICoreWebView2Controller> webviewController;
 

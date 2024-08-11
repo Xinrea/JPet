@@ -1,5 +1,6 @@
 ﻿#include "GamePanel.hpp"
 #include "LAppDefine.hpp"
+#include "LAppPal.hpp"
 #include "resource.h"
 
 #include <winuser.h>
