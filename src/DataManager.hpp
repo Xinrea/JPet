@@ -97,6 +97,14 @@ class DataManager {
     }
     return tasks;
   }
+  std::shared_ptr<GameTask> GetCurrentTask() {
+    for (auto& task : tasks) {
+      if (task->status == TStatus::RUNNING || task->status == TStatus::WAIT_SETTLE) {
+        return task;
+      }
+    }
+    return nullptr;
+  }
 
   void Save();
 

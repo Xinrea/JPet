@@ -5,151 +5,69 @@
  * that can be found at
  * https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html.
  */
-
 #include "LAppSprite.hpp"
+#include "LAppView.hpp"
+#define _USE_MATH_DEFINES
+#include <math.h>
 
-#include "LAppDelegate.hpp"
-#include "LAppPal.hpp"
+LAppSprite::LAppSprite(float x, float y, float inner, float outer) {
+  unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
+  glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+  glCompileShader(vertexShader);
 
-LAppSprite::LAppSprite(float x, float y, float width, float height,
-                       GLuint textureId, GLuint programId)
-    : _rect() {
-  _rect.left = (x - width * 0.5f);
-  _rect.right = (x + width * 0.5f);
-  _rect.up = (y + height * 0.5f);
-  _rect.down = (y - height * 0.5f);
-  _textureId = textureId;
+  unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+  glCompileShader(fragmentShader);
 
-  // 何番目のattribute変数か
-  _positionLocation = glGetAttribLocation(programId, "position");
-  _uvLocation = glGetAttribLocation(programId, "uv");
-  _textureLocation = glGetUniformLocation(programId, "texture");
-  _colorLocation = glGetUniformLocation(programId, "baseColor");
+  shaderProgram_ = glCreateProgram();
+  glAttachShader(shaderProgram_, vertexShader);
+  glAttachShader(shaderProgram_, fragmentShader);
+  glLinkProgram(shaderProgram_);
 
-  _spriteColor[0] = 1.0f;
-  _spriteColor[1] = 1.0f;
-  _spriteColor[2] = 1.0f;
-  _spriteColor[3] = 1.0f;
-}
-
-LAppSprite::~LAppSprite() {}
-
-void LAppSprite::Render() const {
-  // 画面サイズを取得する
-  int maxWidth, maxHeight;
-  glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &maxWidth,
-                    &maxHeight);
-
-  if (maxWidth == 0 || maxHeight == 0) {
-    return;  // この際は描画できず
+  float vertices[(FULL_SEGMENTS + 1) * 4]; // Enough for a full circle plus two extra points
+  int index = 0;
+  for (int i = 0; i <= FULL_SEGMENTS; i++) {
+    float angle = 2.0f * M_PI * i / FULL_SEGMENTS + M_PI / 2;
+    // Inner vertex
+    vertices[index++] = cos(angle) * inner + x;
+    vertices[index++] = sin(angle) * inner + y;
+    // Outer vertex
+    vertices[index++] = cos(angle) * outer + x;
+    vertices[index++] = sin(angle) * outer + y;
   }
 
-  glEnable(GL_TEXTURE_2D);
-  const GLfloat uvVertex[] = {
-      1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-  };
+  glGenVertexArrays(1, &vao_);
+  glGenBuffers(1, &vbo_);
 
-  // attribute属性を有効にする
-  glEnableVertexAttribArray(_positionLocation);
-  glEnableVertexAttribArray(_uvLocation);
+  glBindVertexArray(vao_);
 
-  // uniform属性の登録
-  glUniform1i(_textureLocation, 0);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-  // 頂点データ
-  float positionVertex[] = {
-      (_rect.right - maxWidth * 0.5f) / (maxWidth * 0.5f),
-      (_rect.up - maxHeight * 0.5f) / (maxHeight * 0.5f),
-      (_rect.left - maxWidth * 0.5f) / (maxWidth * 0.5f),
-      (_rect.up - maxHeight * 0.5f) / (maxHeight * 0.5f),
-      (_rect.left - maxWidth * 0.5f) / (maxWidth * 0.5f),
-      (_rect.down - maxHeight * 0.5f) / (maxHeight * 0.5f),
-      (_rect.right - maxWidth * 0.5f) / (maxWidth * 0.5f),
-      (_rect.down - maxHeight * 0.5f) / (maxHeight * 0.5f)};
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
 
-  // attribute属性を登録
-  glVertexAttribPointer(_positionLocation, 2, GL_FLOAT, false, 0,
-                        positionVertex);
-  glVertexAttribPointer(_uvLocation, 2, GL_FLOAT, false, 0, uvVertex);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
 
-  glUniform4f(_colorLocation, _spriteColor[0], _spriteColor[1], _spriteColor[2],
-              _spriteColor[3]);
-
-  // モデルの描画
-  glBindTexture(GL_TEXTURE_2D, _textureId);
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+  var_alpha_ = glGetUniformLocation(shaderProgram_, "globalAlpha");
 }
 
-void LAppSprite::RenderImmidiate(GLuint textureId,
-                                 const GLfloat uvVertex[8]) const {
-  // 画面サイズを取得する
-  int maxWidth, maxHeight;
-  glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &maxWidth,
-                    &maxHeight);
+LAppSprite::~LAppSprite() {
+  glDeleteVertexArrays(1, &vao_);
+  glDeleteBuffers(1, &vbo_);
+}
 
-  if (maxWidth == 0 || maxHeight == 0) {
-    return;  // この際は描画できず
+void LAppSprite::Render() {
+  if (current_alpha_ < target_alpha_) {
+    current_alpha_ += 5;
   }
-
-  glEnable(GL_TEXTURE_2D);
-
-  // attribute属性を有効にする
-  glEnableVertexAttribArray(_positionLocation);
-  glEnableVertexAttribArray(_uvLocation);
-
-  // uniform属性の登録
-  glUniform1i(_textureLocation, 0);
-
-  // 頂点データ
-  float positionVertex[] = {
-      (_rect.right - maxWidth * 0.5f) / (maxWidth * 0.5f),
-      (_rect.up - maxHeight * 0.5f) / (maxHeight * 0.5f),
-      (_rect.left - maxWidth * 0.5f) / (maxWidth * 0.5f),
-      (_rect.up - maxHeight * 0.5f) / (maxHeight * 0.5f),
-      (_rect.left - maxWidth * 0.5f) / (maxWidth * 0.5f),
-      (_rect.down - maxHeight * 0.5f) / (maxHeight * 0.5f),
-      (_rect.right - maxWidth * 0.5f) / (maxWidth * 0.5f),
-      (_rect.down - maxHeight * 0.5f) / (maxHeight * 0.5f)};
-
-  // attribute属性を登録
-  glVertexAttribPointer(_positionLocation, 2, GL_FLOAT, false, 0,
-                        positionVertex);
-  glVertexAttribPointer(_uvLocation, 2, GL_FLOAT, false, 0, uvVertex);
-
-  glUniform4f(_colorLocation, _spriteColor[0], _spriteColor[1], _spriteColor[2],
-              _spriteColor[3]);
-
-  // モデルの描画
-  glBindTexture(GL_TEXTURE_2D, textureId);
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-}
-
-bool LAppSprite::IsHit(float pointX, float pointY) const {
-  // 画面サイズを取得する
-  int maxWidth, maxHeight;
-  glfwGetWindowSize(LAppDelegate::GetInstance()->GetWindow(), &maxWidth,
-                    &maxHeight);
-
-  if (maxWidth == 0 || maxHeight == 0) {
-    return false;  // この際は描画できず
+  if (current_alpha_ > target_alpha_) {
+    current_alpha_ -= 5;
   }
-
-  // Y座標は変換する必要あり
-  float y = maxHeight - pointY;
-
-  return false;
-}
-
-void LAppSprite::SetColor(float r, float g, float b, float a) {
-  _spriteColor[0] = r;
-  _spriteColor[1] = g;
-  _spriteColor[2] = b;
-  _spriteColor[3] = a;
-}
-
-void LAppSprite::ResetRect(float x, float y, float width, float height) {
-  _rect.left = (x - width * 0.5f);
-  _rect.right = (x + width * 0.5f);
-  _rect.up = (y + height * 0.5f);
-  _rect.down = (y - height * 0.5f);
+  glUseProgram(shaderProgram_);
+  glUniform1f(var_alpha_, float(current_alpha_) / 100.0f);
+  glBindVertexArray(vao_);
+  glDrawArrays(GL_TRIANGLE_STRIP, 0, (FULL_SEGMENTS + 1) * 2 * progress_);
+  glBindVertexArray(0);
 }

@@ -108,7 +108,7 @@ class LAppDelegate {
    */
   bool GetIsEnd() { return _isEnd; }
 
-  bool GetIsMsg() { return _isMsg; }
+  bool IsHover() { return last_update_ > 0 && ((glfwGetTime() - last_update_) <= 3); }
 
   void SetIsSetting(bool s) { _isSetting = s; }
 
@@ -219,7 +219,6 @@ class LAppDelegate {
   double _cX, _cY;
   bool _isEnd;  ///< APP終了しているか
   bool _isShowing = true;
-  bool _isMsg;
   bool _isLive;
   int _mWidth, _mHeight;
   std::wstring _exePath;
@@ -248,6 +247,8 @@ class LAppDelegate {
   atomic_bool _need_snapshot;
   std::mutex _mtx;
   std::condition_variable _cv;
+
+  int last_update_ = 0;
 };
 
 class EventHandler {

@@ -8,10 +8,10 @@
 
 #include "LAppView.hpp"
 
+#include <ctime>
 #include <math.h>
 
-#include <string>
-
+#include "DataManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppDelegate.hpp"
 #include "LAppLive2DManager.hpp"
@@ -26,9 +26,6 @@ using namespace LAppDefine;
 
 LAppView::LAppView()
     : _programId(0),
-      _msg(NULL),
-      _gear(NULL),
-      _power(NULL),
       _renderSprite(NULL),
       _renderTarget(SelectTarget_None) {
   _clearColor[0] = 1.0f;
@@ -52,9 +49,7 @@ LAppView::~LAppView() {
   delete _viewMatrix;
   delete _deviceToScreen;
   delete _touchManager;
-  delete _msg;
-  delete _gear;
-  delete _power;
+  delete task_progress_;
 }
 
 void LAppView::Initialize() {
@@ -94,7 +89,20 @@ void LAppView::Render() {
 
   // Cubism更新・描画
   Live2DManager->OnUpdate();
-  if (LAppDelegate::GetInstance()->GetIsMsg()) _msg->Render();
+  if (LAppDelegate::GetInstance()->IsHover()) {
+    task_progress_->Show();
+  } else {
+    task_progress_->Hide();
+  }
+
+  time_t now = time(nullptr);
+  float p = 0;
+  auto task = DataManager::GetInstance()->GetCurrentTask();
+  if (task) {
+    p = min(float(now - task->start_time) / task->GetCurrentCost(), 1.0f);
+  }
+  task_progress_->UpdateProgress(p);
+  task_progress_->Render();
 }
 
 void LAppView::InitializeSprite() {
@@ -114,7 +122,7 @@ void LAppView::InitializeSprite() {
   float y = height * 0.5f;
   float fWidth = static_cast<float>(width);
   float fHeight = static_cast<float>(height);
-  _msg = new LAppSprite(x, y, fWidth, fHeight, msgTexture->id, _programId);
+  task_progress_ = new LAppSprite(0.55f, 0.8f, 0.05f, 0.1f);
 }
 
 TouchManager* LAppView::GetTouchManager() { return _touchManager; }
@@ -215,18 +223,4 @@ void LAppView::ResizeSprite() {
   LAppPal::PrintLog("wsize: %d %d", width, height);
   float x = 0.0f;
   float y = 0.0f;
-
-  if (_msg) {
-    GLuint id = _msg->GetTextureId();
-    LAppTextureManager::TextureInfo* texInfo =
-        textureManager->GetTextureInfoById(id);
-    if (texInfo) {
-      float ty = (static_cast<float>(height) - modelHeight) / height;
-      x = width * 0.5f;
-      y = 0.5f * height;
-      float fWidth = static_cast<float>(width);
-      float fHeight = static_cast<float>(height);
-      _msg->ResetRect(x, y, fWidth, fHeight);
-    }
-  }
 }

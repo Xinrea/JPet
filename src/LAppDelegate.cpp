@@ -122,6 +122,7 @@ bool LAppDelegate::Initialize() {
   glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
   glfwWindowHint(GLFW_FLOATING, GL_TRUE);
   glfwWindowHint(GLFW_DEPTH_BITS, 16);
+  glfwWindowHint(GLFW_SAMPLES, 4);
   glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
   _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet",
                              NULL, NULL);
@@ -197,6 +198,8 @@ bool LAppDelegate::Initialize() {
   // 透過設定
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  glEnable(GL_MULTISAMPLE);
 
   // コールバック関数の登録
   glfwSetMouseButtonCallback(_window, EventHandler::OnMouseCallBack);
@@ -459,7 +462,6 @@ LAppDelegate::LAppDelegate()
       _pX(0),
       _pY(0),
       _isEnd(false),
-      _isMsg(false),
       _iposX(400),
       _iposY(400),
       _cX(0),
@@ -563,6 +565,7 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
 void LAppDelegate::OnMouseCallBack(GLFWwindow *window, double x, double y) {
   _mouseX = static_cast<float>(x);
   _mouseY = static_cast<float>(y);
+  last_update_ = glfwGetTime();
   if (_captured) {
     LAppModel *model = LAppLive2DManager::GetInstance()->GetModel(0);
     if (model != NULL) {
@@ -576,10 +579,10 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, double x, double y) {
     // 简单模拟拖动时的物理效果
     double dx = x - _cX;
     if (dx > 0) {
-      _view->OnTouchesMoved(x - 30 * dx, ypos - 2 * height / 3);
+      _view->OnTouchesMoved(x - 30 * dx, ypos - 2.0f * height / 3);
     }
     if (dx < 0) {
-      _view->OnTouchesMoved(x - 30 * dx, ypos - 2 * height / 3);
+      _view->OnTouchesMoved(x - 30 * dx, ypos - 2.0f * height / 3);
     }
     return;
   }

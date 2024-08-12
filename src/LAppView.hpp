@@ -153,9 +153,7 @@ class LAppView {
   Csm::CubismMatrix44* _deviceToScreen;  ///< デバイスからスクリーンへの行列
   Csm::CubismViewMatrix* _viewMatrix;  ///< viewMatrix
   GLuint _programId;                   ///< シェーダID
-  LAppSprite* _msg;                    ///< 背景画像
-  LAppSprite* _gear;                   ///< ギア画像
-  LAppSprite* _power;                  ///< 電源画像
+  LAppSprite *task_progress_;
 
   // レンダリング先を別ターゲットにする方式の場合に使用
   LAppSprite*
