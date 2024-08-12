@@ -67,8 +67,8 @@ public:
         "title": "拧瓶盖",
         "desc": "「我真的能办到吗...」轴伊呆呆地凝望着饮料瓶",
         "requirements": {
-          "intellect": 9,
-          "strength": 9
+          "intellect": 7,
+          "strength": 7
         },
         "rewards": {
           "exp": 30
@@ -112,13 +112,13 @@ public:
         "title": "健身环直播",
         "desc": "*轴伊从尘封的抽屉中刨出了健身环",
         "requirements": {
-          "endurance": 7,
-          "strength": 7
+          "endurance": 9,
+          "strength": 9
         },
         "rewards": {
-          "speed": 1,
-          "endurance": 1,
-          "strength": 1
+          "endurance": 2,
+          "strength": 2,
+          "will": 1
         },
         "repeatable": true
       },
