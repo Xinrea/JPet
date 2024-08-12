@@ -251,15 +251,15 @@
               <p class="mb-1 flex justify-between align-middle items-center">
                 <span class="flex items-center"
                   ><span class="badge info">T{task.id}</span><span class="ml-2">
-                    <span>{task.title}</span>
-                    <span class="icon"
+                    <p>{task.title}</p>
+                    <p class="icon text-gray-500"
                       ><img
                         class="inline"
                         width="12"
                         height="12"
                         src={ClockIcon}
                         alt=""
-                      />{formatRemain(task.cost)}</span
+                      />{formatRemain(task.cost)}</p
                     >
                   </span></span
                 >
