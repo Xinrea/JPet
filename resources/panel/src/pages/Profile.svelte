@@ -53,9 +53,9 @@
   ];
 
   $: currentExp = attributes.exp;
-  $: buycost = Math.floor(10 * Math.pow(1.5, attributes.buycnt));
+  $: buycost = Math.floor(10 * Math.pow(1.25, attributes.buycnt));
   $: revertgain = Math.floor(
-    (10 * Math.pow(1.5, Math.max(attributes.buycnt - 1, 0))) / 2,
+    (10 * Math.pow(1.25, Math.max(attributes.buycnt - 1, 0))) / 2,
   );
 
   // current time to next time point

@@ -33,7 +33,11 @@ void BuffManager::Update() {
   updateGuard(headers);
   auto end_time = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-  LAppPal::PrintLog(LogLevel::Info, "[BuffManager]Update buffs status cost=%dms", duration.count());
+  if (duration.count() >= 1500) {
+    LAppPal::PrintLog(LogLevel::Info,
+                      "[BuffManager]Update buffs status cost=%dms",
+                      duration.count());
+  }
 }
 
 void BuffManager::updateDynamic(const httplib::Headers& headers) {

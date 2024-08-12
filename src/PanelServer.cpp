@@ -119,7 +119,7 @@ void PanelServer::doServe() {
                  auto dataManager = DataManager::GetInstance();
                  int currentExperience = dataManager->GetAttribute("exp");
                  int buycnt = dataManager->GetAttribute("buycnt");
-                 int currentCost = 10 * pow(1.5, buycnt);
+                 int currentCost = 10 * pow(1.25, buycnt);
                  if (currentCost > currentExperience) {
                    res.status = 400;
                    return;
@@ -138,7 +138,7 @@ void PanelServer::doServe() {
                    // TODO check valid attribute
                    auto dataManager = DataManager::GetInstance();
                    int buycnt = dataManager->GetAttribute("buycnt");
-                   int revertCost = 10 * pow(1.5, max(buycnt - 1, 0)) / 2;
+                   int revertCost = 10 * pow(1.25, max(buycnt - 1, 0)) / 2;
                    dataManager->AddAttribute(targetAttribute, -1);
                    dataManager->AddAttribute("exp", revertCost);
                    dataManager->AddAttribute("buycnt", -1);
