@@ -1,5 +1,7 @@
 #pragma once
 
+#include <windows.h>
+#include <winuser.h>
 #include <wrl.h>
 #include <wil/com.h>
 #include <webview2.h>
@@ -40,7 +42,13 @@ class GamePanel {
   /**
    * @brief Show the panel
    */
-  void Show() { ShowWindow(_window, SW_SHOWNORMAL); }
+  void Show() { 
+    if (IsWindowVisible(_window)) {
+      ShowWindow(_window, SW_HIDE); 
+    } else {
+      ShowWindow(_window, SW_SHOWNORMAL); 
+    }
+  }
 
   void Close() {
     webviewController->Close();
