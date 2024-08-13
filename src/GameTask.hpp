@@ -79,7 +79,7 @@ public:
         "id": 2,
         "cost": 3600,
         "title": "跑步 800m",
-        "desc": "跑步训练！这是真是存在的吗？",
+        "desc": "跑步训练！这是真实存在的吗？",
         "requirements": {
           "endurance": 5,
           "strength": 3
