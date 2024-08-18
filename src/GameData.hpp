@@ -6,8 +6,10 @@
 #include <unordered_map>
 #include <mutex>
 #include <filesystem>
+#include <rocksdb/db.h>
 
 #include "LAppPal.hpp"
+#include "LAppDefine.hpp"
 
 enum class EntryType {
   TypeString,
@@ -140,116 +142,147 @@ class Entry {
  */
 class GameData {
  private:
-  std::wstring _path;
-  std::unordered_map<std::string, Entry> _m;
-  std::mutex _mutex;
+  rocksdb::DB* db;
+  rocksdb::WriteOptions writeOptions;
 
   void parse(const std::vector<char>& data) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    size_t offset = 0;
-    while (offset < data.size()) {
-      Entry entry(data, offset);
-      _m.insert({entry.key, entry});
+    try {
+      size_t offset = 0;
+      while (offset < data.size()) {
+        Entry entry(data, offset);
+        switch (entry.type)
+        {
+        case EntryType::TypeInt: {
+          int32_t v = entry.getInt();
+          db->Put(writeOptions, entry.key, std::string(reinterpret_cast<char*>(&v), sizeof(int32_t)));
+          break;
+        }
+        case EntryType::TypeBool: {
+          bool b = entry.getBool();
+          db->Put(writeOptions, entry.key, std::string(reinterpret_cast<char*>(&b), sizeof(bool)));
+          break;
+        }
+        case EntryType::TypeFloat: {
+          float f = entry.getFloat();
+          db->Put(writeOptions, entry.key, std::string(reinterpret_cast<char*>(&f), sizeof(float)));
+          break;
+        }
+        case EntryType::TypeString: {
+          db->Put(writeOptions, entry.key, entry.getString());
+          break;
+        }
+        default: {
+          LAppPal::PrintLog(LogLevel::Warn, "[GameData]Unknown entry type");
+          break;
+        }
+        }
+      }
+    } catch (const std::exception& e) {
+      LAppPal::PrintLog(LogLevel::Error, e.what());
     }
     LAppPal::PrintLog(LogLevel::Debug, "[GameData]Parse done");
   }
 
  public:
-  GameData(const std::wstring& path) : _path(path) {
-    // load data from file, if file not exist, create one
-    if (!std::filesystem::exists(std::filesystem::path(_path))) {
-      std::ofstream file(_path);
-      if (!file.is_open()) {
-        LAppPal::PrintLog(LogLevel::Debug, "Failed to create file");
-        throw std::runtime_error("Failed to create file");
-      }
-      file.close();
+  GameData(const std::wstring& path) {
+    writeOptions.sync = true;
+    rocksdb::Options options;
+    options.create_if_missing = true;
+    rocksdb::Status status = rocksdb::DB::Open(options, LAppPal::WStringToString(LAppDefine::documentPath) + "/GameData", &db);
+    if (!status.ok()) {
+      LAppPal::PrintLog(LogLevel::Error, "[GameData]Failed to open db");
+      return;
     }
-    std::ifstream file(_path, std::ios::binary | std::ios::ate);
-    if (file.is_open()) {
-      std::streamsize size = file.tellg();
-      file.seekg(0, std::ios::beg);
-      // print file size
-      std::vector<char> buffer(size);
-      if (!file.read(buffer.data(), size)) {
-        throw std::runtime_error("Failed to read file");
+    // load old data from file, if file not exist, skip reading
+    if (std::filesystem::exists(std::filesystem::path(path))) {
+      std::ifstream file(path, std::ios::binary | std::ios::ate);
+      if (file.is_open()) {
+        std::streamsize size = file.tellg();
+        file.seekg(0, std::ios::beg);
+        // print file size
+        std::vector<char> buffer(size);
+        if (file.read(buffer.data(), size)) {
+          file.close();
+          parse(buffer);
+        }
       }
-      file.close();
-      parse(buffer);
-    } else {
-      throw std::runtime_error("Failed to open file");
+
+      // old data file is no longer needed
+      std::filesystem::remove(path);
     }
+  }
+
+  ~GameData() {
+    db->Close();
+    delete db;
   }
 
   void Dump() {
-    // write data to file
-    std::ofstream file(_path, std::ios::binary);
-    if (file.is_open()) {
-      for (auto& kv : _m) {
-        auto data = kv.second.serialize();
-        file.write(data.data(), data.size());
-      }
-      file.close();
-    } else {
-      throw std::runtime_error("Failed to open file");
+  }
+
+  void Update(const std::string& key, int32_t value) {
+    auto status = db->Put(writeOptions, key, std::string(reinterpret_cast<char*>(&value), sizeof(int32_t)));
+    if (!status.ok()) {
+      LAppPal::PrintLog(LogLevel::Error, "[GameData]Failed to update %s", key.c_str());
     }
   }
 
-  void Update(const std::string& key, int value) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _m.insert_or_assign(key, Entry(EntryType::TypeInt, key, value));
-    Dump();
-  }
-
   void Update(const std::string& key, bool value) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _m.insert_or_assign(key, Entry(EntryType::TypeBool, key, value));
-    Dump();
+    auto status = db->Put(writeOptions, key, std::string(reinterpret_cast<char*>(&value), sizeof(bool)));
+    if (!status.ok()) {
+      LAppPal::PrintLog(LogLevel::Error, "[GameData]Failed to update %s", key.c_str());
+    }
   }
 
   void Update(const std::string& key, float value) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _m.insert_or_assign(key, Entry(EntryType::TypeFloat, key, value));
-    Dump();
+    auto status = db->Put(writeOptions, key, std::string(reinterpret_cast<char*>(&value), sizeof(float)));
+    if (!status.ok()) {
+      LAppPal::PrintLog(LogLevel::Error, "[GameData]Failed to update %s", key.c_str());
+    }
   }
 
   void Update(const std::string& key, const std::string& value) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _m.insert_or_assign(key, Entry(EntryType::TypeString, key, value));
-    Dump();
+    auto status = db->Put(writeOptions, key, value);
+    if (!status.ok()) {
+      LAppPal::PrintLog(LogLevel::Error, "[GameData]Failed to update %s", key.c_str());
+    }
   }
 
-  bool Get(const std::string& key, int& value) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    if (_m.find(key) != _m.end()) {
-      value = _m.at(key).getInt();
+  bool Get(const std::string& key, int32_t& value) {
+    std::string v;
+    auto status = db->Get(rocksdb::ReadOptions(), key, &v);
+    if (status.ok()) {
+      value = *reinterpret_cast<int32_t*>(v.data());
       return true;
     }
     return false;
   }
 
   bool Get(const std::string& key, bool& value) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    if (_m.find(key) != _m.end()) {
-      value = _m.at(key).getBool();
+    std::string v;
+    auto status = db->Get(rocksdb::ReadOptions(), key, &v);
+    if (status.ok()) {
+      value = *reinterpret_cast<bool*>(v.data());
       return true;
     }
     return false;
   }
 
   bool Get(const std::string& key, float& value) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    if (_m.find(key) != _m.end()) {
-      value = _m.at(key).getFloat();
+    std::string v;
+    auto status = db->Get(rocksdb::ReadOptions(), key, &v);
+    if (status.ok()) {
+      value = *reinterpret_cast<float*>(v.data());
       return true;
     }
     return false;
   }
 
   bool Get(const std::string& key, std::string& value) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    if (_m.find(key) != _m.end()) {
-      value = _m.at(key).getString();
+    std::string v;
+    auto status = db->Get(rocksdb::ReadOptions(), key, &v);
+    if (status.ok()) {
+      value = v;
       return true;
     }
     return false;

@@ -112,7 +112,7 @@ int main() {
 
     if (GetSaveFileName(&ofn) == TRUE) {
        CopyFile(filepath.c_str(), ofn.lpstrFile, TRUE);
-       DeleteFile(filepath.c_str());
+       std::filesystem::remove(filepath);
     }
   }
 

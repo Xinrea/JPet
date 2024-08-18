@@ -31,15 +31,17 @@ bool DataManager::init() {
 
   // check reset marker
   const std::wstring markerPath = LAppDefine::documentPath + L"/.reset";
-  const std::wstring dataPath = LAppDefine::documentPath + L"/jpet.dat";
+  const std::wstring oldDataPath = LAppDefine::documentPath + L"/jpet.dat";
+  const std::wstring dataPath = LAppDefine::documentPath + L"/GameData";
   if (IsResetMarked()) {
     std::filesystem::remove(std::filesystem::path(markerPath));
-    std::filesystem::remove(std::filesystem::path(dataPath));
+    std::filesystem::remove(std::filesystem::path(oldDataPath));
+    std::filesystem::remove_all(std::filesystem::path(dataPath));
     LAppPal::PrintLog(LogLevel::Info, "[DataManager]Data reseted due to marker");
   }
   // initialize game data
-  bool firstData = !std::filesystem::exists(std::filesystem::path(dataPath));
-  gameData = std::make_shared<GameData>(dataPath);
+  bool firstData = !std::filesystem::exists(std::filesystem::path(dataPath)) && !std::filesystem::exists(std::filesystem::path(oldDataPath));
+  gameData = std::make_shared<GameData>(oldDataPath);
   if (firstData) {
     AddAttribute("speed", 2);
     AddAttribute("strength", 1);
@@ -320,7 +322,7 @@ void DataManager::AddAttribute(const std::string& key, int value) {
   int current = 0;
   gameData->Get("attr." + key, current);
   // WARN not support negative value yet
-  gameData->Update("attr." + key, max(current + value, 0));
+  gameData->Update("attr." + key, std::max(current + value, 0));
 }
 
 std::vector<int> DataManager::TaskStatus(int id) {

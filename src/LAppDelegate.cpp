@@ -758,7 +758,7 @@ void LAppDelegate::Snapshot() {
   if (GetSaveFileName(&ofn) == TRUE) {
     // Use ofn.lpstrFile here to open the file for writing
     CopyFile(filepath.c_str(), ofn.lpstrFile, TRUE);
-    DeleteFile(filepath.c_str());
+    std::filesystem::remove(filepath);
   }
 }
 

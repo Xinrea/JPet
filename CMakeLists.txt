@@ -44,6 +44,7 @@ find_package(cpr CONFIG REQUIRED)
 find_package(cryptopp CONFIG REQUIRED)
 find_package(croncpp CONFIG REQUIRED)
 find_package(semver CONFIG REQUIRED)
+find_package(RocksDB CONFIG REQUIRED)
 
 # Set Visual Studio startup project.
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${APP_NAME})
@@ -174,6 +175,8 @@ target_link_libraries(${APP_NAME}
   cryptopp::cryptopp
   croncpp::croncpp
   semver::semver
+  RocksDB::rocksdb
+  RocksDB::rocksdb-shared
   Dbghelp
 
   # Solve the MSVCRT confliction if using MSVC.
@@ -250,6 +253,7 @@ target_compile_definitions(${APP_NAME}
   PRIVATE
   CPPHTTPLIB_OPENSSL_SUPPORT
   WIN32_LEAN_AND_MEAN
+  NOMINMAX
   _HAS_STD_BYTE=0
   VERSION="${JVERSION}"
 )
