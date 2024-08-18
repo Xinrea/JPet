@@ -11,6 +11,7 @@
     "cpr",
     "cryptopp",
     "croncpp",
-    "neargye-semver"
+    "neargye-semver",
+    "rocksdb"
   ]
 }

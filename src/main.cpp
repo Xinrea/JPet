@@ -51,6 +51,14 @@ bool CheckWebView2Runtime() {
 
 int main() {
   SetUnhandledExceptionFilter(unhandled_handler);
+
+  // check JPet already running
+  HANDLE hMutex = CreateMutex(NULL, FALSE, L"JPetMutex");
+  if (GetLastError() == ERROR_ALREADY_EXISTS) {
+    MessageBox(nullptr, L"JPet 已经在运行中", L"错误", MB_OK);
+    return 1;
+  }
+
   INITCOMMONCONTROLSEX icce;
   icce.dwSize = sizeof(INITCOMMONCONTROLSEX);
   icce.dwICC = 0 | ICC_WIN95_CLASSES | ICC_BAR_CLASSES | ICC_COOL_CLASSES;
@@ -113,6 +121,9 @@ int main() {
     return 1;
   }
   LAppDelegate::GetInstance()->Run();
+
+  ReleaseMutex(hMutex);
+  CloseHandle(hMutex);
 
   return 0;
 }
