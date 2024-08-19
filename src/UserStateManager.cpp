@@ -15,6 +15,7 @@ using namespace WinToastLib;
 void UserStateManager::CheckUpdate() {
   httplib::SSLClient live_cli("pet.vjoi.cn", 443);
   live_cli.set_follow_location(true);
+  live_cli.enable_server_certificate_verification(false);
   live_cli.set_connection_timeout(std::chrono::seconds(1));
   auto res = live_cli.Get("/version.txt");
   if (res && res->status == 200) {
