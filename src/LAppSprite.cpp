@@ -50,7 +50,7 @@ LAppSprite::LAppSprite(float x, float y, float inner, float outer) {
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 
-  var_alpha_ = glGetUniformLocation(shaderProgram_, "globalAlpha");
+  var_color_ = glGetUniformLocation(shaderProgram_, "globalColor");
 }
 
 LAppSprite::~LAppSprite() {
@@ -66,7 +66,11 @@ void LAppSprite::Render() {
     current_alpha_ -= 5;
   }
   glUseProgram(shaderProgram_);
-  glUniform1f(var_alpha_, float(current_alpha_) / 100.0f);
+  if (progress_ >= 1.0f) {
+    glUniform4f(var_color_, 1, 0.51, 0.18, float(current_alpha_) / 100.0f);
+  } else {
+    glUniform4f(var_color_, 0.47, 0.79, 0.18, float(current_alpha_) / 100.0f);
+  }
   glBindVertexArray(vao_);
   glDrawArrays(GL_TRIANGLE_STRIP, 0, (FULL_SEGMENTS + 1) * 2 * progress_);
   glBindVertexArray(0);

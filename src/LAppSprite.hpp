@@ -54,7 +54,7 @@ class LAppSprite {
   const static int FULL_SEGMENTS = 360;
   GLuint vbo_;      ///< テクスチャID
   GLuint vao_;             ///< 矩形
-  GLuint var_alpha_;
+  GLuint var_color_;
   int current_alpha_ = 0;
   int target_alpha_ = 0;
   float progress_ = 0;
@@ -66,9 +66,9 @@ class LAppSprite {
                                    "}\0";
   const char *fragmentShaderSource =
       "#version 330 core\n"
-      "uniform float globalAlpha;"
+      "uniform vec4 globalColor;"
       "out vec4 FragColor;\n"
       "void main() {\n"
-      "   FragColor = vec4(0.47, 0.79, 0.18, globalAlpha);\n"
+      "   FragColor = globalColor;\n"
       "}\0";
 };
