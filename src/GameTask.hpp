@@ -71,7 +71,7 @@ public:
           "strength": 7
         },
         "rewards": {
-          "exp": 30
+          "exp": 50
         },
         "repeatable": true
       },
@@ -81,8 +81,8 @@ public:
         "title": "跑步 800m",
         "desc": "跑步训练！这是真实存在的吗？",
         "requirements": {
-          "endurance": 5,
-          "strength": 3
+          "endurance": 8,
+          "strength": 5
         },
         "rewards": {
           "endurance": 1,
@@ -101,8 +101,8 @@ public:
           "intellect": 3
         },
         "rewards": {
-          "endurance": 1,
-          "intellect": 1
+          "endurance": 3,
+          "intellect": 2
         },
         "repeatable": true
       },
@@ -112,13 +112,13 @@ public:
         "title": "健身环直播",
         "desc": "*轴伊从尘封的抽屉中刨出了健身环",
         "requirements": {
-          "endurance": 9,
-          "strength": 9
+          "endurance": 10,
+          "strength": 10
         },
         "rewards": {
-          "endurance": 2,
+          "endurance": 3,
           "strength": 2,
-          "will": 1
+          "will": 2
         },
         "repeatable": true
       },
@@ -128,12 +128,12 @@ public:
         "title": "困困夜行电台直播",
         "desc": "闲聊与读故事 time",
         "requirements": {
-          "endurance": 5,
-          "will": 3
+          "endurance": 3,
+          "will": 5
         },
         "rewards": {
-          "will": 1,
-          "intellect": 1
+          "will": 3,
+          "intellect": 2
         },
         "repeatable": true
       },
@@ -143,12 +143,12 @@ public:
         "title": "游戏直播",
         "desc": "「是采集卡延迟，真的。」",
         "requirements": {
-          "speed": 5,
-          "will": 3
+          "speed": 3,
+          "will": 5
         },
         "rewards": {
-          "speed": 1,
-          "intellect": 1
+          "speed": 2,
+          "intellect": 3
         },
         "repeatable": true
       },
@@ -158,11 +158,11 @@ public:
         "title": "歌回直播",
         "desc": "「屋内的湿气 像储存爱你的记忆~」",
         "requirements": {
-          "will": 3,
-          "intellect": 5
+          "will": 5,
+          "intellect": 3
         },
         "rewards": {
-          "will": 2
+          "will": 4
         },
         "repeatable": true
       },
@@ -195,8 +195,9 @@ public:
           "strength": 15
         },
         "rewards": {
-          "speed": 3,
-          "endurance": 2
+          "speed": 4,
+          "endurance": 6,
+          "strength": 5
         },
         "repeatable": true
       },
@@ -206,12 +207,16 @@ public:
         "title": "旅游",
         "desc": "*轴伊正在收拾东西出门",
         "requirements": {
-          "endurance": 15,
-          "strength": 10
+          "speed": 25,
+          "endurance": 25,
+          "strength": 25
         },
         "rewards": {
-          "endurance": 2,
-          "intellect": 3
+          "speed": 8,
+          "endurance": 8,
+          "strength": 6,
+          "will": 6,
+          "intellect": 8
         },
         "repeatable": false
       },
@@ -221,12 +226,12 @@ public:
         "title": "策划联动直播",
         "desc": "「Work work」",
         "requirements": {
-          "will": 25,
-          "intellect": 25
+          "will": 30,
+          "intellect": 30
         },
         "rewards": {
-          "will": 2,
-          "intellect": 3
+          "will": 8,
+          "intellect": 8
         },
         "repeatable": true
       },
