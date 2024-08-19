@@ -129,6 +129,8 @@ class LAppDelegate {
 
   void ShowPanel();
 
+  void ForceShowPanel();
+
   std::string GetLURL() { return _leftUrl; }
   std::string GetUURL() { return _upUrl; }
   std::string GetRURL() { return _rightUrl; }

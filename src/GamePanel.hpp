@@ -50,6 +50,10 @@ class GamePanel {
     }
   }
 
+  void ForceShow() {
+    ShowWindow(_window, SW_SHOWNORMAL);
+  }
+
   void Close() {
     webviewController->Close();
   }

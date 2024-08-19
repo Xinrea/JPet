@@ -732,6 +732,10 @@ void LAppDelegate::ShowPanel() {
   if (_panel) _panel->Show();
 }
 
+void LAppDelegate::ForceShowPanel() {
+  if (_panel) _panel->ForceShow();
+}
+
 void LAppDelegate::Snapshot() {
   _need_snapshot.store(true);
   std::unique_lock<std::mutex> lock(_mtx);

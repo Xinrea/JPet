@@ -16,7 +16,7 @@ void WinToastEventHandler::toastActivated() const {
     return;
   }
   if (url == "TASK_COMPLETE") {
-    LAppDelegate::GetInstance()->ShowPanel();
+    LAppDelegate::GetInstance()->ForceShowPanel();
     PanelServer::GetInstance()->Notify("TASK_COMPLETE");
     return;
   }
