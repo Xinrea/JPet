@@ -29,7 +29,7 @@ LONG WINAPI unhandled_handler(EXCEPTION_POINTERS* e) {
         mdei.ClientPointers = FALSE;
 
         MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
-                          hFile, MiniDumpNormal, &mdei, NULL, NULL);
+                          hFile, MiniDumpWithDataSegs, &mdei, NULL, NULL);
         CloseHandle(hFile);
     }
     return EXCEPTION_CONTINUE_SEARCH;

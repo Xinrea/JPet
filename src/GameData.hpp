@@ -249,41 +249,57 @@ class GameData {
   }
 
   bool Get(const std::string& key, int32_t& value) {
-    std::string v;
-    auto status = db->Get(rocksdb::ReadOptions(), key, &v);
-    if (status.ok()) {
-      value = *reinterpret_cast<int32_t*>(v.data());
-      return true;
+    try {
+      std::string v;
+      auto status = db->Get(rocksdb::ReadOptions(), key, &v);
+      if (status.ok()) {
+        value = *reinterpret_cast<int32_t *>(v.data());
+        return true;
+      }
+    } catch (const std::exception &e) {
+      LAppPal::PrintLog(LogLevel::Debug, "[GameData]Get key failed %s: %s", key.c_str(), e.what());
     }
     return false;
   }
 
   bool Get(const std::string& key, bool& value) {
-    std::string v;
-    auto status = db->Get(rocksdb::ReadOptions(), key, &v);
-    if (status.ok()) {
-      value = *reinterpret_cast<bool*>(v.data());
-      return true;
+    try {
+      std::string v;
+      auto status = db->Get(rocksdb::ReadOptions(), key, &v);
+      if (status.ok()) {
+        value = *reinterpret_cast<bool *>(v.data());
+        return true;
+      }
+    } catch (const std::exception &e) {
+      LAppPal::PrintLog(LogLevel::Debug, "[GameData]Get key failed %s: %s", key.c_str(), e.what());
     }
     return false;
   }
 
   bool Get(const std::string& key, float& value) {
-    std::string v;
-    auto status = db->Get(rocksdb::ReadOptions(), key, &v);
-    if (status.ok()) {
-      value = *reinterpret_cast<float*>(v.data());
-      return true;
+    try {
+      std::string v;
+      auto status = db->Get(rocksdb::ReadOptions(), key, &v);
+      if (status.ok()) {
+        value = *reinterpret_cast<float *>(v.data());
+        return true;
+      }
+    } catch (const std::exception &e) {
+      LAppPal::PrintLog(LogLevel::Debug, "[GameData]Get key failed %s: %s", key.c_str(), e.what());
     }
     return false;
   }
 
   bool Get(const std::string& key, std::string& value) {
-    std::string v;
-    auto status = db->Get(rocksdb::ReadOptions(), key, &v);
-    if (status.ok()) {
-      value = v;
-      return true;
+    try {
+      std::string v;
+      auto status = db->Get(rocksdb::ReadOptions(), key, &v);
+      if (status.ok()) {
+        value = v;
+        return true;
+      }
+    } catch (const std::exception &e) {
+      LAppPal::PrintLog(LogLevel::Debug, "[GameData]Get key failed %s: %s", key.c_str(), e.what());
     }
     return false;
   }
