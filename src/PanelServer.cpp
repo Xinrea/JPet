@@ -281,6 +281,14 @@ void PanelServer::doServe() {
           if (task->special) {
             DataManager::GetInstance()->SetRaw(task->special->linked_key, 1);
           }
+          DataManager::GetInstance()->SetRaw("buff.failcount", 0);
+          LAppPal::PrintLog("[PanelServer]Failcount set to 0");
+        } else {
+          int failcount =
+              DataManager::GetInstance()->GetWithDefault("buff.failcount", 0);
+          failcount++;
+          DataManager::GetInstance()->SetRaw("buff.failcount", failcount);
+          LAppPal::PrintLog("[PanelServer]Failcount set to %d", failcount);
         }
         if (task->repeatable) {
             task->status = TStatus::IDLE;

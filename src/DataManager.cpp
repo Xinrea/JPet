@@ -255,6 +255,9 @@ int DataManager::CurrentExpDiff() {
   if (bf->IsGuard()) {
     exp *= 1.5f;
   }
+  if (bf->IsFail()) {
+    exp *= 1.5f;
+  }
   return exp;
 }
 

@@ -302,6 +302,17 @@ public:
       tasks.push_back(task);
     }
     if (LAppDefine::DebugLogEnable) {
+      std::shared_ptr<GameTask> taskFail = std::make_shared<GameTask>();
+      taskFail->id = 998;
+      taskFail->cost = 10;
+      taskFail->title = L"必定失败";
+      taskFail->desc = L"";
+      taskFail->requirements["speed"] = 30;
+      taskFail->rewards["exp"] = 1;
+      taskFail->repeatable = true;
+      taskFail->Load();
+      tasks.push_back(taskFail);
+      
       std::shared_ptr<GameTask> taskDebug = std::make_shared<GameTask>();
       taskDebug->id = 999;
       taskDebug->cost = 10;

@@ -36,19 +36,7 @@ public:
     worker_.join();
   }
 
-  std::vector<std::string> GetBuffList() {
-    std::vector<std::string> buffs;
-    if (is_live_) {
-      buffs.push_back("live");
-    }
-    if (is_dynamic_) {
-      buffs.push_back("dynamic");
-    }
-    if (is_guard_) {
-      buffs.push_back("guard");
-    }
-    return buffs;
-  }
+  std::vector<std::string> GetBuffList();
 
   void Update();
 
@@ -63,6 +51,10 @@ public:
   bool IsGuard() {
     return is_guard_;
   }
+
+  bool IsFail();
+
+  bool IsMonday();
 
   int MedalLevel() {
     return medal_level_;

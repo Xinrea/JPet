@@ -1,10 +1,10 @@
 <script>
   import { Tooltip } from "flowbite-svelte";
   import LiveIcon from "../assets/bufficon/live.webp";
-  import SpeedIcon from "../assets/bufficon/speed.webp";
   import GuardIcon from "../assets/bufficon/guard.webp";
   import DynamicIcon from "../assets/bufficon/dynamic.webp";
-  import WillIcon from "../assets/bufficon/will.webp";
+  import FailIcon from "../assets/bufficon/fail.webp";
+  import MondayIcon from "../assets/bufficon/monday.webp";
 
   const nameToIcon = {
     live: {
@@ -19,6 +19,14 @@
       icon: DynamicIcon,
       desc: "100%经验提升<动态>",
     },
+    fail: {
+      icon: FailIcon,
+      desc: "50%经验提升<连败>"
+    },
+    monday: {
+      icon: MondayIcon,
+      desc: "50%经验提升<周一>"
+    }
   };
 
   export let type = "live";

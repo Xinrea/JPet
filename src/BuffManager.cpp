@@ -167,3 +167,34 @@ void BuffManager::updateGuard(const httplib::Headers& headers) {
     LAppPal::PrintLog(LogLevel::Error, "[BuffManager]Fetch medal info failed");
   }
 }
+
+std::vector<std::string> BuffManager::GetBuffList() {
+  std::vector<std::string> buffs;
+  if (is_live_) {
+    buffs.push_back("live");
+  }
+  if (is_dynamic_) {
+    buffs.push_back("dynamic");
+  }
+  if (is_guard_) {
+    buffs.push_back("guard");
+  }
+  if (IsFail()) {
+    buffs.push_back("fail");
+  }
+  if (IsMonday()) {
+    buffs.push_back("monday");
+  }
+  return buffs;
+}
+
+bool BuffManager::IsFail() {
+  return DataManager::GetInstance()->GetWithDefault("buff.failcount", 0) >= 2;
+}
+
+bool BuffManager::IsMonday() {
+  time_t now = time(0);
+  tm ltm;
+  localtime_s(&ltm, &now);
+  return ltm.tm_wday == 1;
+}
