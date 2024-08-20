@@ -188,9 +188,11 @@ class GameData {
     writeOptions.sync = true;
     rocksdb::Options options;
     options.create_if_missing = true;
-    rocksdb::Status status = rocksdb::DB::Open(options, LAppPal::WStringToString(LAppDefine::documentPath) + "/GameData", &db);
+    std::wstring dbPath = LAppDefine::documentPath + L"/GameData";
+    rocksdb::Status status =
+        rocksdb::DB::Open(options, LAppPal::WStringToString(dbPath), &db);
     if (!status.ok()) {
-      LAppPal::PrintLog(LogLevel::Error, "[GameData]Failed to open db");
+      LAppPal::PrintLog(LogLevel::Error, "[GameData]Failed to open db: %d", status.code());
       return;
     }
     // load old data from file, if file not exist, skip reading
@@ -217,7 +219,8 @@ class GameData {
     delete db;
   }
 
-  void Dump() {
+  bool Initialized() {
+    return db != nullptr;
   }
 
   void Update(const std::string& key, int32_t value) {

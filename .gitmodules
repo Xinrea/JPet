@@ -1,0 +1,3 @@
+[submodule "thirdparty/rocksdb"]
+	path = thirdparty/rocksdb
+	url = git@github.com:Xinrea/rocksdb.git

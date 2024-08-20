@@ -23,6 +23,7 @@ set(RES_PATH ${CMAKE_CURRENT_SOURCE_DIR}/resources)
 set(THIRD_PARTY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
 set(GLFW_PATH ${THIRD_PARTY_PATH}/glfw)
 set(FMOD_PATH ${THIRD_PARTY_PATH}/fmod)
+set(ROCKSDB_PATH ${THIRD_PARTY_PATH}/rocksdb)
 set(SDK_ROOT_PATH ${THIRD_PARTY_PATH}/CubismSdkForNative)
 set(CORE_PATH ${SDK_ROOT_PATH}/Core)
 set(FRAMEWORK_PATH ${SDK_ROOT_PATH}/Framework)
@@ -44,7 +45,6 @@ find_package(cpr CONFIG REQUIRED)
 find_package(cryptopp CONFIG REQUIRED)
 find_package(croncpp CONFIG REQUIRED)
 find_package(semver CONFIG REQUIRED)
-find_package(RocksDB CONFIG REQUIRED)
 
 # Set Visual Studio startup project.
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${APP_NAME})
@@ -126,6 +126,8 @@ endif()
 # Add GLEW ,GLFW.
 add_subdirectory(${GLFW_PATH} ${CMAKE_CURRENT_BINARY_DIR}/glfw)
 
+add_subdirectory(${ROCKSDB_PATH} ${CMAKE_CURRENT_BINARY_DIR}/rocksdb)
+
 # Specify Cubism Framework rendering.
 set(FRAMEWORK_SOURCE OpenGL)
 
@@ -175,8 +177,7 @@ target_link_libraries(${APP_NAME}
   cryptopp::cryptopp
   croncpp::croncpp
   semver::semver
-  RocksDB::rocksdb
-  RocksDB::rocksdb-shared
+  rocksdb
   Dbghelp
 
   # Solve the MSVCRT confliction if using MSVC.

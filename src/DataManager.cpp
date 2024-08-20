@@ -42,6 +42,10 @@ bool DataManager::init() {
   // initialize game data
   bool firstData = !std::filesystem::exists(std::filesystem::path(dataPath)) && !std::filesystem::exists(std::filesystem::path(oldDataPath));
   gameData = std::make_shared<GameData>(oldDataPath);
+  if (!gameData->Initialized()) {
+    LAppPal::PrintLog(LogLevel::Error, "[DataManager]Failed to initialize GameData");
+    return false;
+  }
   if (firstData) {
     AddAttribute("speed", 2);
     AddAttribute("strength", 1);
@@ -54,7 +58,8 @@ bool DataManager::init() {
 
 DataManager::DataManager() {
   if (!init()) {
-    LAppPal::PrintLog("Failed to initialize DataManager");
+    LAppPal::PrintLog(LogLevel::Error, "Failed to initialize DataManager");
+    throw std::runtime_error("Failed to initialize DataManager");
   }
 }
 

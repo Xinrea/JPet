@@ -66,7 +66,7 @@ int main() {
   wchar_t documents[MAX_PATH];
   HRESULT result = SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL,
                                     SHGFP_TYPE_CURRENT, documents);
-  LAppDefine::documentPath = wstring(documents) + L"\\jpet\\";
+  LAppDefine::documentPath = wstring(documents) + L"\\jpet";
   if (!PathFileExists(LAppDefine::documentPath.c_str())) {
     CreateDirectory(LAppDefine::documentPath.c_str(), NULL);
   }
