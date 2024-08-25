@@ -20,7 +20,7 @@
 #pragma comment(lib, "comctl32.lib")
 
 LONG WINAPI unhandled_handler(EXCEPTION_POINTERS* e) {
-    const wstring dumpfile = LAppDefine::documentPath + L"/minidump.dmp";
+    const wstring dumpfile = LAppDefine::documentPath + L"/minidump_" VERSION ".dmp";
     HANDLE hFile = CreateFile(dumpfile.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile && (hFile != INVALID_HANDLE_VALUE)) {
         MINIDUMP_EXCEPTION_INFORMATION mdei;
@@ -89,14 +89,15 @@ int main() {
   LAppDefine::execPath = std::wstring(curPath);
 
   // check dumpfile
-  const wstring filepath = LAppDefine::documentPath + L"/minidump.dmp";
-  if (std::filesystem::exists(std::filesystem::path(filepath))) {
+  const wstring dumpfile =
+      LAppDefine::documentPath + L"/minidump_" VERSION ".dmp";
+  if (std::filesystem::exists(std::filesystem::path(dumpfile))) {
     MessageBox(nullptr,
                L"检测到 JPet "
                L"上次运行时崩溃，请选择目录保存崩溃报告，发送给开发者 @Xinrea",
                L"检测到崩溃报告", MB_OK);
     OPENFILENAME ofn;                         // Common dialog box structure
-    wchar_t szFile[260] = L"minidump.dmp\0";  // Buffer for file name
+    wchar_t szFile[260] = L"minidump_" VERSION ".dmp\0";  // Buffer for file name
 
     ZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
@@ -111,8 +112,8 @@ int main() {
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
 
     if (GetSaveFileName(&ofn) == TRUE) {
-       CopyFile(filepath.c_str(), ofn.lpstrFile, TRUE);
-       std::filesystem::remove(filepath);
+       CopyFile(dumpfile.c_str(), ofn.lpstrFile, TRUE);
+       std::filesystem::remove(dumpfile);
     }
   }
 

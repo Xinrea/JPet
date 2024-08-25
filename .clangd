@@ -24,6 +24,8 @@ CompileFlags:
 		- "-D"
 		- "_HAS_STD_BYTE=0"
 		- "-D"
+		- "NOMINMAX"
+		- "-D"
 		- "UNICODE"
 		- "-D"
 		- "_UNICODE"
