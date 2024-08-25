@@ -250,7 +250,7 @@ int DataManager::CurrentExpDiff() {
   int currentExp = GetAttribute("exp");
   int intellect = GetAttribute("intellect");
   int medal = BuffManager::GetInstance()->MedalLevel();
-  int exp = 1 + ceil(99 * LAppPal::EaseInOut(intellect + medal - 4) / 100);
+  int exp = 1 + ceil(499 * LAppPal::EaseInOut(intellect + medal / 3 - 4) / 100);
   BuffManager* bf = BuffManager::GetInstance();
   if (bf->IsDynamic()) {
     exp *= 2;
