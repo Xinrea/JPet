@@ -129,13 +129,14 @@
         lack += value - attrs[key];
       }
     }
-    lack = lack * 6;
-    if (lack + 60 >= 200) {
+    lack = lack * 6 + 60;
+    if (lack >= 200) {
       return 0;
     }
     lack -= attrs.will;
+    lack = Math.max(lack, 10);
     lack /= 2;
-    return Math.min(Math.max(70 - lack, 0), 100);
+    return Math.min(Math.max(100 - lack, 0), 100);
   }
 
   function formatDate(time) {

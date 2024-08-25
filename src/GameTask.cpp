@@ -69,8 +69,9 @@ void GameTask::TryDone() {
       LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d failed before will takes effect", id);
     } else {
       lack -= will;
-      if (lack < 0) {
-        lack = 0;
+      // max rate is 95%
+      if (lack < 10) {
+        lack = 10;
       }
       // using random number to determine success
       int random = rand() % 200;
