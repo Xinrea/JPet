@@ -49,7 +49,8 @@ bool AudioManager::Initialize() {
 bool AudioManager::IsPlay() {
   if (_channel) {
     bool isPlay;
-    return _channel->isPlaying(&isPlay);
+    _channel->isPlaying(&isPlay);
+    return isPlay;
   }
   return false;
 }

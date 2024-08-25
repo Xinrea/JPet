@@ -16,12 +16,14 @@
 #include <Rendering/OpenGL/CubismRenderer_OpenGLES2.hpp>
 #include <Utils/CubismString.hpp>
 
-#include "AudioManager.hpp"
+#include "CubismFramework.hpp"
 #include "LAppDefine.hpp"
 #include "LAppDelegate.hpp"
+#include "LAppLive2DManager.hpp"
 #include "LAppPal.hpp"
 #include "LAppTextureManager.hpp"
 #include "PartStateManager.h"
+#include "Type/CubismBasicType.hpp"
 
 using namespace Live2D::Cubism::Framework;
 using namespace Live2D::Cubism::Framework::DefaultParameterId;
@@ -40,7 +42,7 @@ void FinishedMotion(ACubismMotion* self) {
   PartStateManager::GetInstance()->SnapshotState();
   LAppPal::PrintLog(LogLevel::Debug, "[Model]Motion finished");
 }
-}  // namespace
+} // namespace
 
 LAppModel::LAppModel()
     : CubismUserModel(), _modelSetting(NULL), _userTimeSeconds(0.0f) {
@@ -214,6 +216,14 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
     }
   }
 
+  // mouthIds
+  {
+    for (csmInt32 i = 1; i <= 6; i++) {
+      std::string param_key = "ParamMouth" + std::to_string(i);
+      _mouthIds.PushBack(CubismFramework::GetIdManager()->GetId(param_key.c_str()));
+    }
+  }
+
   // Layout
   csmMap<csmString, csmFloat32> layout;
   _modelSetting->GetLayoutMap(layout);
@@ -222,7 +232,8 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
   PartStateManager::GetInstance()->BindModel(_model);
   PartStateManager::GetInstance()->ApplyState();
 
-  LAppPal::PrintLog("[APP]Model motions count: %d, groups: %d",
+  LAppPal::PrintLog(LogLevel::Info,
+                    "[Model]Model motions count: %d, groups: %d",
                     _modelSetting->GetMotionCount("All"),
                     _modelSetting->GetMotionGroupCount());
   for (csmInt32 i = 0; i < _modelSetting->GetMotionGroupCount(); i++) {
@@ -356,6 +367,29 @@ void LAppModel::Update() {
   if (_expressionManager != NULL) {
     _expressionManager->UpdateMotion(
         _model, deltaTimeSeconds);  // 表情でパラメータ更新（相対変化）
+  }
+
+  // Overwrite mouth for speaking
+  if (LAppDelegate::GetInstance()->IsPlay()) {
+    // reset to zero
+    for (int i = 0; i < _mouthIds.GetSize(); i++) {
+      _model->SetParameterValue(_mouthIds[i], 0);
+    }
+    
+    // switch between mount1 and mount4 for speaking animation
+    static csmFloat32 last_switch = _userTimeSeconds;
+    csmFloat32 escape = _userTimeSeconds - last_switch;
+    if (escape <= 0.25f) {
+      _model->SetParameterValue(_mouthIds[0], 30);
+      _model->SetParameterValue(_mouthIds[3], 0);
+    }
+    if (escape > 0.25f && escape <= 0.5f) {
+      _model->SetParameterValue(_mouthIds[0], 0);
+      _model->SetParameterValue(_mouthIds[3], 30);
+    }
+    if (escape > 0.5f) {
+      last_switch = _userTimeSeconds;
+    }
   }
 
 

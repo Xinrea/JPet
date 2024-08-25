@@ -8,7 +8,9 @@
 
 #pragma once
 
+#include "Id/CubismId.hpp"
 #include "Motion/ACubismMotion.hpp"
+#include "Type/CubismBasicType.hpp"
 #include <CubismFramework.hpp>
 #include <Motion/CubismMotion.hpp>
 #include <ICubismModelSetting.hpp>
@@ -204,6 +206,7 @@ class LAppModel : public Csm::CubismUserModel {
   Csm::csmMap<Csm::csmString, Csm::ACubismMotion*>
       _expressions;  ///< 読み込まれている表情のリスト
   Csm::csmMap<Csm::csmString, Csm::ACubismMotion*> _presets;
+  Csm::csmVector<Csm::CubismIdHandle> _mouthIds;
   Csm::csmVector<Csm::csmRectF> _hitArea;
   Csm::csmVector<Csm::csmRectF> _userArea;
   const Csm::CubismId* _idParamAngleX;      ///< パラメータID: ParamAngleX
