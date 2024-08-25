@@ -19,7 +19,8 @@ bool DataManager::init() {
     }
     file.close();
     // initialize with default values
-    LAppPal::PrintLog("Created config file: %s", configPath.c_str());
+    LAppPal::PrintLog(LogLevel::Info, L"Created config file: %ls",
+                      configPath.c_str());
   } else {
     try {
       data = toml::parse_file(configPath);
@@ -370,12 +371,12 @@ void DataManager::SetResetMark() {
     // create a new config file
     std::ofstream file(markerPath);
     if (!file.is_open()) {
-      LAppPal::PrintLog(LogLevel::Error, "[DataManager]Failed to create marker file: %s", markerPath.c_str());
+      LAppPal::PrintLog(LogLevel::Error, L"[DataManager]Failed to create marker file: %ls", markerPath.c_str());
       return;
     }
     file.close();
     // initialize with default values
-    LAppPal::PrintLog(LogLevel::Debug, "[DataManager]Created marker file: %s", markerPath.c_str());
+    LAppPal::PrintLog(LogLevel::Debug, L"[DataManager]Created marker file: %ls", markerPath.c_str());
   }
 }
 
