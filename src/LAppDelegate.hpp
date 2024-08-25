@@ -110,6 +110,7 @@ class LAppDelegate {
 
   bool IsHover() { return last_update_ > 0 && ((glfwGetTime() - last_update_) <= 3); }
 
+  AudioManager *GetAudioManager() { return _au; }
   bool IsPlay() { return _au->IsPlay(); }
 
   void SetIsSetting(bool s) { _isSetting = s; }

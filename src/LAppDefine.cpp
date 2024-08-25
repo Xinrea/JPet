@@ -36,9 +36,14 @@ const csmChar *OptionImg = "imgs/message.png";
 // ディレクトリ名とmodel3.jsonの名前を一致させておくこと
 
 // 外部定義ファイル(json)と合わせる
-const csmChar *HitAreaSetting = "HitAreaHairBall";
-const csmChar *HitAreaNameHead = "AreaHead";
-const csmChar *HitAreaNameBody = "AreaBody";
+const csmChar *HitAreaHairBall = "HitAreaHairBall";
+const csmChar *HitAreaHead = "HitAreaHead";
+const csmChar *HitAreaEarL = "HitAreaEarL";
+const csmChar *HitAreaEarR = "HitAreaEarR";
+const csmChar *HitAreaArmsL = "HitAreaArmsL";
+const csmChar *HitAreaArmsR = "HitAreaArmsR";
+const csmChar *HitAreaLegs = "HitAreaLegs";
+const csmChar *HitAreaTail = "HitAreaTail";
 const int GunChangeList[2] = {14, 13};
 const csmChar *HitAreaNameMouth = "AreaMouth";
 const csmChar *HitAreaNameWanzi = "AreaWanzi";

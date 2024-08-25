@@ -11,6 +11,8 @@ CompileFlags:
 		- "../thirdparty/CubismSdkForNative/Framework/src"
 		- "-I"
 		- "../thirdparty/CubismSdkForNative/Core/include"
+		- "-I"
+		- "../thirdparty/rocksdb/include"
 		- "-D"
 		- "FRAMEWORK_SOURCE=OpenGL"
 		- "-D"

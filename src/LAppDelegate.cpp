@@ -516,9 +516,6 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
       _captured = true;
       glfwGetCursorPos(window, &_cX, &_cY);
       _view->OnTouchesBegan(_mouseX, _mouseY);
-      if (DataManager::GetInstance()->GetConfig<bool>("audio", "touch_audio", true)) {
-        _au->Play3dSound(AudioType::CLICK);
-      }
       // set expression
     } else if (GLFW_RELEASE == action) {
       if (_captured) {

@@ -14,29 +14,49 @@
 	"Groups": [
 		{
 			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
 			"Name": "EyeBlink",
 			"Ids": [
 				"ParamEyeLOpen"
 			]
-		},
-		{
-			"Target": "Parameter",
-			"Name": "LipSync",
-			"Ids": []
 		}
 	],
 	"HitAreas": [
 		{
-			"Id": "HitAreaHat",
-			"Name": ""
-		},
-		{
-			"Id": "HitAreaEar",
-			"Name": ""
+			"Id": "HitAreaEarR",
+			"Name": "HitAreaEarR"
 		},
 		{
 			"Id": "HitAreaHairBall",
 			"Name": "HitAreaHairBall"
+		},
+		{
+			"Id": "HitAreaHead",
+			"Name": "HitAreaHead"
+		},
+		{
+			"Id": "HitAreaEarL",
+			"Name": "HitAreaEarL"
+		},
+		{
+			"Id": "HitAreaLegs",
+			"Name": "HitAreaLegs"
+		},
+		{
+			"Id": "HitAreaTail",
+			"Name": "HitAreaTail"
+		},
+		{
+			"Id": "HitAreaArmsR",
+			"Name": "HitAreaArmsR"
+		},
+		{
+			"Id": "HitAreaArmsL2",
+			"Name": "HitAreaArmsL"
 		}
 	]
 }

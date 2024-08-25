@@ -12,10 +12,9 @@
 #include <GLFW/glfw3.h>
 
 #include <Rendering/CubismRenderer.hpp>
-#include <functional>
-#include <random>
 #include <string>
 
+#include "AudioManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppDelegate.hpp"
 #include "LAppModel.hpp"
@@ -109,15 +108,56 @@ void LAppLive2DManager::OnFollow() {
 }
 
 void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
-  // TODO: 添加动作表情和声音
   LAppPal::PrintLog(LogLevel::Debug,
                     "[Live2DManager]Tap point: {x:%.2f y:%.2f}", x, y);
   CubismMotionQueueEntryHandle hr;
+  AudioManager* au = LAppDelegate::GetInstance()->GetAudioManager();
   for (csmUint32 i = 0; i < _models.GetSize(); i++) {
-    if (_models[i]->HitTest(HitAreaSetting, x, y)) {
+    if (_models[i]->HitTest(HitAreaHairBall, x, y)) {
       LAppPal::PrintLog(LogLevel::Debug, "[Live2DManager]Hit area: [%s]",
-                        HitAreaSetting);
+                        HitAreaHairBall);
       LAppDelegate::GetInstance()->ShowPanel();
+      return;
+    }
+    // no need to check other hitareas
+    if (!DataManager::GetInstance()->GetConfig<bool>("audio", "touch_audio",
+                                                    true)) {
+      return;
+    }
+    // only 5% chance to trigger special audio
+    if (rand() % 100 < 95) {
+      au->Play3dSound(AudioType::CLICK);
+      return;
+    }
+    if (_models[i]->HitTest(HitAreaHead, x, y)) {
+      LAppPal::PrintLog(LogLevel::Debug, "[Live2DManager]Hit area: [%s]",
+                        HitAreaHead);
+      au->Play3dSound(L"resources/audios/t_head.mp3");
+      return;
+    }
+    if (_models[i]->HitTest(HitAreaEarL, x, y) || _models[i]->HitTest(HitAreaEarR, x, y)) {
+      LAppPal::PrintLog(LogLevel::Debug, "[Live2DManager]Hit area: [%s]",
+                        HitAreaEarL);
+      au->Play3dSound(L"resources/audios/t_ears.mp3");
+      return;
+    }
+    if (_models[i]->HitTest(HitAreaArmsL, x, y) || _models[i]->HitTest(HitAreaArmsR, x, y)) {
+      LAppPal::PrintLog(LogLevel::Debug, "[Live2DManager]Hit area: [%s]",
+                        HitAreaArmsL);
+      au->Play3dSound(L"resources/audios/t_arms.mp3");
+      return;
+    }
+    if (_models[i]->HitTest(HitAreaLegs, x, y)) {
+      LAppPal::PrintLog(LogLevel::Debug, "[Live2DManager]Hit area: [%s]",
+                        HitAreaLegs);
+      au->Play3dSound(L"resources/audios/t_legs.mp3");
+      return;
+    }
+    if (_models[i]->HitTest(HitAreaTail, x, y)) {
+      LAppPal::PrintLog(LogLevel::Debug, "[Live2DManager]Hit area: [%s]",
+                        HitAreaTail);
+      au->Play3dSound(L"resources/audios/t_tail.mp3");
+      return;
     }
   }
 }

@@ -1,4 +1,5 @@
 *.mp3
+dll/
 thirdparty/glfw
 thirdparty/fmod
 thirdparty/CubismSdkForNative/Samples
