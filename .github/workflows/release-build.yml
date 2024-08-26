@@ -49,6 +49,10 @@ jobs:
       with:
         # Path to input .iss script file
         path: build-scripts/jpet_setup.iss
+
+    - name: Prepare files
+      run: |
+        cp ${{github.workspace}}/dll/* ${{github.workspace}}/build/bin/JPet/Release/
               
     - name: Upload a Release Zip
       uses: actions/upload-artifact@v4.3.6
@@ -57,7 +61,7 @@ jobs:
         name: jpet-${{ github.ref_name }}
         # A file, directory or wildcard pattern that describes what to upload
         path: |
-          ${{github.workspace}}/build/bin/JPet/Release/
+          ${{github.workspace}}/build/bin/JPet/Release/*
           !${{github.workspace}}/build/bin/JPet/Release/*.pdb
 
     - name: Upload a Release Installer
