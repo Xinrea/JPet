@@ -266,7 +266,7 @@ int DataManager::CurrentExpDiff() {
     exp *= 1.5f;
   }
   exp *= pow(10, starcnt);
-  return exp;
+  return std::min(exp, 99999999);
 }
 
 void DataManager::AddExp() {
@@ -351,6 +351,7 @@ void DataManager::AddAttribute(const std::string& key, int value) {
   int current = 0;
   gameData->Get("attr." + key, current);
   // WARN not support negative value yet
+  int new_value = std::min(std::max(current + value, 0), 99999999);
   gameData->Update("attr." + key, std::max(current + value, 0));
 }
 
