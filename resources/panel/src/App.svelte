@@ -25,6 +25,7 @@
     intellect: 0,
     buycnt: 0,
   };
+  let starcnt = 0;
   let expdiff = 0;
   let clothes = {
     current: 0,
@@ -41,6 +42,7 @@
         attributes = data.attributes;
         expdiff = data.expdiff;
         buffs = data.buffs;
+        starcnt = data.starcnt;
         console.log(data);
       });
   }
@@ -74,10 +76,10 @@
   </div>
   <div class="flex flex-col p-4 pt-4 bg-gray-50 z-10">
     <div class:hide={activeTab !== 0}>
-      <Profile {attributes} {expdiff} {clothes} {buffs} />
+      <Profile {attributes} {expdiff} {clothes} {buffs} {starcnt} />
     </div>
     <div class:hide={activeTab !== 1}>
-      <Task {attributes} />
+      <Task {attributes} {starcnt} />
     </div>
     <div class:hide={activeTab !== 2}>
       <Custom current={clothes.current} />

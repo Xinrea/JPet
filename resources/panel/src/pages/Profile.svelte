@@ -10,8 +10,10 @@
   import imgClothes1 from "../assets/c1.png";
   import imgClothes2 from "../assets/c2.png";
   import imgClothes3 from "../assets/c3.png";
+  import starIcon from "../assets/star.png";
+  import starOutlineIcon from "../assets/star_outline.png";
   import Progress from "../components/Progress.svelte";
-    import BuffIcon from "../components/BuffIcon.svelte";
+  import BuffIcon from "../components/BuffIcon.svelte";
 
   const clothesImages = [imgClothes1, imgClothes2, imgClothes3];
   const attributeArray = ["speed", "endurance", "strength", "will", "intellect"];
@@ -52,11 +54,14 @@
     "live", "dynamic", "guard"
   ];
 
+  export let starcnt = 0;
+
   $: currentExp = attributes.exp;
   $: buycost = Math.floor(10 * Math.pow(1.25, attributes.buycnt));
   $: revertgain = Math.floor(
     (10 * Math.pow(1.25, Math.max(attributes.buycnt - 1, 0))) / 2,
   );
+  $: starAvailable = ["speed", "endurance", "strength", "will", "intellect"].every(attr => attributes[attr] >= 53);
 
   // current time to next time point
   let timeToNextPoint = 60 - new Date().getSeconds();
@@ -95,6 +100,13 @@
     }
     clothes.current = id;
     fetch(`/api/clothes/${id}`, { method: "POST" });
+  }
+
+  let starModal = false;
+
+  function fetchStar() {
+    fetch(`/api/star`, {method: "POST"});
+    starModal = false;
   }
 
   const tooltips = [
@@ -190,6 +202,27 @@
       <img src={clothesImages[clothes.current]} alt="avatar" />
     </div>
     <div style="height: 128px; width: 128px; margin-left: 2rem;">
+      <Modal title="星级提升" bind:open={starModal} size="xs" autoclose>
+        <h3 class="mb-5 text-lg font-normal text-gray-500">
+          此次操作会消耗所有属性各 53 点换取一颗星，要换取吗？
+        </h3>
+        <Button disabled={!starAvailable} on:click={fetchStar}>确认</Button>
+        <Button color="alternative">取消</Button>
+      </Modal>
+      <a href={"#"} on:click={()=>{starModal = true;}} class="flex justify-center absolute cursor-pointer" style="width: 128px; top: 16px;">
+        {#if starcnt > 0}
+          {#each {length: starcnt} as _, i}
+            {#if i == 0}
+              <img style="height: 28px;" alt="" src={starIcon} />
+            {:else}
+              <img style="height: 28px; margin-left: -16px" alt="" src={starIcon} />
+            {/if}
+          {/each}
+        {:else}
+            <img style="height: 28px;" alt="" src={starOutlineIcon} />
+        {/if}
+      </a>
+      <Tooltip>经验获取量提升，任务成功率降低</Tooltip>
       <Progress max={60} value={60 - timeToNextPoint}>
         <div
           style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); text-align: center;"

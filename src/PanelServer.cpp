@@ -108,6 +108,10 @@ nlohmann::json PanelServer::getTaskStatus() {
 
 void PanelServer::doServe() {
   server->set_base_dir("resources/panel/dist");
+  server->Post("/api/star",
+               [](const httplib::Request &req, httplib::Response &res) {
+                 DataManager::GetInstance()->FetchStar();
+               });
   server->Post("/api/attr/:attr",
                [](const httplib::Request &req, httplib::Response &res) {
                  std::string targetAttribute = req.path_params.at("attr");
@@ -162,6 +166,7 @@ void PanelServer::doServe() {
                                dataManager->GetWithDefault("clothes.2.active", 0) == 1});
     json["expdiff"] = dataManager->CurrentExpDiff();
     json["buffs"] = nlohmann::json::array();
+    json["starcnt"] = dataManager->GetWithDefault("starcnt", 0);
     auto buffs_array = BuffManager::GetInstance()->GetBuffList();
     for (const auto& buff : buffs_array) {
       json["buffs"].push_back(buff);

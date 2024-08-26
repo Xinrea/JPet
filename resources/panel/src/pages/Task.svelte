@@ -17,6 +17,8 @@
     intellect: 0,
   };
 
+  export let starcnt = 0;
+
   let currentTask = null;
 
   let timeRemain = 0;
@@ -134,7 +136,7 @@
       return 0;
     }
     lack -= attrs.will;
-    lack = Math.max(lack, 10);
+    lack = Math.max(lack, 10 + 10 * starcnt);
     lack /= 2;
     return Math.min(Math.max(100 - lack, 0), 100);
   }

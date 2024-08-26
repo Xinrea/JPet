@@ -71,6 +71,7 @@ class DataManager {
 
   void AddExp();
   int CurrentExpDiff();
+  void FetchStar();
 
   /**
    * @brief   Get the list of attributes.

@@ -249,6 +249,7 @@ void DataManager::Save() {
 int DataManager::CurrentExpDiff() {
   int currentExp = GetAttribute("exp");
   int intellect = GetAttribute("intellect");
+  int starcnt = GetWithDefault("starcnt", 0);
   int medal = BuffManager::GetInstance()->MedalLevel();
   int exp = 1 + ceil(499 * LAppPal::EaseInOut(intellect + medal / 3 - 4) / 100);
   BuffManager* bf = BuffManager::GetInstance();
@@ -264,6 +265,7 @@ int DataManager::CurrentExpDiff() {
   if (bf->IsFail()) {
     exp *= 1.5f;
   }
+  exp *= pow(10, starcnt);
   return exp;
 }
 
@@ -281,6 +283,24 @@ std::vector<int> DataManager::GetAttributeList() {
     attributes.push_back(value);
   }
   return attributes;
+}
+
+void DataManager::FetchStar() {
+  for (const auto &attr :
+       {"speed", "endurance", "strength", "will", "intellect"}) {
+    int value = GetAttribute(attr);
+    if (value < 53) {
+      return;
+    }
+  }
+
+  for (const auto &attr :
+       {"speed", "endurance", "strength", "will", "intellect"}) {
+    AddAttribute(attr, -53);
+  }
+  int current = 0;
+  gameData->Get("starcnt", current);
+  gameData->Update("starcnt", current + 1);
 }
 
 int DataManager::GetWithDefault(const std::string& key, int default_value) {

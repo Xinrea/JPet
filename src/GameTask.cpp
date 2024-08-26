@@ -70,8 +70,10 @@ void GameTask::TryDone() {
     } else {
       lack -= will;
       // max rate is 95%
-      if (lack < 10) {
-        lack = 10;
+      int starcnt = DataManager::GetInstance()->GetWithDefault("starcnt", 0);
+      int min_lack = 10 + 10 * starcnt;
+      if (lack < min_lack) {
+        lack = min_lack;
       }
       // using random number to determine success
       int random = rand() % 200;
