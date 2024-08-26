@@ -2,7 +2,6 @@
 #include <vector>
 #include <string>
 
-#include "LAppPal.hpp"
 #include "httplib.h"
 
 // BuffManager manages buff status. buffs are stored in memory, no need to persist.
@@ -55,6 +54,8 @@ public:
   bool IsFail();
 
   bool IsMonday();
+
+  bool IsBirthday();
 
   int MedalLevel() {
     return medal_level_;

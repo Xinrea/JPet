@@ -5,6 +5,7 @@
   import DynamicIcon from "../assets/bufficon/dynamic.webp";
   import FailIcon from "../assets/bufficon/fail.webp";
   import MondayIcon from "../assets/bufficon/monday.webp";
+  import BirthdayIcon from "../assets/bufficon/birthday.webp";
 
   const nameToIcon = {
     live: {
@@ -26,6 +27,10 @@
     monday: {
       icon: MondayIcon,
       desc: "50%经验提升<周一>"
+    },
+    birthday: {
+      icon: BirthdayIcon,
+      desc: "500%经验提升<生日>"
     }
   };
 

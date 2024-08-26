@@ -266,6 +266,9 @@ int DataManager::CurrentExpDiff() {
   if (bf->IsFail()) {
     exp *= 1.5f;
   }
+  if (bf->IsBirthday()) {
+    exp *= 6;
+  }
   exp *= pow(10, starcnt);
   return std::min(exp, 99999999);
 }

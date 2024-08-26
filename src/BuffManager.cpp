@@ -187,6 +187,9 @@ std::vector<std::string> BuffManager::GetBuffList() {
   if (IsMonday()) {
     buffs.push_back("monday");
   }
+  if (IsBirthday()) {
+    buffs.push_back("birthday");
+  }
   return buffs;
 }
 
@@ -199,4 +202,11 @@ bool BuffManager::IsMonday() {
   tm ltm;
   localtime_s(&ltm, &now);
   return ltm.tm_wday == 1;
+}
+
+bool BuffManager::IsBirthday() {
+  time_t now = time(0);
+  tm ltm;
+  localtime_s(&ltm, &now);
+  return ltm.tm_mon == 10 && ltm.tm_mday == 25;
 }
