@@ -109,11 +109,12 @@ nlohmann::json PanelServer::getTaskStatus() {
 void PanelServer::doServe() {
   server->set_base_dir("resources/panel/dist");
   server->Post("/api/star",
-               [](const httplib::Request &req, httplib::Response &res) {
+               [&](const httplib::Request &req, httplib::Response &res) {
                  DataManager::GetInstance()->FetchStar();
+                 Notify("UPDATE");
                });
   server->Post("/api/attr/:attr",
-               [](const httplib::Request &req, httplib::Response &res) {
+               [&](const httplib::Request &req, httplib::Response &res) {
                  std::string targetAttribute = req.path_params.at("attr");
                  if (targetAttribute.empty()) {
                    res.status = 404;
@@ -132,9 +133,10 @@ void PanelServer::doServe() {
                  dataManager->AddAttribute(targetAttribute, 1);
                  dataManager->AddAttribute("exp", -currentCost);
                  dataManager->AddAttribute("buycnt", 1);
+                 Notify("UPDATE");
                });
   server->Delete("/api/attr/:attr",
-                 [](const httplib::Request &req, httplib::Response &res) {
+                 [&](const httplib::Request &req, httplib::Response &res) {
                    std::string targetAttribute = req.path_params.at("attr");
                    if (targetAttribute.empty()) {
                      res.status = 404;
@@ -147,6 +149,7 @@ void PanelServer::doServe() {
                    dataManager->AddAttribute(targetAttribute, -1);
                    dataManager->AddAttribute("exp", revertCost);
                    dataManager->AddAttribute("buycnt", -1);
+                   Notify("UPDATE");
                  });
   server->Get("/api/profile", [](const httplib::Request &req,
                                  httplib::Response &res) {
@@ -194,7 +197,7 @@ void PanelServer::doServe() {
                  PartStateManager::GetInstance()->Toggle(
                      json["param"].get<string>(), json["enable"].get<bool>());
                });
-  server->Post("/api/clothes/:id", [](const httplib::Request &req,
+  server->Post("/api/clothes/:id", [&](const httplib::Request &req,
                                       httplib::Response &res) {
     int id = std::stoi(req.path_params.at("id"));
     LAppPal::PrintLog(LogLevel::Debug, "POST /api/clothes/%d", id);
@@ -214,6 +217,7 @@ void PanelServer::doServe() {
       return;
     }
     DataManager::GetInstance()->SetRaw("clothes.current", id);
+    Notify("UPDATE");
   });
   server->Get("/api/task",
               [&](const httplib::Request &req, httplib::Response &res) {
@@ -289,6 +293,7 @@ void PanelServer::doServe() {
           }
           DataManager::GetInstance()->SetRaw("buff.failcount", 0);
           LAppPal::PrintLog("[PanelServer]Failcount set to 0");
+          Notify("UPDATE");
         } else {
           int failcount =
               DataManager::GetInstance()->GetWithDefault("buff.failcount", 0);

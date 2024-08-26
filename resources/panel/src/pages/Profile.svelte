@@ -77,21 +77,13 @@
     if (currentExp < buycost) {
       return;
     }
-    fetch(`/api/attr/${targetAttr}`, { method: "POST" })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log(data);
-      });
+    fetch(`/api/attr/${targetAttr}`, { method: "POST" });
   }
   function revertHandle() {
     if (attributes[targetAttr] <= 0) {
       alert("属性值不足");
     }
-    fetch(`/api/attr/${targetAttr}`, { method: "DELETE" })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log(data);
-      });
+    fetch(`/api/attr/${targetAttr}`, { method: "DELETE" });
   }
 
   function changeClothes(id) {

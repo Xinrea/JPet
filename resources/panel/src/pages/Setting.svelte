@@ -77,8 +77,11 @@
       }
     }, 10 * 1000);
     sse.subscribe((e) => {
+      if (!e) {
+        return;
+      }
       console.log("SSE:", e);
-      if (e == "NOTIFY_UPDATE") {
+      if (e.data == "NOTIFY_UPDATE") {
         fetch("/api/config/notify")
           .then((res) => res.json())
           .then((data) => {

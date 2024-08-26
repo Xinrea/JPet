@@ -4,6 +4,7 @@
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
 #include "LAppLive2DManager.hpp"
+#include "PanelServer.hpp"
 
 #include <filesystem>
 
@@ -273,6 +274,7 @@ void DataManager::AddExp() {
   int diff = CurrentExpDiff();
   AddAttribute("exp", diff);
   LAppPal::PrintLog(LogLevel::Debug, "[DataManager]Added %d exp", diff);
+  PanelServer::GetInstance()->Notify("UPDATE");
 }
 
 std::vector<int> DataManager::GetAttributeList() {

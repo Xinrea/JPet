@@ -1,12 +1,12 @@
 import { writable } from 'svelte/store';
 
 function createSSE(url) {
-  const { subscribe, set } = writable(null);
+  const { subscribe, update } = writable(null);
 
   const eventSource = new EventSource(url);
 
   eventSource.onmessage = event => {
-    set(event.data);
+    update(() => ({data: event.data, ts: Date.now()}));
   };
 
   eventSource.onerror = error => {
@@ -18,7 +18,7 @@ function createSSE(url) {
     subscribe,
     close: () => {
       eventSource.close();
-      set(null);
+      update(() => null);
     }
   };
 }

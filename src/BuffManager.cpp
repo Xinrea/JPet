@@ -1,6 +1,7 @@
 #include "BuffManager.hpp"
 #include "DataManager.hpp"
 #include "LAppPal.hpp"
+#include "PanelServer.hpp"
 #include "Wbi.hpp"
 
 #include <httplib.h>
@@ -38,6 +39,7 @@ void BuffManager::Update() {
                       "[BuffManager]Update buffs status cost=%dms",
                       duration.count());
   }
+  PanelServer::GetInstance()->Notify("UPDATE");
 }
 
 void BuffManager::updateDynamic(const httplib::Headers& headers) {
