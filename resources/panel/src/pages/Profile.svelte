@@ -57,7 +57,7 @@
   export let starcnt = 0;
 
   $: currentExp = attributes.exp;
-  $: buycost = Math.floor(10 * Math.pow(1.25, attributes.buycnt));
+  $: buycost = Math.floor(10 * Math.pow(1.25, Math.min(attributes.buycnt, 70)));
   $: revertgain = Math.floor(
     (10 * Math.pow(1.25, Math.max(attributes.buycnt - 1, 0))) / 2,
   );

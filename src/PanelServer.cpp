@@ -123,6 +123,7 @@ void PanelServer::doServe() {
                  auto dataManager = DataManager::GetInstance();
                  int currentExperience = dataManager->GetAttribute("exp");
                  int buycnt = dataManager->GetAttribute("buycnt");
+                 buycnt = std::min(buycnt, 70);
                  int currentCost = 10 * pow(1.25, buycnt);
                  if (currentCost > currentExperience) {
                    res.status = 400;
