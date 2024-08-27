@@ -157,6 +157,12 @@
         <td
           ><span class="flex justify-center align-middle"
             ><button
+              on:mousedown={(e)=>{
+                if (e.button == 1) {
+                  targetAttr = attr;
+                  revertHandle();
+                }
+              }}
               on:click={() => {
                 revertModal = true;
                 targetAttr = attr;
@@ -164,6 +170,12 @@
             >
             <span>{attributes[attr]}</span>
             <button
+              on:mousedown={(e)=>{
+                if (e.button == 1) {
+                  targetAttr = attr;
+                  attrHandle();
+                }
+              }}
               on:click={() => {
                 addModal = true;
                 targetAttr = attr;
