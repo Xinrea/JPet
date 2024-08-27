@@ -19,7 +19,7 @@ void GameTask::Dump() {
 
 int GameTask::GetCurrentCost() {
   int speed = DataManager::GetInstance()->GetAttribute("speed");
-  return cost * (1 - 0.75 * fmin(speed - 2, 100) / 100);
+  return cost * (1 - 0.75 * LAppPal::EaseOut(speed - 2) / 100);
 }
 
 void GameTask::Notify(const wstring& title, const wstring& content,

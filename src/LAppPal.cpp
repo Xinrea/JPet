@@ -172,6 +172,17 @@ double LAppPal::EaseInOut(int x) {
   return 100 * (1 - 0.5 * pow(-0.03 * double(x) + 2.94, 3));
 }
 
+double LAppPal::EaseOut(int x) {
+  if (x <= 0) {
+    return 0;
+  }
+  if (x >= 100) {
+    return 100;
+  }
+  double p = double(x) / 100.0f;
+  return 100 * (1 - (1 - p)*(1 - p));
+}
+
 
 std::vector<std::wstring> LAppPal::ListFolder(const std::wstring& folder_path) {
     std::vector<std::wstring> ret;

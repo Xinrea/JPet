@@ -114,6 +114,8 @@ class LAppPal {
    */
   static double EaseInOut(int x);
 
+  static double EaseOut(int x);
+
  private:
   static double s_currentFrame;
   static double s_lastFrame;
