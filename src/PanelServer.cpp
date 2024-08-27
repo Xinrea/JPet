@@ -89,7 +89,7 @@ nlohmann::json PanelServer::getTaskStatus() {
                                {"desc", LAppPal::WStringToString(task->desc)},
                                {"start_time", task->start_time},
                                {"end_time", task->end_time},
-                               {"cost", task->GetCurrentCost()},
+                               {"cost", task->cost},
                                {"success", task->success},
                                {"status", task->status},
                                {"requirements", task->requirements},

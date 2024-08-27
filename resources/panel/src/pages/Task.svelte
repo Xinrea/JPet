@@ -141,6 +141,18 @@
     return Math.min(Math.max(100 - lack, 0), 100);
   }
 
+  function calcCost(cost, speed) {
+    speed = speed - 2;
+    if (speed <= 0) {
+      speed = 0;
+    }
+    if (speed >= 100) {
+      speed = 100;
+    }
+    let p = speed / 100;
+    return Math.ceil(cost * (1 - 0.75 * (1 - (1 - p)*(1 - p))));
+  }
+
   function formatDate(time) {
     return new Date(time * 1000).toLocaleString();
   }
@@ -262,7 +274,7 @@
                         height="12"
                         src={ClockIcon}
                         alt=""
-                      />{formatRemain(task.cost)}</p
+                      />{formatRemain(calcCost(task.cost, attributes.speed))}</p
                     >
                   </span></span
                 >
@@ -278,7 +290,7 @@
                     <Tooltip class="z-30">执行</Tooltip>
                   {:else}
                     <span class="text-sm text-gray-500"
-                      >{formatDate(task.start_time + task.cost)}</span
+                      >{formatDate(task.end_time)}</span
                     >
                   {/if}
                 </span>
