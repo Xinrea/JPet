@@ -81,7 +81,7 @@
       <Profile {attributes} {expdiff} {clothes} {buffs} {starcnt} />
     </div>
     <div class:hide={activeTab !== 1}>
-      <Task {attributes} {starcnt} />
+      <Task {attributes} {expdiff} {starcnt} />
     </div>
     <div class:hide={activeTab !== 2}>
       <Custom current={clothes.current} />

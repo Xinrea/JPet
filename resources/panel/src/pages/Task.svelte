@@ -19,6 +19,8 @@
 
   export let starcnt = 0;
 
+  export let expdiff = 0;
+
   let currentTask = null;
 
   let timeRemain = 0;
@@ -229,13 +231,23 @@
             />
           {/each}
         </div>
-        {#if Object.entries(currentTask.rewards).length > 0}
-        <div class="text-gray-500 mb-1 align-middle">
-          <span class="badge warn">奖励</span>
-          {#each Object.entries(currentTask.rewards) as [key, value]}
-            <AttributeIcon attribute={key} {value} fullfill />
-          {/each}
-        </div>
+        {#if currentTask.id == 1}
+          <div class="text-gray-500 mb-1 align-middle">
+            <span
+              class="badge warn
+              ">奖励</span
+            >
+              <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
+          </div>
+        {:else}
+          {#if Object.entries(currentTask.rewards).length > 0}
+          <div class="text-gray-500 mb-1 align-middle">
+            <span class="badge warn">奖励</span>
+            {#each Object.entries(currentTask.rewards) as [key, value]}
+              <AttributeIcon attribute={key} {value} fullfill />
+            {/each}
+          </div>
+          {/if}
         {/if}
         {#if currentTask.special}
           <div class="text-gray-500 mb-1 align-middle">
@@ -305,16 +317,26 @@
                   />
                 {/each}
               </div>
-              {#if Object.entries(task.rewards).length > 0}
-              <div class="text-gray-500 mb-1 align-middle">
-                <span
-                  class="badge warn
-                  ">奖励</span
-                >
-                {#each Object.entries(task.rewards) as [key, value]}
-                  <AttributeIcon attribute={key} {value} fullfill />
-                {/each}
-              </div>
+              {#if task.id == 1}
+                <div class="text-gray-500 mb-1 align-middle">
+                  <span
+                    class="badge warn
+                    ">奖励</span
+                  >
+                    <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
+                </div>
+              {:else}
+                {#if Object.entries(task.rewards).length > 0}
+                <div class="text-gray-500 mb-1 align-middle">
+                  <span
+                    class="badge warn
+                    ">奖励</span
+                  >
+                  {#each Object.entries(task.rewards) as [key, value]}
+                    <AttributeIcon attribute={key} {value} fullfill />
+                  {/each}
+                </div>
+                {/if}
               {/if}
               {#if task.special}
                 <div class="text-gray-500 mb-1 align-middle">
@@ -358,9 +380,13 @@
     >
       <h3 class="mb-2 font-normal text-gray-500">获得了如下奖励：</h3>
       <div>
-        {#each Object.entries(rewardTask.rewards) as [key, value]}
-          <AttributeIcon attribute={key} {value} fullfill />
-        {/each}
+        {#if rewardTask.id == 1}
+            <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
+        {:else}
+          {#each Object.entries(rewardTask.rewards) as [key, value]}
+            <AttributeIcon attribute={key} {value} fullfill />
+          {/each}
+        {/if}
       </div>
       {#if rewardTask.special}
         <div>

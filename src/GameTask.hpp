@@ -71,7 +71,7 @@ public:
           "strength": 7
         },
         "rewards": {
-          "exp": 50
+          "exp": 0
         },
         "repeatable": true
       },

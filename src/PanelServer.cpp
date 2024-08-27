@@ -287,6 +287,9 @@ void PanelServer::doServe() {
                ++it) {
             DataManager::GetInstance()->AddAttribute(it->first, it->second);
           }
+          if (task->id == 1) {
+            DataManager::GetInstance()->AddAttribute("exp", 10 * DataManager::GetInstance()->CurrentExpDiff());
+          }
           // if with special, update related key
           if (task->special) {
             DataManager::GetInstance()->SetRaw(task->special->linked_key, 1);
