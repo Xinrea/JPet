@@ -115,6 +115,7 @@
     "轴伊的一些活动可以触发经验加成"
   ];
   let cur_tip = 0;
+  let buff_tip_text = "";
   setInterval(()=>{
     cur_tip = Math.floor(Math.random() * tooltips.length);
   }, 10000);
@@ -228,9 +229,10 @@
       <Tooltip>下次增加{expdiff}点经验</Tooltip>
       <div class="flex justify-center mt-8">
         {#each buffs as buff}
-          <BuffIcon type={buff} />
+          <BuffIcon type={buff} bind:tooltip={buff_tip_text} />
         {/each}
       </div>
+      <Tooltip placement="bottom" arrow={false}>{buff_tip_text}</Tooltip>
     </div>
   </div>
   <div class="flex flex-col justify-center w-full -ml-4 fixed bottom-8">

@@ -35,9 +35,7 @@
   };
 
   export let type = "live";
+  export let tooltip = "";
 </script>
 
-<img width="24px" src={nameToIcon[type].icon} alt="" />
-<Tooltip placement="bottom" class="origin-top scale-75"
-  >{nameToIcon[type].desc}</Tooltip
->
+<img width="24px" src={nameToIcon[type].icon} alt="" on:mouseenter={()=>{tooltip = nameToIcon[type].desc}} on:mouseleave={()=>{tooltip = ""}} />
