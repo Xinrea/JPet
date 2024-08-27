@@ -124,8 +124,10 @@ void PanelServer::doServe() {
                  auto dataManager = DataManager::GetInstance();
                  int currentExperience = dataManager->GetAttribute("exp");
                  int buycnt = dataManager->GetAttribute("buycnt");
-                 buycnt = std::min(buycnt, 70);
-                 int currentCost = 10 * pow(1.25, buycnt);
+                 int currentCost = 53000;
+                 if (buycnt < 25) {
+                   currentCost = std::ceilf(10.0f * pow(1.41, buycnt));
+                 }
                  if (currentCost > currentExperience) {
                    res.status = 400;
                    return;
@@ -145,7 +147,13 @@ void PanelServer::doServe() {
                    // TODO check valid attribute
                    auto dataManager = DataManager::GetInstance();
                    int buycnt = dataManager->GetAttribute("buycnt");
-                   int revertCost = 10 * pow(1.25, max(buycnt - 1, 0)) / 2;
+                   int last_cost = 53000;
+                   // 10 * 1.41^25 = 53762
+                   if (buycnt < 26) {
+                     last_cost = std::ceilf(10.0f * pow(1.41, max(buycnt - 1, 0)));
+                   }
+                   LAppPal::PrintLog(LogLevel::Debug, "[PanelServer]Revert attr buycnt=%d last_cost=%d", buycnt, last_cost);
+                   int revertCost = last_cost / 2;
                    dataManager->AddAttribute(targetAttribute, -1);
                    dataManager->AddAttribute("exp", revertCost);
                    dataManager->AddAttribute("buycnt", -1);

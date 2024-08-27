@@ -57,10 +57,8 @@
   export let starcnt = 0;
 
   $: currentExp = attributes.exp;
-  $: buycost = Math.floor(10 * Math.pow(1.25, Math.min(attributes.buycnt, 70)));
-  $: revertgain = Math.floor(
-    (10 * Math.pow(1.25, Math.max(attributes.buycnt - 1, 0))) / 2,
-  );
+  $: buycost = attributes.buycnt < 25 ? Math.ceil(10 * Math.pow(1.41, attributes.buycnt)) : 53000;
+  $: revertgain = (attributes.buycnt < 26 ? Math.ceil(10 * Math.pow(1.41, Math.max(attributes.buycnt - 1, 0))) : 53000) / 2;
   $: starAvailable = ["speed", "endurance", "strength", "will", "intellect"].every(attr => attributes[attr] >= 53);
 
   // current time to next time point
