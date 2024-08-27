@@ -1,10 +1,12 @@
-﻿#include <queue>
+﻿#include <memory>
+#include <queue>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "LAppPal.hpp"
 #include "StateMessage.hpp"
+#include "Wbi.hpp"
 
 using std::queue;
 using std::string;
@@ -19,12 +21,12 @@ class UserStateWatcher {
   bool lastStatus = false;
   long long lastTime = 0;
   UserStateWatcher(const string& uid,
-                   const string& userAgent, const string& img_key, const string& sub_key);
+                   const string& userAgent, shared_ptr<WbiConfig> wbi_config);
   CheckStatus Check(queue<StateMessage>& messageQueue, const string& cookies);
 
  private:
   bool _initialized = false;
   const string& _userAgent;
-  string img_key, sub_key;
+  shared_ptr<WbiConfig> _wbi_config;
   void initBasicInfo(const string& cookies);
 };

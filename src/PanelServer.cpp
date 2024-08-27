@@ -551,16 +551,20 @@ void PanelServer::doServe() {
 
     DataManager::GetInstance()->SetRaw("uid", uid);
 
+    string request_path = "/x/space/wbi/acc/info?";
     nlohmann::json Params;
     Params["mid"] = uid;
 
-    auto [img_key, sub_key] = LAppDelegate::GetInstance()->GetUserStateManager()->GetWbiKey();
-    const auto mixin_key = Wbi::Get_mixin_key(img_key, sub_key);
-    const auto w_rid = Wbi::Calc_sign(Params, mixin_key);
+    auto wbi_config = LAppDelegate::GetInstance()->GetUserStateManager()->GetWbiKey();
+    if (wbi_config) {
+      const auto mixin_key = Wbi::Get_mixin_key(wbi_config->img_key, wbi_config->sub_key);
+      const auto w_rid = Wbi::Calc_sign(Params, mixin_key);
+      request_path += Wbi::Json_to_url_encode_str(Params) + "&w_rid=" + w_rid;
+    } else {
+      request_path += Wbi::Json_to_url_encode_str(Params);
+    }
 
-    auto resp = client.Get(
-        ("/x/space/wbi/acc/info?" + Wbi::Json_to_url_encode_str(Params) + "&w_rid=" + w_rid).c_str(),
-        headers);
+    auto resp = client.Get(request_path.c_str(), headers);
     if (resp && resp->status == 200) {
       auto json = nlohmann::json::parse(resp->body);
       if (json.at("code") == 0 && json.contains("data")) {

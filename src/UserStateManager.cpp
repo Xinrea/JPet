@@ -1,7 +1,6 @@
 ﻿#include "UserStateManager.h"
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
-#include "Wbi.hpp"
 
 #ifndef CPPHTTPLIB_OPENSSL_SUPPORT
 #define CPPHTTPLIB_OPENSSL_SUPPORT
@@ -72,9 +71,7 @@ void UserStateManager::Init(const std::vector<std::string>& list, HWND parent) {
   WinToast::instance()->setAppUserModelId(aumi);
   WinToast::instance()->initialize();
 
-  auto p = Wbi::Get_wbi_key();
-  img_key = p.first;
-  sub_key = p.second;
+  _wbi_config = Wbi::Get_wbi_key();
 
   // init cookie window
   _cookieWindow = new CookieWindow(parent, GetModuleHandle(nullptr));
@@ -90,7 +87,7 @@ void UserStateManager::CheckThread(const vector<string>& list) {
   for (auto uid : list) {
     std::shared_ptr<UserStateWatcher> watcher =
       std::make_shared<UserStateWatcher>(uid,
-          _cookieWindow->userAgent, img_key, sub_key);
+          _cookieWindow->userAgent, _wbi_config);
     _watchers.push_back(watcher);
   }
   _mutex.unlock();

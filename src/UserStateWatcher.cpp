@@ -10,14 +10,10 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
-#include "LAppDefine.hpp"
-using namespace LAppDefine;
-
 UserStateWatcher::UserStateWatcher(const string& uid,
-                                   const string& userAgent, const string& img_key, const string& sub_key)
-    : _userAgent(userAgent), img_key(img_key), sub_key(sub_key) {
+                                   const string& userAgent, shared_ptr<WbiConfig> wbi_config)
+    : _userAgent(userAgent), _wbi_config(wbi_config) {
   target.uid = uid;
-
 }
 
 void UserStateWatcher::initBasicInfo(const string& cookies) {
@@ -27,16 +23,18 @@ void UserStateWatcher::initBasicInfo(const string& cookies) {
   httplib::SSLClient client = httplib::SSLClient("api.bilibili.com", 443);
   client.set_connection_timeout(std::chrono::seconds(1));
 
+  string request_path = "/x/space/wbi/acc/info?";
   nlohmann::json Params;
   Params["mid"] = target.uid;
-  const auto mixin_key = Wbi::Get_mixin_key(img_key, sub_key);
-  const auto w_rid = Wbi::Calc_sign(Params, mixin_key);
+  if (_wbi_config) {
+    const auto mixin_key = Wbi::Get_mixin_key(_wbi_config->img_key, _wbi_config->sub_key);
+    const auto w_rid = Wbi::Calc_sign(Params, mixin_key);
+    request_path += Wbi::Json_to_url_encode_str(Params) + "&w_rid=" + w_rid;
+  } else {
+    request_path += Wbi::Json_to_url_encode_str(Params);
+  }
 
-  auto res =
-      client.Get(("/x/space/wbi/acc/info?" + Wbi::Json_to_url_encode_str(Params) +
-                  "&w_rid=" + w_rid)
-                     .c_str(),
-                 headers);
+  auto res = client.Get(request_path.c_str(), headers);
   if (res && res->status == 200) {
     try {
       auto json = nlohmann::json::parse(res->body);
@@ -195,16 +193,19 @@ CheckStatus UserStateWatcher::Check(queue<StateMessage>& messageQueue, const str
   liveCli.set_connection_timeout(std::chrono::seconds(1));
 
   // https://api.live.bilibili.com/room/v1/Room/getRoomInfoOld?mid=475210
+
+  string request_path = "/room/v1/Room/getRoomInfoOld?";
   nlohmann::json Params;
   Params["mid"] = target.uid;
-  const auto mixin_key = Wbi::Get_mixin_key(img_key, sub_key);
-  const auto w_rid = Wbi::Calc_sign(Params, mixin_key);
+  if (_wbi_config) {
+    const auto mixin_key = Wbi::Get_mixin_key(_wbi_config->img_key, _wbi_config->sub_key);
+    const auto w_rid = Wbi::Calc_sign(Params, mixin_key);
+    request_path += Wbi::Json_to_url_encode_str(Params) + "&w_rid=" + w_rid;
+  } else {
+    request_path += Wbi::Json_to_url_encode_str(Params);
+  }
 
-  auto infores =
-      liveCli.Get(("/room/v1/Room/getRoomInfoOld?" +
-                   Wbi::Json_to_url_encode_str(Params) + "&w_rid=" + w_rid)
-                      .c_str(),
-                  headers);
+  auto infores = liveCli.Get(request_path.c_str(), headers);
   if (infores && infores->status == 200) {
     try {
       auto json = nlohmann::json::parse(infores->body);

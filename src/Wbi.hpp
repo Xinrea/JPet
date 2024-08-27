@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include <array>   // std::array
-#include <locale>  // std::locale
+#include <memory>
 
 /// thrid party libraries
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
@@ -9,9 +9,11 @@
 #include <cryptopp/hex.h>
 #include <nlohmann/json.hpp>
 
-/*
- * 注意，假定不会发生错误！
- */
+struct WbiConfig {
+    std::string img_key;
+    std::string sub_key;
+};
+
 class Wbi {
   constexpr static std::array<uint8_t, 64> MIXIN_KEY_ENC_TAB_ = {
       46, 47, 18, 2,  53, 8,  23, 32, 15, 50, 10, 31, 58, 3,  45, 35,
@@ -53,7 +55,7 @@ class Wbi {
   }
 
   /* 获取 wbi key */
-  static std::pair<std::string, std::string> Get_wbi_key() {
+  static std::shared_ptr<WbiConfig> Get_wbi_key() {
     const auto url = cpr::Url{"https://api.bilibili.com/x/web-interface/nav"};
     const auto cookie = cpr::Cookies{
         {"SESSDATA", "xxxxxxxxxxxx"},
@@ -66,6 +68,10 @@ class Wbi {
     };
     const auto response = cpr::Get(url, cookie, header);
 
+    if (response.status_code != 200) {
+        return nullptr;
+    }
+
     nlohmann::json json = nlohmann::json::parse(response.text);
 
     const std::string img_url = json["data"]["wbi_img"]["img_url"];
@@ -77,7 +83,10 @@ class Wbi {
     std::string sub_key =
         sub_url.substr(sub_url.find("wbi/") + 4,
                        sub_url.find(".png") - sub_url.find("wbi/") - 4);
-    return {img_key, sub_key};
+    auto ret = std::make_shared<WbiConfig>();
+    ret->img_key = img_key;
+    ret->sub_key = sub_key;
+    return ret;
   }
 
   /* 获取 mixin key */

@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <memory>
 #include <queue>
 #include <thread>
 #include <optional>
@@ -11,6 +12,7 @@
 #include "CookieWindow.hpp"
 #include "LAppDefine.hpp"
 #include "DataManager.hpp"
+#include "Wbi.hpp"
 #include "wintoastlib.h"
 #include "WinToastEventHandler.h"
 
@@ -39,7 +41,7 @@ class UserStateManager {
       }
     }
     std::shared_ptr<UserStateWatcher> watcher = std::make_shared<UserStateWatcher>(uid,
-        _cookieWindow->userAgent, img_key, sub_key);
+        _cookieWindow->userAgent, _wbi_config);
     _watchers.push_back(watcher);
     LAppPal::PrintLog("[UserStateManager]Add watcher %s", uid.c_str());
   }
@@ -84,8 +86,8 @@ class UserStateManager {
     return cookies;
   }
 
-  std::pair<string, string> GetWbiKey() {
-    return std::pair<string, string>(img_key, sub_key);
+  shared_ptr<WbiConfig> GetWbiKey() {
+    return _wbi_config;
   }
 
  private:
@@ -95,8 +97,7 @@ class UserStateManager {
   wstring _exePath;
   const bool& _dynamicNotifyEnabled;
   const bool& _liveNotifyEnabled;
-
-  string img_key, sub_key;
+  shared_ptr<WbiConfig> _wbi_config;
 
   CookieWindow* _cookieWindow = nullptr;
 
