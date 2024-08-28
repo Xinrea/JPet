@@ -269,7 +269,7 @@ int DataManager::CurrentExpDiff() {
   if (bf->IsBirthday()) {
     exp *= 6;
   }
-  exp *= (1 + 0.5 * starcnt);
+  exp *= (1 + 0.2 * starcnt);
   return std::min(exp, 99999999);
 }
 
