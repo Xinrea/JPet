@@ -55,6 +55,12 @@ bool DataManager::init() {
     AddAttribute("will", 3);
     AddAttribute("intellect", 4);
   }
+  // check attributes that more than 100 by adding 0
+  // details are in AddAttribute()
+  for (const auto &attr :
+       {"speed", "endurance", "strength", "will", "intellect"}) {
+    AddAttribute(attr, 0);
+  }
   return true;
 }
 
@@ -357,7 +363,15 @@ void DataManager::AddAttribute(const std::string& key, int value) {
   gameData->Get("attr." + key, current);
   // WARN not support negative value yet
   int new_value = std::min(std::max(current + value, 0), 99999999);
-  gameData->Update("attr." + key, std::max(current + value, 0));
+  // normal attributes are limited to 100
+  if (key != "exp" && key != "buycnt") {
+    // extra is returned as exp
+    if (new_value > 100) {
+      AddAttribute("exp", (new_value - 100) * 53000 / 2);
+      new_value = 100;
+    }
+  }
+  gameData->Update("attr." + key, new_value);
 }
 
 std::vector<int> DataManager::TaskStatus(int id) {

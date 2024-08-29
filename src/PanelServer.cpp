@@ -122,6 +122,11 @@ void PanelServer::doServe() {
                  }
                  // TODO check valid attribute
                  auto dataManager = DataManager::GetInstance();
+                 // cannot add attributes to more than 100
+                 if (dataManager->GetAttribute(targetAttribute) >= 100) {
+                   res.status = 405;
+                   return;
+                 }
                  int currentExperience = dataManager->GetAttribute("exp");
                  int buycnt = dataManager->GetAttribute("buycnt");
                  int currentCost = 53000;
@@ -280,7 +285,8 @@ void PanelServer::doServe() {
                                             httplib::Response &res) {
     LAppPal::PrintLog(LogLevel::Debug, "POST /api/task/:id/confirm");
     int id = std::stoi(req.path_params.at("id"));
-    auto tasks = DataManager::GetInstance()->GetTasks();
+    auto dataManager = DataManager::GetInstance();
+    auto tasks = dataManager->GetTasks();
     for (auto task : tasks) {
       if (task->id == id) {
         if (task->status != TStatus::WAIT_SETTLE) {
@@ -293,23 +299,22 @@ void PanelServer::doServe() {
           // update attribute
           for (auto it = task->rewards.begin(); it != task->rewards.end();
                ++it) {
-            DataManager::GetInstance()->AddAttribute(it->first, it->second);
+            dataManager->AddAttribute(it->first, it->second);
           }
           if (task->id == 1) {
-            DataManager::GetInstance()->AddAttribute("exp", 10 * DataManager::GetInstance()->CurrentExpDiff());
+            dataManager->AddAttribute("exp", 10 * dataManager->CurrentExpDiff());
           }
           // if with special, update related key
           if (task->special) {
-            DataManager::GetInstance()->SetRaw(task->special->linked_key, 1);
+            dataManager->SetRaw(task->special->linked_key, 1);
           }
-          DataManager::GetInstance()->SetRaw("buff.failcount", 0);
+          dataManager->SetRaw("buff.failcount", 0);
           LAppPal::PrintLog("[PanelServer]Failcount set to 0");
           Notify("UPDATE");
         } else {
-          int failcount =
-              DataManager::GetInstance()->GetWithDefault("buff.failcount", 0);
+          int failcount = dataManager->GetWithDefault("buff.failcount", 0);
           failcount++;
-          DataManager::GetInstance()->SetRaw("buff.failcount", failcount);
+          dataManager->SetRaw("buff.failcount", failcount);
           LAppPal::PrintLog("[PanelServer]Failcount set to %d", failcount);
         }
         if (task->repeatable) {
