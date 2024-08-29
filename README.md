@@ -1,18 +1,25 @@
 # JPet
 
-桌面宠物轴伊
+![GitHub Tag](https://img.shields.io/github/v/tag/Xinrea/JPet)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Xinrea/JPet/release-build.yml)
+![GitHub last commit](https://img.shields.io/github/last-commit/Xinrea/JPet)
 
-![img](screenshots/JPet.gif)
+
+## 桌面宠物轴伊
+
+更新发布网站: [https://pet.vjoi.cn](https://pet.vjoi.cn)
+
+![img](screenshots/jpet.png)
 
 ## Live2d 模型
 
 模型绘制：轴伊 Joi
 
-模型制作：Xinrea
-
 \*该 Live2d 模型不可用于其他用途
 
 ## 编译
+
+> 仅支持 Windows 平台（Win10 及以上）
 
 该项目需要的部分依赖已经置于`thirdparty`下，包括：
 
@@ -20,28 +27,24 @@
 - FMOD CORE
 - CubismSdkForNative
 
-其余依赖定义在 vcpkg.json 中，可使用 vcpkg 安装：
+其余依赖定义在 vcpkg.json 中。
 
-```shell
-vcpkg install
+执行以下命令进行构建并运行：
+
+```powershell
+git submodule update --init
+.\build-scripts\build_and_run.ps1
 ```
 
-依赖安装完成后即可使用 CMake 编译
+详细的构建过程可见 `build_and_run.ps1` 的内容，主要分为三步：
 
-## TODO
+1. 前端构建（GamePanel 使用 Webview2 加载页面作为窗口内容）
+2. CMake 配置
+3. 构建以及运行
 
-- ~~更多交互动画~~
-- ~~音頻播放~~
-- ~~配置保存~~
-- ~~快捷打开直播间/主页~~
-- ~~直播/动态通知~~
-- ~~托盘图标和菜单~~
-- ~~拖放删除文件~~
-- ~~自定义缩放参数~~
-- 开机自启动
-- ~~打包安装程序~~
-- ~~更新检查~~
-- ...
+## 游戏设计
+
+- [数值设计文档](doc/attributes.md)
 
 ## Live2D Open Software License
 
