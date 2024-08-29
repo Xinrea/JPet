@@ -49,17 +49,52 @@ bool DataManager::init() {
     return false;
   }
   if (firstData) {
+    SetRaw("data.version", 1);
     AddAttribute("speed", 2);
     AddAttribute("strength", 1);
     AddAttribute("endurance", 1);
     AddAttribute("will", 3);
     AddAttribute("intellect", 4);
   }
+  
   // check attributes that more than 100 by adding 0
   // details are in AddAttribute()
   for (const auto &attr :
        {"speed", "endurance", "strength", "will", "intellect"}) {
     AddAttribute(attr, 0);
+  }
+  
+  // if legacy player
+  if (GetWithDefault("data.version", 0) == 0) {
+    // prepare some extra benefit
+    int extra = 1;
+    if (GetWithDefault("clothes.1.active", 0) > 0) {
+      extra = 2;
+    }
+    if (GetWithDefault("clothes.2.active", 0) > 0) {
+      extra = 3;
+    }
+    // save login cookies
+    auto cookies = GetWithDefault("cookies", "");
+    auto user_agent = GetWithDefault("user-agent", "");
+    // drop old data
+    gameData->Drop();
+    // apply initial
+    AddAttribute("speed", 2);
+    AddAttribute("strength", 1);
+    AddAttribute("endurance", 1);
+    AddAttribute("will", 3);
+    AddAttribute("intellect", 4);
+    // apply benefit
+    for (const auto &attr :
+         {"speed", "endurance", "strength", "will", "intellect"}) {
+      AddAttribute(attr, extra);
+    }
+    // apply login cookies
+    SetRaw("cookies", cookies);
+    SetRaw("user-agent", user_agent);
+    // set data version
+    SetRaw("data.version", 1);
   }
   return true;
 }

@@ -3,8 +3,6 @@
 #include <string>
 #include <fstream>
 #include <vector>
-#include <unordered_map>
-#include <mutex>
 #include <filesystem>
 #include <rocksdb/db.h>
 
@@ -184,7 +182,7 @@ class GameData {
   }
 
  public:
-  GameData(const std::wstring& path) {
+  GameData(const std::wstring& old_datapath) {
     writeOptions.sync = true;
     rocksdb::Options options;
     options.create_if_missing = true;
@@ -196,8 +194,8 @@ class GameData {
       return;
     }
     // load old data from file, if file not exist, skip reading
-    if (std::filesystem::exists(std::filesystem::path(path))) {
-      std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (std::filesystem::exists(std::filesystem::path(old_datapath))) {
+      std::ifstream file(old_datapath, std::ios::binary | std::ios::ate);
       if (file.is_open()) {
         std::streamsize size = file.tellg();
         file.seekg(0, std::ios::beg);
@@ -210,7 +208,7 @@ class GameData {
       }
 
       // old data file is no longer needed
-      std::filesystem::remove(path);
+      std::filesystem::remove(old_datapath);
     }
   }
 
@@ -221,6 +219,17 @@ class GameData {
 
   bool Initialized() {
     return db != nullptr;
+  }
+
+  void Drop() {
+    rocksdb::Slice start("");
+    rocksdb::Slice end("\xFF");
+    auto status = db->DeleteRange(writeOptions, db->DefaultColumnFamily(), start, end);
+    if (!status.ok()) {
+      LAppPal::PrintLog(LogLevel::Error, "[GameData]Drop db failed: %d", status.code());
+      return;
+    }
+    LAppPal::PrintLog(LogLevel::Info, "[GameData]Database dropped");
   }
 
   void Update(const std::string& key, int32_t value) {

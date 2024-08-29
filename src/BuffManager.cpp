@@ -26,6 +26,7 @@ void BuffManager::Update() {
   auto user_agent = dm->GetWithDefault("user-agent", "");
   if (cookies.empty()) {
     // not login, just skip
+    PanelServer::GetInstance()->Notify("UPDATE");
     return;
   }
   httplib::Headers headers = {{"cookie", cookies}, {"User-Agent", user_agent}};
