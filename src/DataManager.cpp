@@ -90,6 +90,7 @@ bool DataManager::init() {
          {"speed", "endurance", "strength", "will", "intellect"}) {
       AddAttribute(attr, extra);
     }
+    SetRaw("legacy", 1);
     // apply login cookies
     SetRaw("cookies", cookies);
     SetRaw("user-agent", user_agent);
@@ -309,6 +310,9 @@ int DataManager::CurrentExpDiff() {
   }
   if (bf->IsBirthday()) {
     exp *= 6;
+  }
+  if (bf->IsLegacy()) {
+    exp *= 1.2f;
   }
   exp *= (1 + 0.2 * starcnt);
   return std::min(exp, 99999999);

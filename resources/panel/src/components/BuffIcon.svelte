@@ -6,6 +6,7 @@
   import FailIcon from "../assets/bufficon/fail.webp";
   import MondayIcon from "../assets/bufficon/monday.webp";
   import BirthdayIcon from "../assets/bufficon/birthday.webp";
+  import LegacyIcon from "../assets/bufficon/legacy.webp";
 
   const nameToIcon = {
     live: {
@@ -31,6 +32,10 @@
     birthday: {
       icon: BirthdayIcon,
       desc: "500%经验提升<生日>"
+    },
+    legacy: {
+      icon: LegacyIcon,
+      desc: "20%经验提升<内测玩家>"
     }
   };
 

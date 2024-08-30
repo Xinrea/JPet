@@ -57,6 +57,8 @@ public:
 
   bool IsBirthday();
 
+  bool IsLegacy();
+
   int MedalLevel() {
     return medal_level_;
   }

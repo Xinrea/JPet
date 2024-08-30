@@ -191,6 +191,9 @@ std::vector<std::string> BuffManager::GetBuffList() {
   if (IsBirthday()) {
     buffs.push_back("birthday");
   }
+  if (IsLegacy()) {
+    buffs.push_back("legacy");
+  }
   return buffs;
 }
 
@@ -210,4 +213,8 @@ bool BuffManager::IsBirthday() {
   tm ltm;
   localtime_s(&ltm, &now);
   return ltm.tm_mon == 10 && ltm.tm_mday == 25;
+}
+
+bool BuffManager::IsLegacy() {
+  return DataManager::GetInstance()->GetWithDefault("legacy", 0) > 0;
 }
