@@ -85,6 +85,13 @@ void LAppLive2DManager::SwitchClothes(int no) {
                                           true);
 }
 
+void LAppLive2DManager::UpdateViewPort() {
+  for (csmUint32 i = 0; i < _models.GetSize(); i++) {
+    LAppModel* model = GetModel(i);
+    model->UpdateViewPort();
+  }
+ }
+
 void LAppLive2DManager::OnDrag(csmFloat32 x, csmFloat32 y) const {
   // if |x| or |y| > 1, should make it in range [-1,1] to make model looks
   // natural

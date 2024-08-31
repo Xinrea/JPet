@@ -197,78 +197,10 @@ void CubismRendererProfile_OpenGLES2::SetGlEnableVertexAttribArray(GLuint index,
 
 void CubismRendererProfile_OpenGLES2::Save()
 {
-    //-- push state --
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &_lastArrayBufferBinding);
-    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &_lastElementArrayBufferBinding);
-    glGetIntegerv(GL_CURRENT_PROGRAM, &_lastProgram);
-
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &_lastActiveTexture);
-    glActiveTexture(GL_TEXTURE1); //テクスチャユニット1をアクティブに（以後の設定対象とする）
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &_lastTexture1Binding2D);
-
-    glActiveTexture(GL_TEXTURE0); //テクスチャユニット0をアクティブに（以後の設定対象とする）
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &_lastTexture0Binding2D);
-
-    glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &_lastVertexAttribArrayEnabled[0]);
-    glGetVertexAttribiv(1, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &_lastVertexAttribArrayEnabled[1]);
-    glGetVertexAttribiv(2, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &_lastVertexAttribArrayEnabled[2]);
-    glGetVertexAttribiv(3, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &_lastVertexAttribArrayEnabled[3]);
-
-    _lastScissorTest = glIsEnabled(GL_SCISSOR_TEST);
-    _lastStencilTest = glIsEnabled(GL_STENCIL_TEST);
-    _lastDepthTest = glIsEnabled(GL_DEPTH_TEST);
-    _lastCullFace = glIsEnabled(GL_CULL_FACE);
-    _lastBlend = glIsEnabled(GL_BLEND);
-
-    glGetIntegerv(GL_FRONT_FACE, &_lastFrontFace);
-
-    glGetBooleanv(GL_COLOR_WRITEMASK, _lastColorMask);
-
-    // backup blending
-    glGetIntegerv(GL_BLEND_SRC_RGB, &_lastBlending[0]);
-    glGetIntegerv(GL_BLEND_DST_RGB, &_lastBlending[1]);
-    glGetIntegerv(GL_BLEND_SRC_ALPHA, &_lastBlending[2]);
-    glGetIntegerv(GL_BLEND_DST_ALPHA, &_lastBlending[3]);
-
-    // モデル描画直前のFBOとビューポートを保存
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &_lastFBO);
     glGetIntegerv(GL_VIEWPORT, _lastViewport);
-
 }
 
-void CubismRendererProfile_OpenGLES2::Restore()
-{
-    glUseProgram(_lastProgram);
-
-    SetGlEnableVertexAttribArray(0, _lastVertexAttribArrayEnabled[0]);
-    SetGlEnableVertexAttribArray(1, _lastVertexAttribArrayEnabled[1]);
-    SetGlEnableVertexAttribArray(2, _lastVertexAttribArrayEnabled[2]);
-    SetGlEnableVertexAttribArray(3, _lastVertexAttribArrayEnabled[3]);
-
-    SetGlEnable(GL_SCISSOR_TEST, _lastScissorTest);
-    SetGlEnable(GL_STENCIL_TEST, _lastStencilTest);
-    SetGlEnable(GL_DEPTH_TEST, _lastDepthTest);
-    SetGlEnable(GL_CULL_FACE, _lastCullFace);
-    SetGlEnable(GL_BLEND, _lastBlend);
-
-    glFrontFace(_lastFrontFace);
-
-    glColorMask(_lastColorMask[0], _lastColorMask[1], _lastColorMask[2], _lastColorMask[3]);
-
-    glBindBuffer(GL_ARRAY_BUFFER, _lastArrayBufferBinding); //前にバッファがバインドされていたら破棄する必要がある
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _lastElementArrayBufferBinding);
-
-    glActiveTexture(GL_TEXTURE1); //テクスチャユニット1を復元
-    glBindTexture(GL_TEXTURE_2D, _lastTexture1Binding2D);
-
-    glActiveTexture(GL_TEXTURE0); //テクスチャユニット0を復元
-    glBindTexture(GL_TEXTURE_2D, _lastTexture0Binding2D);
-
-    glActiveTexture(_lastActiveTexture);
-
-    // restore blending
-    glBlendFuncSeparate(_lastBlending[0], _lastBlending[1], _lastBlending[2], _lastBlending[3]);
-}
+void CubismRendererProfile_OpenGLES2::Restore() {}
 
 /*********************************************************************************************************************
  *                                      CubismRenderer_OpenGLES2

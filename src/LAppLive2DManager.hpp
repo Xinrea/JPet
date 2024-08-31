@@ -58,6 +58,8 @@ class LAppLive2DManager {
 
   void OnFollow();
 
+  void UpdateViewPort();
+
   /**
    * @brief   画面をドラッグしたときの処理
    *

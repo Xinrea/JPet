@@ -41,6 +41,8 @@ void CubismRenderer::Initialize(Framework::CubismModel* model, csmInt32 maskBuff
     _model = model;
 }
 
+void CubismRenderer::UpdateViewPort() { SaveProfile(); }
+
 void CubismRenderer::DrawModel()
 {
     if (GetModel() == NULL) return;
@@ -53,11 +55,11 @@ void CubismRenderer::DrawModel()
      * モデル描画直前の状態に戻すための処理です。
      */
 
-    SaveProfile();
+    // SaveProfile();
 
     DoDrawModel();
 
-    RestoreProfile();
+    // RestoreProfile();
 }
 
 void CubismRenderer::SetMvpMatrix(CubismMatrix44* matrix4x4)

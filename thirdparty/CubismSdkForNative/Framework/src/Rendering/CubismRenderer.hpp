@@ -110,6 +110,8 @@ public:
     */
     virtual void Initialize(Framework::CubismModel* model, csmInt32 maskBufferCount);
 
+    void UpdateViewPort();
+
     /**
      * @brief   モデルを描画する
      *

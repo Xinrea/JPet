@@ -303,6 +303,7 @@ void LAppDelegate::Release() {
 void LAppDelegate::Run() {
   static double initial_audio_idle_time = glfwGetTime();
   DataManager* dataManager = DataManager::GetInstance();
+  LAppLive2DManager::GetInstance()->UpdateViewPort();
   
   // 随机播放启动语音
   _au->Play3dSound(AudioType::START, rand());
@@ -336,6 +337,7 @@ void LAppDelegate::Run() {
 
       // ビューポート変更
       glViewport(0, 0, width, height);
+      LAppLive2DManager::GetInstance()->UpdateViewPort();
     }
 
     // 闲置状态更新

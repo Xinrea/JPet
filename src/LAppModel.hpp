@@ -56,6 +56,8 @@ class LAppModel : public Csm::CubismUserModel {
    */
   void Update();
 
+  void UpdateViewPort();
+
   /**
    * @brief
    * モデルを描画する処理。モデルを描画する空間のView-Projection行列を渡す。

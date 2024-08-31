@@ -516,6 +516,15 @@ void LAppModel::DoDraw() {
   GetRenderer<Rendering::CubismRenderer_OpenGLES2>()->DrawModel();
 }
 
+void LAppModel::UpdateViewPort() {
+  if (_model == NULL) {
+    return;
+  }
+
+  GetRenderer<Rendering::CubismRenderer_OpenGLES2>()->UpdateViewPort();
+}
+
+
 void LAppModel::Draw(CubismMatrix44& matrix) {
   if (_model == NULL) {
     return;
