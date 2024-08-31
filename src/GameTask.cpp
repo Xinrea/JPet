@@ -43,8 +43,6 @@ void GameTask::TryDone() {
   bool state = current_time >= start_time + cost_snapshot;
   // time's up, set status now
   if (state) {
-    status = TStatus::WAIT_SETTLE;
-    Notify(L"任务完成", title, new WinToastEventHandler("TASK_COMPLETE"));
     // check success or not
     int lack = 0;
     for (auto it = requirements.begin(); it != requirements.end(); ++it) {
@@ -84,6 +82,8 @@ void GameTask::TryDone() {
         success = true;
         LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d success", id);
       }
+      status = TStatus::WAIT_SETTLE;
+      Notify(L"任务完成", title, new WinToastEventHandler("TASK_COMPLETE"));
     }
 
     Dump();
