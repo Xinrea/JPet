@@ -65,6 +65,7 @@ void LAppSprite::Render() {
   if (current_alpha_ > target_alpha_) {
     current_alpha_ -= 5;
   }
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glUseProgram(shaderProgram_);
   if (progress_ >= 1.0f) {
     glUniform4f(var_color_, 1, 0.51, 0.18, float(current_alpha_) / 100.0f);
