@@ -81,7 +81,7 @@ class LAppDelegate {
   void OnMouseCallBack(GLFWwindow *window, double x, double y);
 
   // 文件拖放的CallBack，用于获取拖放文件的路径和名称
-  void OnDropCallBack(GLFWwindow *window, int path_count, const WCHAR *paths[]);
+  void OnDropCallBack(GLFWwindow *window, int path_count, const char *paths[]);
 
   void OnWindowPosCallBack(GLFWwindow *window, int x, int y);
 
@@ -265,6 +265,10 @@ class EventHandler {
                               int modify) {
     LAppDelegate::GetInstance()->OnMouseCallBack(window, button, action,
                                                  modify);
+  }
+
+  static void OnDropCallBack(GLFWwindow *window, int path_count, const char* paths[]) {
+    LAppDelegate::GetInstance()->OnDropCallBack(window, path_count, paths);
   }
 
   /**

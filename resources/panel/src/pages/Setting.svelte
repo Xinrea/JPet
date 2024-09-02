@@ -32,6 +32,7 @@
   let _update = true;
   // other
   let _track = true;
+  let _dropfile = true;
   function init() {
     // get from server
     fetch("/api/config/audio")
@@ -62,6 +63,7 @@
       .then((res) => res.json())
       .then((data) => {
         _track = data.track;
+        _dropfile = data.dropfile;
       });
     setTimeout(() => {
       fetch("/api/account")
@@ -143,6 +145,7 @@
       },
       body: JSON.stringify({
         track: _track,
+        dropfile: _dropfile,
       }),
     });
   }
@@ -328,6 +331,9 @@
 <P class="mb-4">其它设置</P>
 <Toggle class="mb-2" bind:checked={_track} on:change={updateOther}
   >鼠标追踪</Toggle
+>
+<Toggle class="mb-2" bind:checked={_dropfile} on:change={updateOther}
+  >文件回收站</Toggle
 >
 <Hr />
 <P class="mb-4">游戏数据设置</P>

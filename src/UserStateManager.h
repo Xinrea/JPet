@@ -90,6 +90,9 @@ class UserStateManager {
     return _wbi_config;
   }
 
+  void Notify(const wstring& title, const wstring& content,
+              WinToastEventHandler* handler);
+  
  private:
   vector<std::shared_ptr<UserStateWatcher>> _watchers;
   std::mutex _mutex;
@@ -103,7 +106,4 @@ class UserStateManager {
 
   std::thread _checkThread;
   bool _running = true;
-
-  void Notify(const wstring& title, const wstring& content,
-              WinToastEventHandler* handler);
 };

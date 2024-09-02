@@ -407,13 +407,18 @@ void PanelServer::doServe() {
                    res.status = 400;
                  }
                });
-  server->Get("/api/config/other", [](const httplib::Request &req, httplib::Response &res) {
-    nlohmann::json resp = {{"track", DataManager::GetInstance()->IsTracking()}};
+  server->Get("/api/config/other", [](const httplib::Request &req,
+                                      httplib::Response &res) {
+    nlohmann::json resp;
+    resp["track"] =  DataManager::GetInstance()->IsTracking();
+    resp["dropfile"] = DataManager::GetInstance()->GetDropFile();
     res.set_content(resp.dump(), "application/json");
   });
   server->Post("/api/config/other", [](const httplib::Request &req, httplib::Response &res) {
     auto json = nlohmann::json::parse(req.body);
     DataManager::GetInstance()->IsTracking(json.at("track"));
+    DataManager::GetInstance()->UpdateDropFile(json.at("dropfile"));
+    DataManager::GetInstance()->Save();
   });
   server->Get("/api/config/notify", [](const httplib::Request &req,
                                        httplib::Response &res) {

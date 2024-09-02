@@ -192,6 +192,27 @@ void DataManager::UpdateDisplay(float scale, bool green, bool rateLimit) {
                                                {"rateLimit", rateLimit}});
 }
 
+bool DataManager::GetDropFile() {
+  if (!data.contains("other")) {
+    data.insert_or_assign("other", toml::table{});
+    return true;
+  }
+  auto other = data.at("other").as_table();
+  if (!other->contains("dropfile")) {
+    other->insert("dropfile", true);
+    return true;
+  }
+  return GetConfig("other", "dropfile", true);
+}
+
+void DataManager::UpdateDropFile(bool enable) {
+  if (!data.contains("other")) {
+    data.insert_or_assign("other", toml::table{});
+  }
+  auto other = data.at("other").as_table();
+  other->insert_or_assign("dropfile", enable);
+}
+
 bool DataManager::IsTracking() {
   if (!data.contains("other")) {
     data.insert_or_assign("other", toml::table{});

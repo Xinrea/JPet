@@ -8,11 +8,14 @@
 
 #include "LAppDelegate.hpp"
 #include "AudioManager.hpp"
+#include "WinToastEventHandler.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <filesystem>
 #include <mutex>
 #include <shellapi.h>
+#include <stdio.h>
 #include <winbase.h>
 #include <winuser.h>
 
@@ -203,6 +206,7 @@ bool LAppDelegate::Initialize() {
 
   // コールバック関数の登録
   glfwSetMouseButtonCallback(_window, EventHandler::OnMouseCallBack);
+  glfwSetDropCallback(_window, EventHandler::OnDropCallBack);
   glfwSetCursorPosCallback(_window, EventHandler::OnMouseCallBack);
   glfwSetWindowPosCallback(_window, EventHandler::OnWindowPosCallBack);
   glfwSetWindowTrayCallback(_window, EventHandler::OnTrayClickCallBack);
@@ -782,4 +786,40 @@ void LAppDelegate::doSnapshot() {
   stbi_write_png(LAppPal::WStringToString(filepath).c_str(), width, height, nrChannels, buffer.data(), stride);
   _need_snapshot.store(false);
   _cv.notify_one();
+}
+
+void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count,
+                                  const char *paths[]) {
+  if (!DataManager::GetInstance()->GetDropFile()) {
+    return;
+  }
+  if (path_count == 0 || paths == nullptr) {
+    return;
+  }
+  auto move_to_recycle = [](const wstring &path) {
+    SHFILEOPSTRUCTW fileOp = {0};
+    fileOp.wFunc = FO_DELETE;
+    fileOp.fFlags = FOF_ALLOWUNDO;
+    std::wstring doubleNullTerminatedPath = path + L'\0';
+    fileOp.pFrom = doubleNullTerminatedPath.c_str();
+    return SHFileOperationW(&fileOp);
+  };
+  // start a temp thread to delete files avoid blocking ui
+  vector<wstring> wpaths;
+  for (size_t i = 0; i < path_count; i++) {
+    auto current_path = LAppPal::StringToWString(paths[i]);
+    wpaths.push_back(current_path);
+  }
+  auto delete_work = [&](vector<wstring> paths) {
+    LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]Deleteing %d files", paths.size());
+    for (const wstring& p : paths) {
+      move_to_recycle(p);
+    }
+    wchar_t content_buffer[128];
+    swprintf_s(content_buffer, L"将 %d 个文件/文件夹移动到了回收站",
+               paths.size());
+    _us->Notify(L"文件回收", wstring(content_buffer),
+                new WinToastEventHandler(""));
+  };
+  std::thread(delete_work, wpaths).detach();
 }

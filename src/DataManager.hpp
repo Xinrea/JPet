@@ -48,6 +48,9 @@ class DataManager {
   void GetNotify(bool *dynamic, bool *live, bool *update);
   void UpdateNotify(bool dynamic, bool live, bool update);
 
+  bool GetDropFile();
+  void UpdateDropFile(bool b);
+
   bool IsTracking();
   void IsTracking(bool enable);
   
