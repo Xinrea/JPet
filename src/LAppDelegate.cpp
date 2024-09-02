@@ -764,7 +764,7 @@ void LAppDelegate::Snapshot() {
 
   if (GetSaveFileName(&ofn) == TRUE) {
     // Use ofn.lpstrFile here to open the file for writing
-    CopyFile(filepath.c_str(), ofn.lpstrFile, TRUE);
+    CopyFile(filepath.c_str(), ofn.lpstrFile, FALSE);
     std::filesystem::remove(filepath);
   }
 }
@@ -811,12 +811,12 @@ void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count,
     wpaths.push_back(current_path);
   }
   auto delete_work = [&](vector<wstring> paths) {
-    LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]Deleteing %d files", paths.size());
+    LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]Deleteing %llu files", paths.size());
     for (const wstring& p : paths) {
       move_to_recycle(p);
     }
     wchar_t content_buffer[128];
-    swprintf_s(content_buffer, L"将 %d 个文件/文件夹移动到了回收站",
+    swprintf_s(content_buffer, L"将 %llu 个文件/文件夹移动到了回收站",
                paths.size());
     _us->Notify(L"文件回收", wstring(content_buffer),
                 new WinToastEventHandler(""));

@@ -112,7 +112,7 @@ int main() {
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
 
     if (GetSaveFileName(&ofn) == TRUE) {
-       CopyFile(dumpfile.c_str(), ofn.lpstrFile, TRUE);
+       CopyFile(dumpfile.c_str(), ofn.lpstrFile, FALSE);
        std::filesystem::remove(dumpfile);
     }
   }
