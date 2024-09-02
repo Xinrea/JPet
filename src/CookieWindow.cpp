@@ -125,7 +125,7 @@ void CookieWindow::WindowProc() {
                                 args->TryGetWebMessageAsString(&message);
                                 // processMessage(&message);
                                 std::wstring wstr(message.get());
-                                std::string str(wstr.begin(), wstr.end());
+                                auto str = LAppPal::WStringToString(wstr);
                                 if (str[0] == 'C') {
                                   cookie = str.substr(1);
                                   LAppPal::PrintLog(LogLevel::Info, "[CookieWindow]New cookie received");
