@@ -57,24 +57,23 @@ void GameTask::TryDone() {
 
     // get willpower
     int will = DataManager::GetInstance()->GetAttribute("will");
-    // every lack of attribute will reduce 3% -> 6
-    // every will will increase 0.5% -> 1
-    lack *= 6;
-    // if lack is 0, the full rate is 70%
-    lack += 60;
-    if (lack >= 200) {
+    // every lack of attribute will reduce 3% -> 12
+    // every will will increase 0.25% -> 1
+    lack *= 12;
+    // if lack is 0, the full rate is 70%, lack 30% -> 120
+    int starcnt = DataManager::GetInstance()->GetWithDefault("starcnt", 0);
+    lack += 120 + 20 * starcnt;
+    if (lack >= 400) {
       success = false;
       LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d failed before will takes effect", id);
     } else {
       lack -= will;
-      // max rate is 95%
-      int starcnt = DataManager::GetInstance()->GetWithDefault("starcnt", 0);
-      int min_lack = 10 + 10 * starcnt;
-      if (lack < min_lack) {
-        lack = min_lack;
+      // max rate is 95%, 5% -> 20
+      if (lack < 20) {
+        lack = 20;
       }
       // using random number to determine success
-      int random = rand() % 200;
+      int random = rand() % 400;
       if (random < lack) {
         success = false;
         LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d failed", id);

@@ -133,13 +133,13 @@
         lack += value - attrs[key];
       }
     }
-    lack = lack * 6 + 60;
-    if (lack >= 200) {
+    lack = lack * 12 + 120 + 20 * starcnt;
+    if (lack >= 400) {
       return 0;
     }
     lack -= attrs.will;
-    lack = Math.max(lack, 10 + 10 * starcnt);
-    lack /= 2;
+    lack = Math.max(lack, 20);
+    lack /= 4;
     return Math.min(Math.max(100 - lack, 0), 100);
   }
 
