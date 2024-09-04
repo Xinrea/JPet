@@ -122,8 +122,8 @@ void PanelServer::doServe() {
                  }
                  // TODO check valid attribute
                  auto dataManager = DataManager::GetInstance();
-                 // cannot add attributes to more than 100
-                 if (dataManager->GetAttribute(targetAttribute) >= 100) {
+                 // cannot add attributes to more than limit
+                 if (dataManager->GetAttribute(targetAttribute) >= dataManager->GetAttrLimit()) {
                    res.status = 405;
                    return;
                  }

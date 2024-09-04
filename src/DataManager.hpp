@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <string>
 #include <toml++/toml.hpp>
 #include <vector>
@@ -79,6 +78,8 @@ class DataManager {
    * [0]speed,[1]endurance,[2]strength,[3]will,[4]intellect,[5]exp,[6]buycnt
    */
   std::vector<int> GetAttributeList();
+  
+  int GetAttrLimit();
 
   int GetAttribute(const std::string& key);
 

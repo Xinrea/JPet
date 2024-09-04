@@ -75,7 +75,7 @@
     if (currentExp < buycost) {
       return;
     }
-    if (attributes[targetAttr] >= 100) {
+    if (attributes[targetAttr] >= (100 + 10 * starcnt)) {
       return;
     }
     fetch(`/api/attr/${targetAttr}`, { method: "POST" });
@@ -191,7 +191,7 @@
       <h3 class="mb-5 text-lg font-normal text-gray-500">
         此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？
       </h3>
-      <Button disabled={currentExp < buycost || attributes[targetAttr] >= 100} on:click={attrHandle}>确认</Button
+      <Button disabled={currentExp < buycost || attributes[targetAttr] >= (100 + 10 * starcnt)} on:click={attrHandle}>确认</Button
       >
       <Button color="alternative">取消</Button>
     </Modal>
