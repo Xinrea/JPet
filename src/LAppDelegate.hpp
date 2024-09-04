@@ -134,12 +134,6 @@ class LAppDelegate {
 
   void ForceShowPanel();
 
-  std::string GetLURL() { return _leftUrl; }
-  std::string GetUURL() { return _upUrl; }
-  std::string GetRURL() { return _rightUrl; }
-  void SetLURL(std::string s) { _leftUrl = s; }
-  void SetUURL(std::string s) { _upUrl = s; }
-  void SetRURL(std::string s) { _rightUrl = s; }
   void AddWatch(const std::string &s) {
     if (_us) _us->AddWatcher(s);
   }
@@ -217,6 +211,7 @@ class LAppDelegate {
   HWND _setHwnd;
   HWND _mainHwnd;
   bool _captured;  ///< クリックしているか
+  bool _menu_captured = false;
   float _mouseX;   ///< マウスX座標
   float _mouseY;   ///< マウスY座標
   float _pX;
@@ -238,7 +233,6 @@ class LAppDelegate {
 
   // Config Part
   int _iposX, _iposY;
-  std::string _leftUrl, _upUrl, _rightUrl;
   bool _isSetting;
   float _timeSetting;
   double _holdTime;

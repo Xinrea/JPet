@@ -12,8 +12,6 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/LAppModel.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LAppPal.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LAppPal.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/LAppSprite.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/LAppSprite.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LAppTextureManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LAppTextureManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LAppView.cpp
@@ -51,4 +49,8 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/GameTask.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/BuffManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/BuffManager.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ProgressSprite.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ProgressSprite.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/MenuSprite.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/MenuSprite.hpp
 )

@@ -1,16 +1,8 @@
-﻿/**
- * Copyright(c) Live2D Inc. All rights reserved.
- *
- * Use of this source code is governed by the Live2D Open Software license
- * that can be found at
- * https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html.
- */
-#include "LAppSprite.hpp"
-#include "LAppView.hpp"
+﻿#include "ProgressSprite.hpp"
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-LAppSprite::LAppSprite(float x, float y, float inner, float outer) {
+ProgressSprite::ProgressSprite(float x, float y, float inner, float outer) {
   unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
   glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
   glCompileShader(vertexShader);
@@ -53,12 +45,12 @@ LAppSprite::LAppSprite(float x, float y, float inner, float outer) {
   var_color_ = glGetUniformLocation(shaderProgram_, "globalColor");
 }
 
-LAppSprite::~LAppSprite() {
+ProgressSprite::~ProgressSprite() {
   glDeleteVertexArrays(1, &vao_);
   glDeleteBuffers(1, &vbo_);
 }
 
-void LAppSprite::Render() {
+void ProgressSprite::Render() {
   if (current_alpha_ < target_alpha_) {
     current_alpha_ += 5;
   }

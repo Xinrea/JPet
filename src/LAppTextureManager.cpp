@@ -7,8 +7,8 @@
  */
 
 #include "LAppTextureManager.hpp"
+#include "LAppDefine.hpp"
 
-#include <iostream>
 #define STBI_NO_STDIO
 #define STBI_ONLY_PNG
 #define STB_IMAGE_IMPLEMENTATION
@@ -40,13 +40,11 @@ LAppTextureManager::TextureInfo* LAppTextureManager::CreateTextureFromPngFile(
   png = stbi_load_from_memory(address, static_cast<int>(size), &width, &height,
                               &channels, STBI_rgb_alpha);
   {
-#ifdef PREMULTIPLIED_ALPHA_ENABLE
     unsigned int* fourBytes = reinterpret_cast<unsigned int*>(png);
     for (int i = 0; i < width * height; i++) {
       unsigned char* p = png + i * 4;
       fourBytes[i] = Premultiply(p[0], p[1], p[2], p[3]);
     }
-#endif
   }
 
   // OpenGL用のテクスチャを生成する

@@ -116,6 +116,9 @@ class LAppPal {
 
   static double EaseOut(int x);
 
+  static bool BrowseFile(std::wstring &path);
+  static bool BrowseFolder(std::wstring &path);
+
  private:
   static double s_currentFrame;
   static double s_lastFrame;

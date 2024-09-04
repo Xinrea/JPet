@@ -1,4 +1,7 @@
 *.mp3
+*.png
+*.webp
+*.svg
 dll/
 thirdparty/glfw
 thirdparty/fmod

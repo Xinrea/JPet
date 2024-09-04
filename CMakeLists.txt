@@ -217,6 +217,12 @@ add_custom_command(
 add_custom_command(
   TARGET ${APP_NAME}
   POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/circle-menu $<TARGET_FILE_DIR:${APP_NAME}>/resources/circle-menu
+)
+
+add_custom_command(
+  TARGET ${APP_NAME}
+  POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/joi $<TARGET_FILE_DIR:${APP_NAME}>/resources/joi
 )
 

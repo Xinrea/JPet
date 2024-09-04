@@ -8,6 +8,7 @@
 
 #include "LAppDelegate.hpp"
 #include "AudioManager.hpp"
+#include "MenuSprite.hpp"
 #include "WinToastEventHandler.h"
 
 #include <GL/glew.h>
@@ -84,11 +85,6 @@ bool LAppDelegate::Initialize() {
   _followlist = dataManager->GetFollowList();
   dataManager->GetNotify(&DynamicNotify, &LiveNotify, &UpdateNotify);
 
-  std::map<std::string, std::string> shortcuts;
-  dataManager->GetShortcut(&shortcuts);
-  _leftUrl = shortcuts["left"];
-  _upUrl = shortcuts["up"];
-  _rightUrl = shortcuts["right"];
   RenderTargetWidth = _scale * DRenderTargetWidth;
   RenderTargetHeight = _scale * DRenderTargetHeight;
   // 音频初始化
@@ -200,7 +196,7 @@ bool LAppDelegate::Initialize() {
 
   // 透過設定
   glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
   glEnable(GL_MULTISAMPLE);
 
@@ -441,11 +437,6 @@ void LAppDelegate::SaveSettings() {
   DataManager *dataManager = DataManager::GetInstance();
   dataManager->UpdateWindowPos(x, y);
 
-  // update shortcuts settings
-  dataManager->UpdateShortcut("left", _leftUrl);
-  dataManager->UpdateShortcut("up", _upUrl);
-  dataManager->UpdateShortcut("right", _rightUrl);
-
   // update display settings
   dataManager->UpdateDisplay(_scale, Green, isLimit);
 
@@ -474,9 +465,6 @@ LAppDelegate::LAppDelegate()
       _cY(0),
       _mHeight(0),
       _mWidth(0),
-      _leftUrl("https://t.bilibili.com/"),
-      _upUrl("https://space.bilibili.com/61639371/dynamic"),
-      _rightUrl("https://live.bilibili.com/21484828"),
       _au(NULL),
       _us(NULL),
       _isLive(false),
@@ -534,34 +522,87 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
       }
     }
   }
-  // if (GLFW_MOUSE_BUTTON_RIGHT == button) {
-  //   SetNotIdle();
-  //   if (GLFW_PRESS == action) {
-  //     _holdTime = glfwGetTime();
-  //     _isMsg = true;
-  //     _pX = _mouseX;
-  //     _pY = _mouseY;
-  //   } else if (GLFW_RELEASE == action) {
-  //     float dx = fabs(_mouseX - _pX);
-  //     float dy = fabs(_mouseY - _pY);
-  //     if (dx < 60 && dy < 60) {
-  //       // 鼠标小范围移动
-  //       double now = glfwGetTime();
-  //       if (now - _holdTime > _timeSetting) _isSetting = true;
-  //     } else if (_mouseX > _pX && dx > dy)
-  //       LUtils::OpenURL(_rightUrl);  // 向右滑动
-  //     else if (_mouseX < _pX && dx > dy)
-  //       LUtils::OpenURL(_leftUrl);  // 向左滑动
-  //     else if (_mouseY < _pY && dy > dx)
-  //       LUtils::OpenURL(_upUrl);  // 向上滑动
-  //     else if (_mouseY > _pY && dy > dx) {
-  //       _isShowing = false;  // 向下滑动
-  //       glfwHideWindow(_window);
-  //     }
-
-  //     _isMsg = false;
-  //   }
-  // }
+  if (GLFW_MOUSE_BUTTON_RIGHT == button) {
+    if (GLFW_PRESS == action) {
+      _holdTime = glfwGetTime();
+      _pX = _mouseX;
+      _pY = _mouseY;
+      _view->GetMenuSprite()->Show();
+      _menu_captured = true;
+    } else if (GLFW_RELEASE == action) {
+      auto selected = _view->GetMenuSprite()->GetSelected();
+      _view->GetMenuSprite()->Hide();
+      _menu_captured = false;
+      if (selected == MenuSelect::None) {
+        return;
+      }
+      // process item selected
+      int item_index = 0;
+      switch (selected) {
+      case MenuSelect::UP: {
+        item_index = 0;
+        break;
+      }
+      case MenuSelect::RIGHT: {
+        item_index = 1;
+        break;
+      }
+      case MenuSelect::DOWN: {
+        item_index = 2;
+        break;
+      }
+      case MenuSelect::LEFT: {
+        item_index = 3;
+        break;
+      }
+      default: {
+        item_index = 0;
+      }
+      }
+      auto dm = DataManager::GetInstance();
+      auto prefix = "shortcut." + std::to_string(item_index);
+      // handle setting item
+      int item_type = dm->GetWithDefault(prefix + ".type", 3);
+      switch (item_type) {
+      case 0: {
+        // open app
+        string param = dm->GetWithDefault(prefix + ".param", "");
+        if (param.empty()) {
+          break;
+        }
+        ShellExecute(NULL, L"open", LAppPal::StringToWString(param).c_str(),
+                     NULL, NULL, SW_SHOWDEFAULT);
+        break;
+      }
+      case 1: {
+        // open folder
+        string param = dm->GetWithDefault(prefix + ".param", "");
+        if (param.empty()) {
+          break;
+        }
+        ShellExecute(NULL, L"open", LAppPal::StringToWString(param).c_str(),
+                     NULL, NULL, SW_SHOWDEFAULT);
+        break;
+      }
+      case 2: {
+        // open link
+        string param = dm->GetWithDefault(prefix + ".param", "");
+        if (param.empty()) {
+          break;
+        }
+        ShellExecute(NULL, L"open", LAppPal::StringToWString(param).c_str(),
+                     NULL, NULL, SW_SHOWDEFAULT);
+        break;
+      }
+      case 3: {
+        ShowPanel();
+        break;
+      }
+      default: {
+      }
+      }
+    }
+  }
   return;
 }
 
@@ -588,6 +629,9 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, double x, double y) {
       _view->OnTouchesMoved(x - 30 * dx, ypos - 2.0f * height / 3);
     }
     return;
+  }
+  if (_menu_captured) {
+    _view->UpdateMenu(x, y);
   }
 }
 

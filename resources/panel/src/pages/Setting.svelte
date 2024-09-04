@@ -11,6 +11,8 @@
     Button,
     Tooltip,
     Modal,
+    Select,
+    InputAddon,
   } from "flowbite-svelte";
   import QRCode from "qrcode";
   import fanAvatar from "../assets/fan.png";
@@ -33,6 +35,17 @@
   // other
   let _track = true;
   let _dropfile = true;
+  let _shortcuts = [];
+  const shortcut_types = [
+    {value: 4, name: "禁用"},
+    {
+      value: 0,
+      name: "程序",
+    },
+    { value: 1, name: "文件夹" },
+    { value: 2, name: "网站" },
+    { value: 3, name: "设置面板" },
+  ];
   function init() {
     // get from server
     fetch("/api/config/audio")
@@ -58,6 +71,11 @@
         _dynamic = data.dynamic;
         _live = data.live;
         _update = data.update;
+      });
+    fetch("/api/config/shortcut")
+      .then((res) => res.json())
+      .then((data) => {
+        _shortcuts = data;
       });
     fetch("/api/config/other")
       .then((res) => res.json())
@@ -134,6 +152,15 @@
         live: _live,
         update: _update,
       }),
+    });
+  }
+  function updateShortcut(index, item) {
+    fetch(`/api/config/shortcut/${index}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(item),
     });
   }
   function updateOther() {
@@ -327,6 +354,76 @@
   >软件更新提醒</Toggle
 >
 <p class="text-xs">*由于 B 站风控政策，非登录状态不保证能够及时提醒。</p>
+<Hr />
+<P class="mb-4">轮盘菜单设置</P>
+{#each _shortcuts as item, i}
+  <div class="flex flex-row w-full mb-2">
+    <Select
+      class="w-1/3 mr-1"
+      items={shortcut_types}
+      bind:value={item.type}
+      on:change={() => {
+        item.param = "";
+        updateShortcut(i, item);
+      }}
+    />
+    {#if item.type == 2}
+      <ButtonGroup class="w-full">
+        <Input
+          type="text"
+          size="sm"
+          bind:value={item.param}
+          on:change={() => {
+            updateShortcut(i, item);
+          }}
+        />
+      </ButtonGroup>
+    {:else if item.type == 3 || item.type == 4}
+      <ButtonGroup class="w-full">
+        <Input type="text" size="sm" disabled />
+      </ButtonGroup>
+    {:else}
+      <ButtonGroup class="w-full">
+        <Input
+          type="text"
+          size="sm"
+          disabled
+          bind:value={item.param}
+          on:change={() => {
+            updateShortcut(i, item);
+          }}
+        />
+        <Button
+          on:click={async () => {
+            const t = item.type == 0 ? "file" : "folder";
+            const resp = await (await fetch("/api/dialog/browse/" + t)).json();
+            if (resp.success) {
+              item.param = resp.path;
+              updateShortcut(i, item);
+            }
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            color="currentColor"
+            class="shrink-0 h-6 w-6 text-slate-400"
+            role="img"
+            aria-label="folder open outline"
+            viewBox="0 0 24 24"
+            ><path
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M3 19V6a1 1 0 0 1 1-1h4.032a1 1 0 0 1 .768.36l1.9 2.28a1 1 0 0 0 .768.36H16a1 1 0 0 1 1 1v1M3 19l3-8h15l-3 8H3Z"
+            ></path></svg
+          >
+        </Button>
+      </ButtonGroup>
+    {/if}
+  </div>
+{/each}
 <Hr />
 <P class="mb-4">其它设置</P>
 <Toggle class="mb-2" bind:checked={_track} on:change={updateOther}

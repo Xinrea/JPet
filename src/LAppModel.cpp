@@ -648,13 +648,8 @@ void LAppModel::SetupTextures() {
         modelTextureNumber, glTextueNumber);
   }
 
-#ifdef PREMULTIPLIED_ALPHA_ENABLE
   GetRenderer<Rendering::CubismRenderer_OpenGLES2>()->IsPremultipliedAlpha(
       true);
-#else
-  GetRenderer<Rendering::CubismRenderer_OpenGLES2>()->IsPremultipliedAlpha(
-      false);
-#endif
 }
 
 void LAppModel::MotionEventFired(const csmString& eventValue) {

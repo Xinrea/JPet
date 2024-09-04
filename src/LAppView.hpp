@@ -15,11 +15,11 @@
 #include <Math/CubismViewMatrix.hpp>
 #include <Rendering/OpenGL/CubismOffscreenSurface_OpenGLES2.hpp>
 
-#include "CubismFramework.hpp"
+#include "MenuSprite.hpp"
 
 class TouchManager;
-class LAppSprite;
 class LAppModel;
+class ProgressSprite;
 
 /**
  * @brief 描画クラス
@@ -49,6 +49,10 @@ class LAppView {
    * @brief 初期化する。
    */
   void Initialize();
+
+  MenuSprite* GetMenuSprite();
+
+  void UpdateMenu(float px, float py);
 
   /**
    * @brief 描画する。
@@ -153,11 +157,11 @@ class LAppView {
   Csm::CubismMatrix44* _deviceToScreen;  ///< デバイスからスクリーンへの行列
   Csm::CubismViewMatrix* _viewMatrix;  ///< viewMatrix
   GLuint _programId;                   ///< シェーダID
-  LAppSprite *task_progress_;
+  ProgressSprite *task_progress_;
 
   // レンダリング先を別ターゲットにする方式の場合に使用
-  LAppSprite*
-      _renderSprite;  ///< モードによっては_renderBufferのテクスチャを描画
+  MenuSprite*
+      _menu;  ///< モードによっては_renderBufferのテクスチャを描画
   Csm::Rendering::CubismOffscreenSurface_OpenGLES2
       _renderBuffer;  ///< モードによってはCubismモデル結果をこっちにレンダリング
   SelectTarget _renderTarget;  ///< レンダリング先の選択肢

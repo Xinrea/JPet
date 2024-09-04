@@ -39,9 +39,6 @@ class DataManager {
   void GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touch_audio);
   void UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio);
 
-  void GetShortcut(std::map<std::string, std::string>* shortcuts);
-  void UpdateShortcut(const std::string& key, const std::string& value);
-
   void GetDisplay(float* scale, bool* green, bool* rateLimit);
   void UpdateDisplay(float scale, bool green, bool rateLimit);
 

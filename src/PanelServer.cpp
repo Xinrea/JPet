@@ -494,6 +494,56 @@ void PanelServer::doServe() {
     nlohmann::json resp = {{"watch_list", followListJson}};
     res.set_content(resp.dump(), "application/json");
   });
+  server->Get("/api/config/shortcut", [](const httplib::Request &req,
+                                          httplib::Response &res) {
+    nlohmann::json shortcuts;
+    auto dm = DataManager::GetInstance();
+    // contain 4 items
+    for (int i = 0; i < 4; i++) {
+      shortcuts.push_back(
+          {{"type",
+            dm->GetWithDefault("shortcut." + std::to_string(i) + ".type", 3)},
+           {"param", dm->GetWithDefault(
+                         "shortcut." + std::to_string(i) + ".param", "")}});
+    }
+    res.set_content(shortcuts.dump(), "application/json");
+  });
+  server->Post("/api/config/shortcut/:id",
+               [](const httplib::Request &req, httplib::Response &res) {
+                 string id = req.path_params.at("id");
+                 auto json = nlohmann::json::parse(req.body);
+                 auto dm = DataManager::GetInstance();
+                 dm->SetRaw("shortcut." + id + ".type", json.at("type").get<int>());
+                 dm->SetRaw<string>("shortcut." + id + ".param", json.at("param").get<string>());
+               });
+  server->Get("/api/dialog/browse/:type",
+              [](const httplib::Request &req, httplib::Response &res) {
+                string t = req.path_params.at("type");
+                nlohmann::json response;
+                wstring path;
+                if (t == "file") {
+                  if (LAppPal::BrowseFile(path)) {
+                    response["success"] = true;
+                    response["path"] = LAppPal::WStringToString(path);
+                  } else {
+                    response["success"] = false;
+                  }
+                  res.set_content(response.dump(), "application/json");
+                  return;
+                }
+                if (t == "folder") {
+                  if (LAppPal::BrowseFolder(path)) {
+                    response["success"] = true;
+                    response["path"] = LAppPal::WStringToString(path);
+                  } else {
+                    response["success"] = false;
+                  }
+                  res.set_content(response.dump(), "application/json");
+                  return;
+                }
+                response["success"] = false;
+                res.set_content(response.dump(), "application/json");
+              });
   server->Post("/api/snapshot", [](const httplib::Request &req,
                                           httplib::Response &res) {
       LAppDelegate::GetInstance()->Snapshot();

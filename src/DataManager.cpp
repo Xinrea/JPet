@@ -151,26 +151,6 @@ void DataManager::UpdateAudio(int volume, bool mute, bool idle_audio, bool touch
                                              {"touch_audio", touch_audio}});
 }
 
-void DataManager::GetShortcut(std::map<std::string, std::string>* shortcuts) {
-  // get shortcuts from data
-  if (data.contains("shortcuts")) {
-    auto shortcutsTable = data.at("shortcuts").as_table();
-    for (const auto& [key, value] : *shortcutsTable) {
-      shortcuts->emplace(key, value.as_string()->get());
-    }
-  }
-}
-
-void DataManager::UpdateShortcut(const std::string& key,
-                                 const std::string& value) {
-  // if shortcuts doesn't exist, create it
-  if (!data.contains("shortcuts")) {
-    data.insert("shortcuts", toml::table{});
-  }
-  auto shortcuts = data.at("shortcuts").as_table();
-  shortcuts->insert_or_assign(key, value);
-}
-
 void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
   if (!data.contains("display")) {
     // update scale, green, rateLimit in data

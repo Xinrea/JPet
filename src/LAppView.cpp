@@ -17,7 +17,7 @@
 #include "LAppLive2DManager.hpp"
 #include "LAppModel.hpp"
 #include "LAppPal.hpp"
-#include "LAppSprite.hpp"
+#include "ProgressSprite.hpp"
 #include "LAppTextureManager.hpp"
 #include "TouchManager.hpp"
 
@@ -26,7 +26,6 @@ using namespace LAppDefine;
 
 LAppView::LAppView()
     : _programId(0),
-      _renderSprite(NULL),
       _renderTarget(SelectTarget_None) {
   _clearColor[0] = 1.0f;
   _clearColor[1] = 1.0f;
@@ -45,7 +44,7 @@ LAppView::LAppView()
 
 LAppView::~LAppView() {
   _renderBuffer.DestroyOffscreenSurface();
-  delete _renderSprite;
+  delete _menu;
   delete _viewMatrix;
   delete _deviceToScreen;
   delete _touchManager;
@@ -84,11 +83,16 @@ void LAppView::Initialize() {
                                 ViewLogicalMaxBottom, ViewLogicalMaxTop);
 }
 
+MenuSprite* LAppView::GetMenuSprite() {
+  return _menu;
+}
+
 void LAppView::Render() {
   LAppLive2DManager* Live2DManager = LAppLive2DManager::GetInstance();
 
   // Cubism更新・描画
   Live2DManager->OnUpdate();
+
   if (LAppDelegate::GetInstance()->IsHover()) {
     task_progress_->Show();
   } else {
@@ -102,7 +106,13 @@ void LAppView::Render() {
     p = min(float(now - task->start_time) / task->GetCurrentCost(), 1.0f);
   }
   task_progress_->UpdateProgress(p);
+  // save vao
+  GLint previousVAO;
+  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &previousVAO);
   task_progress_->Render();
+  _menu->Render();
+  // restore vao
+  glBindVertexArray(previousVAO);
 }
 
 void LAppView::InitializeSprite() {
@@ -122,10 +132,19 @@ void LAppView::InitializeSprite() {
   float y = height * 0.5f;
   float fWidth = static_cast<float>(width);
   float fHeight = static_cast<float>(height);
-  task_progress_ = new LAppSprite(0.55f, 0.8f, 0.05f, 0.1f);
+  task_progress_ = new ProgressSprite(0.55f, 0.8f, 0.05f, 0.1f);
+  _menu = new MenuSprite();
 }
 
 TouchManager* LAppView::GetTouchManager() { return _touchManager; }
+
+void LAppView::UpdateMenu(float px, float py) {
+    float x = _deviceToScreen->TransformX(px) *
+              2 / 0.9;  // 論理座標変換した座標を取得。
+    float y = _deviceToScreen->TransformY(py) *
+              2 / 0.9;  // 論理座標変換した座標を取得。
+    _menu->Update(x, y);
+}
 
 void LAppView::OnTouchesBegan(float px, float py) const {
   _touchManager->TouchesBegan(px, py);

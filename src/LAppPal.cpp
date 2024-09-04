@@ -18,6 +18,8 @@
 #include <codecvt>
 #include <locale>
 #include <windows.h>
+#include <commdlg.h>
+#include <ShlObj.h>
 
 #include "LAppDefine.hpp"
 
@@ -42,6 +44,9 @@ csmByte* LAppPal::LoadFileAsBytes(const string& filePath, csmSizeInt* outSize) {
   struct stat statBuf {};
   if (stat(path, &statBuf) == 0) {
     size = statBuf.st_size;
+  } else {
+    PrintLog(LogLevel::Error, "[LAppPal]Load file failed: %s", filePath.c_str());
+    return nullptr;
   }
 
   std::fstream file;
@@ -202,4 +207,56 @@ std::vector<std::wstring> LAppPal::ListFolder(const std::wstring& folder_path) {
         std::wcout << L"Failed to read directory." << std::endl;
     }
   return ret;
+}
+
+bool LAppPal::BrowseFile(wstring &path) {
+  OPENFILENAME ofn; // 公共对话框结构体
+  wchar_t szFile[MAX_PATH]; // 缓冲区存放文件名
+
+  // 初始化选择文件对话框
+  ZeroMemory(&ofn, sizeof(ofn));
+  ofn.lStructSize = sizeof(ofn);
+  ofn.hwndOwner = NULL;
+  ofn.lpstrFile = szFile;
+  ofn.lpstrFile[0] = '\0';
+  ofn.nMaxFile = sizeof(szFile);
+  ofn.lpstrFilter = L"可执行文件\0*.exe\0";
+  ofn.nFilterIndex = 1;
+  ofn.lpstrFileTitle = NULL;
+  ofn.nMaxFileTitle = 0;
+  ofn.lpstrInitialDir = NULL;
+  ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+  // 显示打开文件对话框
+  if (GetOpenFileName(&ofn) == TRUE) {
+    path = ofn.lpstrFile;
+    return true;
+  }
+  return false;
+}
+
+bool LAppPal::BrowseFolder(wstring &path) {
+    bool ret = false;
+    BROWSEINFO bi;
+    ZeroMemory(&bi, sizeof(bi));
+    bi.lpszTitle = L"请选择一个文件夹";
+    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+
+    LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
+    if (pidl != 0) {
+        // 获取选择的文件夹的路径
+        TCHAR cpath[MAX_PATH];
+        if (SHGetPathFromIDList(pidl, cpath)) {
+          ret = true;
+          path = cpath;
+        }
+
+        // 释放由SHBrowseForFolder分配的内存
+        IMalloc *imalloc = 0;
+        if (SUCCEEDED(SHGetMalloc(&imalloc))) {
+            imalloc->Free(pidl);
+            imalloc->Release();
+        }
+    }
+    return ret;
 }
