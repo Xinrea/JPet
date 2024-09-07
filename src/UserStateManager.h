@@ -65,7 +65,7 @@ class UserStateManager {
     }
   }
 
-  void CheckUpdate();
+  void CheckUpdate(bool notify);
 
   void CheckThread(const vector<string>& list);
 

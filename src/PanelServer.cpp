@@ -355,6 +355,12 @@ void PanelServer::doServe() {
   server->Post("/api/config/folder", [](const httplib::Request &req, httplib::Response &res) {
     ShellExecute(NULL, L"open", LAppDefine::documentPath.c_str(), NULL, NULL, SW_SHOWDEFAULT);
   });
+  server->Post("/api/openlink",
+               [](const httplib::Request &req, httplib::Response &res) {
+                 auto json = nlohmann::json::parse(req.body);
+                 ShellExecute(NULL, L"open", LAppPal::StringToWString(json.at("link")).c_str(),
+                              NULL, NULL, SW_SHOWDEFAULT);
+               });
   server->Get("/api/config/audio",
               [](const httplib::Request &req, httplib::Response &res) {
                 bool mute;
@@ -547,6 +553,15 @@ void PanelServer::doServe() {
   server->Post("/api/snapshot", [](const httplib::Request &req,
                                           httplib::Response &res) {
       LAppDelegate::GetInstance()->Snapshot();
+  });
+  server->Get("/api/version", [](const httplib::Request &req,
+                                          httplib::Response &res) {
+      nlohmann::json response;
+      LAppDelegate::GetInstance()->GetUserStateManager()->CheckUpdate(false);
+      response["need_update"] = DataManager::GetInstance()->GetWithDefault("need_update", 0) == 1;
+      response["local_version"] = VERSION;
+      response["latest_version"] = DataManager::GetInstance()->GetWithDefault("latest_version", "");
+      res.set_content(response.dump(), "application/json");
   });
 
   httplib::SSLClient login_cli("passport.bilibili.com", 443);

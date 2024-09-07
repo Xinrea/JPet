@@ -5,7 +5,8 @@
   import Document from "./pages/Document.svelte";
   import Setting from "./pages/Setting.svelte";
   import Custom from "./pages/Custom.svelte";
-  import { sse } from "./sse.js"
+  import { Indicator } from "flowbite-svelte";
+  import { sse } from "./sse.js";
 
   let activeTab = 0;
   let tabs = [
@@ -47,10 +48,30 @@
       });
   }
 
+  let local_version = "";
+  let latest_version = "";
+  let need_update = false;
+  function fetchVersionInfo() {
+    fetch("/api/version")
+      .then((res) => res.json())
+      .then((d) => {
+        local_version = d["local_version"];
+        latest_version = d["latest_version"];
+        need_update = d["need_update"];
+      });
+  }
 
   updateProfile();
 
-  sse.subscribe(e=>{
+  fetchVersionInfo();
+  setTimeout(
+    () => {
+      fetchVersionInfo();
+    },
+    10 * 60 * 1000,
+  );
+
+  sse.subscribe((e) => {
     if (!e) {
       return;
     }
@@ -70,10 +91,15 @@
   <div class="flex flex-row bg-white sticky top-0 z-20 shadow-md">
     {#each tabs as tab, index}
       <button
-        class="inline-block text-sm font-medium text-center disabled:cursor-not-allowed p-4 border-primary-600 dark:text-primary-500 dark:border-primary-500"
+        class="inline-block relative text-sm font-medium text-center disabled:cursor-not-allowed p-4 border-primary-600 dark:text-primary-500 dark:border-primary-500"
         class:active={activeTab === index}
-        on:click={() => (activeTab = index)}>{tab.name}</button
-      >
+        on:click={() => (activeTab = index)}
+        >{tab.name}
+        {#if index == 4 && need_update}
+          <Indicator color="red" border size="md" placement="center-right">
+          </Indicator>
+        {/if}
+      </button>
     {/each}
   </div>
   <div class="flex flex-col p-4 pt-4 bg-gray-50 z-10">
@@ -90,7 +116,7 @@
       <Setting />
     </div>
     <div class:hide={activeTab !== 4}>
-      <Document />
+      <Document {latest_version} {local_version} />
     </div>
   </div>
 </main>

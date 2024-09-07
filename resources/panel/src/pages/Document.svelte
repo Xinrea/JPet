@@ -1,11 +1,20 @@
 <script>
+  export let local_version = "";
+  export let latest_version = "";
   function openDataFolder() {
     fetch("/api/config/folder", { method: "POST" });
+  }
+  function openlink(link) {
+    fetch("/api/openlink", { method: "POST", body: JSON.stringify({link: link})});
   }
 </script>
 
 <div>
-  <p class="font-medium text-lg">关于<b>经验值</b></p>
+  <p class="font-medium text-lg">版本信息</p>
+  <p class="font-medium text-sm">当前版本：{local_version}</p>
+  <p class="font-medium text-sm">最新版本：{latest_version}</p>
+  <p class="font-medium text-sm"><a class="underline decoration-green-500 decoration-2 font-bold" href={"#"} on:click={()=>openlink("https://pet.vjoi.cn")}>查看最新版本信息</a></p>
+  <p class="font-medium text-lg mt-4">关于<b>经验值</b></p>
   <p class="font-medium text-sm">经验获取：1 经验 = 挂机 1 分钟。</p>
   <p class="font-medium text-sm">随着智力的提升，每分钟获取的经验值会逐渐增加，最多 500 点。</p>
   <p class="font-medium text-lg mt-4">关于<b>速度</b></p>

@@ -245,7 +245,7 @@ bool LAppDelegate::Initialize() {
   _us->Init(_followlist, hwnd);
 
   // check update
-  _us->CheckUpdate();
+  _us->CheckUpdate(UpdateNotify);
 
   // Init task scheduler and basic tasks
   TaskScheduler *ts = TaskScheduler::GetInstance();

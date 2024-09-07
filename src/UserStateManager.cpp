@@ -1,4 +1,5 @@
 ﻿#include "UserStateManager.h"
+#include "DataManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
 
@@ -11,7 +12,7 @@
 
 using namespace WinToastLib;
 
-void UserStateManager::CheckUpdate() {
+void UserStateManager::CheckUpdate(bool notify) {
   httplib::SSLClient live_cli("pet.vjoi.cn", 443);
   live_cli.set_follow_location(true);
   live_cli.enable_server_certificate_verification(false);
@@ -43,10 +44,17 @@ void UserStateManager::CheckUpdate() {
     if (local_version < latest_version) {
       LAppPal::PrintLog("[UserStateWatcher]Need Update: %s -> %s ", VERSION,
                         res->body.c_str());
-      Notify(L"检测到新版本", L"请前往项目页面下载",
-             new WinToastEventHandler("https://pet.vjoi.cn"));
+      DataManager::GetInstance()->SetRaw("need_update", 1);
+      DataManager::GetInstance()->SetRaw("latest_version", latest_version.to_string());
+      if (notify) {
+        Notify(L"检测到新版本", L"请前往项目页面下载",
+               new WinToastEventHandler("https://pet.vjoi.cn"));
+      }
+    } else {
+      DataManager::GetInstance()->SetRaw("need_update", 0);
     }
   } else {
+    DataManager::GetInstance()->SetRaw("need_update", 0);
     LAppPal::PrintLog(LogLevel::Error, "[UserStateWatcher]Check Update Failed");
   }
 }
