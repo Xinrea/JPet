@@ -118,7 +118,6 @@ bool LAppDelegate::Initialize() {
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
   glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
   glfwWindowHint(GLFW_ICONIFIED, GL_FALSE);
-  glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
   glfwWindowHint(GLFW_FLOATING, GL_TRUE);
   glfwWindowHint(GLFW_DEPTH_BITS, 16);
   glfwWindowHint(GLFW_SAMPLES, 4);
@@ -133,7 +132,7 @@ bool LAppDelegate::Initialize() {
   }
 
   // 为了避免1703版本前鼠标穿透的问题，在窗口创建完成后再修改为无边框
-  // glfwSetWindowAttrib(_window, GLFW_DECORATED, GLFW_FALSE);
+  glfwSetWindowAttrib(_window, GLFW_DECORATED, GLFW_FALSE);
 
   GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
   glfwSetCursor(_window, cursor);
