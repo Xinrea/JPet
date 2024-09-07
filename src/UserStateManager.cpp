@@ -51,6 +51,8 @@ void UserStateManager::CheckUpdate(bool notify) {
                new WinToastEventHandler("https://pet.vjoi.cn"));
       }
     } else {
+      DataManager::GetInstance()->SetRaw("latest_version",
+                                         latest_version.to_string());
       DataManager::GetInstance()->SetRaw("need_update", 0);
     }
   } else {
