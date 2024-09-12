@@ -315,7 +315,7 @@ int DataManager::CurrentExpDiff() {
   if (bf->IsLegacy()) {
     exp *= 1.2f;
   }
-  exp *= (1 + 0.2 * starcnt);
+  exp *= (1 + 0.1 * starcnt);
   return std::min(exp, 99999999);
 }
 
