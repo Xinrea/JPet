@@ -30,6 +30,7 @@ jobs:
         manifest-dir: ${{ github.workspace }}
         triplet: x64-windows-release
         token: ${{ github.token }}
+        fetch-depth: 0
         github-binarycache: true
 
     - name: Build For Release
