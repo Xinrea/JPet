@@ -21,6 +21,9 @@ jobs:
       uses: actions/setup-node@v4.0.3
 
     - name: Build Frontend
+      env:
+        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        VITE_SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_KEY }}
       run: cd ${{github.workspace}}\resources\panel && npm install && npm run build
 
     - name: Vcpkg Build
