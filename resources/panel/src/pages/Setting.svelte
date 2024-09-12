@@ -288,6 +288,12 @@
   >
 {:else}
   <div class="text-sm text-gray-500 dark:text-gray-400">加载中</div>
+  <a
+    href={"#"}
+    on:click={logout}
+    class="underline text-gray-500 decoration-green-500 decoration-2 text-sm"
+    >注销登录</a
+  >
 {/if}
 <Hr />
 <P class="mb-4">音频设置</P>
