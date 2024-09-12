@@ -20,6 +20,7 @@
   let rank_star;
   let rank_exp;
   let rank_attr;
+
   function update() {
     supabase
       .from("rankboard")
@@ -60,8 +61,14 @@
           });
       });
   }
-  function upload_info() {
+
+  function confirm() {
     fetch(`/api/account/share`, { method: "POST" });
+    account_info.info.confirm = true;
+    push_data();
+  }
+
+  function push_data() {
     supabase
       .from("rankboard")
       .upsert({
@@ -77,21 +84,33 @@
         ts: new Date().toISOString(),
       })
       .then(() => {
-        console.log("upload success");
+        update();
       });
-    update();
-    account_info.info.confirm = true;
-    setTimeout(upload_info, 10 * 60 * 1000);
   }
+
   let refresh = false;
+  let last_refresh = parseInt(sessionStorage.getItem('last_refresh')) || 0;
   function update_data() {
+    push_data();
+    last_refresh = Date.now();
+    sessionStorage.setItem("last_refresh", last_refresh.toString());
     refresh = true;
-    update();
-    setTimeout(()=>{
-      refresh = false;
-    }, 30 * 1000);
   }
   update();
+
+  setInterval(()=>{
+    if (account_info && account_info.info.confirm) {
+      push_data();
+    }
+  }, 10 * 60 * 1000);
+
+  setInterval(()=>{
+    if (Date.now() - last_refresh >= 60 * 1000) {
+      refresh = false;
+    } else {
+      refresh = true;
+    }
+  })
 </script>
 
 {#if account_info}
@@ -100,9 +119,9 @@
   {:else if !account_info.info.confirm}
     <p class="p-4">
       查看排行榜将会认为你愿意共享游戏数据与部分账号数据(仅 uid
-      和用户名)，数据将每 10 分钟进行一次同步，确认查看吗？
+      和用户名)，数据将自动每 10 分钟进行一次同步，确认查看吗？
     </p>
-    <Button class="w-full" on:click={upload_info}>确认查看</Button>
+    <Button class="w-full" on:click={confirm}>确认查看</Button>
   {:else}
     <Button class="w-full mb-2" on:click={update_data} disabled={refresh}>刷新排行榜</Button>
     <Tabs contentClass="bg-gray-50 rounded-lg dark:bg-gray-800 mt-2">
