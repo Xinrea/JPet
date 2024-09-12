@@ -5,6 +5,7 @@
   import Document from "./pages/Document.svelte";
   import Setting from "./pages/Setting.svelte";
   import Custom from "./pages/Custom.svelte";
+  import Rank from "./pages/Rank.svelte";
   import { Indicator } from "flowbite-svelte";
   import { sse } from "./sse.js";
 
@@ -14,6 +15,7 @@
     { name: "任务" },
     { name: "装扮" },
     { name: "设置" },
+    { name: "排行榜"},
     { name: "说明" },
   ];
 
@@ -33,6 +35,7 @@
     unlock: [true, false, false],
   };
   let buffs = [];
+  let account_info = null;
 
   // fetch current status
   function updateProfile() {
@@ -95,7 +98,7 @@
         class:active={activeTab === index}
         on:click={() => (activeTab = index)}
         >{tab.name}
-        {#if index == 4 && need_update}
+        {#if index == 5 && need_update}
           <Indicator color="red" border size="md" placement="center-right">
           </Indicator>
         {/if}
@@ -113,9 +116,12 @@
       <Custom current={clothes.current} />
     </div>
     <div class:hide={activeTab !== 3}>
-      <Setting />
+      <Setting bind:account_info={account_info} />
     </div>
     <div class:hide={activeTab !== 4}>
+      <Rank {account_info} {attributes} {starcnt} />
+    </div>
+    <div class:hide={activeTab !== 5}>
       <Document {latest_version} {local_version} />
     </div>
   </div>

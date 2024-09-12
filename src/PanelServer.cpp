@@ -652,8 +652,10 @@ void PanelServer::doServe() {
       auto json = nlohmann::json::parse(resp->body);
       if (json.at("code") == 0 && json.contains("data")) {
         try {
+          resp_json["info"]["confirm"] = DataManager::GetInstance()->GetWithDefault("data-share", 0) == 1;
           resp_json["info"]["uname"] =
               json.at("data").at("name").get<std::string>();
+          resp_json["info"]["uid"] = uid;
         } catch (const std::exception &e) {
           LAppPal::PrintLog("[PanelServer]Exception: %s", e.what());
         }
@@ -707,6 +709,10 @@ void PanelServer::doServe() {
       }
       res.set_content(resp_json.dump(), "application/json");
   });
+  server->Post("/api/account/share",
+               [](const httplib::Request &req, httplib::Response &res) {
+                 DataManager::GetInstance()->SetRaw("data-share", 1);
+               });
 
   initSSE();
   server->listen("localhost", 8053);

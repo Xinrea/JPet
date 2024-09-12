@@ -19,6 +19,7 @@
     "vite": "^5.3.1"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
     "qrcode": "^1.5.4"
   }
 }

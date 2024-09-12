@@ -38,3 +38,5 @@ _deps
 
 build/
 build-scripts/Output
+
+.env

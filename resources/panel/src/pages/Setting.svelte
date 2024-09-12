@@ -215,7 +215,7 @@
     fetch("/api/data/reset", { method: "POST" });
   }
   // acount
-  let account_info = null;
+  export let account_info = null;
   let account_modal = false;
   let status_checker = null;
   async function doLogin() {
