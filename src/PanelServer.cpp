@@ -616,8 +616,14 @@ void PanelServer::doServe() {
     resp_json["login"] = true;
     resp_json["info"] = nlohmann::json::object();
     resp_json["info"]["level"] = BuffManager::GetInstance()->MedalLevel();
+    resp_json["info"]["confirm"] =
+        DataManager::GetInstance()->GetWithDefault("data-share", 0) == 1;
 
-    httplib::Headers headers = {{"cookie", cookies}};
+    httplib::Headers headers = {
+        {"cookie", cookies},
+        {"user-agent",
+         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, "
+         "like Gecko) Chrome/128.0.0.0 Safari/537.36"}};
     httplib::SSLClient client = httplib::SSLClient("api.bilibili.com", 443);
     client.set_connection_timeout(std::chrono::seconds(1));
 
@@ -652,7 +658,6 @@ void PanelServer::doServe() {
       auto json = nlohmann::json::parse(resp->body);
       if (json.at("code") == 0 && json.contains("data")) {
         try {
-          resp_json["info"]["confirm"] = DataManager::GetInstance()->GetWithDefault("data-share", 0) == 1;
           resp_json["info"]["uname"] =
               json.at("data").at("name").get<std::string>();
           resp_json["info"]["uid"] = uid;
