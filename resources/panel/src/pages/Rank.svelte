@@ -12,14 +12,19 @@
     TableHeadCell,
   } from "flowbite-svelte";
   import { createClient } from "@supabase/supabase-js";
-  export let account_info;
+  export let account_info = {
+    login: false,
+    info: {
+      confirm: false,
+    }
+  };
   export let attributes = null;
   export let starcnt = 0;
   const supabase = createClient(supabaseUrl, supabaseKey);
-  let rank_data;
-  let rank_star;
-  let rank_exp;
-  let rank_attr;
+  let rank_data = [];
+  let rank_star = [];
+  let rank_exp = [];
+  let rank_attr = [];
 
   function update() {
     supabase
@@ -69,6 +74,9 @@
   }
 
   function push_data() {
+    if(!attributes) {
+      return;
+    }
     supabase
       .from("rankboard")
       .upsert({
