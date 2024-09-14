@@ -110,7 +110,7 @@
     } else {
       refresh = true;
     }
-  })
+  }, 1000);
 </script>
 
 {#if account_info}
