@@ -103,7 +103,7 @@ void LAppView::Render() {
   float p = 0;
   auto task = DataManager::GetInstance()->GetCurrentTask();
   if (task) {
-    p = min(float(now - task->start_time) / task->GetCurrentCost(), 1.0f);
+    p = min(float(now - task->start_time) / task->cost_snapshot, 1.0f);
   }
   task_progress_->UpdateProgress(p);
   // save vao
