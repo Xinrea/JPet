@@ -1,5 +1,5 @@
 <script>
-  import { Tooltip, Button, Modal, Alert} from "flowbite-svelte";
+  import { Tooltip, Button, Modal, Alert } from "flowbite-svelte";
   import speedIcon from "../assets/at-sp.png";
   import enduranceIcon from "../assets/at-end.png";
   import strengthIcon from "../assets/at-str.png";
@@ -11,12 +11,19 @@
   import imgClothes2 from "../assets/c2.png";
   import imgClothes3 from "../assets/c3.png";
   import starIcon from "../assets/star.png";
+  import crownIcon from "../assets/crown.png";
   import starOutlineIcon from "../assets/star_outline.png";
   import Progress from "../components/Progress.svelte";
   import BuffIcon from "../components/BuffIcon.svelte";
 
   const clothesImages = [imgClothes1, imgClothes2, imgClothes3];
-  const attributeArray = ["speed", "endurance", "strength", "will", "intellect"];
+  const attributeArray = [
+    "speed",
+    "endurance",
+    "strength",
+    "will",
+    "intellect",
+  ];
 
   export let clothes = {
     current: 0,
@@ -47,19 +54,29 @@
     intellect: 0,
     buycnt: 0,
   };
-  
+
   export let expdiff = 0;
 
-  export let buffs = [
-    "live", "dynamic", "guard"
-  ];
+  export let buffs = ["live", "dynamic", "guard"];
 
   export let starcnt = 0;
 
   $: currentExp = attributes.exp;
-  $: buycost = attributes.buycnt < 25 ? Math.ceil(10 * Math.pow(1.41, attributes.buycnt)) : 53000;
-  $: revertgain = (attributes.buycnt < 26 ? Math.ceil(10 * Math.pow(1.41, Math.max(attributes.buycnt - 1, 0))) : 53000) / 2;
-  $: starAvailable = ["speed", "endurance", "strength", "will", "intellect"].every(attr => attributes[attr] >= 53);
+  $: buycost =
+    attributes.buycnt < 25
+      ? Math.ceil(10 * Math.pow(1.41, attributes.buycnt))
+      : 53000;
+  $: revertgain =
+    (attributes.buycnt < 26
+      ? Math.ceil(10 * Math.pow(1.41, Math.max(attributes.buycnt - 1, 0)))
+      : 53000) / 2;
+  $: starAvailable = [
+    "speed",
+    "endurance",
+    "strength",
+    "will",
+    "intellect",
+  ].every((attr) => attributes[attr] >= 53);
 
   // current time to next time point
   let timeToNextPoint = 60 - new Date().getSeconds();
@@ -75,7 +92,7 @@
     if (currentExp < buycost) {
       return;
     }
-    if (attributes[targetAttr] >= (100 + 10 * starcnt)) {
+    if (attributes[targetAttr] >= 100 + 10 * starcnt) {
       return;
     }
     fetch(`/api/attr/${targetAttr}`, { method: "POST" });
@@ -98,7 +115,7 @@
   let starModal = false;
 
   function fetchStar() {
-    fetch(`/api/star`, {method: "POST"});
+    fetch(`/api/star`, { method: "POST" });
     starModal = false;
   }
 
@@ -114,10 +131,10 @@
     "点击发团可以快速打开面板",
     "登录账号后，轴芯等级可以提升经验获取量",
     "轴伊的一些活动可以触发经验加成",
-    "鼠标中键点击加点可以跳过确认"
+    "鼠标中键点击加点可以跳过确认",
   ];
   let cur_tip = 0;
-  setInterval(()=>{
+  setInterval(() => {
     cur_tip = Math.floor(Math.random() * tooltips.length);
   }, 10000);
 </script>
@@ -155,35 +172,36 @@
       </tr>
       <tr>
         {#each attributeArray as attr}
-        <td
-          ><span class="flex justify-center align-middle"
-            ><button
-              on:mousedown={(e)=>{
-                if (e.button == 1) {
+          <td
+            ><span class="flex justify-center align-middle"
+              ><button
+                on:mousedown={(e) => {
+                  if (e.button == 1) {
+                    targetAttr = attr;
+                    revertHandle();
+                  }
+                }}
+                on:click={() => {
+                  revertModal = true;
                   targetAttr = attr;
-                  revertHandle();
-                }
-              }}
-              on:click={() => {
-                revertModal = true;
-                targetAttr = attr;
-              }}><img class="icon-button mr-2" src={minusIcon} alt="" /></button
-            >
-            <span>{attributes[attr]}</span>
-            <button
-              on:mousedown={(e)=>{
-                if (e.button == 1) {
+                }}
+                ><img class="icon-button mr-2" src={minusIcon} alt="" /></button
+              >
+              <span>{attributes[attr]}</span>
+              <button
+                on:mousedown={(e) => {
+                  if (e.button == 1) {
+                    targetAttr = attr;
+                    attrHandle();
+                  }
+                }}
+                on:click={() => {
+                  addModal = true;
                   targetAttr = attr;
-                  attrHandle();
-                }
-              }}
-              on:click={() => {
-                addModal = true;
-                targetAttr = attr;
-              }}><img class="icon-button ml-2" src={addIcon} alt="" /></button
-            ></span
-          ></td
-        >
+                }}><img class="icon-button ml-2" src={addIcon} alt="" /></button
+              ></span
+            ></td
+          >
         {/each}
       </tr>
     </table>
@@ -191,7 +209,10 @@
       <h3 class="mb-5 text-lg font-normal text-gray-500">
         此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？
       </h3>
-      <Button disabled={currentExp < buycost || attributes[targetAttr] >= (100 + 10 * starcnt)} on:click={attrHandle}>确认</Button
+      <Button
+        disabled={currentExp < buycost ||
+          attributes[targetAttr] >= 100 + 10 * starcnt}
+        on:click={attrHandle}>确认</Button
       >
       <Button color="alternative">取消</Button>
     </Modal>
@@ -215,17 +236,27 @@
         <Button disabled={!starAvailable} on:click={fetchStar}>确认</Button>
         <Button color="alternative">取消</Button>
       </Modal>
-      <a href={"#"} on:click={()=>{starModal = true;}} class="flex justify-center absolute cursor-pointer" style="width: 128px; top: 16px;">
+      <a
+        href={"#"}
+        on:click={() => {
+          starModal = true;
+        }}
+        class="flex justify-center absolute cursor-pointer flex-col"
+        style="width: 128px; scale: 0.9; top: 0;"
+      >
         {#if starcnt > 0}
-          {#each {length: starcnt} as _, i}
-            {#if i == 0}
+          <div class="justify-center flex">
+            {#each { length: Math.floor(starcnt / 5) } as _, i}
+              <img style="height: 28px;" alt="" src={crownIcon} />
+            {/each}
+          </div>
+          <div class="justify-center flex">
+            {#each { length: starcnt % 5 } as _, i}
               <img style="height: 28px;" alt="" src={starIcon} />
-            {:else}
-              <img style="height: 28px; margin-left: -16px" alt="" src={starIcon} />
-            {/if}
-          {/each}
+            {/each}
+          </div>
         {:else}
-            <img style="height: 28px;" alt="" src={starOutlineIcon} />
+          <img style="height: 28px;" alt="" src={starOutlineIcon} />
         {/if}
       </a>
       <Tooltip>经验获取量提升，任务成功率降低</Tooltip>
@@ -240,7 +271,7 @@
         </div>
       </Progress>
       <Tooltip>下次增加{expdiff}点经验</Tooltip>
-      <div id="buff-ref" class="flex justify-center mt-8">
+      <div id="buff-ref" class="flex justify-center mt-4">
         {#each buffs as buff}
           <BuffIcon type={buff} />
         {/each}
@@ -251,24 +282,24 @@
     <div class="flex justify-center w-full mb-8 px-2">
       <Alert border color="green" dismissable>
         <span class="font-medium">小提示：</span>
-          {tooltips[cur_tip]}
+        {tooltips[cur_tip]}
       </Alert>
     </div>
     <div class="flex justify-center w-full">
-    {#each clothesList as c, i}
-      <div
-        tabindex={i}
-        on:keypress={()=>{}}
-        role="button"
-        on:click={() => changeClothes(i)}
-        class="choice-item"
-        class:disabled={!clothes.unlock[i]}
-        style="background-image: url({clothesImages[i]});"
-      ></div>
-      {#if !clothes.unlock[i]}
-        <Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>
-      {/if}
-    {/each}
+      {#each clothesList as c, i}
+        <div
+          tabindex={i}
+          on:keypress={() => {}}
+          role="button"
+          on:click={() => changeClothes(i)}
+          class="choice-item"
+          class:disabled={!clothes.unlock[i]}
+          style="background-image: url({clothesImages[i]});"
+        ></div>
+        {#if !clothes.unlock[i]}
+          <Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>
+        {/if}
+      {/each}
     </div>
   </div>
 </div>
