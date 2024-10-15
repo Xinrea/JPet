@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <array>   // std::array
 #include <memory>
+#include <regex>
 
 /// thrid party libraries
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
@@ -89,6 +90,35 @@ class Wbi {
     return ret;
   }
 
+  static std::optional<std::string> GetWebId() {
+    const auto url = cpr::Url{"https://space.bilibili.com/475210"};
+    const auto cookie = cpr::Cookies{
+        {"SESSDATA", "xxxxxxxxxxxx"},
+    };
+    const auto header = cpr::Header{
+        {"User-Agent",
+         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, "
+         "like Gecko) Chrome/58.0.3029.110 Safari/537.3"},
+        {"Referer", "https://www.bilibili.com/"},
+    };
+    const auto response = cpr::Get(url, cookie, header);
+    if (response.status_code != 200) {
+        return std::nullopt;
+    }
+    // let re = Regex::new(r#"<script id="__RENDER_DATA__" type="application/json">(.+?)</script>"#).unwrap();
+    const std::string re = R"(<script id="__RENDER_DATA__" type="application/json">(.+?)</script>)";
+    std::regex reg(re);
+    std::smatch match;
+    if (std::regex_search(response.text, match, reg)) {
+        const std::string str = match[1];
+        // urldecode str
+        std::string decoded_str = cpr::util::urlDecode(str);
+        nlohmann::json json = nlohmann::json::parse(decoded_str);
+        return json["access_id"].get<std::string>();
+    }
+    return std::nullopt;
+  }
+
   /* 获取 mixin key */
   static std::string Get_mixin_key(const std::string &Img_key,
                                    const std::string &Sub_key) {
@@ -110,6 +140,18 @@ class Wbi {
   /* 计算签名(w_rid) */
   static std::string Calc_sign(nlohmann::json &Params,
                                const std::string &Mixin_key) {
+    static std::optional<std::string> w_webid = GetWebId();
+    static int w_webid_ts = 0;
+    // may expire in 20 hours
+    if (!w_webid.has_value() || w_webid_ts == 0 || w_webid_ts + 72000 < std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch())
+        .count()) {
+      w_webid = GetWebId();
+      w_webid_ts = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch())
+        .count();
+    }
+    Params["w_webid"] = w_webid.value_or("");
     Params["wts"] = std::chrono::duration_cast<std::chrono::seconds>(
                         std::chrono::system_clock::now().time_since_epoch())
                         .count();
