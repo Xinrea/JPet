@@ -295,7 +295,7 @@ int DataManager::CurrentExpDiff() {
   int intellect = GetAttribute("intellect");
   int starcnt = GetWithDefault("starcnt", 0);
   int medal = BuffManager::GetInstance()->MedalLevel();
-  int exp = 1 + ceil(499 * LAppPal::EaseOut(intellect + medal / 3 - 4) / 100);
+  double exp = 1 + ceil(499 * LAppPal::EaseOut(intellect + medal / 3 - 4) / 100);
   BuffManager* bf = BuffManager::GetInstance();
   if (bf->IsDynamic()) {
     exp *= 2;
@@ -319,7 +319,7 @@ int DataManager::CurrentExpDiff() {
     exp *= 1.2f;
   }
   exp *= (1 + 0.1 * starcnt);
-  return std::min(exp, 99999999);
+  return std::min(static_cast<int>(exp), 99999999);
 }
 
 void DataManager::AddExp() {
