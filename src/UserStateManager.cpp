@@ -9,8 +9,13 @@
 
 #include <httplib.h>
 #include <semver.hpp>
+#include <cstdlib>
 
+#ifdef __APPLE__
+#include "Platform.hpp"
+#else
 using namespace WinToastLib;
+#endif
 
 void UserStateManager::CheckUpdate(bool notify) {
   httplib::SSLClient live_cli("pet.vjoi.cn", 443);
@@ -63,6 +68,10 @@ void UserStateManager::CheckUpdate(bool notify) {
 
 void UserStateManager::Notify(const wstring& title, const wstring& content,
                               WinToastEventHandler* handler) {
+#ifdef __APPLE__
+  std::unique_ptr<WinToastEventHandler> owned(handler);
+  Platform::Notify(title, content, handler ? handler->GetUrl() : "");
+#else
   WinToastTemplate templ = WinToastTemplate(WinToastTemplate::ImageAndText02);
   // convert char* to wstring
   templ.setTextField(title, WinToastTemplate::FirstLine);
@@ -70,8 +79,16 @@ void UserStateManager::Notify(const wstring& title, const wstring& content,
   std::wstring img = LAppDefine::execPath + std::wstring(L"resources/imgs/Avatar.png");
   templ.setImagePath(img);
   WinToast::instance()->showToast(templ, handler, nullptr);
+#endif
 }
 
+#ifdef __APPLE__
+void UserStateManager::Init(const std::vector<std::string>& list, void* parent) {
+  if (std::getenv("JPET_SMOKE_TEST")) {
+    _cookieWindow = new CookieWindow(parent);
+    return;
+  }
+#else
 void UserStateManager::Init(const std::vector<std::string>& list, HWND parent) {
   // 通知初始化
   LAppPal::PrintLog(LogLevel::Info, "[LAppDelegate]Notification Init");
@@ -80,29 +97,45 @@ void UserStateManager::Init(const std::vector<std::string>& list, HWND parent) {
       WinToast::configureAUMI(L"JoiGroup", L"JPetProject", L"JPet", LAppPal::StringToWString(VERSION));
   WinToast::instance()->setAppUserModelId(aumi);
   WinToast::instance()->initialize();
+#endif
 
   _wbi_config = Wbi::Get_wbi_key();
 
   // init cookie window
+#ifdef __APPLE__
+  _cookieWindow = new CookieWindow(parent);
+#else
   _cookieWindow = new CookieWindow(parent, GetModuleHandle(nullptr));
+#endif
   // running check thread
   _checkThread = std::thread(&UserStateManager::CheckThread, this, list);
-  _checkThread.detach();
 }
 
 void UserStateManager::CheckThread(const vector<string>& list) {
   // sleep for 3 seconds to wait for cookie window
-  std::this_thread::sleep_for(std::chrono::seconds(3));
+  if (Wait(3)) return;
+#ifdef __APPLE__
+  auto userAgent = _cookieWindow->GetUserAgent();
+  if (!userAgent.empty())
+    DataManager::GetInstance()->SetRaw("user-agent", userAgent);
+#endif
   _mutex.lock();
   for (auto uid : list) {
     std::shared_ptr<UserStateWatcher> watcher =
       std::make_shared<UserStateWatcher>(uid,
-          _cookieWindow->userAgent, _wbi_config);
+          _cookieWindow->GetUserAgent(), _wbi_config);
     _watchers.push_back(watcher);
   }
   _mutex.unlock();
   int check_delay = 3;
   while (_running) {
+#ifdef __APPLE__
+    auto latestUserAgent = _cookieWindow->GetUserAgent();
+    if (!latestUserAgent.empty() && latestUserAgent != userAgent) {
+      userAgent = latestUserAgent;
+      DataManager::GetInstance()->SetRaw("user-agent", userAgent);
+    }
+#endif
     // copy a shadow of _watchers
     _mutex.lock();
     std::vector<std::shared_ptr<UserStateWatcher>> watchers = _watchers;
@@ -144,15 +177,19 @@ void UserStateManager::CheckThread(const vector<string>& list) {
         } 
       }
       if (check_delay >= 60) {
+#ifdef __APPLE__
+        Platform::Alert(L"Error", L"获取动态信息失败，请在出现的窗口中点击完成可能出现的验证码，随后关闭窗口");
+#else
         MessageBox(nullptr, L"获取动态信息失败，请在出现的窗口中点击完成可能出现的验证码，随后关闭窗口",
                    L"Error", MB_OK);
+#endif
         _cookieWindow->Show();
         goto skip;
       }
-      std::this_thread::sleep_for(std::chrono::seconds(check_delay));
+      if (Wait(check_delay)) return;
     }
   skip:
     // sleep for 10 seconds
-    std::this_thread::sleep_for(std::chrono::seconds(check_delay));
+    if (Wait(check_delay)) return;
   }
 }

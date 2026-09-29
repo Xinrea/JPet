@@ -1,9 +1,12 @@
 #pragma once
 
+#ifndef __APPLE__
 #include <wrl.h>
 #include <wil/com.h>
 #include <webview2.h>
+#endif
 
+#include <memory>
 #include <string>
 
 /**
@@ -19,7 +22,15 @@ class CookieWindow {
    *
    * @param[in] parent The parent window handle
    */
+#ifdef __APPLE__
+  CookieWindow(void* parent = nullptr);
+#else
   CookieWindow(HWND parent, HINSTANCE instance);
+#endif
+
+  // Read snapshots rather than sharing mutable browser state with the watcher.
+  std::string GetUserAgent() const;
+  std::string GetCookies() const;
 
   /**
    * @brief Destroy the GamePanel object
@@ -65,6 +76,11 @@ class CookieWindow {
 
   void UpdateCookie();
 
+#ifdef __APPLE__
+ private:
+  struct Impl;
+  std::shared_ptr<Impl> _impl;
+#else
   wil::com_ptr<ICoreWebView2Controller> webviewController;
 
  private:
@@ -77,4 +93,10 @@ class CookieWindow {
   wil::com_ptr<ICoreWebView2CookieManager> _cookieManager;
 
   void WindowProc();
+#endif
 };
+
+#ifndef __APPLE__
+inline std::string CookieWindow::GetUserAgent() const { return userAgent; }
+inline std::string CookieWindow::GetCookies() const { return cookie; }
+#endif

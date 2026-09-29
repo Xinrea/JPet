@@ -13,9 +13,9 @@ bool DataManager::init() {
   // check file existence
   if (!std::filesystem::exists(std::filesystem::path(configPath))) {
     // create a new config file
-    std::ofstream file(configPath);
+    std::ofstream file{std::filesystem::path(configPath)};
     if (!file.is_open()) {
-      LAppPal::PrintLog("Failed to create config file: %s", configPath.c_str());
+      LAppPal::PrintLog(LogLevel::Error, L"Failed to create config file: %ls", configPath.c_str());
       return false;
     }
     file.close();
@@ -24,7 +24,7 @@ bool DataManager::init() {
                       configPath.c_str());
   } else {
     try {
-      data = toml::parse_file(configPath);
+      data = toml::parse_file(LAppPal::WStringToString(configPath));
     } catch (const toml::parse_error& err) {
       LAppPal::PrintLog("Failed to parse config file: %s", err.what());
       return false;
@@ -280,7 +280,7 @@ void DataManager::RemoveFollow(const std::string& uid) {
 }
 
 void DataManager::Save() {
-  const std::wstring configPath = LAppDefine::documentPath + L"\\jpet.toml";
+  const std::filesystem::path configPath = std::filesystem::path(LAppDefine::documentPath) / "jpet.toml";
   std::ofstream file(configPath);
   if (!file.is_open()) {
     LAppPal::PrintLog("Failed to open config file for writing");
@@ -458,7 +458,7 @@ void DataManager::SetResetMark() {
   // check file existence
   if (!std::filesystem::exists(std::filesystem::path(markerPath))) {
     // create a new config file
-    std::ofstream file(markerPath);
+    std::ofstream file{std::filesystem::path(markerPath)};
     if (!file.is_open()) {
       LAppPal::PrintLog(LogLevel::Error, L"[DataManager]Failed to create marker file: %ls", markerPath.c_str());
       return;

@@ -16,13 +16,10 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/LAppTextureManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LAppView.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LAppView.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UserStateManager.h
   ${CMAKE_CURRENT_SOURCE_DIR}/UserStateManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UserStateWatcher.h
@@ -31,15 +28,12 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/PartStateManager.h
   ${CMAKE_CURRENT_SOURCE_DIR}/PartStateManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/resource.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/JPet.rc
   ${CMAKE_CURRENT_SOURCE_DIR}/PanelServer.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/PanelServer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GamePanel.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/GamePanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/CookieWindow.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/CookieWindow.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Wbi.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GameData.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GameData.cpp
@@ -54,3 +48,12 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/MenuSprite.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/MenuSprite.hpp
 )
+
+if(APPLE)
+  target_sources(${APP_NAME} PRIVATE
+    mainMac.mm PlatformMac.mm MacDesktop.mm MacWebViews.mm AudioManagerMac.mm)
+else()
+  target_sources(${APP_NAME} PRIVATE
+    main.cpp PlatformWin.cpp AudioManager.cpp WinToastEventHandler.cpp
+    GamePanel.cpp CookieWindow.cpp JPet.rc)
+endif()

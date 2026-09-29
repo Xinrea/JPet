@@ -8,7 +8,11 @@
 
 #include "LAppLive2DManager.hpp"
 
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
 #include <GL/glew.h>
+#endif
 #include <GLFW/glfw3.h>
 
 #include <Rendering/CubismRenderer.hpp>

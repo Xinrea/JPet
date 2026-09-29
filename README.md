@@ -1,5 +1,56 @@
 # JPet
 
+## macOS（Apple Silicon）
+
+项目现在支持使用 Apple Silicon（`arm64`）的 macOS。macOS 版本使用 GLFW/Cocoa
+透明窗口、WKWebView 设置和登录窗口、AVFoundation 音频以及菜单栏状态项；透明区域
+暂时仍属于 JPet 窗口并会接收鼠标事件。
+
+依赖准备和构建：
+
+```sh
+cd resources/panel
+npm ci --legacy-peer-deps
+npm run build
+cd ../..
+
+./build/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+./build/vcpkg/vcpkg install --triplet arm64-osx
+
+cmake -S . -B build/macos-arm64 -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DCMAKE_TOOLCHAIN_FILE=build/vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -DVCPKG_TARGET_TRIPLET=arm64-osx
+cmake --build build/macos-arm64
+open build/macos-arm64/bin/JPet/JPet.app
+```
+
+也可以使用一键脚本完成前端构建、CMake 配置、C++ 依赖安装、编译和启动：
+
+```sh
+./build-scripts/build_and_run_macos.sh
+```
+
+脚本默认使用 `build/vcpkg` 和 `build/vcpkg_installed`。如果 vcpkg 位于其他位置，
+可以通过环境变量覆盖：
+
+```sh
+VCPKG_DIR=/path/to/vcpkg \
+VCPKG_INSTALLED_DIR=/path/to/vcpkg_installed \
+./build-scripts/build_and_run_macos.sh
+```
+
+默认构建 Release 版本；开发调试时可以使用：
+
+```sh
+BUILD_TYPE=Debug ./build-scripts/build_and_run_macos.sh
+```
+
+Apple 已弃用 OpenGL，但当前 Live2D OpenGL 渲染路径仍可运行；后续如需长期支持，
+应另行评估 Cubism Metal 渲染后端。macOS 的登录页会使用系统持久化的 WebKit
+Cookie 存储。
+
 ![GitHub Tag](https://img.shields.io/github/v/tag/Xinrea/JPet)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Xinrea/JPet/release-build.yml)
 ![GitHub last commit](https://img.shields.io/github/last-commit/Xinrea/JPet)

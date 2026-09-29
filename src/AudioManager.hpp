@@ -2,7 +2,11 @@
 #include <vector>
 #include <string>
 
+#ifdef __APPLE__
+#include <memory>
+#else
 #include "fmod.hpp"
+#endif
 #pragma once
 using std::map;
 using std::vector;
@@ -27,10 +31,15 @@ class AudioManager {
   void Release();
 
  private:
+#ifdef __APPLE__
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+#else
   FMOD::System *_system;
   FMOD::Channel *_channel;
   map<wstring, FMOD::Sound *> sounds;
   vector<wstring> start_audios_;
   vector<wstring> idle_audios_;
   vector<wstring> click_audios_;
+#endif
 };

@@ -22,6 +22,8 @@ void UserStateWatcher::initBasicInfo(const string& cookies) {
   // change client host
   httplib::SSLClient client = httplib::SSLClient("api.bilibili.com", 443);
   client.set_connection_timeout(std::chrono::seconds(1));
+  client.set_read_timeout(std::chrono::seconds(5));
+  client.set_write_timeout(std::chrono::seconds(5));
 
   string request_path = "/x/space/wbi/acc/info?";
   nlohmann::json Params;
@@ -76,6 +78,8 @@ CheckStatus UserStateWatcher::Check(queue<StateMessage>& messageQueue, const str
 
   httplib::SSLClient dynamicCli("api.bilibili.com", 443);
   dynamicCli.set_connection_timeout(std::chrono::seconds(1));
+  dynamicCli.set_read_timeout(std::chrono::seconds(5));
+  dynamicCli.set_write_timeout(std::chrono::seconds(5));
 
   auto dres = dynamicCli.Get(
       ("/x/polymer/web-dynamic/v1/feed/space?host_mid=" + target.uid).c_str(),
@@ -191,6 +195,8 @@ CheckStatus UserStateWatcher::Check(queue<StateMessage>& messageQueue, const str
   }
   httplib::SSLClient liveCli("api.live.bilibili.com", 443);
   liveCli.set_connection_timeout(std::chrono::seconds(1));
+  liveCli.set_read_timeout(std::chrono::seconds(5));
+  liveCli.set_write_timeout(std::chrono::seconds(5));
 
   // https://api.live.bilibili.com/room/v1/Room/getRoomInfoOld?mid=475210
 

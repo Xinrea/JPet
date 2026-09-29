@@ -1,5 +1,6 @@
 ﻿#include "WinToastEventHandler.h"
 
+#ifndef __APPLE__
 #include <Windows.h>
 #include <shellapi.h>
 
@@ -30,3 +31,4 @@ void WinToastEventHandler::toastDismissed(WinToastDismissalReason state) const {
 }
 
 void WinToastEventHandler::toastFailed() const {}
+#endif

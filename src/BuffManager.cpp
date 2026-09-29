@@ -204,14 +204,22 @@ bool BuffManager::IsFail() {
 bool BuffManager::IsMonday() {
   time_t now = time(0);
   tm ltm;
+#ifdef _WIN32
   localtime_s(&ltm, &now);
+#else
+  localtime_r(&now, &ltm);
+#endif
   return ltm.tm_wday == 1;
 }
 
 bool BuffManager::IsBirthday() {
   time_t now = time(0);
   tm ltm;
+#ifdef _WIN32
   localtime_s(&ltm, &now);
+#else
+  localtime_r(&now, &ltm);
+#endif
   return ltm.tm_mon == 10 && ltm.tm_mday == 25;
 }
 

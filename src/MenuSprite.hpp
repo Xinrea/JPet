@@ -1,7 +1,11 @@
 ﻿#pragma once
 
 #include "LAppTextureManager.hpp"
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
 #include <GL/glew.h>
+#endif
 #include <GLFW/glfw3.h>
 
 enum class MenuSelect {
@@ -64,25 +68,44 @@ class MenuSprite {
   LAppTextureManager::TextureInfo* base_texture_;
   LAppTextureManager::TextureInfo* mask_texture_;
   LAppTextureManager::TextureInfo* icons_texture_[4];
+#ifdef __APPLE__
+  const char *vertexShaderSource = "#version 120\n"
+                                   "attribute vec2 aPos;\n"
+                                   "attribute vec2 aTexCoord;\n"
+#else
   const char *vertexShaderSource = "#version 330 core\n"
                                    "layout (location = 0) in vec2 aPos;\n"
                                    "layout (location = 1) in vec2 aTexCoord;\n"
+#endif
                                    "uniform mat2 uScale;\n"
                                    "uniform vec2 uTransition;\n"
                                    "uniform mat2 uTexRotate;\n"
+#ifdef __APPLE__
+                                   "varying vec2 TexCoord;\n"
+#else
                                    "out vec2 TexCoord;\n"
+#endif
                                    "void main() {\n"
                                    "   vec2 new_pos = uScale * aPos + uTransition;"
                                    "   gl_Position = vec4(new_pos, 0.0, 1.0);\n"
                                    "   TexCoord = uTexRotate * aTexCoord;\n"
                                    "}\0";
   const char *fragmentShaderSource =
+#ifdef __APPLE__
+      "#version 120\n"
+      "varying vec2 TexCoord;\n"
+#else
       "#version 330 core\n"
       "in vec2 TexCoord;\n"
       "out vec4 FragColor;\n"
+#endif
       "uniform sampler2D texture1;\n"
       "void main() {\n"
+#ifdef __APPLE__
+      "   gl_FragColor = texture2D(texture1, TexCoord);\n"
+#else
       "   FragColor = texture(texture1, TexCoord);\n"
+#endif
       "}\0";
 
   LAppTextureManager::TextureInfo* load(std::string filename);

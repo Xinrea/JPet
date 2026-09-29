@@ -7,21 +7,27 @@
 #include "PartStateManager.h"
 #include "LAppDelegate.hpp"
 #include "Wbi.hpp"
-
-#include <shellapi.h>
-#include <winuser.h>
+#include "Platform.hpp"
 
 void PanelServer::Start() {
-  // start thread
   worker_ = std::thread(&PanelServer::doServe, this);
-  worker_.detach();
 }
 
-void PanelServer::DataSinkHandle(httplib::DataSink &sink) {
+void PanelServer::Stop() {
+  _stopping = true;
+  server->stop();
+  _cv.notify_all();
+  if (worker_.joinable()) worker_.join();
+}
+
+bool PanelServer::DataSinkHandle(httplib::DataSink &sink) {
   std::unique_lock<std::mutex> lock(_mtx);
-  int id = _messageId + 1;
-  _cv.wait(lock, [&] { return _messageId == id; });
-  sink.write(_message.c_str(), _message.size());
+  int id = _messageId;
+  _cv.wait_for(lock, std::chrono::seconds(10), [&] { return _stopping || _messageId != id; });
+  if (_stopping) return false;
+  const std::string message = _messageId == id ? ": keepalive\n\n" : _message;
+  lock.unlock();
+  return sink.write(message.c_str(), message.size());
 }
 
 void PanelServer::Notify(const std::string &message) {
@@ -41,8 +47,7 @@ void PanelServer::initSSE() {
     res.set_chunked_content_provider(
         "text/event-stream", [&](size_t /*offset*/, httplib::DataSink &sink) {
           // this will block until server wants to send message
-          DataSinkHandle(sink);
-          return true;
+          return DataSinkHandle(sink);
         });
   });
 }
@@ -353,13 +358,12 @@ void PanelServer::doServe() {
     res.status = 404;
   });
   server->Post("/api/config/folder", [](const httplib::Request &req, httplib::Response &res) {
-    ShellExecute(NULL, L"open", LAppDefine::documentPath.c_str(), NULL, NULL, SW_SHOWDEFAULT);
+    Platform::Open(LAppPal::WStringToString(LAppDefine::documentPath));
   });
   server->Post("/api/openlink",
                [](const httplib::Request &req, httplib::Response &res) {
                  auto json = nlohmann::json::parse(req.body);
-                 ShellExecute(NULL, L"open", LAppPal::StringToWString(json.at("link")).c_str(),
-                              NULL, NULL, SW_SHOWDEFAULT);
+                 Platform::Open(json.at("link").get<std::string>());
                });
   server->Get("/api/config/audio",
               [](const httplib::Request &req, httplib::Response &res) {
@@ -720,6 +724,6 @@ void PanelServer::doServe() {
                });
 
   initSSE();
-  server->listen("localhost", 8053);
+  if (!_stopping) server->listen("127.0.0.1", 8053);
   LAppPal::PrintLog(LogLevel::Info, "[PanelServer]Worker exit");
 }

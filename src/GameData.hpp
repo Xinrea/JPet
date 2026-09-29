@@ -140,7 +140,7 @@ class Entry {
  */
 class GameData {
  private:
-  rocksdb::DB* db;
+  rocksdb::DB* db = nullptr;
   rocksdb::WriteOptions writeOptions;
 
   void parse(const std::vector<char>& data) {
@@ -195,7 +195,7 @@ class GameData {
     }
     // load old data from file, if file not exist, skip reading
     if (std::filesystem::exists(std::filesystem::path(old_datapath))) {
-      std::ifstream file(old_datapath, std::ios::binary | std::ios::ate);
+      std::ifstream file(std::filesystem::path(old_datapath), std::ios::binary | std::ios::ate);
       if (file.is_open()) {
         std::streamsize size = file.tellg();
         file.seekg(0, std::ios::beg);
@@ -213,7 +213,7 @@ class GameData {
   }
 
   ~GameData() {
-    db->Close();
+    if (db) db->Close();
     delete db;
   }
 

@@ -20,13 +20,21 @@
   };
   export let attributes = null;
   export let starcnt = 0;
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  // Ranking is optional in local desktop builds. Vite leaves these values
+  // undefined when no .env file is present; do not let that blank the entire
+  // settings WebView during development.
+  const supabase =
+    supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
   let rank_data = [];
   let rank_star = [];
   let rank_exp = [];
   let rank_attr = [];
 
   function update() {
+    if (!supabase) {
+      rank_data = [];
+      return;
+    }
     supabase
       .from("rankboard")
       .select(
@@ -74,7 +82,7 @@
   }
 
   function push_data() {
-    if(!attributes) {
+    if (!supabase || !attributes) {
       return;
     }
     supabase

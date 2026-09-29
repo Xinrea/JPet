@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Copyright(c) Live2D Inc. All rights reserved.
  *
  * Use of this source code is governed by the Live2D Open Software license
@@ -10,11 +10,21 @@
 #include "AudioManager.hpp"
 #include "MenuSprite.hpp"
 #include "WinToastEventHandler.h"
+#include "Platform.hpp"
+#ifdef __APPLE__
+#include "MacDesktop.hpp"
+#endif
 
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
 #include <GL/glew.h>
+#endif
 #include <GLFW/glfw3.h>
 #include <filesystem>
 #include <mutex>
+#include <cstdlib>
+#ifdef _WIN32
 #include <shellapi.h>
 #include <stdio.h>
 #include <winbase.h>
@@ -27,6 +37,7 @@
 #include <VersionHelpers.h>
 
 #define STBI_MSC_SECURE_CRT
+#endif
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
@@ -42,18 +53,22 @@
 #include "TaskScheduler.hpp"
 #include "resource.h"
 
+#ifdef _WIN32
 #include <wintoastlib.h>
 
 #define WM_IAWENTRAY WM_USER + 5
+#endif
 
 using namespace Csm;
 using namespace std;
 using namespace LAppDefine;
 
+#ifdef _WIN32
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK PreWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                LPARAM lParam);
 WNDPROC DefaultProc;
+#endif
 
 namespace {
 LAppDelegate *s_instance = NULL;
@@ -77,7 +92,9 @@ void LAppDelegate::ReleaseInstance() {
 
 bool LAppDelegate::Initialize() {
   LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]START");
+#ifdef _WIN32
   WinToastLib::WinToast::instance()->setShortcutPolicy(WinToastLib::WinToast::SHORTCUT_POLICY_IGNORE);
+#endif
   DataManager *dataManager = DataManager::GetInstance();
   // 设置初始化
   dataManager->GetWindowPos(&_iposX, &_iposY);
@@ -106,11 +123,13 @@ bool LAppDelegate::Initialize() {
   _mWidth = mode->width;
 
   // 获取当前路径，发送通知时图片地址需要为绝对路径
+#ifdef _WIN32
   wchar_t curPath[256];
   GetModuleFileName(GetModuleHandle(NULL), static_cast<LPWSTR>(curPath),
                     sizeof(curPath));
   _exePath = std::wstring(curPath);
   LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]Get Execute Path");
+#endif
 
   // Windowの生成_
   // 使用GLFW_DECORATED实现边框，会导致1703版本及以前，整个窗口鼠标穿透
@@ -122,6 +141,13 @@ bool LAppDelegate::Initialize() {
   glfwWindowHint(GLFW_DEPTH_BITS, 16);
   glfwWindowHint(GLFW_SAMPLES, 4);
   glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
+#ifdef __APPLE__
+  // Existing sprite shaders use GLSL 120, so retain a legacy GL context.
+  glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+  glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_TRUE);
+#endif
   _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "JPet",
                              NULL, NULL);
 
@@ -138,6 +164,7 @@ bool LAppDelegate::Initialize() {
   glfwSetCursor(_window, cursor);
   glfwSetWindowPos(_window, _iposX, _iposY);
 
+#ifdef _WIN32
   HWND hwnd = glfwGetWin32Window(_window);
   _mainHwnd = hwnd;
 
@@ -169,6 +196,9 @@ bool LAppDelegate::Initialize() {
   }
 
   SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 255, LWA_COLORKEY);
+#else
+  MacDesktop::Initialize(_window);
+#endif
 
   // 音频设定3d位置
   int x, y;
@@ -183,11 +213,13 @@ bool LAppDelegate::Initialize() {
     glfwSwapInterval(1);
   }
 
+#ifndef __APPLE__
   if (glewInit() != GLEW_OK) {
     LAppPal::PrintLog(LogLevel::Error, "[LAppDelegate]Can't Initilize Glew.");
     glfwTerminate();
     return GL_FALSE;
   }
+#endif
 
   // テクスチャサンプリング設定
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -204,7 +236,9 @@ bool LAppDelegate::Initialize() {
   glfwSetDropCallback(_window, EventHandler::OnDropCallBack);
   glfwSetCursorPosCallback(_window, EventHandler::OnMouseCallBack);
   glfwSetWindowPosCallback(_window, EventHandler::OnWindowPosCallBack);
+#ifdef _WIN32
   glfwSetWindowTrayCallback(_window, EventHandler::OnTrayClickCallBack);
+#endif
 
   // ウィンドウサイズ記憶
   int width, height;
@@ -213,6 +247,7 @@ bool LAppDelegate::Initialize() {
   _windowHeight = height;
 
   // 托盘图标初始化
+#ifdef _WIN32
   appIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));
   nid.cbSize = sizeof(NOTIFYICONDATA);
   nid.hWnd = hwnd;
@@ -225,6 +260,7 @@ bool LAppDelegate::Initialize() {
 
   // 设置窗口图标（绿幕模式下会显示在任务栏）
   SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)appIcon);
+#endif
 
   // AppView 初始化
   _view->Initialize();
@@ -235,30 +271,45 @@ bool LAppDelegate::Initialize() {
   srand(time(NULL));
 
   // Start panel server
-  auto panelServer = PanelServer::GetInstance();
-  panelServer->Start();
+  if (!std::getenv("JPET_SMOKE_TEST")) {
+    auto panelServer = PanelServer::GetInstance();
+    panelServer->Start();
+  }
 
   // Init Game Panel
+  if (std::getenv("JPET_SMOKE_TEST")) return GL_TRUE;
+#ifdef _WIN32
   _panel = new GamePanel(hwnd, GetModuleHandle(NULL));
+#else
+  _panel = new GamePanel();
+#endif
+  if (std::getenv("JPET_AUTO_SHOW_PANEL")) _panel->ForceShow();
   // 用户状态管理初始化
   _us = new UserStateManager(DynamicNotify, LiveNotify);
+#ifdef _WIN32
   _us->Init(_followlist, hwnd);
+#else
+  _us->Init(_followlist);
+#endif
 
   // check update
-  _us->CheckUpdate(UpdateNotify);
+  if (!std::getenv("JPET_SMOKE_TEST")) _us->CheckUpdate(UpdateNotify);
 
   // Init task scheduler and basic tasks
+  if (!std::getenv("JPET_SMOKE_TEST")) {
   TaskScheduler *ts = TaskScheduler::GetInstance();
   auto expTask = std::make_shared<ExpTask>();
   auto checkTask = std::make_shared<CheckTask>();
   ts->AddTask(expTask);
   ts->AddTask(checkTask);
+  }
 
   return GL_TRUE;
 }
 
 void LAppDelegate::SetGreen(bool green) {
   Green = green;
+#ifdef _WIN32
   HWND hwnd = glfwGetWin32Window(_window);
   if (Green) {
     DWORD exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
@@ -269,17 +320,38 @@ void LAppDelegate::SetGreen(bool green) {
     exStyle |= WS_EX_TOOLWINDOW;
     SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
   }
+#endif
 }
 
 void LAppDelegate::SetLimit(bool limit) {
   isLimit = limit;
+#ifndef __APPLE__
   if (limit)
     glfwSwapInterval(2);
   else
     glfwSwapInterval(1);
+#endif
 }
 
 void LAppDelegate::Release() {
+#ifdef __APPLE__
+  MacDesktop::Shutdown();
+  if (!std::getenv("JPET_SMOKE_TEST")) TaskScheduler::GetInstance()->Stop();
+  PanelServer::GetInstance()->Stop();
+  delete _us;
+  _us = nullptr;
+  delete _panel;
+  _panel = nullptr;
+  // All GL resources must be destroyed while their context still exists.
+  glfwMakeContextCurrent(_window);
+  LAppLive2DManager::ReleaseInstance();
+  delete _view;
+  delete _textureManager;
+  CubismFramework::Dispose();
+  AudioManager::ReleaseInstance();
+  glfwDestroyWindow(_window);
+  glfwTerminate();
+#else
   // Windowの削除
   glfwDestroyWindow(_window);
 
@@ -297,20 +369,22 @@ void LAppDelegate::Release() {
   CubismFramework::Dispose();
 
   LAppPal::ReleaseLog();
+#endif
 }
 
 void LAppDelegate::Run() {
   static double initial_audio_idle_time = glfwGetTime();
   DataManager* dataManager = DataManager::GetInstance();
   LAppLive2DManager::GetInstance()->UpdateViewPort();
-  
+
   // 随机播放启动语音
-  _au->Play3dSound(AudioType::START, rand());
+  if (!std::getenv("JPET_SMOKE_TEST")) _au->Play3dSound(AudioType::START, rand());
 
   // メインループ
   bool noskip = false;
   while (glfwWindowShouldClose(_window) == GL_FALSE && !_isEnd) {
-    if (!_isShowing) {
+    if (!_isShowing && !_need_snapshot.load()) {
+      glfwWaitEventsTimeout(0.1);
       goto render_end;
     }
     noskip = !noskip;
@@ -335,9 +409,21 @@ void LAppDelegate::Run() {
       _windowHeight = height;
 
       // ビューポート変更
+#ifndef __APPLE__
       glViewport(0, 0, width, height);
+#endif
       LAppLive2DManager::GetInstance()->UpdateViewPort();
     }
+#ifdef __APPLE__
+    {
+      // Rendering is in pixels; mouse input and sprite layout stay in points.
+      int fw, fh;
+      glfwGetFramebufferSize(_window, &fw, &fh);
+      glViewport(0, 0, fw, fh);
+      LAppLive2DManager::GetInstance()->UpdateViewPort();
+      glfwSwapInterval(isLimit ? 2 : 1);
+    }
+#endif
 
     // 闲置状态更新
     if (IsCount) {
@@ -375,11 +461,16 @@ void LAppDelegate::Run() {
     _view->Render();
 
     // バッファの入れ替え
+#ifdef __APPLE__
+    if (_need_snapshot.load()) doSnapshot();
+#endif
     glfwSwapBuffers(_window);
 
+#ifndef __APPLE__
     if (_need_snapshot.load()) {
       doSnapshot();
     }
+#endif
 
   render_end:
     // Poll for and process events
@@ -422,7 +513,9 @@ void LAppDelegate::Run() {
   }
   // Release前保存配置
   SaveSettings();
+#ifdef _WIN32
   Shell_NotifyIcon(NIM_DELETE, &nid);
+#endif
   LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]TrayICON Delete");
   Release();
 
@@ -569,8 +662,7 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
         if (param.empty()) {
           break;
         }
-        ShellExecute(NULL, L"open", LAppPal::StringToWString(param).c_str(),
-                     NULL, NULL, SW_SHOWDEFAULT);
+        Platform::Open(param);
         break;
       }
       case 1: {
@@ -579,8 +671,7 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
         if (param.empty()) {
           break;
         }
-        ShellExecute(NULL, L"open", LAppPal::StringToWString(param).c_str(),
-                     NULL, NULL, SW_SHOWDEFAULT);
+        Platform::Open(param);
         break;
       }
       case 2: {
@@ -589,8 +680,7 @@ void LAppDelegate::OnMouseCallBack(GLFWwindow *window, int button, int action,
         if (param.empty()) {
           break;
         }
-        ShellExecute(NULL, L"open", LAppPal::StringToWString(param).c_str(),
-                     NULL, NULL, SW_SHOWDEFAULT);
+        Platform::Open(param);
         break;
       }
       case 3: {
@@ -643,7 +733,7 @@ void LAppDelegate::OnWindowPosCallBack(GLFWwindow *window, int x, int y) {}
 #define IDM_EXIT 2003
 #define IDM_PROJECT 2005
 
-void LAppDelegate::OnTrayClickCallBack(GLFWwindow *window, int b, WPARAM w) {
+void LAppDelegate::OnTrayClickCallBack(GLFWwindow *window, int b, uintptr_t w) {
   if (b == 2) {
     Menu();
   } else {
@@ -670,7 +760,7 @@ void LAppDelegate::OnTrayClickCallBack(GLFWwindow *window, int b, WPARAM w) {
         break;
       }
       case IDM_PROJECT: {
-        ShellExecute(NULL, L"open", L"https://pet.vjoi.cn", NULL, NULL, SW_SHOWNORMAL);
+        Platform::Open("https://pet.vjoi.cn");
         break;
       }
       default:
@@ -749,6 +839,7 @@ bool LAppDelegate::CheckShader(GLuint shaderId) {
 }
 
 void LAppDelegate::Menu() {
+#ifdef _WIN32
   // TODO using a seperate window as menu
   POINT p;
   GetCursorPos(&p);
@@ -768,6 +859,8 @@ void LAppDelegate::Menu() {
   SetForegroundWindow(glfwGetWin32Window(_window));
   TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, p.x, p.y, NULL,
                  glfwGetWin32Window(_window), NULL);
+  DestroyMenu(hMenu);
+#endif
 }
 
 std::thread LAppDelegate::MenuThread() {
@@ -783,6 +876,10 @@ void LAppDelegate::ForceShowPanel() {
 }
 
 void LAppDelegate::Snapshot() {
+#ifdef __APPLE__
+  _need_snapshot.store(true);
+  glfwPostEmptyEvent();
+#else
   _need_snapshot.store(true);
   std::unique_lock<std::mutex> lock(_mtx);
   _cv.wait(lock, [&]{return !_need_snapshot.load();});
@@ -810,6 +907,7 @@ void LAppDelegate::Snapshot() {
     CopyFile(filepath.c_str(), ofn.lpstrFile, FALSE);
     std::filesystem::remove(filepath);
   }
+#endif
 }
 
 void LAppDelegate::doSnapshot() {
@@ -817,18 +915,30 @@ void LAppDelegate::doSnapshot() {
   const wstring filepath = LAppDefine::documentPath + L"/snapshot.png";
   int width, height;
   glfwGetFramebufferSize(_window, &width, &height);
+  if (width <= 0 || height <= 0) {
+    _need_snapshot.store(false);
+    _cv.notify_one();
+    return;
+  }
   GLsizei nrChannels = 4;
   GLsizei stride = nrChannels * width;
   stride += (stride % 4) ? (4 - stride % 4) : 0;
   GLsizei bufferSize = stride * height;
   std::vector<char> buffer(bufferSize);
   glPixelStorei(GL_PACK_ALIGNMENT, 4);
+#ifdef __APPLE__
+  glReadBuffer(GL_BACK);
+#else
   glReadBuffer(GL_FRONT);
+#endif
   glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
   stbi_flip_vertically_on_write(true);
-  stbi_write_png(LAppPal::WStringToString(filepath).c_str(), width, height, nrChannels, buffer.data(), stride);
+  const bool saved = stbi_write_png(LAppPal::WStringToString(filepath).c_str(), width, height, nrChannels, buffer.data(), stride) != 0;
   _need_snapshot.store(false);
   _cv.notify_one();
+#ifdef __APPLE__
+  if (saved) Platform::SaveFile(filepath, L"snapshot.png");
+#endif
 }
 
 void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count,
@@ -839,6 +949,13 @@ void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count,
   if (path_count == 0 || paths == nullptr) {
     return;
   }
+#ifdef __APPLE__
+  size_t moved = 0;
+  for (int i = 0; i < path_count; ++i) {
+    if (Platform::TrashFile(LAppPal::StringToWString(paths[i]))) ++moved;
+  }
+  Platform::Notify(L"文件回收", L"将 " + std::to_wstring(moved) + L" 个文件/文件夹移动到了废纸篓");
+#else
   auto move_to_recycle = [](const wstring &path) {
     SHFILEOPSTRUCTW fileOp = {0};
     fileOp.wFunc = FO_DELETE;
@@ -865,4 +982,5 @@ void LAppDelegate::OnDropCallBack(GLFWwindow *window, int path_count,
                 new WinToastEventHandler(""));
   };
   std::thread(delete_work, wpaths).detach();
+#endif
 }

@@ -8,10 +8,16 @@
 
 #pragma once
 
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
 #include <GL/glew.h>
+#endif
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
 #include <Windows.h>
 #include <shellapi.h>
+#endif
 #include <atomic>
 #include <condition_variable>
 
@@ -86,7 +92,7 @@ class LAppDelegate {
   void OnWindowPosCallBack(GLFWwindow *window, int x, int y);
 
   // 修改glfw添加的新CallBack，用于响应托盘事件
-  void OnTrayClickCallBack(GLFWwindow *window, int b, WPARAM w);
+  void OnTrayClickCallBack(GLFWwindow *window, int b, uintptr_t w);
 
   /**
    * @brief シェーダーを登録する。
@@ -208,8 +214,10 @@ class LAppDelegate {
   Csm::CubismFramework::Option _cubismOption;  ///< Cubism SDK Option
   GLFWwindow *_window;                         ///< OpenGL ウィンドウ
   LAppView *_view;                             ///< View情報
+#ifdef _WIN32
   HWND _setHwnd;
   HWND _mainHwnd;
+#endif
   bool _captured;  ///< クリックしているか
   bool _menu_captured = false;
   float _mouseX;   ///< マウスX座標
@@ -217,7 +225,7 @@ class LAppDelegate {
   float _pX;
   float _pY;
   double _cX, _cY;
-  bool _isEnd;  ///< APP終了しているか
+  std::atomic_bool _isEnd;  ///< APP終了しているか
   bool _isShowing = true;
   bool _isLive;
   int _mWidth, _mHeight;
@@ -225,9 +233,11 @@ class LAppDelegate {
   std::vector<std::string> _followlist;
   AudioManager *_au;
   UserStateManager *_us;
+#ifdef _WIN32
   NOTIFYICONDATA nid;
+#endif
 
-  GamePanel *_panel;
+  GamePanel *_panel = nullptr;
 
   LAppTextureManager *_textureManager;  ///< テクスチャマネージャー
 
@@ -241,9 +251,11 @@ class LAppDelegate {
   int _windowWidth;   ///< Initialize関数で設定したウィンドウ幅
   int _windowHeight;  ///< Initialize関数で設定したウィンドウ高さ
 
+#ifdef _WIN32
   HICON appIcon;
+#endif
 
-  atomic_bool _need_snapshot;
+  atomic_bool _need_snapshot{false};
   std::mutex _mtx;
   std::condition_variable _cv;
 
@@ -275,7 +287,7 @@ class EventHandler {
   static void OnWindowPosCallBack(GLFWwindow *window, int x, int y) {
     LAppDelegate::GetInstance()->OnWindowPosCallBack(window, x, y);
   }
-  static void OnTrayClickCallBack(GLFWwindow *window, int b, WPARAM w) {
+  static void OnTrayClickCallBack(GLFWwindow *window, int b, uintptr_t w) {
     LAppDelegate::GetInstance()->OnTrayClickCallBack(window, b, w);
   }
 };

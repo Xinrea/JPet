@@ -11,13 +11,14 @@ class PanelServer {
   std::condition_variable _cv;
   std::atomic_int _messageId = 0;
   std::thread worker_;
+  std::atomic_bool _stopping{false};
 
 
   PanelServer() { server = new httplib::Server(); };
 
   void initSSE();
 
-  void DataSinkHandle(httplib::DataSink& sink);
+  bool DataSinkHandle(httplib::DataSink& sink);
 
   void doServe();
 
@@ -30,11 +31,12 @@ class PanelServer {
   }
 
   ~PanelServer() {
-    server->stop();
+    Stop();
     delete server;
   }
 
   void Start();
+  void Stop();
 
   void Notify(const std::string& message);
 };

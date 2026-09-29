@@ -31,20 +31,40 @@ set(FRAMEWORK_PATH ${SDK_ROOT_PATH}/Framework)
 # Set project.
 project(${APP_NAME} CXX)
 
-set(GLEW_USE_STATIC_LIBS OFF)
+if(APPLE)
+  enable_language(OBJCXX)
+  set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "JPet supports Apple Silicon only")
+  if(NOT CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
+    message(FATAL_ERROR "macOS builds support arm64 only; use -DCMAKE_OSX_ARCHITECTURES=arm64")
+  endif()
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
+endif()
+
+if(APPLE)
+  set(GLEW_USE_STATIC_LIBS ON)
+else()
+  set(GLEW_USE_STATIC_LIBS OFF)
+endif()
 
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(GLEW REQUIRED)
-find_package(unofficial-wintoast CONFIG REQUIRED)
 find_package(httplib CONFIG REQUIRED)
 find_package(Stb REQUIRED)
-find_package(unofficial-webview2 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(cpr CONFIG REQUIRED)
 find_package(cryptopp CONFIG REQUIRED)
 find_package(croncpp CONFIG REQUIRED)
 find_package(semver CONFIG REQUIRED)
+find_path(TOMLPLUSPLUS_INCLUDE_DIR toml++/toml.hpp REQUIRED)
+if(WIN32)
+  find_package(unofficial-wintoast CONFIG REQUIRED)
+  find_package(unofficial-webview2 CONFIG REQUIRED)
+elseif(APPLE)
+  find_package(RocksDB CONFIG REQUIRED)
+else()
+  message(FATAL_ERROR "Supported platforms: Windows and macOS arm64")
+endif()
 
 # Set Visual Studio startup project.
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${APP_NAME})
@@ -73,7 +93,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Detect architecture.
-if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+if(APPLE)
+  set(ARCH arm64)
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
   set(ARCH x86_64)
   set(FMOD_ARCH x64)
 elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64")
@@ -90,7 +112,12 @@ endif()
 # Import as static library.
 add_library(Live2DCubismCore STATIC IMPORTED)
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+if(APPLE)
+  set_target_properties(Live2DCubismCore PROPERTIES
+    IMPORTED_LOCATION "${CORE_PATH}/lib/macos/arm64/libLive2DCubismCore.a"
+    INTERFACE_INCLUDE_DIRECTORIES "${CORE_PATH}/include"
+  )
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   message(NOTICE "Using MSVC")
 
   if(CORE_CRL_MD)
@@ -126,7 +153,9 @@ endif()
 # Add GLEW ,GLFW.
 add_subdirectory(${GLFW_PATH} ${CMAKE_CURRENT_BINARY_DIR}/glfw)
 
-add_subdirectory(${ROCKSDB_PATH} ${CMAKE_CURRENT_BINARY_DIR}/rocksdb)
+if(WIN32)
+  add_subdirectory(${ROCKSDB_PATH} ${CMAKE_CURRENT_BINARY_DIR}/rocksdb)
+endif()
 
 # Specify Cubism Framework rendering.
 set(FRAMEWORK_SOURCE OpenGL)
@@ -135,20 +164,40 @@ set(FRAMEWORK_SOURCE OpenGL)
 add_subdirectory(${FRAMEWORK_PATH})
 
 # Add rendering definition to framework.
-target_compile_definitions(Framework PUBLIC CSM_TARGET_WIN_GL)
+if(APPLE)
+  target_compile_definitions(Framework PUBLIC CSM_TARGET_MAC_GL CSM_TARGET_COCOS GL_SILENCE_DEPRECATION)
+else()
+  target_compile_definitions(Framework PUBLIC CSM_TARGET_WIN_GL)
+endif()
 
 # Add include path of GLEW to framework.
-target_include_directories(Framework PUBLIC ${GLEW_PATH}/include)
+if(NOT APPLE)
+  target_include_directories(Framework PUBLIC ${GLEW_PATH}/include)
+endif()
 
 # Link libraries to framework.
-target_link_libraries(Framework Live2DCubismCore GLEW::GLEW)
+target_link_libraries(Framework Live2DCubismCore)
+if(NOT APPLE)
+  target_link_libraries(Framework GLEW::GLEW)
+endif()
 
 # Find opengl libraries.
 find_package(OpenGL REQUIRED)
 
 # Make executable app.
 # if Release, should use WIN32 to hide console window.
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
+if(APPLE)
+  add_executable(${APP_NAME} MACOSX_BUNDLE)
+  set_target_properties(${APP_NAME} PROPERTIES
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist.in"
+    MACOSX_BUNDLE_BUNDLE_NAME "${APP_NAME}"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "cn.vjoi.jpet"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${JVERSION}"
+    OBJCXX_STANDARD 17
+    OBJCXX_STANDARD_REQUIRED YES
+  )
+  target_compile_options(${APP_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
   add_executable(${APP_NAME} WIN32)
 else()
   add_executable(${APP_NAME})
@@ -157,86 +206,77 @@ endif()
 # Add source files.
 add_subdirectory(src)
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
-set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
+if(MSVC)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
+  set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
+  set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
+endif()
 
 # Link libraries to app.
 target_link_libraries(${APP_NAME}
+  PRIVATE
   Framework
-  GLEW::GLEW
   OpenSSL::SSL
   OpenSSL::Crypto
-  unofficial::wintoast::wintoast
   httplib::httplib
   glfw
-  fmod_vc
-  unofficial::webview2::webview2
   nlohmann_json::nlohmann_json
   cpr::cpr
   cryptopp::cryptopp
   croncpp::croncpp
   semver::semver
-  rocksdb
-  Dbghelp
-
-  # Solve the MSVCRT confliction if using MSVC.
-  debug -NODEFAULTLIB:libcmtd.lib
-  optimized -NODEFAULTLIB:libcmt.lib
+  Threads::Threads
+  OpenGL::GL
 )
 
 # Specify include directories.
-target_include_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/inc ${GLEW_INCLUDE_DIRS} ${Stb_INCLUDE_DIR})
-target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/ ${GLEW_LIBRARIES})
+target_include_directories(${APP_NAME} PRIVATE ${GLEW_INCLUDE_DIRS} ${Stb_INCLUDE_DIR} ${TOMLPLUSPLUS_INCLUDE_DIR})
+if(APPLE)
+  target_link_libraries(${APP_NAME} PRIVATE RocksDB::rocksdb
+    "-framework AppKit" "-framework WebKit" "-framework AVFoundation"
+    "-framework Foundation" "-framework UserNotifications")
+else()
+  target_link_libraries(${APP_NAME} PRIVATE GLEW::GLEW)
+  target_include_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/inc)
+  target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/)
+  target_link_libraries(${APP_NAME} PRIVATE rocksdb fmod_vc Dbghelp
+    unofficial::wintoast::wintoast unofficial::webview2::webview2)
+endif()
 
 # Build in multi-process.
-target_compile_options(${APP_NAME} PRIVATE /MP)
+if(MSVC)
+  target_compile_options(${APP_NAME} PRIVATE /MP)
+  target_link_libraries(${APP_NAME} PRIVATE
+    debug -NODEFAULTLIB:libcmtd.lib optimized -NODEFAULTLIB:libcmt.lib)
+endif()
 
 # Copy resource directory to build directory, except for panel
 
-make_directory(${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}/resources/panel)
+if(APPLE)
+  set(APP_RESOURCES "$<TARGET_BUNDLE_CONTENT_DIR:${APP_NAME}>/Resources/resources")
+else()
+  set(APP_RESOURCES "$<TARGET_FILE_DIR:${APP_NAME}>/resources")
+endif()
+if(NOT EXISTS "${RES_PATH}/panel/dist/index.html")
+  message(FATAL_ERROR "Build the settings panel first: cd resources/panel && npm ci && npm run build")
+endif()
 
-add_custom_command(
-  TARGET ${APP_NAME}
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RES_PATH}/logo.ico $<TARGET_FILE_DIR:${APP_NAME}>/resources/logo.ico
-)
-
-add_custom_command(
-  TARGET ${APP_NAME}
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/audios $<TARGET_FILE_DIR:${APP_NAME}>/resources/audios
-)
-
-add_custom_command(
-  TARGET ${APP_NAME}
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/imgs $<TARGET_FILE_DIR:${APP_NAME}>/resources/imgs
-)
-
-add_custom_command(
-  TARGET ${APP_NAME}
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/circle-menu $<TARGET_FILE_DIR:${APP_NAME}>/resources/circle-menu
-)
-
-add_custom_command(
-  TARGET ${APP_NAME}
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/joi $<TARGET_FILE_DIR:${APP_NAME}>/resources/joi
-)
-
-add_custom_command(
-  TARGET ${APP_NAME}
-  POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory ${RES_PATH}/panel/dist $<TARGET_FILE_DIR:${APP_NAME}>/resources/panel/dist
-)
-
-
-add_custom_command(TARGET ${APP_NAME} POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-  "${FMOD_PATH}/core/lib/${FMOD_ARCH}/fmod.dll"
-  $<TARGET_FILE_DIR:${APP_NAME}>)
+foreach(DIRECTORY audios imgs circle-menu joi panel/dist)
+  string(REPLACE "/" "_" DIRECTORY_TARGET "${DIRECTORY}")
+  add_custom_target(${APP_NAME}_resource_${DIRECTORY_TARGET} ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${APP_RESOURCES}/${DIRECTORY}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${RES_PATH}/${DIRECTORY}" "${APP_RESOURCES}/${DIRECTORY}"
+    VERBATIM)
+  add_dependencies(${APP_NAME} ${APP_NAME}_resource_${DIRECTORY_TARGET})
+endforeach()
+if(WIN32)
+  add_custom_target(${APP_NAME}_resource_logo ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${RES_PATH}/logo.ico" "${APP_RESOURCES}/logo.ico"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${FMOD_PATH}/core/lib/${FMOD_ARCH}/fmod.dll" $<TARGET_FILE_DIR:${APP_NAME}>)
+  add_dependencies(${APP_NAME} ${APP_NAME}_resource_logo)
+endif()
 
 # Set project properties.
 set_target_properties(${APP_NAME} PROPERTIES

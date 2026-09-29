@@ -6,6 +6,8 @@
 #include <optional>
 #include <map>
 #include <mutex>
+#include <atomic>
+#include <condition_variable>
 
 #include "StateMessage.hpp"
 #include "UserStateWatcher.h"
@@ -13,7 +15,9 @@
 #include "LAppDefine.hpp"
 #include "DataManager.hpp"
 #include "Wbi.hpp"
+#ifndef __APPLE__
 #include "wintoastlib.h"
+#endif
 #include "WinToastEventHandler.h"
 
 using std::queue;
@@ -26,11 +30,17 @@ class UserStateManager {
         _liveNotifyEnabled(liveNotifyEnabled) {}
   ~UserStateManager() {
     _running = false;
-    _mutex.lock();
+    _wake.notify_all();
+    if (_checkThread.joinable()) _checkThread.join();
+    std::lock_guard<std::mutex> lock(_mutex);
     _watchers.clear();
-    _mutex.unlock();
+    delete _cookieWindow;
   }
+#ifdef __APPLE__
+  void Init(const std::vector<std::string>& list, void* parent = nullptr);
+#else
   void Init(const std::vector<std::string>& list, HWND parent);
+#endif
 
   void AddWatcher(const std::string& uid) {
     std::lock_guard<std::mutex> lock(_mutex);
@@ -41,7 +51,7 @@ class UserStateManager {
       }
     }
     std::shared_ptr<UserStateWatcher> watcher = std::make_shared<UserStateWatcher>(uid,
-        _cookieWindow->userAgent, _wbi_config);
+        _cookieWindow->GetUserAgent(), _wbi_config);
     _watchers.push_back(watcher);
     LAppPal::PrintLog("[UserStateManager]Add watcher %s", uid.c_str());
   }
@@ -81,7 +91,7 @@ class UserStateManager {
   string FetchCookies() {
     auto cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
     if (cookies.empty()) {
-      cookies = _cookieWindow->cookie;
+      cookies = _cookieWindow->GetCookies();
     }
     return cookies;
   }
@@ -105,5 +115,12 @@ class UserStateManager {
   CookieWindow* _cookieWindow = nullptr;
 
   std::thread _checkThread;
-  bool _running = true;
+  std::atomic<bool> _running{true};
+  std::mutex _waitMutex;
+  std::condition_variable _wake;
+  bool Wait(int seconds) {
+    std::unique_lock<std::mutex> lock(_waitMutex);
+    return _wake.wait_for(lock, std::chrono::seconds(seconds),
+                          [this] { return !_running.load(); });
+  }
 };

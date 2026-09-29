@@ -1,6 +1,10 @@
 ﻿#pragma once
 
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
 #include <GL/glew.h>
+#endif
 #include <GLFW/glfw3.h>
 
 /**
@@ -51,16 +55,33 @@ class ProgressSprite {
   int target_alpha_ = 0;
   float progress_ = 0;
   GLuint shaderProgram_;
+#ifdef __APPLE__
+  const char *vertexShaderSource = "#version 120\n"
+                                   "attribute vec2 aPos;\n"
+#else
   const char *vertexShaderSource = "#version 330 core\n"
                                    "layout (location = 0) in vec2 aPos;\n"
+#endif
                                    "void main() {\n"
                                    "   gl_Position = vec4(aPos, 0.0, 1.0);\n"
                                    "}\0";
   const char *fragmentShaderSource =
+#ifdef __APPLE__
+      "#version 120\n"
+#else
       "#version 330 core\n"
+#endif
       "uniform vec4 globalColor;"
+#ifdef __APPLE__
+      "varying vec4 FragColor;\n"
+#else
       "out vec4 FragColor;\n"
+#endif
       "void main() {\n"
+#ifdef __APPLE__
+      "   gl_FragColor = globalColor;\n"
+#else
       "   FragColor = globalColor;\n"
+#endif
       "}\0";
 };

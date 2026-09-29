@@ -3,11 +3,21 @@
   "dependencies": [
     "glew",
     "openssl",
-    "wintoast",
+    {
+      "name": "wintoast",
+      "platform": "windows"
+    },
     "cpp-httplib",
     "stb",
     "tomlplusplus",
-    "webview2",
+    {
+      "name": "webview2",
+      "platform": "windows"
+    },
+    {
+      "name": "rocksdb",
+      "platform": "osx"
+    },
     "nlohmann-json",
     "cpr",
     "cryptopp",

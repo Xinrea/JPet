@@ -1,6 +1,10 @@
 ﻿#include "MenuSprite.hpp"
 #include "DataManager.hpp"
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
 #include "GL/gl.h"
+#endif
 #include "LAppDefine.hpp"
 #include "LAppTextureManager.hpp"
 #include "LAppPal.hpp"
@@ -41,6 +45,10 @@ MenuSprite::MenuSprite() {
   shaderProgram_ = glCreateProgram();
   glAttachShader(shaderProgram_, vertexShader);
   glAttachShader(shaderProgram_, fragmentShader);
+#ifdef __APPLE__
+  glBindAttribLocation(shaderProgram_, 0, "aPos");
+  glBindAttribLocation(shaderProgram_, 1, "aTexCoord");
+#endif
   glLinkProgram(shaderProgram_);
   link_checker(shaderProgram_);
 
@@ -51,30 +59,44 @@ MenuSprite::MenuSprite() {
   scaleLoc = glGetUniformLocation(shaderProgram_, "uScale");
   tranLoc = glGetUniformLocation(shaderProgram_, "uTransition");
 
+#ifdef __APPLE__
+  float vertices[] = {
+      0.75f, 0.75f, 1.0f, 0.0f, 0.75f, -0.75f, 1.0f, 1.0f,
+      -0.75f, 0.75f, 0.0f, 0.0f, 0.75f, -0.75f, 1.0f, 1.0f,
+      -0.75f, -0.75f, 0.0f, 1.0f, -0.75f, 0.75f, 0.0f, 0.0f};
+#else
   float vertices[] = {0.75f,  0.75f,  1.0f, 0.0f,
                       0.75f,  -0.75f, 1.0f, 1.0f,
                       -0.75f, -0.75f, 0.0f, 1.0f,
                       -0.75f, 0.75f,  0.0f, 0.0f};
+#endif
 
   unsigned int indices[] = {
     0, 1, 3,
     1, 2, 3
   };
 
+#ifndef __APPLE__
   GLint previousVAO;
   glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &previousVAO);
-
   glGenVertexArrays(1, &vao_);
+#endif
   glGenBuffers(1, &vbo_);
+#ifndef __APPLE__
   glGenBuffers(1, &ebo_);
+#endif
 
   // setup vao
+#ifndef __APPLE__
   glBindVertexArray(vao_);
+#endif
 
   glBindBuffer(GL_ARRAY_BUFFER, vbo_);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+#ifndef __APPLE__
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+#endif
 
   // 位置属性
   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
@@ -107,16 +129,22 @@ MenuSprite::MenuSprite() {
     glBindTexture(GL_TEXTURE_2D, icons_texture_[i]->id);
   }
   
+#ifndef __APPLE__
   glBindVertexArray(previousVAO);
+#endif
 
   LAppPal::PrintLog(LogLevel::Debug, "[MenuSprite]initialized");
 }
 
 MenuSprite::~MenuSprite() {
   texture_manager_.ReleaseTextures();
+#ifndef __APPLE__
   glDeleteVertexArrays(1, &vao_);
   glDeleteBuffers(1, &vbo_);
   glDeleteBuffers(1, &ebo_);
+#else
+  glDeleteBuffers(1, &vbo_);
+#endif
 }
 
 LAppTextureManager::TextureInfo* MenuSprite::load(std::string filename) {
@@ -160,7 +188,16 @@ void MenuSprite::Render() {
   glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   glUseProgram(shaderProgram_);
 
+#ifdef __APPLE__
+  glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                        (void*)(2 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+#else
   glBindVertexArray(vao_);
+#endif
   
   renderBg();
   
@@ -178,7 +215,11 @@ void MenuSprite::renderBg() {
   glUniform2f(tranLoc, 0, 0);
   glUniformMatrix2fv(scaleLoc, 1, GL_FALSE, scaleMatrix);
   glUniformMatrix2fv(texRotLoc, 1, GL_FALSE, dRotateMatrix);
+#ifdef __APPLE__
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+#else
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+#endif
 }
 
 void MenuSprite::renderItems() {
@@ -194,7 +235,11 @@ void MenuSprite::renderItems() {
     }
     glUniform2fv(tranLoc, 1, transitions[i]);
     glUniform1i(texLoc, 12 + icon_t);
+#ifdef __APPLE__
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+#else
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+#endif
   }
   
 }
@@ -205,5 +250,9 @@ void MenuSprite::renderMask() {
   glUniform2f(tranLoc, 0, 0);
   glUniformMatrix2fv(scaleLoc, 1, GL_FALSE, scaleMatrix);
   glUniformMatrix2fv(texRotLoc, 1, GL_FALSE, getRotateMatrix());
+#ifdef __APPLE__
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+#else
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+#endif
 }

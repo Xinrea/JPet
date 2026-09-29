@@ -17,9 +17,15 @@
 #include <iostream>
 #include <codecvt>
 #include <locale>
+#include <filesystem>
+#include <cmath>
+#ifdef _WIN32
 #include <windows.h>
 #include <commdlg.h>
 #include <ShlObj.h>
+#else
+#include "Platform.hpp"
+#endif
 
 #include "LAppDefine.hpp"
 
@@ -33,7 +39,7 @@ double LAppPal::s_deltaTime = 0.0;
 std::wfstream LAppPal::s_logFile;
 
 void LAppPal::Init() {
-  LAppPal::s_logFile = std::wfstream(documentPath + L"\\jpet.log", std::ios::out | std::ios::app);
+  LAppPal::s_logFile = std::wfstream(std::filesystem::path(documentPath) / "jpet.log", std::ios::out | std::ios::app);
 }
 
 csmByte* LAppPal::LoadFileAsBytes(const string& filePath, csmSizeInt* outSize) {
@@ -82,7 +88,7 @@ void LAppPal::PrintLog(const csmChar* format, ...) {
   va_list args;
   csmChar buf[4096];
   va_start(args, format);
-  vsnprintf_s(buf, sizeof(buf), format, args);  // 標準出力でレンダリング
+  vsnprintf(buf, sizeof(buf), format, args);
 #ifdef CSM_DEBUG_MEMORY_LEAKING
   // メモリリークチェック時は大量の標準出力がはしり重いのでprintfを利用する
   std::printf(buf);
@@ -106,12 +112,12 @@ void LAppPal::PrintLog(LogLevel level, const wchar_t* format, ...) {
   va_list args;
   wchar_t buf[4096];
   va_start(args, format);
-  vswprintf_s(buf, sizeof(buf) / sizeof(wchar_t), format, args);  // 標準出力でレンダリング
+  vswprintf(buf, sizeof(buf) / sizeof(wchar_t), format, args);
   // add time info
   time_t now = time(nullptr);
   struct tm* pnow = localtime(&now);
   wchar_t timebuf[64];
-  wcsftime(timebuf, sizeof(timebuf), L"[%Y-%m-%d %H:%M:%S]", pnow);
+  wcsftime(timebuf, sizeof(timebuf) / sizeof(wchar_t), L"[%Y-%m-%d %H:%M:%S]", pnow);
   wstring levelStr = L"[INFO]";
   if (level == LogLevel::Debug) levelStr = L"[DEBUG]";
   if (level == LogLevel::Info) levelStr = L"[INFO]";
@@ -129,7 +135,7 @@ void LAppPal::PrintLog(LogLevel level, const csmChar* format, ...) {
   va_list args;
   csmChar buf[4096];
   va_start(args, format);
-  vsnprintf_s(buf, sizeof(buf), format, args);  // 標準出力でレンダリング
+  vsnprintf(buf, sizeof(buf), format, args);
 #ifdef CSM_DEBUG_MEMORY_LEAKING
   // メモリリークチェック時は大量の標準出力がはしり重いのでprintfを利用する
   std::printf(buf);
@@ -190,6 +196,16 @@ double LAppPal::EaseOut(int x) {
 
 
 std::vector<std::wstring> LAppPal::ListFolder(const std::wstring& folder_path) {
+#ifdef __APPLE__
+  std::vector<std::wstring> result;
+  std::error_code error;
+  for (const auto& entry : std::filesystem::directory_iterator(
+           std::filesystem::path(folder_path), error)) {
+    if (entry.is_regular_file() && entry.path().extension() == ".mp3")
+      result.push_back(entry.path().filename().wstring());
+  }
+  return result;
+#else
     std::vector<std::wstring> ret;
     std::wstring searchPath = folder_path + L"\\*.mp3";
     WIN32_FIND_DATAW findData;
@@ -207,9 +223,13 @@ std::vector<std::wstring> LAppPal::ListFolder(const std::wstring& folder_path) {
         std::wcout << L"Failed to read directory." << std::endl;
     }
   return ret;
+#endif
 }
 
 bool LAppPal::BrowseFile(wstring &path) {
+#ifdef __APPLE__
+  return Platform::Browse(path, false);
+#else
   OPENFILENAME ofn; // 公共对话框结构体
   wchar_t szFile[MAX_PATH]; // 缓冲区存放文件名
 
@@ -233,9 +253,13 @@ bool LAppPal::BrowseFile(wstring &path) {
     return true;
   }
   return false;
+#endif
 }
 
 bool LAppPal::BrowseFolder(wstring &path) {
+#ifdef __APPLE__
+    return Platform::Browse(path, true);
+#else
     bool ret = false;
     BROWSEINFO bi;
     ZeroMemory(&bi, sizeof(bi));
@@ -259,4 +283,5 @@ bool LAppPal::BrowseFolder(wstring &path) {
         }
     }
     return ret;
+#endif
 }

@@ -1,10 +1,13 @@
 #pragma once
 
+#ifndef __APPLE__
 #include <windows.h>
 #include <winuser.h>
 #include <wrl.h>
 #include <wil/com.h>
 #include <webview2.h>
+#endif
+#include <memory>
 #include <string>
 
 /**
@@ -17,7 +20,11 @@ class GamePanel {
    *
    * @param[in] parent The parent window handle
    */
+#ifdef __APPLE__
+  GamePanel(void* parent = nullptr);
+#else
   GamePanel(HWND parent, HINSTANCE instance);
+#endif
 
   /**
    * @brief Destroy the GamePanel object
@@ -42,6 +49,15 @@ class GamePanel {
   /**
    * @brief Show the panel
    */
+#ifdef __APPLE__
+  void Show();
+  void ForceShow();
+  void Close();
+
+ private:
+  struct Impl;
+  std::shared_ptr<Impl> _impl;
+#else
   void Show() { 
     if (IsWindowVisible(_window)) {
       ShowWindow(_window, SW_HIDE); 
@@ -68,4 +84,5 @@ class GamePanel {
   wil::com_ptr<ICoreWebView2> webview;
 
   void WindowProc();
+#endif
 };

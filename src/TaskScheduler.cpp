@@ -7,12 +7,15 @@ TaskScheduler::TaskScheduler() {
 }
 
 TaskScheduler::~TaskScheduler() {
-  _running = false;
+  Stop();
   _mutex.lock();
   _tasks.clear();
   _mutex.unlock();
-  // wait for worker thread
-  _worker.join();
+}
+
+void TaskScheduler::Stop() {
+  _running = false;
+  if (_worker.joinable()) _worker.join();
 }
 
 void TaskScheduler::AddTask(std::shared_ptr<Task> task) {

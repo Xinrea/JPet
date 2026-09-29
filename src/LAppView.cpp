@@ -106,13 +106,17 @@ void LAppView::Render() {
     p = min(float(now - task->start_time) / task->cost_snapshot, 1.0f);
   }
   task_progress_->UpdateProgress(p);
+#ifndef __APPLE__
   // save vao
   GLint previousVAO;
   glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &previousVAO);
+#endif
   task_progress_->Render();
   _menu->Render();
+#ifndef __APPLE__
   // restore vao
   glBindVertexArray(previousVAO);
+#endif
 }
 
 void LAppView::InitializeSprite() {

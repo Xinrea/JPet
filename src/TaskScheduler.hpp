@@ -2,6 +2,9 @@
 
 #include <memory>
 #include <mutex>
+#include <atomic>
+#include <thread>
+#include <chrono>
 
 #include "Task.hpp"
 
@@ -21,13 +24,14 @@ class TaskScheduler {
 
     void AddTask(std::shared_ptr<Task> task);
     void RemoveTask(std::shared_ptr<Task> task);
+    void Stop();
 
   private:
     TaskScheduler();
     std::vector<std::shared_ptr<Task>> _tasks;
     std::mutex _mutex;
     std::thread _worker;
-    bool _running = true;
+    std::atomic_bool _running{true};
     void doRun();
     void tick();
 };
