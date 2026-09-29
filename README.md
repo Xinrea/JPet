@@ -32,6 +32,14 @@ open build/macos-arm64/bin/JPet/JPet.app
 ./build-scripts/build_and_run_macos.sh
 ```
 
+如果是第一次在本机设置开发环境，可以先运行准备脚本。它会自动检查工具、
+下载并初始化 vcpkg、安装前端依赖和 C++ 依赖：
+
+```sh
+./.agent/prepare
+./build-scripts/build_and_run_macos.sh
+```
+
 脚本默认使用 `build/vcpkg` 和 `build/vcpkg_installed`。如果 vcpkg 位于其他位置，
 可以通过环境变量覆盖：
 

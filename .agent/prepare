@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Prepare the local macOS arm64 build environment for JPet.
+# Run this script from any directory inside the repository.
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VCPKG_DIR="${VCPKG_DIR:-${ROOT_DIR}/build/vcpkg}"
+VCPKG_INSTALLED_DIR="${VCPKG_INSTALLED_DIR:-${ROOT_DIR}/build/vcpkg_installed}"
+
+die() {
+  echo "Error: $*" >&2
+  exit 1
+}
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  die "JPet's macOS build must be prepared on macOS."
+fi
+
+if [[ "$(uname -m)" != "arm64" ]]; then
+  die "JPet's macOS build supports Apple Silicon (arm64) only."
+fi
+
+missing_tools=()
+for tool in git cmake ninja node npm; do
+  if ! command_exists "${tool}"; then
+    missing_tools+=("${tool}")
+  fi
+done
+
+if (( ${#missing_tools[@]} > 0 )); then
+  echo "Missing required tools: ${missing_tools[*]}" >&2
+  if command_exists brew; then
+    echo "Install them with:" >&2
+    echo "  brew install cmake ninja node" >&2
+  else
+    echo "Install Homebrew from https://brew.sh, then run:" >&2
+    echo "  brew install cmake ninja node" >&2
+  fi
+  exit 1
+fi
+
+mkdir -p "${ROOT_DIR}/build"
+
+if [[ ! -x "${VCPKG_DIR}/vcpkg" ]]; then
+  if [[ -e "${VCPKG_DIR}" && ! -d "${VCPKG_DIR}/.git" ]]; then
+    die "${VCPKG_DIR} exists but is not a vcpkg checkout. Set VCPKG_DIR to another path or remove it."
+  fi
+
+  if [[ ! -d "${VCPKG_DIR}/.git" ]]; then
+    echo "Cloning vcpkg..."
+    git clone https://github.com/microsoft/vcpkg.git "${VCPKG_DIR}"
+  fi
+
+  echo "Bootstrapping vcpkg..."
+  "${VCPKG_DIR}/bootstrap-vcpkg.sh" -disableMetrics
+fi
+
+echo "Installing panel dependencies..."
+(cd "${ROOT_DIR}/resources/panel" && npm ci --legacy-peer-deps --no-audit --no-fund)
+
+echo "Installing C++ dependencies..."
+"${VCPKG_DIR}/vcpkg" install \
+  --triplet arm64-osx \
+  --x-install-root="${VCPKG_INSTALLED_DIR}" \
+  --disable-metrics
+
+cat <<EOF
+
+JPet is prepared for macOS arm64.
+Build and run it with:
+  ${ROOT_DIR}/build-scripts/build_and_run_macos.sh
+EOF
