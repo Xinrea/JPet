@@ -1,34 +1,24 @@
 <script>
   export let value = 0;
   export let max = 100;
-
-  $: progressPath = () => {
-    if (value <= 0) {
-      return "";
-    } else if (value >= max) {
-      return "M50,5A45 45 0 1 1 49.9999 5";
-    } else {
-      const angle = Math.PI * 2 * (value / max);
-      const x = 50 + Math.cos(angle - Math.PI / 2) * 45;
-      const y = 50 + Math.sin(angle - Math.PI / 2) * 45;
-
-      let path = "M50,5";
-
-      if (angle > Math.PI) {
-        path += "A45 45 0 0 1 50 95";
-      }
-
-      path += `A45 45 0 0 1 ${x} ${y}`;
-
-      return path;
-    }
-  };
+  const circumference = 2 * Math.PI * 45;
+  $: progress = Math.min(max, Math.max(0, Number(value) || 0));
+  $: progressRatio = max > 0 ? progress / max : 0;
+  $: progressOffset = circumference * (1 - progressRatio);
 </script>
 
 <div>
   <svg viewBox="0 0 100 100">
-    <path d="M50,5A45 45 0 1 1 49.9999 5" />
-    <path d={progressPath()} />
+    <circle class="progress-track" cx="50" cy="50" r="45" />
+    <circle
+      fill="none"
+      class="progress-value"
+      cx="50"
+      cy="50"
+      r="45"
+      stroke-dasharray={circumference}
+      style={`stroke-dashoffset: ${progressOffset};`}
+    />
   </svg>
   <div>
     <slot>
@@ -45,13 +35,17 @@
     stroke-linecap: var(--progress-linecap, round);
     width: 100%;
   }
-  path:first-child {
+  .progress-track {
+    fill: none;
     stroke: var(--progress-trackcolor, grey);
     stroke-width: var(--progress-trackwidth, 9px);
   }
-  path:last-child {
+  .progress-value {
     stroke: var(--progress-color, #79ca2e);
     stroke-width: var(--progress-width, 10px);
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dashoffset 60ms linear;
   }
   div {
     height: 100%;

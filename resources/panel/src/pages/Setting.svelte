@@ -17,6 +17,7 @@
   import QRCode from "qrcode";
   import fanAvatar from "../assets/fan.png";
   import { sse } from "../sse.js";
+  import { onDestroy } from "svelte";
   // audio
   let _volume = "20";
   let _mute = false;
@@ -83,19 +84,8 @@
         _track = data.track;
         _dropfile = data.dropfile;
       });
-    setTimeout(() => {
-      fetch("/api/account")
-        .then((res) => res.json())
-        .then((data) => {
-          account_info = data;
-        });
-    }, 1000);
-    setInterval(async () => {
-      const res = await fetch("/api/account");
-      if (res.status == 200) {
-        account_info = await res.json();
-      }
-    }, 10 * 1000);
+    account_initial_timer = setTimeout(() => loadAccount(), 1000);
+    account_refresh_timer = setInterval(() => loadAccount(), 10 * 1000);
     sse.subscribe((e) => {
       if (!e) {
         return;
@@ -217,50 +207,166 @@
   // acount
   export let account_info = null;
   let account_modal = false;
+  let account_error = "";
+  let qr_status = "等待扫码";
+  let qr_error = "";
   let status_checker = null;
-  async function doLogin() {
-    const qr_info = await (await fetch("/api/account/qr")).json();
-    var canvas = document.getElementById("qrcode");
-    QRCode.toCanvas(canvas, qr_info.url, (e) => {
-      if (e) {
-        console.error("Create QRCode failed", e);
-      } else {
-        console.log("QRCode updated");
-      }
-    });
-    // release previous checker
-    if (status_checker) {
-      clearInterval(status_checker);
+  let status_controller = null;
+  let login_generation = 0;
+  let account_refresh_timer = null;
+  let account_initial_timer = null;
+  let account_load_controller = null;
+  let account_load_generation = 0;
+  let qr_key = "";
+
+  function invalidateAccountLoads() {
+    account_load_generation += 1;
+    if (account_load_controller) {
+      account_load_controller.abort();
+      account_load_controller = null;
     }
-    status_checker = setInterval(async () => {
-      const res = await (await fetch("/api/account/qr-status")).json();
-      if (res.success) {
-        clearInterval(status_checker);
-        account_modal = false;
-        console.log("account confirmed");
-        fetch("/api/account")
-          .then((res) => res.json())
-          .then((data) => {
-            account_info = data;
-          });
+  }
+
+  async function loadAccount() {
+    const generation = account_load_generation;
+    if (account_load_controller) account_load_controller.abort();
+    const controller = new AbortController();
+    account_load_controller = controller;
+    try {
+      const res = await fetch("/api/account", { signal: controller.signal });
+      const data = await res.json();
+      if (generation !== account_load_generation) return;
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      account_info = data;
+      account_error = "";
+    } catch (e) {
+      if (e.name === "AbortError" || generation !== account_load_generation) {
         return;
       }
-      // if qrcode is closed, there is no need to check
-      if (!account_modal) {
-        clearInterval(status_checker);
+      console.error("Account refresh failed", e);
+      account_error = `账号信息获取失败：${e.message || "网络错误"}`;
+    } finally {
+      if (account_load_controller === controller) {
+        account_load_controller = null;
       }
-    }, 2000);
+    }
+  }
+
+  function stopQrPolling() {
+    login_generation += 1;
+    if (status_checker) {
+      clearTimeout(status_checker);
+      status_checker = null;
+    }
+    if (status_controller) {
+      status_controller.abort();
+      status_controller = null;
+    }
+  }
+
+  async function pollQr(generation) {
+    if (!account_modal || generation !== login_generation) return;
+    const controller = new AbortController();
+    status_controller = controller;
+    try {
+      const res = await fetch(
+        `/api/account/qr-status?qrcode_key=${encodeURIComponent(qr_key)}`,
+        { signal: controller.signal },
+      );
+      const data = await res.json();
+      if (!account_modal || generation !== login_generation) return;
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (data.success) {
+        qr_status = "登录成功，正在刷新账号信息…";
+        invalidateAccountLoads();
+        const accountRes = await fetch("/api/account");
+        const accountData = await accountRes.json();
+        if (!accountRes.ok) throw new Error(accountData.error || `HTTP ${accountRes.status}`);
+        if (generation !== login_generation) return;
+        account_info = accountData;
+        account_error = "";
+        account_modal = false;
+        return;
+      }
+      if (data.code === 86038) {
+        qr_status = "二维码已过期，请点击重试";
+        login_generation += 1;
+        return;
+      }
+      qr_status = data.code === 86090 ? "已扫码，请在手机上确认登录" : "等待扫码";
+    } catch (e) {
+      if (e.name === "AbortError" || generation !== login_generation) return;
+      qr_error = `登录状态获取失败：${e.message || "网络错误"}`;
+      qr_status = "";
+      return;
+    } finally {
+      if (status_controller === controller) status_controller = null;
+    }
+    if (account_modal && generation === login_generation) {
+      status_checker = setTimeout(() => pollQr(generation), 2000);
+    }
+  }
+
+  async function doLogin() {
+    stopQrPolling();
+    const generation = login_generation;
+    qr_status = "正在生成二维码…";
+    qr_error = "";
+    try {
+      const res = await fetch("/api/account/qr");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      qr_key = data.key || "";
+      if (!qr_key) throw new Error("二维码缺少登录标识");
+      if (!account_modal || generation !== login_generation) return;
+      const canvas = document.getElementById("qrcode");
+      await QRCode.toCanvas(canvas, data.url);
+      if (!account_modal || generation !== login_generation) return;
+      qr_status = "等待扫码";
+      pollQr(generation);
+    } catch (e) {
+      if (generation !== login_generation) return;
+      qr_status = "";
+      qr_error = `二维码生成失败：${e.message || "网络错误"}`;
+    }
   }
   async function logout() {
-    fetch("/api/account", { method: "DELETE" });
+    invalidateAccountLoads();
+    try {
+      const res = await fetch("/api/account", { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      account_info = { login: false, info: { confirm: false } };
+      account_error = "";
+    } catch (e) {
+      account_error = `注销失败：${e.message || "网络错误"}`;
+    }
   }
   init();
+  onDestroy(() => {
+    stopQrPolling();
+    if (account_refresh_timer) clearInterval(account_refresh_timer);
+    if (account_initial_timer) clearTimeout(account_initial_timer);
+    invalidateAccountLoads();
+  });
+  $: if (!account_modal) stopQrPolling();
 </script>
 
 <Modal bind:open={account_modal} on:open={doLogin}>
   <div class="flex justify-center">
     <canvas id="qrcode" />
   </div>
+  {#if qr_status}<p class="mt-3 text-center">{qr_status}</p>{/if}
+  {#if qr_error}
+    <p class="mt-3 text-center text-red-600">{qr_error}</p>
+    <div class="mt-3 flex justify-center">
+      <Button on:click={doLogin}>重试</Button>
+    </div>
+  {:else if qr_status === "二维码已过期，请点击重试"}
+    <div class="mt-3 flex justify-center">
+      <Button on:click={doLogin}>重新生成二维码</Button>
+    </div>
+  {/if}
 </Modal>
 <P class="mb-4">账号设置</P>
 {#if account_info && account_info.login}
@@ -295,6 +401,7 @@
     >注销登录</a
   >
 {/if}
+{#if account_error}<p class="mt-2 text-sm text-red-600">{account_error}</p>{/if}
 <Hr />
 <P class="mb-4">音频设置</P>
 <Toggle class="mb-2" bind:checked={_mute} on:change={updateAudio}>静音</Toggle>

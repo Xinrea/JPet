@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from "svelte";
   import { Tooltip, Button, Modal, Alert } from "flowbite-svelte";
   import speedIcon from "../assets/at-sp.png";
   import enduranceIcon from "../assets/at-end.png";
@@ -78,11 +79,18 @@
     "intellect",
   ].every((attr) => attributes[attr] >= 53);
 
-  // current time to next time point
-  let timeToNextPoint = 60 - new Date().getSeconds();
-  setInterval(() => {
-    timeToNextPoint = 60 - new Date().getSeconds();
-  }, 1000);
+  // Update the experience ring frequently enough to make the movement
+  // continuous while deriving the value from the wall clock so timer drift
+  // cannot accumulate.
+  let timeToNextPoint = 60 - (Date.now() / 1000) % 60;
+  onMount(() => {
+    const updateTimeToNextPoint = () => {
+      timeToNextPoint = 60 - (Date.now() / 1000) % 60;
+    };
+    updateTimeToNextPoint();
+    const timer = setInterval(updateTimeToNextPoint, 50);
+    return () => clearInterval(timer);
+  });
 
   // modal
   let addModal = false;
@@ -247,16 +255,16 @@
         {#if starcnt > 0}
           <div class="justify-center flex">
             {#each { length: Math.floor(starcnt / 5) } as _, i}
-              <img style="height: 28px;" alt="" src={crownIcon} />
+              <img class="rank-icon" alt="" src={crownIcon} />
             {/each}
           </div>
           <div class="justify-center flex">
             {#each { length: starcnt % 5 } as _, i}
-              <img style="height: 28px;" alt="" src={starIcon} />
+              <img class="rank-icon" alt="" src={starIcon} />
             {/each}
           </div>
         {:else}
-          <img style="height: 28px;" alt="" src={starOutlineIcon} />
+          <img class="rank-icon" alt="" src={starOutlineIcon} />
         {/if}
       </a>
       <Tooltip>经验获取量提升，任务成功率降低</Tooltip>
@@ -339,6 +347,13 @@
     visibility: hidden;
     width: 1.2rem;
     cursor: pointer;
+  }
+
+  .rank-icon {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex: 0 0 28px;
   }
 
   td:hover .icon-button {
