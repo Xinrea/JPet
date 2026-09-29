@@ -1,0 +1,2 @@
+# Share the vcpkg checkout between Delta workspaces on this machine.
+build/vcpkg

@@ -36,12 +36,14 @@ open build/macos-arm64/bin/JPet/JPet.app
 下载并初始化 vcpkg、安装前端依赖和 C++ 依赖：
 
 ```sh
-./.agent/prepare
+./.agents/prepare
 ./build-scripts/build_and_run_macos.sh
 ```
 
-脚本默认使用 `build/vcpkg` 和 `build/vcpkg_installed`。如果 vcpkg 位于其他位置，
-可以通过环境变量覆盖：
+`.agents/linked` 会将 `build/vcpkg` 链接到本机的共享目录，因此多个 Delta
+工作区不会重复保存 vcpkg。首次使用时如果共享目录还没有 vcpkg，准备脚本会自动
+下载并初始化；之后的工作区会复用同一份 checkout。脚本默认使用
+`build/vcpkg` 和 `build/vcpkg_installed`。如果 vcpkg 位于其他位置，可以通过环境变量覆盖：
 
 ```sh
 VCPKG_DIR=/path/to/vcpkg \
