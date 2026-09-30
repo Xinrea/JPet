@@ -356,13 +356,19 @@ void PanelServer::doServe() {
         return;
       }
       const auto level = json.value("level", std::string{"error"});
-      if (level == "warn") {
+      if (level == "debug") {
+        LAppPal::PrintLog(LogLevel::Debug, "[WebView] %s", message.c_str());
+      } else if (level == "info") {
+        LAppPal::PrintLog(LogLevel::Info, "[WebView] %s", message.c_str());
+      } else if (level == "warn") {
         LAppPal::PrintLog(LogLevel::Warn, "[WebView] %s", message.c_str());
       } else {
         LAppPal::PrintLog(LogLevel::Error, "[WebView] %s", message.c_str());
       }
       res.status = 204;
-    } catch (const std::exception &) {
+    } catch (const std::exception &e) {
+      LAppPal::PrintLog(LogLevel::Warn, "[WebView]Invalid log payload: %s",
+                        e.what());
       res.status = 400;
     }
   });

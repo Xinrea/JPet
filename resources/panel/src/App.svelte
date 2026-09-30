@@ -8,6 +8,7 @@
   import Rank from "./pages/Rank.svelte";
   import { Indicator } from "flowbite-svelte";
   import { sse } from "./sse.js";
+  import { reportFrontend, reportFrontendError } from "./logger.js";
 
   let activeTab = 0;
   let tabs = [
@@ -40,14 +41,27 @@
   // fetch current status
   function updateProfile() {
     fetch("/api/profile")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`profile request failed: HTTP ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
         clothes = data.clothes;
         attributes = data.attributes;
         expdiff = data.expdiff;
         buffs = data.buffs;
         starcnt = data.starcnt;
-        console.log(data);
+        reportFrontend("info", "[App] profile loaded", {
+          exp: attributes.exp,
+          expdiff,
+          starcnt,
+          buffCount: buffs.length,
+        });
+      })
+      .catch((error) => {
+        reportFrontendError("[App] profile request failed", error);
       });
   }
 

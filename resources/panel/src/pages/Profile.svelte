@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { reportFrontend } from "../logger.js";
   import { Tooltip, Button, Modal, Alert } from "flowbite-svelte";
   import speedIcon from "../assets/at-sp.png";
   import enduranceIcon from "../assets/at-end.png";
@@ -84,11 +85,41 @@
   // cannot accumulate.
   let timeToNextPoint = 60 - (Date.now() / 1000) % 60;
   onMount(() => {
+    let tickCount = 0;
+    let lastReportAt = 0;
+    const now = () =>
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    let previousTickAt = now();
     const updateTimeToNextPoint = () => {
+      const currentTime = now();
       timeToNextPoint = 60 - (Date.now() / 1000) % 60;
+      tickCount += 1;
+      if (tickCount === 1 || currentTime - lastReportAt >= 5000) {
+        reportFrontend(
+          tickCount === 1 ? "info" : "debug",
+          "[Profile] experience timer tick",
+          {
+            tickCount,
+            intervalMs: Math.round(currentTime - previousTickAt),
+            timeToNextPoint,
+            value: 60 - timeToNextPoint,
+            visibilityState: document.visibilityState,
+            hidden: document.hidden,
+          },
+        );
+        lastReportAt = currentTime;
+      }
+      previousTickAt = currentTime;
     };
     updateTimeToNextPoint();
     const timer = setInterval(updateTimeToNextPoint, 50);
+    reportFrontend("info", "[Profile] experience timer started", {
+      intervalMs: 50,
+      visibilityState: document.visibilityState,
+      hidden: document.hidden,
+    });
     return () => clearInterval(timer);
   });
 
