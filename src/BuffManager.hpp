@@ -2,16 +2,19 @@
 #include <vector>
 #include <string>
 
+#include "BilibiliDynamic.hpp"
 #include "httplib.h"
 
 // BuffManager manages buff status. buffs are stored in memory, no need to persist.
 class BuffManager {
 private:
-  time_t latest_ = 0;
   bool is_live_ = false;
   bool is_dynamic_ = false;
   bool is_guard_ = false;
   int medal_level_ = 0;
+  long long latest_dynamic_ = 0;
+  time_t dynamic_retry_at_ = 0;
+  std::shared_ptr<WbiConfig> wbi_config_;
 
   bool running_ = true;
   std::thread worker_;
@@ -56,8 +59,6 @@ public:
   bool IsMonday();
 
   bool IsBirthday();
-
-  bool IsLegacy();
 
   int MedalLevel() {
     return medal_level_;

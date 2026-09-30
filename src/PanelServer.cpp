@@ -713,9 +713,11 @@ void PanelServer::doServe() {
   server->Post("/api/config/notify", [](const httplib::Request &req,
                                         httplib::Response &res) {
     nlohmann::json json = nlohmann::json::parse(req.body);
-    DataManager::GetInstance()->UpdateNotify(json.at("live"), json.at("dynamic"), json.at("update"));
-    LAppDelegate::GetInstance()->LiveNotify = json.at("live");
+    DataManager::GetInstance()->UpdateNotify(json.at("dynamic"),
+                                             json.at("live"),
+                                             json.at("update"));
     LAppDelegate::GetInstance()->DynamicNotify = json.at("dynamic");
+    LAppDelegate::GetInstance()->LiveNotify = json.at("live");
     LAppDelegate::GetInstance()->UpdateNotify = json.at("update");
   });
   server->Put("/api/config/notify", [](const httplib::Request &req,

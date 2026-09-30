@@ -221,17 +221,6 @@ class GameData {
     return db != nullptr;
   }
 
-  void Drop() {
-    rocksdb::Slice start("");
-    rocksdb::Slice end("\xFF");
-    auto status = db->DeleteRange(writeOptions, db->DefaultColumnFamily(), start, end);
-    if (!status.ok()) {
-      LAppPal::PrintLog(LogLevel::Error, "[GameData]Drop db failed: %d", status.code());
-      return;
-    }
-    LAppPal::PrintLog(LogLevel::Info, "[GameData]Database dropped");
-  }
-
   void Update(const std::string& key, int32_t value) {
     auto status = db->Put(writeOptions, key, std::string(reinterpret_cast<char*>(&value), sizeof(int32_t)));
     if (!status.ok()) {

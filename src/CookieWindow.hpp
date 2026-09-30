@@ -74,8 +74,6 @@ class CookieWindow {
    */
   bool IsVisible();
 
-  void UpdateCookie();
-
 #ifdef __APPLE__
  private:
   struct Impl;

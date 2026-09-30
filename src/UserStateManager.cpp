@@ -99,7 +99,15 @@ void UserStateManager::Init(const std::vector<std::string>& list, HWND parent) {
   WinToast::instance()->initialize();
 #endif
 
-  _wbi_config = Wbi::Get_wbi_key();
+  try {
+    _wbi_config = BilibiliDynamic::FetchWbiConfig(
+        DataManager::GetInstance()->GetWithDefault("cookies", ""),
+        DataManager::GetInstance()->GetWithDefault("user-agent", ""));
+  } catch (const std::exception& e) {
+    _wbi_config.reset();
+    LAppPal::PrintLog(LogLevel::Warn,
+                      "[UserStateManager]Fetch WBI key failed %s", e.what());
+  }
 
   // init cookie window
 #ifdef __APPLE__
@@ -160,6 +168,9 @@ void UserStateManager::CheckThread(const vector<string>& list) {
         if (messageInfo.type == MessageType::DynamicMessage &&
             _dynamicNotifyEnabled) {
           auto wdesc = LAppPal::StringToWString(messageInfo.extra2);
+          if (wdesc.empty()) {
+            wdesc = L"动态有更新";
+          }
           Notify(wuname + L" - 新动态", wdesc,
                  new WinToastEventHandler("https://t.bilibili.com/" +
                                           messageInfo.extra1));
@@ -168,9 +179,6 @@ void UserStateManager::CheckThread(const vector<string>& list) {
       if (status != CheckStatus::SUCCESS) {
         check_delay *= 2;
         LAppPal::PrintLog(LogLevel::Warn, "[UserStateManager]API failure make delay updated to %d", check_delay);
-        if (status == CheckStatus::RESTRICT) {
-          _cookieWindow->UpdateCookie();
-        }
       } else {
         if (check_delay >= 12) {
           check_delay /= 3;
@@ -178,9 +186,9 @@ void UserStateManager::CheckThread(const vector<string>& list) {
       }
       if (check_delay >= 60) {
 #ifdef __APPLE__
-        Platform::Alert(L"Error", L"获取动态信息失败，请在出现的窗口中点击完成可能出现的验证码，随后关闭窗口");
+        Platform::Alert(L"Error", L"获取直播信息失败，请在出现的窗口中点击完成可能出现的验证码，随后关闭窗口");
 #else
-        MessageBox(nullptr, L"获取动态信息失败，请在出现的窗口中点击完成可能出现的验证码，随后关闭窗口",
+        MessageBox(nullptr, L"获取直播信息失败，请在出现的窗口中点击完成可能出现的验证码，随后关闭窗口",
                    L"Error", MB_OK);
 #endif
         _cookieWindow->Show();

@@ -187,15 +187,6 @@ void CookieWindow::Show() {
   }
 }
 
-void CookieWindow::UpdateCookie() {
-  if (webview == nullptr) {
-    LAppPal::PrintLog("[CookieWindow]Webview is null");
-    return;
-  }
-  LAppPal::PrintLog("[CookieWindow]Try update cookies");
-  Reload();
-}
-
 CookieWindow::~CookieWindow() {
   if (_window) {
     DestroyWindow(_window);

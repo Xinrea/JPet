@@ -272,7 +272,6 @@ void CookieWindow::Reload() {
   OnMain([state = _impl] { [state->view reload]; ReadCookies(state); });
 }
 void CookieWindow::doReload() { Reload(); }
-void CookieWindow::UpdateCookie() { Reload(); }
 void CookieWindow::Show() {
   OnMain([state = _impl] { [state->view reload]; SetVisible(state, true); });
 }

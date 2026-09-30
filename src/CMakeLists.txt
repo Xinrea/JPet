@@ -30,6 +30,7 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/resource.h
   ${CMAKE_CURRENT_SOURCE_DIR}/PanelServer.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/PanelServer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/BilibiliDynamic.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GamePanel.hpp

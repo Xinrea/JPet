@@ -49,7 +49,6 @@ bool DataManager::init() {
     return false;
   }
   if (firstData) {
-    SetRaw("data.version", 1);
     AddAttribute("speed", 2);
     AddAttribute("strength", 1);
     AddAttribute("endurance", 1);
@@ -64,39 +63,6 @@ bool DataManager::init() {
     AddAttribute(attr, 0);
   }
   
-  // if legacy player
-  if (GetWithDefault("data.version", 0) == 0) {
-    // prepare some extra benefit
-    int extra = 1;
-    if (GetWithDefault("clothes.1.active", 0) > 0) {
-      extra = 2;
-    }
-    if (GetWithDefault("clothes.2.active", 0) > 0) {
-      extra = 3;
-    }
-    // save login cookies
-    auto cookies = GetWithDefault("cookies", "");
-    auto user_agent = GetWithDefault("user-agent", "");
-    // drop old data
-    gameData->Drop();
-    // apply initial
-    AddAttribute("speed", 2);
-    AddAttribute("strength", 1);
-    AddAttribute("endurance", 1);
-    AddAttribute("will", 3);
-    AddAttribute("intellect", 4);
-    // apply benefit
-    for (const auto &attr :
-         {"speed", "endurance", "strength", "will", "intellect"}) {
-      AddAttribute(attr, extra);
-    }
-    SetRaw("legacy", 1);
-    // apply login cookies
-    SetRaw("cookies", cookies);
-    SetRaw("user-agent", user_agent);
-    // set data version
-    SetRaw("data.version", 1);
-  }
   return true;
 }
 
@@ -233,8 +199,7 @@ void DataManager::GetNotify(bool *dynamic, bool *live, bool *update) {
   *update = GetConfig("notify", "update", true);
 }
 
-void DataManager::UpdateNotify(
-                               bool dynamic, bool live, bool update) {
+void DataManager::UpdateNotify(bool dynamic, bool live, bool update) {
   // update followList, dynamic, live, update in data
   initNotifySection();
   auto notifyTable = data.at("notify").as_table();
@@ -297,26 +262,23 @@ int DataManager::CurrentExpDiff() {
   int medal = BuffManager::GetInstance()->MedalLevel();
   double exp = 1 + ceil(499 * LAppPal::EaseOut(intellect + medal / 3 - 4) / 100);
   BuffManager* bf = BuffManager::GetInstance();
-  if (bf->IsDynamic()) {
+  if (bf->IsLive()) {
     exp *= 2;
   }
-  if (bf->IsLive()) {
-    exp *= 3;
+  if (bf->IsDynamic()) {
+    exp *= 1.5f;
   }
   if (bf->IsGuard()) {
-    exp *= 1.5f;
+    exp *= 1.25f;
   }
   if (bf->IsMonday()) {
-    exp *= 1.5f;
+    exp *= 1.25f;
   }
   if (bf->IsFail()) {
-    exp *= 1.5f;
+    exp *= 1.25f;
   }
   if (bf->IsBirthday()) {
-    exp *= 6;
-  }
-  if (bf->IsLegacy()) {
-    exp *= 1.2f;
+    exp *= 3.5f;
   }
   exp *= (1 + 0.1 * starcnt);
   return std::min(static_cast<int>(exp), 99999999);

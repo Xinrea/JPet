@@ -6,36 +6,31 @@
   import FailIcon from "../assets/bufficon/fail.webp";
   import MondayIcon from "../assets/bufficon/monday.webp";
   import BirthdayIcon from "../assets/bufficon/birthday.webp";
-  import LegacyIcon from "../assets/bufficon/legacy.webp";
 
   const nameToIcon = {
     live: {
       icon: LiveIcon,
-      desc: "200%经验提升<直播>",
-    },
-    guard: {
-      icon: GuardIcon,
-      desc: "50%经验提升<舰长>",
+      desc: "100%经验提升<直播>",
     },
     dynamic: {
       icon: DynamicIcon,
-      desc: "100%经验提升<动态>",
+      desc: "50%经验提升<动态>",
+    },
+    guard: {
+      icon: GuardIcon,
+      desc: "25%经验提升<舰长>",
     },
     fail: {
       icon: FailIcon,
-      desc: "50%经验提升<连败>"
+      desc: "25%经验提升<连败>"
     },
     monday: {
       icon: MondayIcon,
-      desc: "50%经验提升<周一>"
+      desc: "25%经验提升<周一>"
     },
     birthday: {
       icon: BirthdayIcon,
-      desc: "500%经验提升<生日>"
-    },
-    legacy: {
-      icon: LegacyIcon,
-      desc: "20%经验提升<内测玩家>"
+      desc: "250%经验提升<生日>"
     }
   };
 

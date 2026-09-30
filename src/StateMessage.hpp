@@ -20,8 +20,8 @@ class StateMessage {
   WatchTarget target;
   string extra1;
   string extra2;
-  StateMessage(MessageType tp, const WatchTarget& t, const string& ex1,
-               const string& ex2) {
+  StateMessage(MessageType tp, const WatchTarget& t, const string& ex1 = "",
+               const string& ex2 = "") {
     type = tp;
     target = t;
     extra1 = ex1;
