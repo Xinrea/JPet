@@ -310,7 +310,7 @@
         </div>
       </Progress>
       <Tooltip>下次增加{expdiff}点经验</Tooltip>
-      <div id="buff-ref" class="flex justify-center mt-4">
+      <div id="buff-ref" class="flex items-center justify-center mt-4">
         {#each buffs as buff}
           <BuffIcon type={buff} />
         {/each}

@@ -42,5 +42,20 @@
   export let type = "live";
 </script>
 
-<img width="24px" src={nameToIcon[type].icon} alt="" />
+<img
+  class="buff-icon"
+  width="24"
+  height="32"
+  src={nameToIcon[type].icon}
+  alt=""
+/>
 <Tooltip reference="#buff-ref" placement="bottom" arrow={false}>{nameToIcon[type].desc}</Tooltip>
+
+<style>
+  .buff-icon {
+    display: block;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 32px;
+  }
+</style>
