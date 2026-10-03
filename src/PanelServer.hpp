@@ -1,6 +1,8 @@
 #pragma once
 #include <httplib.h>
 #include <mutex>
+#include <deque>
+#include <cstdint>
 #include <nlohmann/json.hpp>
 #include "AccountAvatarCache.hpp"
 
@@ -8,9 +10,9 @@ class PanelServer {
  private:
   httplib::Server* server;
   std::mutex _mtx;
-  std::string _message;
+  std::deque<std::pair<uint64_t, std::string>> _messages;
   std::condition_variable _cv;
-  std::atomic_int _messageId = 0;
+  uint64_t _messageId = 0;
   std::thread worker_;
   std::atomic_bool _stopping{false};
   AccountAvatarCache avatarCache_;
@@ -20,7 +22,7 @@ class PanelServer {
 
   void initSSE();
 
-  bool DataSinkHandle(httplib::DataSink& sink);
+  bool DataSinkHandle(httplib::DataSink& sink, uint64_t& cursor);
 
   void doServe();
 

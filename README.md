@@ -114,6 +114,18 @@ git submodule update --init
 ## 游戏设计
 
 - [数值设计文档](doc/attributes.md)
+- [成就系统：50 个成就与解锁条件](doc/achievements.md)
+
+面板新增「成就」页面，展示收集比例、分类、解锁条件、单项进度和解锁日期，
+支持搜索、状态筛选和排序。成就会自动解锁并提示；升星或消耗属性不会撤销成就。
+旧存档按现存记录补发可确认的成就，陪伴时长和互动次数从更新后开始累计。
+
+成就条件与持久化检查（使用独立临时存档）：
+
+```sh
+bash build-scripts/test_achievements_macos.sh
+bash build-scripts/test_task_queue_macos.sh
+```
 
 ## Live2D Open Software License
 

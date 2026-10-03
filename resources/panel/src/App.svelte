@@ -6,6 +6,9 @@
   import Setting from "./pages/Setting.svelte";
   import Custom from "./pages/Custom.svelte";
   import Rank from "./pages/Rank.svelte";
+  import Achievement from "./pages/Achievement.svelte";
+  import AchievementIcon from "./components/AchievementIcon.svelte";
+  import { onDestroy } from "svelte";
   import { Indicator } from "flowbite-svelte";
   import { sse } from "./sse.js";
   import { reportFrontend, reportFrontendError } from "./logger.js";
@@ -14,6 +17,7 @@
   let tabs = [
     { name: "总览" },
     { name: "任务" },
+    { name: "成就" },
     { name: "装扮" },
     { name: "设置" },
     { name: "排行榜"},
@@ -88,7 +92,9 @@
     10 * 60 * 1000,
   );
 
-  sse.subscribe((e) => {
+  let achievementNotice = [];
+  let noticeTimer;
+  const unsubscribe = sse.subscribe((e) => {
     if (!e) {
       return;
     }
@@ -100,19 +106,30 @@
     if (e.data == "UPDATE") {
       updateProfile();
     }
+    if (e.data.startsWith("{")) {
+      try {
+        const message = JSON.parse(e.data);
+        if (message.type === "ACHIEVEMENT_UNLOCKED") {
+          achievementNotice = message.achievements;
+          clearTimeout(noticeTimer);
+          noticeTimer = setTimeout(() => achievementNotice = [], 7000);
+        }
+      } catch (error) { reportFrontendError("[App] invalid achievement event", error); }
+    }
   });
+  onDestroy(() => { unsubscribe(); clearTimeout(noticeTimer); });
 </script>
 
 <main>
   <!-- tab buttons -->
-  <div class="flex flex-row bg-white sticky top-0 z-20 shadow-md">
+  <div class="flex flex-row overflow-x-auto bg-white sticky top-0 z-20 shadow-md">
     {#each tabs as tab, index}
       <button
-        class="inline-block relative text-sm font-medium text-center disabled:cursor-not-allowed p-4 border-primary-600 dark:text-primary-500 dark:border-primary-500"
+        class="inline-block shrink-0 relative text-sm font-medium text-center disabled:cursor-not-allowed p-4 border-primary-600 dark:text-primary-500 dark:border-primary-500"
         class:active={activeTab === index}
         on:click={() => (activeTab = index)}
         >{tab.name}
-        {#if index == 5 && need_update}
+        {#if index == 6 && need_update}
           <Indicator color="red" border size="md" placement="center-right">
           </Indicator>
         {/if}
@@ -126,19 +143,30 @@
     <div class:hide={activeTab !== 1}>
       <Task {attributes} {expdiff} {starcnt} />
     </div>
-    <div class:hide={activeTab !== 2}>
+    {#if activeTab === 2}<Achievement />{/if}
+    <div class:hide={activeTab !== 3}>
       <Custom current={clothes.current} />
     </div>
-    <div class:hide={activeTab !== 3}>
+    <div class:hide={activeTab !== 4}>
       <Setting bind:account_info={account_info} />
     </div>
-    <div class:hide={activeTab !== 4}>
+    <div class:hide={activeTab !== 5}>
       <Rank {account_info} {attributes} {starcnt} />
     </div>
-    <div class:hide={activeTab !== 5}>
+    <div class:hide={activeTab !== 6}>
       <Document {latest_version} {local_version} />
     </div>
   </div>
+  {#if achievementNotice.length > 0}
+    <div class="achievement-notice" role="status" aria-live="polite">
+      <button class="notice-content" on:click={() => { activeTab = 2; achievementNotice = []; }}>
+        <strong><AchievementIcon name="trophy" size={18} /> 解锁新成就</strong>
+        <span><AchievementIcon name={achievementNotice[0].icon} size={16} /> {achievementNotice[0].title}{achievementNotice.length > 1 ? ` 等 ${achievementNotice.length} 项` : ""}</span>
+        <small>点击查看成就收藏</small>
+      </button>
+      <button class="notice-dismiss" aria-label="关闭成就提示" on:click={() => achievementNotice = []}><AchievementIcon name="close" size={18} /></button>
+    </div>
+  {/if}
 </main>
 
 <style>
@@ -149,4 +177,9 @@
   .active {
     @apply text-primary-600 border-b-2;
   }
+  .achievement-notice { position: fixed; bottom: 24px; right: 24px; z-index: 50; display: flex; max-width: calc(100vw - 48px); border: 1px solid #d4dfbf; border-radius: 14px; background: #fcfdf9; box-shadow: 0 10px 35px #33415526; color: #4d7c0f; }
+  .notice-content { display: flex; flex-direction: column; gap: 5px; padding: 16px 20px; text-align: left; font-size: 13px; }
+  .notice-content small { font-size: 11px; }
+  .notice-content strong, .notice-content span { display: flex; align-items: center; gap: 6px; }
+  .notice-dismiss { align-self: flex-start; padding: 12px; }
 </style>

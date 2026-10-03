@@ -108,7 +108,7 @@ std::string DataManager::StartTask(int id, time_t now) {
   int duration = task->GetCurrentCost();
   gameData->UpdateBatch({{prefix + "start_time", static_cast<int>(now)},
       {prefix + "success", 0}, {prefix + "status", static_cast<int>(TStatus::RUNNING)},
-      {prefix + "cost_snapshot", duration}});
+      {prefix + "cost_snapshot", duration}, {prefix + "queued", 0}});
   task->start_time = now;
   task->success = false;
   task->status = TStatus::RUNNING;
@@ -158,7 +158,7 @@ void DataManager::StartNextQueuedTask(time_t now) {
     int duration = task->GetCurrentCost();
     gameData->UpdateBatch({{prefix + "start_time", static_cast<int>(now)},
         {prefix + "success", 0}, {prefix + "status", static_cast<int>(TStatus::RUNNING)},
-        {prefix + "cost_snapshot", duration}}, {{"task.queue", nlohmann::json{
+        {prefix + "cost_snapshot", duration}, {prefix + "queued", 1}}, {{"task.queue", nlohmann::json{
             {"next_id", nextQueueId}, {"entries", remaining}}.dump()}});
     taskQueue = remaining;
     task->start_time = now;
@@ -172,6 +172,7 @@ void DataManager::StartNextQueuedTask(time_t now) {
 
 bool DataManager::SettleTask(const std::shared_ptr<GameTask>& task, time_t now) {
   if (task->status != TStatus::WAIT_SETTLE) return false;
+  LoadAchievements();
   std::map<std::string, int> updates;
   auto actualRewards = task->success ? task->rewards : std::map<std::string, int>{};
   if (task->success) {
@@ -219,10 +220,18 @@ bool DataManager::SettleTask(const std::shared_ptr<GameTask>& task, time_t now) 
   if (history.size() > 10) history.erase(history.begin() + 10, history.end());
   // Commit the rewards and settled status atomically to prevent double rewards
   // if the app exits before advancing the queue.
-  gameData->UpdateBatch(updates, {{"task.history", history.dump()}});
+  auto nextAchievements = achievementState;
+  Achievements::Task(nextAchievements, task->id, task->success,
+      GetWithDefault(prefix + "queued", 0) == 1);
+  Achievements::Observe(nextAchievements, AchievementSnapshot(updates));
+  auto unlocked = Achievements::Evaluate(nextAchievements, now);
+  gameData->UpdateBatch(updates, {{"task.history", history.dump()},
+      {"achievements.state", nextAchievements.dump()}});
+  achievementState = nextAchievements;
   taskHistory = history;
   task->end_time = now;
   task->status = status;
+  NotifyAchievements(unlocked);
   task->Notify(task->success ? L"任务成功，奖励已发放" : L"任务失败，已自动结算",
                task->title, new WinToastEventHandler("TASK_COMPLETE"));
   return true;

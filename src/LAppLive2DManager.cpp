@@ -130,6 +130,13 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
       LAppDelegate::GetInstance()->ShowPanel();
       return;
     }
+    // Count actual body hits independently of sound settings and random audio.
+    if (_models[i]->HitTest(HitAreaHead, x, y) ||
+        _models[i]->HitTest(HitAreaEarL, x, y) || _models[i]->HitTest(HitAreaEarR, x, y) ||
+        _models[i]->HitTest(HitAreaArmsL, x, y) || _models[i]->HitTest(HitAreaArmsR, x, y) ||
+        _models[i]->HitTest(HitAreaLegs, x, y) || _models[i]->HitTest(HitAreaTail, x, y)) {
+      DataManager::GetInstance()->RecordAchievementEvent("touch");
+    }
     // no need to check other hitareas
     if (!DataManager::GetInstance()->GetConfig<bool>("audio", "touch_audio",
                                                     true)) {

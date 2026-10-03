@@ -249,20 +249,24 @@ void PanelServer::Stop() {
   if (worker_.joinable()) worker_.join();
 }
 
-bool PanelServer::DataSinkHandle(httplib::DataSink &sink) {
+bool PanelServer::DataSinkHandle(httplib::DataSink &sink, uint64_t& cursor) {
   std::unique_lock<std::mutex> lock(_mtx);
-  int id = _messageId;
-  _cv.wait_for(lock, std::chrono::seconds(10), [&] { return _stopping || _messageId != id; });
+  _cv.wait_for(lock, std::chrono::seconds(10), [&] { return _stopping || _messageId != cursor; });
   if (_stopping) return false;
-  const std::string message = _messageId == id ? ": keepalive\n\n" : _message;
+  std::string message;
+  for (const auto& [id, event] : _messages) if (id > cursor) message += event;
+  cursor = _messageId;
+  if (message.empty()) message = ": keepalive\n\n";
   lock.unlock();
   return sink.write(message.c_str(), message.size());
 }
 
 void PanelServer::Notify(const std::string &message) {
   std::lock_guard<std::mutex> lock(_mtx);
-  _message = "data: " + message + "\n\n";
-  _messageId++;
+  // A task can unlock several achievements, then immediately send UPDATE.
+  // Retain recent events so the refresh cannot overwrite the unlock notice.
+  _messages.emplace_back(++_messageId, "data: " + message + "\n\n");
+  if (_messages.size() > 64) _messages.pop_front();
   _cv.notify_all();
 }
 
@@ -273,10 +277,15 @@ void PanelServer::initSSE() {
   server->Get("/api/sse", [this](const httplib::Request &req,
                                  httplib::Response &res) {
     LAppPal::PrintLog(LogLevel::Debug, "GET /api/sse");
+    uint64_t cursor;
+    {
+      std::lock_guard<std::mutex> lock(_mtx);
+      cursor = _messageId;
+    }
     res.set_chunked_content_provider(
-        "text/event-stream", [&](size_t /*offset*/, httplib::DataSink &sink) {
+        "text/event-stream", [this, cursor](size_t /*offset*/, httplib::DataSink &sink) mutable {
           // this will block until server wants to send message
-          return DataSinkHandle(sink);
+          return DataSinkHandle(sink, cursor);
         });
   });
 }
@@ -400,6 +409,15 @@ void PanelServer::doServe() {
       json["buffs"].push_back(buff);
     }
     res.set_content(json.dump(), "application/json");
+  });
+  server->Get("/api/achievements", [](const httplib::Request&, httplib::Response& res) {
+    try {
+      res.set_content(DataManager::GetInstance()->GetAchievementState().dump(), "application/json");
+    } catch (const std::exception& e) {
+      LAppPal::PrintLog(LogLevel::Error, "[Achievements]Load failed: %s", e.what());
+      res.status = 500;
+      res.set_content("{\"error\":\"成就加载失败，请重试\"}", "application/json");
+    }
   });
   server->Post("/api/data/reset", [](const httplib::Request &req, httplib::Response &res) {
     DataManager::GetInstance()->SetResetMark();

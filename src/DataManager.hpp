@@ -8,6 +8,7 @@
 
 #include "GameData.hpp"
 #include "GameTask.hpp"
+#include "Achievements.hpp"
 
 class DataManager {
  private:
@@ -18,6 +19,12 @@ class DataManager {
   nlohmann::json taskQueue = nlohmann::json::array();
   nlohmann::json taskHistory = nlohmann::json::array();
   int64_t nextQueueId = 1;
+  bool achievementsLoaded = false;
+  bool achievementsReady = false;
+  nlohmann::json achievementState;
+  void LoadAchievements();
+  std::map<std::string, int> AchievementSnapshot(const std::map<std::string, int>& updates = {});
+  void NotifyAchievements(const nlohmann::json& unlocked);
   void LoadTasks();
   void SaveTaskQueue();
   void StartNextQueuedTask(time_t now);
@@ -80,6 +87,9 @@ class DataManager {
   float GetWithDefault(const std::string& key, float default_value);
 
   void AddExp();
+  nlohmann::json GetAchievementState();
+  void RefreshAchievements(time_t now = time(nullptr), bool notify = true);
+  void RecordAchievementEvent(const std::string& event, time_t now = time(nullptr));
   int CurrentExpDiff();
   void FetchStar();
 

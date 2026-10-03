@@ -96,6 +96,9 @@ int main(int argc, char** argv) {
           {"buffs", nlohmann::json::array()}};
       res.set_content(profile.dump(), "application/json");
     });
+    preview.Get("/api/achievements", [&](const auto&, auto& res) {
+      res.set_content(dm->GetAchievementState().dump(), "application/json");
+    });
     preview.Get("/api/config/shortcut", [](const auto&, auto& res) { res.set_content("[]", "application/json"); });
     preview.Get("/api/config/account", [](const auto&, auto& res) { res.set_content("{\"login\":false}", "application/json"); });
     preview.Get("/api/sse", [](const auto&, auto& res) {
@@ -241,6 +244,66 @@ int main(int argc, char** argv) {
     dm->TickTasks(1010);
     assert(dm->GetAttribute("exp") == 600);
     assert(dm->GetTaskState()["history"][0]["rewards"]["exp"] == 600);
+  } else if (scenario == "achievements") {
+    attributes(dm, 50);
+    savedTask(dm, 1, true, TStatus::WAIT_SETTLE);
+    savedTask(dm, 2, true, TStatus::WAIT_SETTLE);
+    savedTask(dm, 8, true, TStatus::WAIT_SETTLE);
+    dm->SetRaw("task.2.queued", 1);
+    dm->TickTasks(1800000000);
+    auto state = Achievements::Parse(dm->GetWithDefault("achievements.state", std::string{}));
+    assert(state["metrics"]["successes"] == 3);
+    assert(state["metrics"]["queued_successes"] == 1);
+    assert(state["metrics"]["variety"] == 3);
+    assert(state["unlocked"]["task_2"] == 1800000000);
+    assert(state["unlocked"]["dress"] == 1800000000);
+    assert(state["unlocked"]["balanced_50"] == 1800000000);
+    dm->TickTasks(1800000001);
+    assert(dm->GetAchievementState()["total"] == 50);
+    assert(Achievements::Parse(dm->GetWithDefault("achievements.state", std::string{})) == state);
+  } else if (scenario == "achievement_restart") {
+    auto before = dm->GetWithDefault("achievements.state", std::string{});
+    auto state = dm->GetAchievementState();
+    dm->TickTasks(1800000002);
+    assert(dm->GetWithDefault("achievements.state", std::string{}) == before);
+    assert(state["total"] == 50);
+    // Attribute spending must not remove a previous achievement or its progress.
+    attributes(dm, 0);
+    state = dm->GetAchievementState();
+    for (auto& item : state["list"]) {
+      if (item["id"] == "balanced_50") {
+        assert(item["unlocked"] == true && item["progress"] == 50);
+        assert(item["unlocked_at"] == 1800000000);
+      }
+    }
+  } else if (scenario == "achievement_migrate") {
+    savedTask(dm, 13, true, TStatus::ARCHIVED);
+    savedTask(dm, 2, true, TStatus::IDLE);
+    dm->SetRaw("task.history", std::string{"[{\"id\":2,\"success\":true},{\"id\":2,\"success\":true},{\"id\":3,\"success\":false}]"});
+    dm->SetRaw("clothes.1.active", 1);
+    dm->SetRaw("clothes.2.active", 1);
+    dm->SetRaw("starcnt", 3);
+    dm->GetAchievementState();
+    auto state = Achievements::Parse(dm->GetWithDefault("achievements.state", std::string{}));
+    assert(state["metrics"]["successes"] == 3);
+    assert(state["metrics"]["task.2"] == 2);
+    assert(state["metrics"]["failures"] == 1);
+    assert(state["unlocked"].contains("task_13"));
+    assert(state["unlocked"].contains("wardrobe"));
+    assert(state["unlocked"].contains("star_3"));
+    assert(!state["unlocked"].contains("hello"));
+  } else if (scenario == "achievement_events") {
+    for (int i = 0; i < 60; ++i) dm->RecordAchievementEvent("minute", 1800000000 + i * 60);
+    std::vector<std::thread> touches;
+    for (int i = 0; i < 10; ++i) touches.emplace_back([&] {
+      for (int j = 0; j < 20; ++j) dm->RecordAchievementEvent("touch", 1800000000);
+    });
+    for (auto& thread : touches) thread.join();
+    auto state = Achievements::Parse(dm->GetWithDefault("achievements.state", std::string{}));
+    assert(state["metrics"]["minutes"] == 60);
+    assert(state["metrics"]["days"] == 1);
+    assert(state["metrics"]["touches"] == 200);
+    assert(state["unlocked"].contains("hour") && state["unlocked"].contains("touch_200"));
   } else if (scenario == "corrupt") {
     attributes(dm, 10);
     dm->SetRaw("task.queue", std::string{"invalid JSON"});

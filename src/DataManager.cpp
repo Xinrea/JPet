@@ -63,6 +63,8 @@ bool DataManager::init() {
     AddAttribute(attr, 0);
   }
   
+  RefreshAchievements(time(nullptr), false);
+  achievementsReady = true;
   return true;
 }
 
@@ -289,6 +291,7 @@ void DataManager::AddExp() {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
   int diff = CurrentExpDiff();
   AddAttribute("exp", diff);
+  RecordAchievementEvent("minute");
   LAppPal::PrintLog(LogLevel::Debug, "[DataManager]Added %d exp", diff);
   PanelServer::GetInstance()->Notify("UPDATE");
 }
@@ -314,6 +317,8 @@ void DataManager::FetchStar() {
     }
   }
 
+  RefreshAchievements();
+
   for (const auto &attr :
        {"speed", "endurance", "strength", "will", "intellect"}) {
     AddAttribute(attr, -53);
@@ -321,6 +326,7 @@ void DataManager::FetchStar() {
   int current = 0;
   gameData->Get("starcnt", current);
   gameData->Update("starcnt", current + 1);
+  RefreshAchievements();
 }
 
 int DataManager::GetWithDefault(const std::string& key, int default_value) {
@@ -390,6 +396,7 @@ void DataManager::AddAttribute(const std::string& key, int value) {
     }
   }
   gameData->Update("attr." + key, new_value);
+  if (achievementsReady) RefreshAchievements();
 }
 
 std::vector<int> DataManager::TaskStatus(int id) {
