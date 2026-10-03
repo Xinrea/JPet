@@ -256,6 +256,7 @@ void DataManager::Save() {
 }
 
 int DataManager::CurrentExpDiff() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   int currentExp = GetAttribute("exp");
   int intellect = GetAttribute("intellect");
   int starcnt = GetWithDefault("starcnt", 0);
@@ -285,6 +286,7 @@ int DataManager::CurrentExpDiff() {
 }
 
 void DataManager::AddExp() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   int diff = CurrentExpDiff();
   AddAttribute("exp", diff);
   LAppPal::PrintLog(LogLevel::Debug, "[DataManager]Added %d exp", diff);
@@ -292,6 +294,7 @@ void DataManager::AddExp() {
 }
 
 std::vector<int> DataManager::GetAttributeList() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   std::vector<int> attributes;
   for (const auto& attr : {"speed", "endurance", "strength", "will",
                            "intellect", "exp", "buycnt"}) {
@@ -302,6 +305,7 @@ std::vector<int> DataManager::GetAttributeList() {
 }
 
 void DataManager::FetchStar() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   for (const auto &attr :
        {"speed", "endurance", "strength", "will", "intellect"}) {
     int value = GetAttribute(attr);
@@ -351,6 +355,7 @@ void DataManager::PostProcess(const std::string& key, int value) {
 }
 
 int DataManager::GetAttribute(const std::string& key) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   int value = 0;
   try {
     gameData->Get("attr." + key, value);
@@ -364,11 +369,13 @@ int DataManager::GetAttribute(const std::string& key) {
 }
 
 int DataManager::GetAttrLimit() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   int starcnt = GetWithDefault("starcnt", 0);
   return 100 + starcnt * 10;
 }
 
 void DataManager::AddAttribute(const std::string& key, int value) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   int current = 0;
   gameData->Get("attr." + key, current);
   // WARN not support negative value yet

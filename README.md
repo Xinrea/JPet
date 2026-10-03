@@ -57,6 +57,14 @@ VCPKG_INSTALLED_DIR=/path/to/vcpkg_installed \
 BUILD_TYPE=Debug ./build-scripts/build_and_run_macos.sh
 ```
 
+任务队列回归检查（使用独立临时存档，不修改游戏数据）：
+
+```sh
+bash build-scripts/test_task_queue_macos.sh
+```
+
+也可以添加 `preview` 参数，用测试数据预览任务界面，地址为 `http://127.0.0.1:18765`。
+
 Apple 已弃用 OpenGL，但当前 Live2D OpenGL 渲染路径仍可运行；后续如需长期支持，
 应另行评估 Cubism Metal 渲染后端。macOS 的登录页会使用系统持久化的 WebKit
 Cookie 存储。

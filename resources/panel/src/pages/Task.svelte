@@ -1,459 +1,310 @@
 <script>
+  import { onMount, onDestroy } from "svelte";
   import AttributeIcon from "../components/AttributeIcon.svelte";
-  import { Button, ButtonGroup, Tooltip, Modal } from "flowbite-svelte";
-  import RunIcon from "../assets/run.svg";
-  import InfoIcon from "../assets/info.svg";
-  import CancelIcon from "../assets/cancel.svg";
+  import { Button, Tooltip } from "flowbite-svelte";
   import ClockIcon from "../assets/clock.svg";
-  import DoneIcon from "../assets/done.svg";
   import ClothesIcon from "../assets/clothes.svg";
+  import { sse } from "../sse.js";
+  import { reportFrontendError } from "../logger.js";
 
-  export let attributes = {
-    exp: 0,
-    speed: 0,
-    endurance: 0,
-    strength: 0,
-    will: 0,
-    intellect: 0,
-  };
-
+  export let attributes = { exp: 0, speed: 0, endurance: 0, strength: 0, will: 0, intellect: 0 };
   export let starcnt = 0;
-
   export let expdiff = 0;
 
   let currentTask = null;
-
-  let timeRemain = 0;
-
-  setInterval(() => {
-    if (currentTask && timeRemain > 0) {
-      timeRemain = Math.max(
-        currentTask.cost -
-          Math.floor(Date.now() / 1000 - currentTask.start_time),
-        0,
-      );
-    }
-    if (currentTask && timeRemain <= 0 && currentTask.status == 1) {
-      // update task status
-      updateStatus();
-    }
-  }, 1000);
-
   let taskList = [];
+  let queue = [];
+  let queueCapacity = 2;
+  let history = [];
+  let timeRemain = 0;
+  let busy = false;
+  let loading = false;
+  let error = "";
+  let statusError = "";
+  let requestVersion = 0;
+  let clockTimer;
+  let refreshTimer;
+  let unsubscribe;
 
-  function updateStatus() {
-    fetch("/api/task")
-      .then((res) => res.json())
-      .then((data) => {
-        // if undone and started, set currentTask
-        // @ts-ignore
-        currentTask = data.current;
-        taskList = data.list;
-        if (currentTask) {
-          timeRemain = Math.max(
-            currentTask.cost -
-              Math.floor(Date.now() / 1000 - currentTask.start_time),
-            0,
-          );
-        }
-      });
+  function updateClock() {
+    timeRemain = currentTask
+      ? Math.max(0, currentTask.cost - (Math.floor(Date.now() / 1000) - currentTask.start_time))
+      : 0;
   }
 
-  function startTask(id) {
-    backToTop();
-    fetch(`/api/task/${id}/start`, {
-      method: "POST",
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        currentTask = data.current;
-        taskList = data.list;
-      });
+  function applyState(data) {
+    currentTask = data.current ?? null;
+    taskList = data.list ?? [];
+    queue = data.queue ?? [];
+    queueCapacity = data.queue_capacity ?? 2;
+    history = data.history ?? [];
+    updateClock();
   }
 
-  function cancelTask(id) {
-    fetch(`/api/task/${id}/cancel`, {
-      method: "POST",
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        currentTask = data.current;
-        taskList = data.list;
-      });
-  }
-
-  function confirmTask(task) {
-    let should_reward = task.success;
-    const id = task.id;
-    fetch(`/api/task/${id}/confirm`, {
-      method: "POST",
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        currentTask = data.current;
-        taskList = data.list;
-        // show rewards
-        if (should_reward) {
-          rewardModal = true;
-          rewardTask = task;
-        }
-      });
-  }
-
-  function formatRemain(s) {
-    let str = "";
-    if (s >= 60) {
-      let minutes = Math.floor(s / 60);
-      if (minutes >= 60) {
-        let hours = Math.floor(minutes / 60);
-        if (hours > 0) {
-          str += hours + "h";
-        }
+  async function updateStatus() {
+    if (busy || loading) return;
+    loading = true;
+    const version = ++requestVersion;
+    try {
+      const response = await fetch("/api/task");
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (version === requestVersion) {
+        applyState(data);
+        statusError = "";
       }
-      minutes = minutes % 60;
-      if (minutes > 0) {
-        str += minutes + "m";
-      }
+    } catch (failure) {
+      if (version === requestVersion) statusError = "任务状态加载失败，正在重试。";
+      reportFrontendError("[Task] status request failed", failure);
+    } finally {
+      loading = false;
     }
-    let seconds = s % 60;
-    if (str == "" || seconds > 0) {
-      str += seconds + "s";
-    }
-    return str;
   }
 
-  // reward modal
-  let rewardModal = false;
-  let rewardTask = null;
-
-  function calcRate(attrs, task) {
-    let lack = 0;
-    for (const [key, value] of Object.entries(task.requirements)) {
-      if (attrs[key] < value) {
-        lack += value - attrs[key];
-      }
+  async function taskAction(url, method = "POST", body) {
+    if (busy) return;
+    busy = true;
+    error = "";
+    ++requestVersion;
+    try {
+      const response = await fetch(url, {
+        method,
+        ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "任务操作失败，请重试。");
+      applyState(data);
+    } catch (failure) {
+      error = failure.message || "任务操作失败，请重试。";
+      reportFrontendError("[Task] action failed", failure);
+    } finally {
+      busy = false;
     }
+  }
+
+  function calcRate(task) {
+    let lack = Object.entries(task.requirements).reduce(
+      (sum, [key, value]) => sum + Math.max(0, value - attributes[key]), 0,
+    );
     lack = lack * 12 + 120 + 20 * starcnt;
-    if (lack >= 400) {
-      return 0;
-    }
-    lack -= attrs.will;
-    lack = Math.max(lack, 20);
-    lack /= 4;
-    return Math.min(Math.max(100 - lack, 0), 100);
+    if (lack >= 400) return 0;
+    return (400 - Math.max(20, lack - attributes.will)) / 4;
   }
 
-  function calcCost(cost, speed) {
-    speed = speed - 2;
-    if (speed <= 0) {
-      speed = 0;
-    }
-    if (speed >= 100) {
-      speed = 100;
-    }
-    let p = speed / 100;
-    return Math.ceil(cost * (1 - 0.75 * (1 - (1 - p)*(1 - p))));
+  function calcCost(cost) {
+    const p = Math.max(0, Math.min(attributes.speed - 2, 100)) / 100;
+    return Math.floor(cost * (1 - 0.75 * (1 - (1 - p) * (1 - p))));
   }
 
-  function formatDate(time) {
-    return new Date(time * 1000).toLocaleString();
+  function formatRemain(seconds) {
+    const s = Math.max(0, Math.floor(seconds));
+    const hours = Math.floor(s / 3600);
+    const minutes = Math.floor((s % 3600) / 60);
+    return `${hours ? `${hours}h` : ""}${minutes ? `${minutes}m` : ""}${s % 60 || (!hours && !minutes) ? `${s % 60}s` : ""}`;
   }
 
-  function backToTop() {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
+  function canQueue(task) {
+    return queue.length < queueCapacity && task.status !== 3 &&
+      (task.repeatable || (!queue.some((entry) => entry.id === task.id) && currentTask?.id !== task.id));
+  }
+
+  function submitTask(task) {
+    const immediately = !currentTask && queue.length === 0 && calcRate(task) > 0;
+    taskAction(`/api/task/${task.id}/${immediately ? "start" : "queue"}`);
+  }
+
+  $: queueBlocked = !currentTask && queue.length > 0 && calcRate(queue[0]) === 0;
+
+  onMount(() => {
+    updateStatus();
+    clockTimer = setInterval(updateClock, 1000);
+    refreshTimer = setInterval(updateStatus, 5000);
+    unsubscribe = sse.subscribe((event) => {
+      if (event?.data === "UPDATE" || event?.data === "TASK_COMPLETE") updateStatus();
     });
-  }
+  });
 
-  updateStatus();
-
-  // if attributes changed, update rate for each task
-  $: {
-    taskList.forEach((task) => {
-      task.rate = calcRate(attributes, task);
-    });
-    taskList = [...taskList];
-    if (currentTask) {
-      currentTask.rate = calcRate(attributes, currentTask);
-      currentTask = { ...currentTask };
-    }
-  }
+  onDestroy(() => {
+    clearInterval(clockTimer);
+    clearInterval(refreshTimer);
+    unsubscribe?.();
+    ++requestVersion;
+  });
 </script>
 
 <div>
-  {#if currentTask}
-    <div class="task mb-8">
-      <div class="header items-center">
-        <span>[T{currentTask.id}] {currentTask.title}</span>
-        {#if currentTask.status == 2}
-          <span class="flex items-center">
-            <span>{currentTask.success ? "任务成功" : "任务失败"}</span>
-            <Button
-              class="!p-2 ml-2"
-              color="alternative"
-              size="sm"
-              on:click={() => confirmTask(currentTask)}
-              ><img src={DoneIcon} width="16px" alt="" /></Button
-            >
-            <Tooltip class="z-30">确认</Tooltip>
-          </span>
-        {:else}
-          <span class="flex items-center">
-            <span
-              >{timeRemain == 0
-                ? "⌛"
-                : formatRemain(timeRemain)}</span
-            >
-            <Button
-              class="!p-2 ml-2"
-              color="alternative"
-              size="sm"
-              on:click={() => cancelTask(currentTask.id)}
-              ><img src={CancelIcon} width="16px" alt="" /></Button
-            >
-            <Tooltip class="z-30">中止</Tooltip>
-          </span>
-        {/if}
-      </div>
+  {#if error || statusError}
+    <p class="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600" role="alert">{error || statusError}</p>
+  {/if}
 
+  {#if currentTask}
+    <div class="task mb-4">
+      <div class="header">
+        <span>正在执行 · {currentTask.title}</span>
+        <span class="text-sm">{timeRemain > 0 ? formatRemain(timeRemain) : "正在结算…"}</span>
+      </div>
       <div class="content text-gray-600">
-        <p class="mb-4 flex justify-between">
-          <span class="text-sm">{currentTask.desc}</span>
-        </p>
-        <div class="text-gray-500 mb-1 align-middle">
+        <p class="mb-3 text-sm">{currentTask.desc}</p>
+        <div class="mb-2 flex flex-wrap items-center gap-1">
           <span class="badge info">要求</span>
           {#each Object.entries(currentTask.requirements) as [key, value]}
-            <AttributeIcon
-              attribute={key}
-              {value}
-              fullfill={attributes[key] >= value}
-            />
+            <AttributeIcon attribute={key} {value} fullfill={attributes[key] >= value} />
           {/each}
         </div>
-        {#if currentTask.id == 1}
-          <div class="text-gray-500 mb-1 align-middle">
-            <span
-              class="badge warn
-              ">奖励</span
-            >
-              <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
-          </div>
-        {:else}
-          {#if Object.entries(currentTask.rewards).length > 0}
-          <div class="text-gray-500 mb-1 align-middle">
-            <span class="badge warn">奖励</span>
+        <div class="mb-2 flex flex-wrap items-center gap-1">
+          <span class="badge warn">奖励</span>
+          {#if currentTask.id === 1}
+            <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
+          {:else}
             {#each Object.entries(currentTask.rewards) as [key, value]}
               <AttributeIcon attribute={key} {value} fullfill />
             {/each}
-          </div>
           {/if}
-        {/if}
-        {#if currentTask.special}
-          <div class="text-gray-500 mb-1 align-middle">
-            <span
-              class="badge warn
-              ">特殊奖励</span
-            >
-            <span style="font-size: 12px;">{currentTask.special.title}</span>
-            <Tooltip>{currentTask.special.desc}</Tooltip>
-          </div>
-        {/if}
-        <div class="text-gray-500 align-middle">
-          <span class="badge other">成功率</span>
-          <span style="font-size: 12px;">
-            {currentTask.rate}%
+          {#if currentTask.special}<span class="text-sm">{currentTask.special.desc}</span>{/if}
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="text-sm">成功率 {calcRate(currentTask)}% · 完成后自动结算</span>
+          <span class="flex gap-2">
+            {#if currentTask.repeatable}
+              <Button color="alternative" size="xs" disabled={busy || !canQueue(currentTask)}
+                on:click={() => taskAction(`/api/task/${currentTask.id}/queue`)}>再排一次</Button>
+            {/if}
+            <Button color="alternative" size="xs" disabled={busy}
+              on:click={() => taskAction(`/api/task/${currentTask.id}/cancel`)}>中止</Button>
           </span>
         </div>
       </div>
     </div>
   {/if}
+
+  <div class="task mb-4">
+    <div class="header"><span>待执行队列</span><span>{queue.length} / {queueCapacity}</span></div>
+    <div class="content">
+      <p class="mb-3 text-xs text-gray-500">基础 2 个位置，每颗星增加 1 个。运行中的任务不占位置，队列按顺序执行。</p>
+      {#if queueBlocked}
+        <p class="mb-3 rounded bg-amber-50 p-2 text-sm text-amber-700" role="status">
+          队首任务成功率为 0，已暂停启动。请提升属性、调整顺序或移除该任务。
+        </p>
+      {/if}
+      {#if queue.length === 0}
+        <p class="py-2 text-sm text-gray-400">队列为空。可以从下方添加任务，排完后自动结束。</p>
+      {:else}
+        <ol class="divide-y divide-gray-100">
+          {#each queue as task, index (task.entry_id)}
+            <li class="flex flex-wrap items-center justify-between gap-2 py-3">
+              <div class="flex items-center gap-2 text-gray-600">
+                <span class="queue-position">{index + 1}</span>
+                <div>
+                  <p class="text-sm">{task.title}</p>
+                  <p class="text-xs text-gray-400">预计 {formatRemain(calcCost(task.cost))} · 当前成功率 {calcRate(task)}%</p>
+                </div>
+              </div>
+              <div class="flex gap-1">
+                <Button color="alternative" size="xs" aria-label={`上移${task.title}`} disabled={busy || index === 0}
+                  on:click={() => taskAction(`/api/task/queue/${task.entry_id}/move`, "POST", { direction: -1 })}>↑</Button>
+                <Button color="alternative" size="xs" aria-label={`下移${task.title}`} disabled={busy || index === queue.length - 1}
+                  on:click={() => taskAction(`/api/task/queue/${task.entry_id}/move`, "POST", { direction: 1 })}>↓</Button>
+                <Button color="alternative" size="xs" disabled={busy}
+                  on:click={() => taskAction(`/api/task/queue/${task.entry_id}`, "DELETE")}>移除</Button>
+              </div>
+            </li>
+          {/each}
+        </ol>
+      {/if}
+    </div>
+  </div>
+
+  {#if history.length > 0}
+    <div class="task mb-4">
+      <div class="header">最近结算</div>
+      <div class="content">
+        {#each history as task, index}
+          <details class="history-item" open={index === 0}>
+            <summary class="cursor-pointer text-sm text-gray-600">
+              <span class:text-green-600={task.success} class:text-red-500={!task.success}>{task.success ? "成功" : "失败"}</span>
+              · {task.title}
+              <span class="ml-2 text-xs text-gray-400">{new Date(task.end_time * 1000).toLocaleString()}</span>
+            </summary>
+            <div class="mt-2 flex flex-wrap items-center gap-1 text-sm text-gray-500">
+              {#if task.success}
+                <span>已发放：</span>
+                {#each Object.entries(task.rewards) as [key, value]}
+                  <AttributeIcon attribute={key} {value} fullfill />
+                {/each}
+                {#if task.special}<span>{task.special.desc}</span>{/if}
+              {:else}
+                <span>本次未获得奖励。</span>
+              {/if}
+            </div>
+          </details>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
   <div class="task">
     <div class="header">任务列表</div>
     <div class="content">
-      <ul>
-        {#each taskList as task, i}
-          <li class="mb-4" class:archived={task.status == 3}>
-            <div class="text-gray-600">
-              <p class="mb-1 flex justify-between align-middle items-center">
-                <span class="flex items-center"
-                  ><span class="badge info">T{task.id}</span><span class="ml-2">
-                    <p>{task.title}</p>
-                    <p class="icon text-gray-500"
-                      ><img
-                        class="inline"
-                        width="12"
-                        height="12"
-                        src={ClockIcon}
-                        alt=""
-                      />{formatRemain(calcCost(task.cost, attributes.speed))}</p
-                    >
-                  </span></span
-                >
-                <span class="text-end">
-                  {#if task.status != 3}
-                    <Button
-                      color="alternative"
-                      size="sm"
-                      disabled={task.rate == 0}
-                      on:click={() => startTask(task.id)}
-                      ><img src={RunIcon} width="16px" alt="" /></Button
-                    >
-                    <Tooltip class="z-30">执行</Tooltip>
-                  {:else}
-                    <span class="text-sm text-gray-500"
-                      >{formatDate(task.end_time)}</span
-                    >
-                  {/if}
-                </span>
-              </p>
-              <div class="text-gray-500 mb-1 align-middle">
-                <span class="badge info">要求</span>
-                {#each Object.entries(task.requirements) as [key, value]}
-                  <AttributeIcon
-                    attribute={key}
-                    {value}
-                    fullfill={attributes[key] >= value}
-                  />
-                {/each}
+      <ul class="divide-y divide-gray-100">
+        {#each taskList as task (task.id)}
+          <li class="py-3" class:archived={task.status === 3}>
+            <div class="mb-2 flex items-center justify-between gap-2 text-gray-600">
+              <div>
+                <p class="text-sm"><span class="mr-2 text-green-600">T{task.id}</span>{task.title}</p>
+                <p class="mt-1 text-xs text-gray-400"><img class="inline" width="12" height="12" src={ClockIcon} alt="" /> {formatRemain(calcCost(task.cost))}</p>
               </div>
-              {#if task.id == 1}
-                <div class="text-gray-500 mb-1 align-middle">
-                  <span
-                    class="badge warn
-                    ">奖励</span
-                  >
-                    <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
-                </div>
+              {#if task.status === 3}
+                <span class="text-xs text-gray-400">已完成</span>
               {:else}
-                {#if Object.entries(task.rewards).length > 0}
-                <div class="text-gray-500 mb-1 align-middle">
-                  <span
-                    class="badge warn
-                    ">奖励</span
-                  >
+                <Button color="alternative" size="sm" disabled={busy || !canQueue(task)} on:click={() => submitTask(task)}>
+                  {!currentTask && queue.length === 0 && calcRate(task) > 0 ? "执行" : "加入队列"}
+                </Button>
+              {/if}
+            </div>
+            <div class="mb-2 flex flex-wrap items-center gap-1 text-gray-500">
+              <span class="badge info">要求</span>
+              {#each Object.entries(task.requirements) as [key, value]}
+                <AttributeIcon attribute={key} {value} fullfill={attributes[key] >= value} />
+              {/each}
+            </div>
+            {#if task.id === 1 || Object.keys(task.rewards).length > 0}
+              <div class="mb-2 flex flex-wrap items-center gap-1 text-gray-500">
+                <span class="badge warn">奖励</span>
+                {#if task.id === 1}
+                  <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
+                {:else}
                   {#each Object.entries(task.rewards) as [key, value]}
                     <AttributeIcon attribute={key} {value} fullfill />
                   {/each}
-                </div>
                 {/if}
-              {/if}
-              {#if task.special}
-                <div class="text-gray-500 mb-1 align-middle">
-                  <span
-                    class="badge warn
-                    ">特殊奖励</span
-                  >
-                  <span style="font-size: 12px;"
-                    ><img
-                      class="inline"
-                      width="16px"
-                      src={ClothesIcon}
-                      alt=""
-                    />{task.special.title}</span
-                  >
-                  <Tooltip>{task.special.desc}</Tooltip>
-                </div>
-              {/if}
-              {#if task.status != 3}
-                <div class="text-gray-500 align-middle">
-                  <span class="badge other">成功率</span>
-                  <span style="font-size: 12px;">
-                    {task.rate}%
-                  </span>
-                </div>
-              {/if}
-            </div>
-            {#if i < taskList.length - 1}
-              <hr class="mt-4" />
+              </div>
+            {/if}
+            {#if task.special}
+              <div class="mb-2 flex items-center gap-2 text-sm text-gray-500">
+                <span class="badge warn">特殊奖励</span>
+                <img class="inline" width="16" src={ClothesIcon} alt="" />{task.special.title}
+                <Tooltip>{task.special.desc}</Tooltip>
+              </div>
+            {/if}
+            {#if task.status !== 3}
+              <p class="text-xs text-gray-500">成功率 {calcRate(task)}%{!task.repeatable && queue.some((entry) => entry.id === task.id) ? " · 已排队" : ""}</p>
             {/if}
           </li>
         {/each}
       </ul>
     </div>
-    <Modal
-      title="任务奖励"
-      bind:open={rewardModal}
-      size="xs"
-      autoclose
-      outsideclose
-    >
-      <h3 class="mb-2 font-normal text-gray-500">获得了如下奖励：</h3>
-      <div>
-        {#if rewardTask.id == 1}
-            <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
-        {:else}
-          {#each Object.entries(rewardTask.rewards) as [key, value]}
-            <AttributeIcon attribute={key} {value} fullfill />
-          {/each}
-        {/if}
-      </div>
-      {#if rewardTask.special}
-        <div>
-          <span style="font-size: 12px;"
-            ><img
-              class="inline"
-              width="16px"
-              src={ClothesIcon}
-              alt=""
-            />{rewardTask.special.title}</span
-          >
-          <Tooltip>{rewardTask.special.desc}</Tooltip>
-        </div>
-      {/if}
-    </Modal>
   </div>
 </div>
 
 <style>
-  .task {
-    border-radius: 0.25rem;
-    border: 1px solid #e2e8f0;
-    background-color: white;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    overflow: hidden;
-  }
-  .task .header {
-    display: flex;
-    justify-content: space-between;
-    color: white;
-    background-color: #79ca2e;
-    padding: 4px 12px;
-    font-size: 1rem;
-    font-weight: bold;
-  }
-
-  .task .content {
-    padding: 8px;
-  }
-
-  .badge {
-    padding: 4px 8px;
-    border-radius: 4px;
-    color: #fff;
-    text-align: center;
-    margin: 4px 0px;
-    font-size: 12px;
-  }
-
-  .badge.info {
-    background-color: #79ca2e;
-  }
-
-  .badge.warn {
-    background-color: #ff666b;
-  }
-
-  .badge.other {
-    background-color: #6089f6;
-  }
-
-  .icon {
-    vertical-align: super;
-    font-size: 12px;
-  }
-
-  .archived {
-    opacity: 0.5;
-  }
+  .task { border-radius: 0.25rem; border: 1px solid #e2e8f0; background: white; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); overflow: hidden; }
+  .header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: white; background: #79ca2e; padding: 6px 12px; font-size: 1rem; font-weight: bold; }
+  .content { padding: 12px; }
+  .badge { padding: 4px 8px; border-radius: 4px; color: #fff; text-align: center; font-size: 12px; }
+  .badge.info { background: #79ca2e; }
+  .badge.warn { background: #ff666b; }
+  .queue-position { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #eef8e5; color: #579c1c; font-size: 12px; }
+  .history-item { padding: 8px 0; }
+  .history-item + .history-item { border-top: 1px solid #f3f4f6; }
+  .archived { opacity: 0.5; }
 </style>

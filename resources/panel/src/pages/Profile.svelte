@@ -298,7 +298,7 @@
           <img class="rank-icon" alt="" src={starOutlineIcon} />
         {/if}
       </a>
-      <Tooltip>经验获取量提升，任务成功率降低</Tooltip>
+      <Tooltip>经验获取量提升，任务成功率降低，任务队列增加 1 个位置</Tooltip>
       <Progress max={60} value={60 - timeToNextPoint}>
         <div
           style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); text-align: center;"

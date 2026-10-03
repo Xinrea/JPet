@@ -2,6 +2,8 @@
 #include "DataManager.hpp"
 #include "LAppDefine.hpp"
 
+#include <random>
+
 #ifdef __APPLE__
 #include "Platform.hpp"
 #else
@@ -42,58 +44,25 @@ void GameTask::Notify(const wstring& title, const wstring& content,
 #endif
 }
 
-void GameTask::TryDone() {
-  // task not running now
-  if (status != TStatus::RUNNING) {
-    return;
+double GameTask::SuccessRate() {
+  auto dm = DataManager::GetInstance();
+  int lack = 0;
+  for (const auto& [key, required] : requirements) {
+    lack += std::max(0, required - dm->GetAttribute(key));
   }
-  // compare start time + cost with current time
-  time_t current_time = time(NULL);
-  bool state = current_time >= start_time + cost_snapshot;
-  // time's up, set status now
-  if (state) {
-    // check success or not
-    int lack = 0;
-    for (auto it = requirements.begin(); it != requirements.end(); ++it) {
-      // get attribute from game data
-      int value = DataManager::GetInstance()->GetAttribute(it->first);
-      if (value < it->second) {
-        // if lack attribute
-        lack += it->second - value;
-      }
-    }
-    srand(time(NULL));
+  lack = lack * 12 + 120 + 20 * dm->GetWithDefault("starcnt", 0);
+  if (lack >= 400) return 0;
+  lack = std::max(20, lack - dm->GetAttribute("will"));
+  return (400 - lack) / 400.0;
+}
 
-    // get willpower
-    int will = DataManager::GetInstance()->GetAttribute("will");
-    // every lack of attribute will reduce 3% -> 12
-    // every will will increase 0.25% -> 1
-    lack *= 12;
-    // if lack is 0, the full rate is 70%, lack 30% -> 120
-    int starcnt = DataManager::GetInstance()->GetWithDefault("starcnt", 0);
-    lack += 120 + 20 * starcnt;
-    if (lack >= 400) {
-      success = false;
-      LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d failed before will takes effect", id);
-    } else {
-      lack -= will;
-      // max rate is 95%, 5% -> 20
-      if (lack < 20) {
-        lack = 20;
-      }
-      // using random number to determine success
-      int random = rand() % 400;
-      if (random < lack) {
-        success = false;
-        LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d failed", id);
-      } else {
-        success = true;
-        LAppPal::PrintLog(LogLevel::Info, "[GameTask]Task %d success", id);
-      }
-      status = TStatus::WAIT_SETTLE;
-      Notify(L"任务完成", title, new WinToastEventHandler("TASK_COMPLETE"));
-    }
+void GameTask::TryDone(time_t now) {
+  if (status != TStatus::RUNNING || now < start_time + cost_snapshot) return;
 
-    Dump();
-  }
+  static thread_local std::mt19937 random(std::random_device{}());
+  std::uniform_int_distribution<int> roll(0, 399);
+  success = roll(random) >= static_cast<int>(std::lround((1 - SuccessRate()) * 400));
+  // Even a guaranteed failure must settle, otherwise it blocks the whole queue.
+  status = TStatus::WAIT_SETTLE;
+  Dump();
 }

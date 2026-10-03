@@ -53,7 +53,8 @@ public:
 
   void Dump();
 
-  void TryDone();
+  void TryDone(time_t now = time(nullptr));
+  double SuccessRate();
 
   void Notify(const wstring& title, const wstring& content,
                               WinToastEventHandler* handler);

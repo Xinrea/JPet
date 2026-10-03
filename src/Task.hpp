@@ -47,10 +47,7 @@ class CheckTask : public Task {
     return false;
   }
   void Execute() override {
-    auto gameTasks = DataManager::GetInstance()->GetTasks();
-    for (auto& task : gameTasks) {
-      task->TryDone();
-    }
+    DataManager::GetInstance()->TickTasks();
   }
   bool IsDone() override {
     return false;

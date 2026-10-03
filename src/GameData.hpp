@@ -5,6 +5,8 @@
 #include <vector>
 #include <filesystem>
 #include <rocksdb/db.h>
+#include <rocksdb/write_batch.h>
+#include <map>
 
 #include "LAppPal.hpp"
 #include "LAppDefine.hpp"
@@ -219,6 +221,19 @@ class GameData {
 
   bool Initialized() {
     return db != nullptr;
+  }
+
+  // Rewards, task status and queue transitions must survive restarts together.
+  void UpdateBatch(const std::map<std::string, int>& integers,
+                   const std::map<std::string, std::string>& strings = {}) {
+    rocksdb::WriteBatch batch;
+    for (const auto& [key, value] : integers) {
+      int32_t stored = value;
+      batch.Put(key, std::string(reinterpret_cast<char*>(&stored), sizeof(stored)));
+    }
+    for (const auto& [key, value] : strings) batch.Put(key, value);
+    auto status = db->Write(writeOptions, &batch);
+    if (!status.ok()) throw std::runtime_error(status.ToString());
   }
 
   void Update(const std::string& key, int32_t value) {

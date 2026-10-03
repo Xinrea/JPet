@@ -282,62 +282,7 @@ void PanelServer::initSSE() {
 }
 
 nlohmann::json PanelServer::getTaskStatus() {
-  auto tasks = DataManager::GetInstance()->GetTasks();
-  std::shared_ptr<GameTask> currentTask;
-  // find current task
-  for (auto task : tasks) {
-    if (task->status == TStatus::RUNNING ||
-        task->status == TStatus::WAIT_SETTLE) {
-      currentTask = task;
-      break;
-    }
-  }
-  nlohmann::json data = nlohmann::json::object();
-  if (currentTask) {
-    // filter out current task
-    tasks.erase(std::remove(tasks.begin(), tasks.end(), currentTask),
-                tasks.end());
-    data["current"] = {
-        {"id", currentTask->id},
-        {"title", LAppPal::WStringToString(currentTask->title)},
-        {"desc", LAppPal::WStringToString(currentTask->desc)},
-        {"start_time", currentTask->start_time},
-        {"end_time", currentTask->end_time},
-        {"cost", currentTask->cost_snapshot},
-        {"success", currentTask->success},
-        {"status", currentTask->status},
-        {"repeatable", currentTask->repeatable},
-        {"requirements", currentTask->requirements},
-        {"rewards", currentTask->rewards},
-    };
-    if (currentTask->special) {
-      data["current"]["special"] = nlohmann::json::object();
-      data["current"]["special"]["title"] = LAppPal::WStringToString(currentTask->special->title);
-      data["current"]["special"]["desc"] = LAppPal::WStringToString(currentTask->special->desc);
-    }
-  }
-  nlohmann::json taskList = nlohmann::json::array();
-  for (auto task : tasks) {
-    nlohmann::json taskJson = {{"id", task->id},
-                               {"title", LAppPal::WStringToString(task->title)},
-                               {"desc", LAppPal::WStringToString(task->desc)},
-                               {"start_time", task->start_time},
-                               {"end_time", task->end_time},
-                               {"cost", task->cost},
-                               {"success", task->success},
-                               {"status", task->status},
-                               {"requirements", task->requirements},
-                               {"rewards", task->rewards},
-                               {"repeatable", task->repeatable}};
-    if (task->special) {
-      taskJson["special"] = nlohmann::json::object();
-      taskJson["special"]["title"] = LAppPal::WStringToString(task->special->title);
-      taskJson["special"]["desc"] = LAppPal::WStringToString(task->special->desc);
-    }
-    taskList.push_back(taskJson);
-  }
-  data["list"] = taskList;
-  return data;
+  return DataManager::GetInstance()->GetTaskState();
 }
 
 void PanelServer::doServe() {
@@ -386,6 +331,7 @@ void PanelServer::doServe() {
                  }
                  // TODO check valid attribute
                  auto dataManager = DataManager::GetInstance();
+                 std::lock_guard<std::recursive_mutex> lock(dataManager->GameMutex());
                  // cannot add attributes to more than limit
                  if (dataManager->GetAttribute(targetAttribute) >= dataManager->GetAttrLimit()) {
                    res.status = 405;
@@ -415,6 +361,7 @@ void PanelServer::doServe() {
                    }
                    // TODO check valid attribute
                    auto dataManager = DataManager::GetInstance();
+                   std::lock_guard<std::recursive_mutex> lock(dataManager->GameMutex());
                    int buycnt = dataManager->GetAttribute("buycnt");
                    int last_cost = 53000;
                    // 10 * 1.41^25 = 53762
@@ -508,113 +455,55 @@ void PanelServer::doServe() {
                   LAppPal::PrintLog(LogLevel::Error, e.what());
                 }
               });
-  server->Post("/api/task/:id/start", [&](const httplib::Request &req,
-                                          httplib::Response &res) {
-    LAppPal::PrintLog(LogLevel::Debug, "POST /api/task/:id/start");
-    int id = std::stoi(req.path_params.at("id"));
-    auto tasks = DataManager::GetInstance()->GetTasks();
-    std::shared_ptr<GameTask> targetTask;
-    for (auto task : tasks) {
-      // cannot start a new task while old one is running
-      if (task->status == TStatus::RUNNING ||
-          task->status == TStatus::WAIT_SETTLE) {
-        LAppPal::PrintLog(LogLevel::Warn,
-                          "[PanelServer]Already exists a running task");
-        res.status = 400;
+  auto taskResponse = [this](httplib::Response& res,
+                             const std::function<std::string()>& action) {
+    try {
+      auto dm = DataManager::GetInstance();
+      std::lock_guard<std::recursive_mutex> lock(dm->GameMutex());
+      auto error = action();
+      if (!error.empty()) {
+        res.status = 409;
+        res.set_content(nlohmann::json{{"error", error}}.dump(), "application/json");
         return;
       }
-      if (task->id == id) {
-        targetTask = task;
-      }
+      res.set_content(getTaskStatus().dump(), "application/json");
+    } catch (const std::exception& e) {
+      res.status = 400;
+      res.set_content(nlohmann::json{{"error", "任务操作失败，请刷新后重试"}}.dump(), "application/json");
+      LAppPal::PrintLog(LogLevel::Warn, "[Tasks]API request failed: %s", e.what());
     }
-    if (targetTask) {
-        if (targetTask->status == TStatus::ARCHIVED) {
-          // obviously archived task cannot be started
-          res.status = 401;
-          return;
-        }
-        // do starting work
-        targetTask->start_time = time(nullptr);
-        targetTask->success = false;
-        targetTask->status = TStatus::RUNNING;
-        targetTask->cost_snapshot = targetTask->GetCurrentCost();
-        targetTask->Dump();
-        auto data = getTaskStatus();
-        res.set_content(data.dump(), "application/json");
-        return;
-    }
-    res.status = 401;
+  };
+  server->Post("/api/task/:id/start", [taskResponse](const httplib::Request& req,
+                                                   httplib::Response& res) {
+    taskResponse(res, [&] {
+      return DataManager::GetInstance()->StartTask(std::stoi(req.path_params.at("id")));
+    });
   });
-  server->Post("/api/task/:id/confirm", [&](const httplib::Request &req,
-                                            httplib::Response &res) {
-    LAppPal::PrintLog(LogLevel::Debug, "POST /api/task/:id/confirm");
-    int id = std::stoi(req.path_params.at("id"));
-    auto dataManager = DataManager::GetInstance();
-    auto tasks = dataManager->GetTasks();
-    for (auto task : tasks) {
-      if (task->id == id) {
-        if (task->status != TStatus::WAIT_SETTLE) {
-          res.status = 400;
-          return;
-        }
-        // complete this task
-        task->end_time = time(nullptr);
-        if (task->success) {
-          // update attribute
-          for (auto it = task->rewards.begin(); it != task->rewards.end();
-               ++it) {
-            dataManager->AddAttribute(it->first, it->second);
-          }
-          if (task->id == 1) {
-            dataManager->AddAttribute("exp", 10 * dataManager->CurrentExpDiff());
-          }
-          // if with special, update related key
-          if (task->special) {
-            dataManager->SetRaw(task->special->linked_key, 1);
-          }
-          dataManager->SetRaw("buff.failcount", 0);
-          LAppPal::PrintLog("[PanelServer]Failcount set to 0");
-          Notify("UPDATE");
-        } else {
-          int failcount = dataManager->GetWithDefault("buff.failcount", 0);
-          failcount++;
-          dataManager->SetRaw("buff.failcount", failcount);
-          LAppPal::PrintLog("[PanelServer]Failcount set to %d", failcount);
-        }
-        if (task->repeatable) {
-            task->status = TStatus::IDLE;
-        } else {
-            task->status = task->success ? TStatus::ARCHIVED : TStatus::IDLE;
-        }
-        task->Dump();
-        auto data = getTaskStatus();
-        res.set_content(data.dump(), "application/json");
-        return;
-      }
-    }
-    res.status = 404;
+  server->Post("/api/task/:id/queue", [taskResponse](const httplib::Request& req,
+                                                   httplib::Response& res) {
+    taskResponse(res, [&] {
+      return DataManager::GetInstance()->QueueTask(std::stoi(req.path_params.at("id")));
+    });
   });
-  server->Post("/api/task/:id/cancel", [&](const httplib::Request &req,
-                                           httplib::Response &res) {
-    LAppPal::PrintLog(LogLevel::Debug, "POST /api/task/:id/cancel");
-    int id = std::stoi(req.path_params.at("id"));
-    auto tasks = DataManager::GetInstance()->GetTasks();
-    for (auto task : tasks) {
-      if (task->id == id) {
-        if (task->status != TStatus::RUNNING) {
-          res.status = 400;
-          return;
-        }
-        task->start_time = 0;
-        task->success = false;
-        task->status = TStatus::IDLE;
-        task->Dump();
-        auto data = getTaskStatus();
-        res.set_content(data.dump(), "application/json");
-        return;
-      }
-    }
-    res.status = 404;
+  server->Delete("/api/task/queue/:entryId", [taskResponse](const httplib::Request& req,
+                                                         httplib::Response& res) {
+    taskResponse(res, [&] {
+      return DataManager::GetInstance()->RemoveQueuedTask(std::stoll(req.path_params.at("entryId")));
+    });
+  });
+  server->Post("/api/task/queue/:entryId/move", [taskResponse](const httplib::Request& req,
+                                                           httplib::Response& res) {
+    taskResponse(res, [&] {
+      auto payload = nlohmann::json::parse(req.body);
+      return DataManager::GetInstance()->MoveQueuedTask(
+          std::stoll(req.path_params.at("entryId")), payload.at("direction").get<int>());
+    });
+  });
+  server->Post("/api/task/:id/cancel", [taskResponse](const httplib::Request& req,
+                                                    httplib::Response& res) {
+    taskResponse(res, [&] {
+      return DataManager::GetInstance()->CancelTask(std::stoi(req.path_params.at("id")));
+    });
   });
   server->Post("/api/config/folder", [](const httplib::Request &req, httplib::Response &res) {
     Platform::Open(LAppPal::WStringToString(LAppDefine::documentPath));

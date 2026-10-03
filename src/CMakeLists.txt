@@ -33,6 +33,7 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/BilibiliDynamic.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerTasks.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GamePanel.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/CookieWindow.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Wbi.hpp

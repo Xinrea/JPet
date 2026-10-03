@@ -3,6 +3,8 @@
 #include <string>
 #include <toml++/toml.hpp>
 #include <vector>
+#include <mutex>
+#include <cstdint>
 
 #include "GameData.hpp"
 #include "GameTask.hpp"
@@ -12,6 +14,15 @@ class DataManager {
   toml::table data;
   std::shared_ptr<GameData> gameData;
   std::vector<std::shared_ptr<GameTask>> tasks;
+  std::recursive_mutex gameMutex;
+  nlohmann::json taskQueue = nlohmann::json::array();
+  nlohmann::json taskHistory = nlohmann::json::array();
+  int64_t nextQueueId = 1;
+  void LoadTasks();
+  void SaveTaskQueue();
+  void StartNextQueuedTask(time_t now);
+  bool SettleTask(const std::shared_ptr<GameTask>& task, time_t now);
+  std::shared_ptr<GameTask> FindTask(int id);
   bool init();
   DataManager();
 
@@ -93,20 +104,17 @@ class DataManager {
    * @return  status list. [0]start_time, [1]end_time, [2]success, [3]status
    */
   std::vector<int> TaskStatus(int id);
-  std::vector<std::shared_ptr<GameTask>> GetTasks() {
-    if (tasks.empty()) {
-      tasks = GameTask::InitTasks();
-    }
-    return tasks;
-  }
-  std::shared_ptr<GameTask> GetCurrentTask() {
-    for (auto& task : tasks) {
-      if (task->status == TStatus::RUNNING || task->status == TStatus::WAIT_SETTLE) {
-        return task;
-      }
-    }
-    return nullptr;
-  }
+  // Serialize task transitions with API requests and attribute mutations.
+  std::recursive_mutex& GameMutex() { return gameMutex; }
+  std::shared_ptr<GameTask> GetCurrentTask();
+  nlohmann::json GetTaskState();
+  int TaskQueueCapacity();
+  void TickTasks(time_t now = time(nullptr));
+  std::string StartTask(int id, time_t now = time(nullptr));
+  std::string QueueTask(int id, time_t now = time(nullptr));
+  std::string RemoveQueuedTask(int64_t entryId);
+  std::string MoveQueuedTask(int64_t entryId, int direction);
+  std::string CancelTask(int id, time_t now = time(nullptr));
 
   void Save();
 
