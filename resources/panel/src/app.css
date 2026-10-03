@@ -2,8 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
+body,
+#app {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
 body {
     /* disable select */
     user-select: none !important;
     background-color: rgb(249,250,251);
+}
+
+.panel-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.panel-scroll::-webkit-scrollbar-track,
+.panel-scroll::-webkit-scrollbar-corner {
+    background: theme("colors.gray.50");
+}
+
+.panel-scroll::-webkit-scrollbar-thumb {
+    min-height: 32px;
+    border: 2px solid theme("colors.gray.50");
+    border-radius: 999px;
+    background: theme("colors.primary.300");
+}
+
+.panel-scroll::-webkit-scrollbar-thumb:hover {
+    background: theme("colors.primary.400");
+}
+
+.panel-scroll::-webkit-scrollbar-thumb:active {
+    background: theme("colors.primary.500");
+}
+
+@supports not selector(::-webkit-scrollbar) {
+    .panel-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: theme("colors.primary.300") theme("colors.gray.50");
+    }
 }

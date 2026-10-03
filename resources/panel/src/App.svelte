@@ -122,7 +122,7 @@
 
 <main>
   <!-- tab buttons -->
-  <div class="flex flex-row overflow-x-auto bg-white sticky top-0 z-20 shadow-md">
+  <div class="panel-tabs panel-scroll flex flex-row overflow-x-auto bg-white z-20 shadow-md">
     {#each tabs as tab, index}
       <button
         class="inline-block shrink-0 relative text-sm font-medium text-center disabled:cursor-not-allowed p-4 border-primary-600 dark:text-primary-500 dark:border-primary-500"
@@ -136,7 +136,9 @@
       </button>
     {/each}
   </div>
-  <div class="flex flex-col p-4 pt-4 bg-gray-50 z-10">
+  <!-- 内容滚动区可聚焦，以支持方向键和 Page Up / Page Down。 -->
+  <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+  <div class="panel-content panel-scroll flex flex-col p-4 pt-4 bg-gray-50" role="region" aria-label={tabs[activeTab].name + "内容"} tabindex="0">
     <div class:hide={activeTab !== 0}>
       <Profile {attributes} {expdiff} {clothes} {buffs} {starcnt} />
     </div>
@@ -170,6 +172,31 @@
 </main>
 
 <style>
+  main {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .panel-tabs {
+    flex-shrink: 0;
+  }
+
+  .panel-content {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .panel-content:focus-visible {
+    outline: 2px solid theme("colors.primary.500");
+    outline-offset: -2px;
+  }
+
   .hide {
     display: none;
   }
