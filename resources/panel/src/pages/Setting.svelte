@@ -1,6 +1,5 @@
 <script>
   import {
-    Avatar,
     Label,
     P,
     Toggle,
@@ -371,7 +370,17 @@
 <P class="mb-4">账号设置</P>
 {#if account_info && account_info.login}
   <div class="flex items-center space-x-4 rtl:space-x-reverse">
-    <Avatar src={fanAvatar} rounded size="lg" />
+    {#key account_info.info.avatar}
+      <img
+        src={account_info.info.avatar || fanAvatar}
+        alt={`${account_info.info.uname}的头像`}
+        class="w-20 h-20 rounded object-cover bg-gray-100 dark:bg-gray-600"
+        on:error={(event) => {
+          const image = event.currentTarget;
+          if (image.getAttribute("src") !== fanAvatar) image.src = fanAvatar;
+        }}
+      />
+    {/key}
     <div class="space-y-1 font-medium dark:text-white">
       <div>{account_info.info.uname}</div>
       <div class="text-sm text-gray-500 dark:text-gray-400">

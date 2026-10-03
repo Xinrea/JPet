@@ -754,15 +754,17 @@ void PanelServer::doServe() {
     }
     DataManager::GetInstance()->SetRaw("cookies", string(""));
     DataManager::GetInstance()->SetRaw("uid", string(""));
+    avatarCache_.ClearAccount();
     BuffManager::GetInstance()->Update();
     res.set_content(R"({"success":true})", "application/json");
   });
 
-  server->Get("/api/account", [](const httplib::Request &req,
+  server->Get("/api/account", [this](const httplib::Request &req,
                                  httplib::Response &res) {
     string cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
     nlohmann::json resp_json = {};
     if (cookies.empty()) {
+      avatarCache_.ClearAccount();
       resp_json["login"] = false;
       resp_json["info"] = {{"confirm", false}};
       res.set_content(resp_json.dump(), "application/json");
@@ -798,8 +800,11 @@ void PanelServer::doServe() {
           resp_json["info"]["uname"] =
               data.value("uname", std::string{});
           resp_json["info"]["uid"] = uid;
+          resp_json["info"]["avatar"] =
+              avatarCache_.SetAccount(uid, data.value("face", std::string{}));
           resp_json["info"]["level"] = BuffManager::GetInstance()->MedalLevel();
         } else {
+          avatarCache_.ClearAccount();
           DataManager::GetInstance()->SetRaw("uid", string(""));
         }
         res.set_content(resp_json.dump(), "application/json");
@@ -811,6 +816,46 @@ void PanelServer::doServe() {
     res.status = 502;
     resp_json["error"] = "账号信息服务暂时不可用";
     res.set_content(resp_json.dump(), "application/json");
+  });
+
+  server->Get("/api/account/avatar", [this](const httplib::Request &req,
+                                           httplib::Response &res) {
+    if (!req.has_param("uid") || !req.has_param("v")) {
+      res.set_header("Cache-Control", "no-store");
+      res.status = 400;
+      return;
+    }
+    const auto directory = std::filesystem::path(LAppDefine::documentPath) /
+                           "cache" / "avatars";
+    auto image = avatarCache_.Get(
+        req.get_param_value("uid"), req.get_param_value("v"), directory,
+        [](const std::string& source) -> std::string {
+          std::string host, path;
+          if (!ParseHttpsUrl(source, host, path)) return {};
+          httplib::SSLClient client(host, 443);
+          client.set_connection_timeout(std::chrono::seconds(3));
+          client.set_read_timeout(std::chrono::seconds(5));
+          // Do not forward login cookies or follow redirects to other hosts.
+          httplib::Headers headers = {{"Referer", "https://www.bilibili.com/"}};
+          std::string body;
+          auto response = client.Get(path, headers,
+              [&body](const char* data, size_t size) {
+                if (size > AccountAvatarCache::MaxImageSize - body.size())
+                  return false;
+                body.append(data, size);
+                return true;
+              });
+          if (!response || response->status != 200) return {};
+          return body;
+        });
+    if (image.body.empty()) {
+      res.set_header("Cache-Control", "no-store");
+      res.status = 404;
+      return;
+    }
+    res.set_header("Cache-Control", "private, max-age=86400, immutable");
+    res.set_header("X-Content-Type-Options", "nosniff");
+    res.set_content(std::move(image.body), image.contentType);
   });
 
   server->Get("/api/account/qr", [&](const httplib::Request &req,

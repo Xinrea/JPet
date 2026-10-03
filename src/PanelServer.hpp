@@ -2,6 +2,7 @@
 #include <httplib.h>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include "AccountAvatarCache.hpp"
 
 class PanelServer {
  private:
@@ -12,6 +13,7 @@ class PanelServer {
   std::atomic_int _messageId = 0;
   std::thread worker_;
   std::atomic_bool _stopping{false};
+  AccountAvatarCache avatarCache_;
 
 
   PanelServer() { server = new httplib::Server(); };
