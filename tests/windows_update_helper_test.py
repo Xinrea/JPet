@@ -31,7 +31,9 @@ function Start-Process {
     if ($env:JPET_TEST_FAIL_LAUNCH -eq '1' -and
         [IO.File]::ReadAllLines($env:JPET_TEST_LAUNCHES).Length -eq 1) { throw 'Simulated launch failure' }
 }
+$global:LASTEXITCODE = 0
 & $Helper -ParentId 2147483647 -Staged $Staged -Target $Target -FailureLog $FailureLog
+exit $LASTEXITCODE
 """, encoding="utf-8-sig")
 
     def tearDown(self):
