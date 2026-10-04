@@ -82,7 +82,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Restore C++ binary cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cpp-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/vcpkg-cache
           key: vcpkg-${{ matrix.os }}-${{ matrix.triplet }}-${{ env.VCPKG_REVISION }}-${{ hashFiles('vcpkg.json', 'build-scripts/triplets/*') }}
@@ -169,6 +170,12 @@ jobs:
             build/vcpkg/buildtrees/**/*.log
             build/release/vcpkg-manifest-install.log
           if-no-files-found: ignore
+      - name: Save built C++ dependencies
+        if: always() && steps.cpp-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/vcpkg-cache
+          key: ${{ steps.cpp-cache.outputs.cache-primary-key }}
 
   release:
     if: github.event_name == 'push'

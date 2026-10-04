@@ -246,7 +246,8 @@ endif()
 
 # Build in multi-process.
 if(MSVC)
-  target_compile_options(${APP_NAME} PRIVATE /MP)
+  target_compile_options(${APP_NAME} PRIVATE /MP /utf-8)
+  target_compile_options(rocksdb PRIVATE /MP /utf-8)
   target_link_libraries(${APP_NAME} PRIVATE
     debug -NODEFAULTLIB:libcmtd.lib optimized -NODEFAULTLIB:libcmt.lib)
 endif()
@@ -315,6 +316,7 @@ if(JPET_BUILD_UPDATE_TESTS)
   enable_testing()
   add_executable(update_release_test tests/update_release_test.cpp)
   target_include_directories(update_release_test PRIVATE src)
+  target_compile_options(update_release_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
   target_link_libraries(update_release_test PRIVATE OpenSSL::Crypto nlohmann_json::nlohmann_json semver::semver)
   add_test(NAME update_release COMMAND update_release_test)
 endif()
