@@ -21,6 +21,11 @@ void WinToastEventHandler::toastActivated() const {
     PanelServer::GetInstance()->Notify("TASK_COMPLETE");
     return;
   }
+  if (url == "SOFTWARE_UPDATE") {
+    LAppDelegate::GetInstance()->ForceShowPanel();
+    PanelServer::GetInstance()->Notify("SOFTWARE_UPDATE");
+    return;
+  }
   std::wstring w_url = LAppPal::StringToWString(url);
   ShellExecute(NULL, L"open", w_url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 }

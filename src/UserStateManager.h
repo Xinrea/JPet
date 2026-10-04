@@ -75,8 +75,6 @@ class UserStateManager {
     }
   }
 
-  void CheckUpdate(bool notify);
-
   void CheckThread(const vector<string>& list);
 
   std::optional<StateMessage> FetchOne() {

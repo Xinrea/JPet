@@ -52,6 +52,7 @@
 #include "PanelServer.hpp"
 #include "PartStateManager.h"
 #include "TaskScheduler.hpp"
+#include "UpdateManager.hpp"
 #include "resource.h"
 
 #ifdef _WIN32
@@ -303,8 +304,13 @@ bool LAppDelegate::Initialize() {
   _us->Init(_followlist);
 #endif
 
-  // check update
-  if (!std::getenv("JPET_SMOKE_TEST")) _us->CheckUpdate(UpdateNotify);
+  UpdateManager::GetInstance()->Start([this](const Updates::Release& release) {
+    if (DataManager::GetInstance()->GetConfig<bool>("notify", "update", true)) {
+      _us->Notify(L"检测到 JPet " + LAppPal::StringToWString(release.version),
+                  L"打开设置面板的说明页面，可下载并重启更新。",
+                  new WinToastEventHandler("SOFTWARE_UPDATE"));
+    }
+  });
 
   if (!std::getenv("JPET_SMOKE_TEST")) CloudGame::GetInstance()->Start();
 
@@ -338,12 +344,13 @@ void LAppDelegate::SetLimit(bool limit) {
 }
 
 void LAppDelegate::Release() {
+  UpdateManager::GetInstance()->Stop();
   if (!std::getenv("JPET_SMOKE_TEST")) CloudGame::GetInstance()->Stop();
-#ifdef __APPLE__
-  MacDesktop::Shutdown();
   PanelServer::GetInstance()->Stop();
   delete _us;
   _us = nullptr;
+#ifdef __APPLE__
+  MacDesktop::Shutdown();
   delete _panel;
   _panel = nullptr;
   // All GL resources must be destroyed while their context still exists.
@@ -387,6 +394,10 @@ void LAppDelegate::Run() {
   // メインループ
   bool noskip = false;
   while (glfwWindowShouldClose(_window) == GL_FALSE && !_isEnd) {
+    if (UpdateManager::GetInstance()->ApplyPendingInstall()) {
+      _isEnd = true;
+      break;
+    }
     if (!_isShowing && !_need_snapshot.load()) {
       glfwWaitEventsTimeout(0.1);
       goto render_end;

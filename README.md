@@ -1,5 +1,43 @@
 # JPet
 
+## 自动构建与更新
+
+推送版本 tag（如 `3.0.0` 或 `v3.0.0`）会触发
+[发布工作流](.github/workflows/release-build.yml)，构建 Windows x64 和 macOS ARM64。
+两个平台都通过构建与更新测试后，工作流自动创建 GitHub Release，上传：
+
+- `jpet-<版本>-windows-x64.zip`：完整便携包，也是 Windows 自动更新包。
+- `jpet-<版本>-windows-x64-setup.exe`：当前用户安装程序。
+- `jpet-<版本>-macos-arm64.zip`：包含 `JPet.app` 的完整应用包。
+- `SHA256SUMS`：下载文件的 SHA-256 校验值。
+
+```sh
+git tag 3.0.0
+git push origin 3.0.0
+```
+
+也可以在 Actions 中手动运行工作流，输入 `3.0.0` 进行构建测试；手动运行只上传
+Actions artifacts。`3.0.0-rc.1` 等预发布 tag 会创建 prerelease，程序仅自动检查正式 Release。
+
+启动时会在后台检查 [GitHub Releases](https://github.com/Xinrea/JPet/releases)，之后每 6 小时
+自动检查一次。设置面板的「说明」页面支持手动检查、查看更新说明、下载和「重启并更新」。
+更新包会通过 HTTPS 下载，并验证 GitHub Release asset 的 SHA-256 和文件大小。
+下载、校验及解压完成后，点击重启才会安装；安装助手等待旧进程正常退出，替换应用后
+重新启动。替换或启动失败会尝试恢复旧版本，本地用户数据保留在原数据目录中。
+
+macOS 应先将 `JPet.app` 移到可写的应用目录再运行。发布包使用 ad-hoc 签名，未进行
+Apple Developer ID 签名和公证。Windows 旧版若安装在 Program Files，更新时会请求 UAC 授权。
+失败信息会保存在用户数据目录的 `updates/last-error.txt`，Mac 助手详细日志位于相应下载目录。
+
+更新校验与 Mac 安装助手回归检查：
+
+```sh
+cmake -S . -B build/macos-arm64 -DJPET_BUILD_UPDATE_TESTS=ON
+cmake --build build/macos-arm64
+ctest --test-dir build/macos-arm64 --output-on-failure
+python3 tests/update_helper_test.py
+```
+
 ## macOS（Apple Silicon）
 
 项目现在支持使用 Apple Silicon（`arm64`）的 macOS。macOS 版本使用 GLFW/Cocoa
@@ -95,7 +133,7 @@ Cookie 存储。
 
 ## 编译
 
-> 仅支持 Windows 平台（Win10 及以上）
+> Windows 构建需要 Win10 及以上；Mac ARM 构建方式见上文。
 
 该项目需要的部分依赖已经置于`thirdparty`下，包括：
 

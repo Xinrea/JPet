@@ -16,7 +16,7 @@
  */
 
 #ifndef VERSION
-#define VERSION "2.0.0-alpha"
+#define VERSION "3.0.0"
 #endif
 
 namespace LAppDefine {

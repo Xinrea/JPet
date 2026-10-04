@@ -5,6 +5,8 @@
 #include "LAppDelegate.hpp"
 #include "LAppPal.hpp"
 #include "PanelServer.hpp"
+#include <unistd.h>
+#include <fcntl.h>
 
 namespace {
 NSString* Text(const std::wstring& text) {
@@ -31,10 +33,10 @@ void OnMainSync(dispatch_block_t block) {
  didReceiveNotificationResponse:(UNNotificationResponse*)response
          withCompletionHandler:(void (^)(void))completion {
   NSString* action = response.notification.request.content.userInfo[@"action"];
-  if ([action isEqualToString:@"TASK_COMPLETE"]) {
+  if ([action isEqualToString:@"TASK_COMPLETE"] || [action isEqualToString:@"SOFTWARE_UPDATE"]) {
     dispatch_async(dispatch_get_main_queue(), ^{
       LAppDelegate::GetInstance()->ForceShowPanel();
-      PanelServer::GetInstance()->Notify("TASK_COMPLETE");
+      PanelServer::GetInstance()->Notify(action.UTF8String);
     });
   } else if (action.length) {
     Platform::Open(action.UTF8String);
@@ -130,5 +132,58 @@ bool Platform::TrashFile(const std::wstring& path) {
                                              resultingItemURL:nil error:&error];
     if (error) NSLog(@"JPet trash: %@", error);
     return result;
+  }
+}
+
+bool Platform::ExtractUpdate(const std::filesystem::path& archive,
+                             const std::filesystem::path& stage, std::string& error) {
+  @autoreleasepool {
+    NSTask* task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/ditto"];
+    task.arguments = @[@"-x", @"-k", [NSString stringWithUTF8String:archive.c_str()],
+                       [NSString stringWithUTF8String:stage.c_str()]];
+    task.standardOutput = [NSFileHandle fileHandleWithNullDevice];
+    task.standardError = [NSFileHandle fileHandleWithNullDevice];
+    NSError* launchError = nil;
+    if (![task launchAndReturnError:&launchError]) { error = "无法启动更新包解压工具"; return false; }
+    [task waitUntilExit];
+    if (task.terminationStatus != 0) { error = "更新包解压失败，请重新下载"; return false; }
+    return true;
+  }
+}
+
+bool Platform::LaunchUpdate(const std::filesystem::path& staged,
+                            const std::filesystem::path& work,
+                            const std::filesystem::path& failureLog, std::string& error) {
+  @autoreleasepool {
+    const auto target = std::filesystem::path(NSBundle.mainBundle.bundlePath.fileSystemRepresentation);
+    if (target.extension() != ".app" || target.string().find("/AppTranslocation/") != std::string::npos) {
+      error = "请先将 JPet.app 移到应用程序目录，再重启 JPet 后更新"; return false;
+    }
+    const auto probe = target.parent_path() / (".jpet-write-test-" + work.filename().string());
+    const int descriptor = open(probe.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0600);
+    if (descriptor < 0) { error = "应用目录不可写，请移动 JPet.app 到当前用户的应用程序目录后重试"; return false; }
+    close(descriptor); unlink(probe.c_str());
+    try {
+      const auto source = target / "Contents/Resources/resources/updater/macos.sh";
+      const auto script = work / "updater.sh";
+      std::filesystem::copy_file(source, script, std::filesystem::copy_options::overwrite_existing);
+      const auto log = work / "updater.log";
+      [[NSFileManager defaultManager] createFileAtPath:[NSString stringWithUTF8String:log.c_str()] contents:nil attributes:nil];
+      NSTask* task = [[NSTask alloc] init];
+      task.executableURL = [NSURL fileURLWithPath:@"/bin/bash"];
+      task.arguments = @[[NSString stringWithUTF8String:script.c_str()],
+                         [NSString stringWithFormat:@"%d", getpid()],
+                         [NSString stringWithUTF8String:staged.c_str()],
+                         [NSString stringWithUTF8String:target.c_str()],
+                         [NSString stringWithUTF8String:failureLog.c_str()]];
+      task.currentDirectoryURL = [NSURL fileURLWithPath:[NSString stringWithUTF8String:work.c_str()]];
+      task.standardInput = [NSFileHandle fileHandleWithNullDevice];
+      task.standardOutput = [NSFileHandle fileHandleForWritingAtPath:[NSString stringWithUTF8String:log.c_str()]];
+      task.standardError = task.standardOutput;
+      NSError* launchError = nil;
+      if (![task launchAndReturnError:&launchError]) { error = "无法启动更新助手"; return false; }
+      return true;
+    } catch (const std::exception&) { error = "无法准备更新助手，请检查磁盘空间"; return false; }
   }
 }

@@ -11,7 +11,7 @@ set(APP_NAME JPet)
 
 # JVERSION can be set by -D option.
 if(NOT DEFINED JVERSION)
-  set(JVERSION "2.0.0-alpha")
+  set(JVERSION "3.0.0")
 endif()
 
 message(STATUS "JPet version: ${JVERSION}")
@@ -193,6 +193,7 @@ if(APPLE)
     MACOSX_BUNDLE_BUNDLE_NAME "${APP_NAME}"
     MACOSX_BUNDLE_GUI_IDENTIFIER "cn.vjoi.jpet"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${JVERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${JVERSION}"
     OBJCXX_STANDARD 17
     OBJCXX_STANDARD_REQUIRED YES
   )
@@ -239,7 +240,7 @@ else()
   target_link_libraries(${APP_NAME} PRIVATE GLEW::GLEW)
   target_include_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/inc)
   target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/)
-  target_link_libraries(${APP_NAME} PRIVATE rocksdb fmod_vc Dbghelp
+  target_link_libraries(${APP_NAME} PRIVATE rocksdb fmod_vc Dbghelp Crypt32
     unofficial::wintoast::wintoast unofficial::webview2::webview2)
 endif()
 
@@ -261,7 +262,7 @@ if(NOT EXISTS "${RES_PATH}/panel/dist/index.html")
   message(FATAL_ERROR "Build the settings panel first: cd resources/panel && npm ci && npm run build")
 endif()
 
-foreach(DIRECTORY audios imgs circle-menu joi panel/dist)
+foreach(DIRECTORY audios imgs circle-menu joi panel/dist updater)
   string(REPLACE "/" "_" DIRECTORY_TARGET "${DIRECTORY}")
   add_custom_target(${APP_NAME}_resource_${DIRECTORY_TARGET} ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory "${APP_RESOURCES}/${DIRECTORY}"
@@ -307,4 +308,13 @@ target_compile_definitions(${APP_NAME}
 # if build Debug, add debug definition.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_definitions(${APP_NAME} PRIVATE JPET_DEBUG)
+endif()
+
+option(JPET_BUILD_UPDATE_TESTS "Build release selection and checksum tests" OFF)
+if(JPET_BUILD_UPDATE_TESTS)
+  enable_testing()
+  add_executable(update_release_test tests/update_release_test.cpp)
+  target_include_directories(update_release_test PRIVATE src)
+  target_link_libraries(update_release_test PRIVATE OpenSSL::Crypto nlohmann_json::nlohmann_json semver::semver)
+  add_test(NAME update_release COMMAND update_release_test)
 endif()

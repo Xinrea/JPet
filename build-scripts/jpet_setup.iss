@@ -2,7 +2,9 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "JPet"
-#define MyAppVersion "20240810"
+#ifndef MyAppVersion
+#define MyAppVersion "3.0.0"
+#endif
 #define MyAppPublisher "Xinrea"
 #define MyAppURL "https://pet.vjoi.cn/"
 #define MyAppExeName "JPet.exe"
@@ -18,7 +20,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={localappdata}\Programs\{#MyAppName}
 ; "ArchitecturesAllowed=x64compatible" specifies that Setup cannot run
 ; on anything but x64 and Windows 11 on Arm.
 ArchitecturesAllowed=x64compatible
@@ -29,9 +31,9 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)
-;PrivilegesRequired=lowest
+PrivilegesRequired=lowest
 OutputBaseFilename=JPetSetup
-SetupIconFile=
+SetupIconFile=..\resources\logo.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -43,8 +45,7 @@ Name: "Chinese"; MessagesFile: "ChineseSimplified.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\build\bin\JPet\Release\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs
-Source: "..\dll\*"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build\package\JPet\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
@@ -53,4 +54,3 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
-

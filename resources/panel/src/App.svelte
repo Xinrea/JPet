@@ -71,28 +71,28 @@
       });
   }
 
-  let local_version = "";
-  let latest_version = "";
+  let updater = {};
   let need_update = false;
+  $: need_update = updater.need_update === true;
+  let versionTimer;
+  let destroyed = false;
   function fetchVersionInfo() {
-    fetch("/api/version")
+    clearTimeout(versionTimer);
+    return fetch("/api/version")
       .then((res) => res.json())
       .then((d) => {
-        local_version = d["local_version"];
-        latest_version = d["latest_version"];
-        need_update = d["need_update"];
+        updater = d;
+      })
+      .catch((error) => reportFrontendError("[App] version status failed", error))
+      .finally(() => {
+        if (!destroyed) versionTimer = setTimeout(fetchVersionInfo,
+          ["checking", "downloading", "verifying", "installing"].includes(updater.state) ? 1000 : 30000);
       });
   }
 
   updateProfile();
 
   fetchVersionInfo();
-  setTimeout(
-    () => {
-      fetchVersionInfo();
-    },
-    10 * 60 * 1000,
-  );
 
   let achievementNotice = [];
   let noticeTimer;
@@ -108,6 +108,10 @@
     if (e.data == "UPDATE") {
       updateProfile();
     }
+    if (e.data === "SOFTWARE_UPDATE") {
+      activeTab = 6;
+      fetchVersionInfo();
+    }
     if (e.data.startsWith("{")) {
       try {
         const message = JSON.parse(e.data);
@@ -119,7 +123,7 @@
       } catch (error) { reportFrontendError("[App] invalid achievement event", error); }
     }
   });
-  onDestroy(() => { unsubscribe(); clearTimeout(noticeTimer); });
+  onDestroy(() => { destroyed = true; unsubscribe(); clearTimeout(noticeTimer); clearTimeout(versionTimer); });
 </script>
 
 <main>
@@ -162,7 +166,7 @@
     </div>
     {#if activeTab === 5}<Rank {account_info} />{/if}
     <div class:hide={activeTab !== 6}>
-      <Document {latest_version} {local_version} />
+      <Document bind:updater on:refresh={fetchVersionInfo} />
     </div>
   </div>
   {#if achievementNotice.length > 0}

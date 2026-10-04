@@ -9,6 +9,7 @@
 #include "LAppDelegate.hpp"
 #include "Wbi.hpp"
 #include "Platform.hpp"
+#include "UpdateManager.hpp"
 
 #include <map>
 #include <string_view>
@@ -692,13 +693,27 @@ void PanelServer::doServe() {
   });
   server->Get("/api/version", [](const httplib::Request &req,
                                           httplib::Response &res) {
-      nlohmann::json response;
-      LAppDelegate::GetInstance()->GetUserStateManager()->CheckUpdate(false);
-      response["need_update"] = DataManager::GetInstance()->GetWithDefault("need_update", 0) == 1;
-      response["local_version"] = VERSION;
-      response["latest_version"] = DataManager::GetInstance()->GetWithDefault("latest_version", "");
-      res.set_content(response.dump(), "application/json");
+      res.set_header("Cache-Control", "no-store");
+      res.set_content(UpdateManager::GetInstance()->Status().dump(), "application/json");
   });
+  const auto updateAction = [](auto action) {
+    return [action](const httplib::Request& req, httplib::Response& res) {
+      // The panel is same-origin. Reject browser requests from other sites.
+      const auto origin = req.get_header_value("Origin");
+      if (!origin.empty() && origin != "http://127.0.0.1:8053" && origin != "http://localhost:8053") {
+        res.status = 403; res.set_content(R"({"error":"请求来源无效"})", "application/json"); return;
+      }
+      std::string error;
+      const bool accepted = (UpdateManager::GetInstance()->*action)(error);
+      auto status = UpdateManager::GetInstance()->Status();
+      if (!accepted) status["error"] = error;
+      res.status = accepted ? 202 : 409;
+      res.set_content(status.dump(), "application/json");
+    };
+  };
+  server->Post("/api/update/check", updateAction(&UpdateManager::Check));
+  server->Post("/api/update/download", updateAction(&UpdateManager::Download));
+  server->Post("/api/update/install", updateAction(&UpdateManager::Install));
 
   server->Delete("/api/account", [&](const httplib::Request &req,
                                      httplib::Response &res) {

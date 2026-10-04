@@ -8,7 +8,6 @@
 #endif
 
 #include <httplib.h>
-#include <semver.hpp>
 #include <cstdlib>
 
 #ifdef __APPLE__
@@ -16,55 +15,6 @@
 #else
 using namespace WinToastLib;
 #endif
-
-void UserStateManager::CheckUpdate(bool notify) {
-  httplib::SSLClient live_cli("pet.vjoi.cn", 443);
-  live_cli.set_follow_location(true);
-  live_cli.enable_server_certificate_verification(false);
-  live_cli.set_connection_timeout(std::chrono::seconds(1));
-  auto res = live_cli.Get("/version.txt");
-  if (res && res->status == 200) {
-    LAppPal::PrintLog(
-        LogLevel::Debug,
-        (std::string("[UserStateWatcher]Check Update Latest: ") + res->body)
-            .c_str());
-    bool need_check = true;
-    string version_str = string(res->body);
-    size_t endpos = version_str.find_last_not_of('\n');
-    if (endpos != std::string::npos) {
-      version_str = version_str.substr(0, endpos + 1);
-    }
-    try {
-      semver::version latest_version{version_str};
-    } catch (const std::exception& e) {
-      LAppPal::PrintLog(LogLevel::Warn, "[UserStateManager]Latest version is not formatted %s", e.what());
-      need_check = false;
-    }
-    if (!need_check) {
-      return;
-    }
-    semver::version latest_version{version_str};
-    semver::version local_version{(VERSION)};
-    
-    if (local_version < latest_version) {
-      LAppPal::PrintLog("[UserStateWatcher]Need Update: %s -> %s ", VERSION,
-                        res->body.c_str());
-      DataManager::GetInstance()->SetRaw("need_update", 1);
-      DataManager::GetInstance()->SetRaw("latest_version", latest_version.to_string());
-      if (notify) {
-        Notify(L"检测到新版本", L"请前往项目页面下载",
-               new WinToastEventHandler("https://pet.vjoi.cn"));
-      }
-    } else {
-      DataManager::GetInstance()->SetRaw("latest_version",
-                                         latest_version.to_string());
-      DataManager::GetInstance()->SetRaw("need_update", 0);
-    }
-  } else {
-    DataManager::GetInstance()->SetRaw("need_update", 0);
-    LAppPal::PrintLog(LogLevel::Error, "[UserStateWatcher]Check Update Failed");
-  }
-}
 
 void UserStateManager::Notify(const wstring& title, const wstring& content,
                               WinToastEventHandler* handler) {
