@@ -1,8 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "jpet-cloud",
+  "account_id": "507f35340f4c1062376b79dbbb011ce6",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-04",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "s.jpet.powerlive.io", "custom_domain": true }],
   "durable_objects": {
     "bindings": [{ "name": "PLAYERS", "class_name": "Player" }]
   },
@@ -10,6 +14,7 @@
   "d1_databases": [{
     "binding": "RANK",
     "database_name": "jpet-rank",
+    "database_id": "27fb48bb-efed-4428-8c22-9bc89ab5298c",
     "migrations_dir": "migrations"
   }],
   "observability": {

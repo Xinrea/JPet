@@ -99,10 +99,58 @@ bash build-scripts/test_achievements_macos.sh
 
 ## 部署到 Cloudflare
 
+### 生产环境
+
+生产服务地址为 `https://s.jpet.powerlive.io`。在 JPet 设置页的「云端游戏服务」中填写此地址，
+或在启动时设置 `JPET_CLOUD_URL=https://s.jpet.powerlive.io`。
+
+`cloud/wrangler.jsonc` 的顶层配置对应生产环境，固定以下资源：
+
+- Worker：`jpet-cloud`，账号 ID：`507f35340f4c1062376b79dbbb011ce6`。
+- 玩家存档：`PLAYERS` 绑定到 SQLite Durable Object 类 `Player`，首次部署通过 `v1` 迁移创建。
+- 排行榜：`RANK` 绑定到 D1 数据库 `jpet-rank`，数据库 ID：`27fb48bb-efed-4428-8c22-9bc89ab5298c`，区域为 APAC。
+- 域名：Workers Custom Domain `s.jpet.powerlive.io`，由 Cloudflare 管理 DNS 与 HTTPS 证书。
+- 已开启日志和 1% 采样追踪，关闭 `workers.dev` 和版本预览地址。
+
+更新生产服务时，复用配置中的资源，执行：
+
+```sh
+cd cloud
+npm ci
+npm run types
+npm run typecheck
+npm test
+npm run deploy:check
+npm run db:remote
+npm run deploy
+```
+
+健康检查与排行榜检查：
+
+```sh
+curl --fail https://s.jpet.powerlive.io/health
+curl --fail 'https://s.jpet.powerlive.io/v1/rank?metric=starcnt&limit=1'
+```
+
+健康检查返回 `{"ok":true,"protocol":1}`。`npm run dev`、本地数据库迁移和云端测试
+仍使用本地模拟存储。
+
+### 在新账号初始化
+
+以下步骤仅用于在其他账号初始化服务；已有生产环境直接使用上述更新流程。
+登录后先将 `wrangler.jsonc` 的 `account_id` 改为目标账号，将 `routes` 改为该账号下的自有域名，
+并移除原有 `database_id`，再创建数据库：
+
 ```sh
 cd cloud
 npm ci
 npx wrangler login
+npx wrangler whoami
+```
+
+确认并修改目标账号和域名后执行：
+
+```sh
 npx wrangler d1 create jpet-rank
 ```
 
