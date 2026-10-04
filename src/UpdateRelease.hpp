@@ -4,6 +4,7 @@
 #include <cctype>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <regex>
 #include <stdexcept>
 #include <string>
@@ -37,6 +38,18 @@ inline std::string Version(const std::string& tag) {
   if (value.size() > 128 || !std::regex_match(value, std::regex(R"([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)")))
     throw std::runtime_error("Release 的版本号无效");
   return semver::version{value}.to_string();
+}
+
+inline bool IsStableRelease(const nlohmann::json& json) {
+  if (!json.is_object() || json.value("draft", false) || json.value("prerelease", false)) return false;
+  const auto tag = json.find("tag_name");
+  if (tag == json.end() || !tag->is_string()) return false;
+  // Check the tag as well: testing releases may be missing the prerelease flag.
+  try {
+    return semver::version{Version(tag->get<std::string>())}.prerelease_type == semver::prerelease::none;
+  } catch (const std::exception&) {
+    return false;
+  }
 }
 
 inline Release ParseRelease(const nlohmann::json& json, const std::string& current,
@@ -73,6 +86,15 @@ inline Release ParseRelease(const nlohmann::json& json, const std::string& curre
     break;
   }
   return release;
+}
+
+inline std::optional<Release> FindStableRelease(const nlohmann::json& releases, const std::string& current,
+                                              const std::string& platform) {
+  if (!releases.is_array()) throw std::runtime_error("GitHub Release 列表无效");
+  for (const auto& json : releases) {
+    if (IsStableRelease(json)) return ParseRelease(json, current, platform);
+  }
+  return std::nullopt;
 }
 
 inline std::string SHA256(const std::filesystem::path& path) {

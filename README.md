@@ -18,6 +18,8 @@ git push origin 3.0.0
 
 也可以在 Actions 中手动运行工作流，输入 `3.0.0` 进行构建测试；手动运行只上传
 Actions artifacts。`3.0.0-rc.1` 等预发布 tag 会创建 prerelease，程序仅自动检查正式 Release。
+版本号带 beta、alpha、rc 等预发布后缀的 Release 即使未标记为 prerelease，也会被跳过；
+若最新 Release 为测试版，程序会继续查找正式版本。
 
 启动时会在后台检查 [GitHub Releases](https://github.com/Xinrea/JPet/releases)，之后每 6 小时
 自动检查一次。设置面板的「说明」页面支持手动检查、查看更新说明、下载和「重启并更新」。

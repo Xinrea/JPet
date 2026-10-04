@@ -172,19 +172,34 @@ void UpdateManager::Run() {
 void UpdateManager::CheckRelease() {
   httplib::Client client("https://api.github.com");
   ConfigureTLS(client);
-  std::string body;
-  auto response = client.Get("/repos/Xinrea/JPet/releases/latest", Headers(), [&](const char* data, size_t size) {
-    if (stopping_ || body.size() + size > 2 * 1024 * 1024) return false;
-    body.append(data, size); return true;
-  });
-  if (!response) throw std::runtime_error("无法连接 GitHub，请稍后重试");
-  if (response->status == 404) {
+  std::optional<Updates::Release> selected;
+  // Keep GitHub's designated latest release when it is stable. Otherwise,
+  // search older pages instead of failing on an unmarked beta/alpha/rc tag.
+  for (unsigned int page = 0; !stopping_; ++page) {
+    const auto path = page == 0 ? std::string("/repos/Xinrea/JPet/releases/latest")
+                               : "/repos/Xinrea/JPet/releases?per_page=30&page=" + std::to_string(page);
+    std::string body;
+    auto response = client.Get(path, Headers(), [&](const char* data, size_t size) {
+      if (stopping_ || body.size() + size > 2 * 1024 * 1024) return false;
+      body.append(data, size); return true;
+    });
+    if (!response) throw std::runtime_error("无法连接 GitHub，请稍后重试");
+    if (response->status == 404) {
+      if (page == 0) continue;
+      break;
+    }
+    if (response->status == 403 || response->status == 429) throw std::runtime_error("GitHub 请求过于频繁，请稍后重试");
+    if (response->status != 200) throw std::runtime_error("GitHub 版本检查失败（HTTP " + std::to_string(response->status) + "）");
+    const auto json = nlohmann::json::parse(body);
+    selected = Updates::FindStableRelease(page == 0 ? nlohmann::json::array({json}) : json, VERSION, Updates::PlatformName());
+    if (selected || (page > 0 && response->get_header_value("Link").find("rel=\"next\"") == std::string::npos)) break;
+  }
+  if (stopping_) return;
+  if (!selected) {
     std::lock_guard<std::mutex> lock(mutex_);
     release_ = {}; state_ = "idle"; error_ = "尚无正式 Release"; return;
   }
-  if (response->status == 403 || response->status == 429) throw std::runtime_error("GitHub 请求过于频繁，请稍后重试");
-  if (response->status != 200) throw std::runtime_error("GitHub 版本检查失败（HTTP " + std::to_string(response->status) + "）");
-  auto release = Updates::ParseRelease(nlohmann::json::parse(body), VERSION, Updates::PlatformName());
+  auto release = std::move(*selected);
   bool notify = false;
   {
     std::lock_guard<std::mutex> lock(mutex_);
