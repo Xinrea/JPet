@@ -41,6 +41,7 @@
   };
   let buffs = [];
   let account_info = null;
+  let game = { online: false, cloud: { error: "正在同步云端状态" } };
 
   // fetch current status
   function updateProfile() {
@@ -52,6 +53,7 @@
         return res.json();
       })
       .then((data) => {
+        game = data;
         clothes = data.clothes;
         attributes = data.attributes;
         expdiff = data.expdiff;
@@ -139,11 +141,17 @@
   <!-- 内容滚动区可聚焦，以支持方向键和 Page Up / Page Down。 -->
   <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
   <div class="panel-content panel-scroll flex flex-col p-4 pt-4 bg-gray-50" role="region" aria-label={tabs[activeTab].name + "内容"} tabindex="0">
+    <p class="mb-3 rounded border p-3 text-sm" class:border-green-200={game.online} class:bg-green-50={game.online}
+      class:border-amber-200={!game.online} class:bg-amber-50={!game.online} role="status">
+      {game.online ? "云端已连接 · 任务和经验正在推进" : `${game.cloud?.error || "连接中断"} · 任务和经验已暂停`}
+    </p>
     <div class:hide={activeTab !== 0}>
-      <Profile {attributes} {expdiff} {clothes} {buffs} {starcnt} />
+      <Profile {attributes} {expdiff} {clothes} {buffs} {starcnt} online={game.online}
+        expProgress={game.exp_progress_seconds ?? 0} buycost={game.buycost ?? 0}
+        revertgain={game.revertgain ?? 0} starAvailable={game.star_available ?? false} />
     </div>
     <div class:hide={activeTab !== 1}>
-      <Task {attributes} {expdiff} {starcnt} />
+      <Task {attributes} online={game.online} />
     </div>
     {#if activeTab === 2}<Achievement />{/if}
     <div class:hide={activeTab !== 3}>
@@ -152,9 +160,7 @@
     <div class:hide={activeTab !== 4}>
       <Setting bind:account_info={account_info} />
     </div>
-    <div class:hide={activeTab !== 5}>
-      <Rank {account_info} {attributes} {starcnt} />
-    </div>
+    {#if activeTab === 5}<Rank {account_info} />{/if}
     <div class:hide={activeTab !== 6}>
       <Document {latest_version} {local_version} />
     </div>

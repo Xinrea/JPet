@@ -57,13 +57,20 @@ VCPKG_INSTALLED_DIR=/path/to/vcpkg_installed \
 BUILD_TYPE=Debug ./build-scripts/build_and_run_macos.sh
 ```
 
-任务队列回归检查（使用独立临时存档，不修改游戏数据）：
+游戏规则和存档已迁移到 Cloudflare。启动后在设置中填写云端服务地址并登录账号。
+未连接时显示缓存，任务与挂机经验保持暂停。服务开发、部署和协议见
+[云端游戏服务说明](doc/cloud-game.md)。
+
+云端任务与存储回归检查：
 
 ```sh
-bash build-scripts/test_task_queue_macos.sh
+cd cloud
+npm ci
+npm run types
+npm test
+cd ..
+bash build-scripts/test_cloud_sync_macos.sh
 ```
-
-也可以添加 `preview` 参数，用测试数据预览任务界面，地址为 `http://127.0.0.1:18765`。
 
 Apple 已弃用 OpenGL，但当前 Live2D OpenGL 渲染路径仍可运行；后续如需长期支持，
 应另行评估 Cubism Metal 渲染后端。macOS 的登录页会使用系统持久化的 WebKit
@@ -115,6 +122,7 @@ git submodule update --init
 
 - [数值设计文档](doc/attributes.md)
 - [成就系统：50 个成就与解锁条件](doc/achievements.md)
+- [Cloudflare 云端游戏服务与部署](doc/cloud-game.md)
 
 面板新增「成就」页面，展示收集比例、分类、解锁条件、单项进度和解锁日期，
 支持搜索、状态筛选和排序。成就会自动解锁并提示；升星或消耗属性不会撤销成就。

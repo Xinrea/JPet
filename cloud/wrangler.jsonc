@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jpet-cloud",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-04",
+  "durable_objects": {
+    "bindings": [{ "name": "PLAYERS", "class_name": "Player" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Player"] }],
+  "d1_databases": [{
+    "binding": "RANK",
+    "database_name": "jpet-rank",
+    "migrations_dir": "migrations"
+  }],
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  }
+}

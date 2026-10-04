@@ -5,6 +5,7 @@
 #include <vector>
 #include <mutex>
 #include <cstdint>
+#include <chrono>
 
 #include "GameData.hpp"
 #include "GameTask.hpp"
@@ -14,22 +15,11 @@ class DataManager {
  private:
   toml::table data;
   std::shared_ptr<GameData> gameData;
-  std::vector<std::shared_ptr<GameTask>> tasks;
   std::recursive_mutex gameMutex;
-  nlohmann::json taskQueue = nlohmann::json::array();
-  nlohmann::json taskHistory = nlohmann::json::array();
-  int64_t nextQueueId = 1;
-  bool achievementsLoaded = false;
-  bool achievementsReady = false;
-  nlohmann::json achievementState;
-  void LoadAchievements();
-  std::map<std::string, int> AchievementSnapshot(const std::map<std::string, int>& updates = {});
-  void NotifyAchievements(const nlohmann::json& unlocked);
-  void LoadTasks();
-  void SaveTaskQueue();
-  void StartNextQueuedTask(time_t now);
-  bool SettleTask(const std::shared_ptr<GameTask>& task, time_t now);
-  std::shared_ptr<GameTask> FindTask(int id);
+  nlohmann::json cloudSnapshot;
+  nlohmann::json legacyBootstrap;
+  std::string cloudCacheUrl;
+  std::chrono::steady_clock::time_point cloudReceivedAt;
   bool init();
   DataManager();
 
@@ -41,6 +31,7 @@ class DataManager {
   ~DataManager() { Save(); };
 
   template <typename T> T GetConfig(const string &section, const string &key, T dvalue) {
+    std::lock_guard<std::recursive_mutex> lock(gameMutex);
     T ret;
     try {
       ret = data.at(section).as_table()->at(key).value_or(dvalue);
@@ -86,12 +77,17 @@ class DataManager {
   string GetWithDefault(const std::string& key, const string& default_value);
   float GetWithDefault(const std::string& key, float default_value);
 
-  void AddExp();
   nlohmann::json GetAchievementState();
-  void RefreshAchievements(time_t now = time(nullptr), bool notify = true);
+  nlohmann::json GetCloudProfile();
+  nlohmann::json GetCloudSnapshot();
+  nlohmann::json ExportCloudBootstrap(const std::string& uid);
+  void ApplyCloudSnapshot(const nlohmann::json& snapshot);
+  void PauseCloudView();
+  void LoadCloudCache(const std::string& uid, const std::string& endpoint = "");
+  void UpdateCloudUrl(const std::string& url);
+  float CloudTaskProgress();
   void RecordAchievementEvent(const std::string& event, time_t now = time(nullptr));
   int CurrentExpDiff();
-  void FetchStar();
 
   /**
    * @brief   Get the list of attributes.
@@ -100,14 +96,10 @@ class DataManager {
    */
   std::vector<int> GetAttributeList();
   
-  int GetAttrLimit();
 
   int GetAttribute(const std::string& key);
 
-  void AddAttribute(const std::string& key, int value);
 
-  void DumpTask(int id, int start_time, int end_time, int success, int status,
-                int cost_snapshot);
 
   /**
    * @brief   Get task status.
@@ -119,7 +111,6 @@ class DataManager {
   std::shared_ptr<GameTask> GetCurrentTask();
   nlohmann::json GetTaskState();
   int TaskQueueCapacity();
-  void TickTasks(time_t now = time(nullptr));
   std::string StartTask(int id, time_t now = time(nullptr));
   std::string QueueTask(int id, time_t now = time(nullptr));
   std::string RemoveQueuedTask(int64_t entryId);

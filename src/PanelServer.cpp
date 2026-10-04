@@ -1,5 +1,6 @@
 #include "PanelServer.hpp"
 #include "BuffManager.hpp"
+#include "CloudGame.hpp"
 #include "DataManager.hpp"
 #include "GameTask.hpp"
 #include "LAppDefine.hpp"
@@ -326,89 +327,60 @@ void PanelServer::doServe() {
       res.status = 400;
     }
   });
-  server->Post("/api/star",
-               [&](const httplib::Request &req, httplib::Response &res) {
-                 DataManager::GetInstance()->FetchStar();
-                 Notify("UPDATE");
-               });
-  server->Post("/api/attr/:attr",
-               [&](const httplib::Request &req, httplib::Response &res) {
-                 std::string targetAttribute = req.path_params.at("attr");
-                 if (targetAttribute.empty()) {
-                   res.status = 404;
-                   return;
-                 }
-                 // TODO check valid attribute
-                 auto dataManager = DataManager::GetInstance();
-                 std::lock_guard<std::recursive_mutex> lock(dataManager->GameMutex());
-                 // cannot add attributes to more than limit
-                 if (dataManager->GetAttribute(targetAttribute) >= dataManager->GetAttrLimit()) {
-                   res.status = 405;
-                   return;
-                 }
-                 int currentExperience = dataManager->GetAttribute("exp");
-                 int buycnt = dataManager->GetAttribute("buycnt");
-                 int currentCost = 53000;
-                 if (buycnt < 25) {
-                   currentCost = std::ceilf(10.0f * pow(1.41, buycnt));
-                 }
-                 if (currentCost > currentExperience) {
-                   res.status = 400;
-                   return;
-                 }
-                 dataManager->AddAttribute(targetAttribute, 1);
-                 dataManager->AddAttribute("exp", -currentCost);
-                 dataManager->AddAttribute("buycnt", 1);
-                 Notify("UPDATE");
-               });
-  server->Delete("/api/attr/:attr",
-                 [&](const httplib::Request &req, httplib::Response &res) {
-                   std::string targetAttribute = req.path_params.at("attr");
-                   if (targetAttribute.empty()) {
-                     res.status = 404;
-                     return;
-                   }
-                   // TODO check valid attribute
-                   auto dataManager = DataManager::GetInstance();
-                   std::lock_guard<std::recursive_mutex> lock(dataManager->GameMutex());
-                   int buycnt = dataManager->GetAttribute("buycnt");
-                   int last_cost = 53000;
-                   // 10 * 1.41^25 = 53762
-                   if (buycnt < 26) {
-                     last_cost = std::ceilf(10.0f * pow(1.41, max(buycnt - 1, 0)));
-                   }
-                   LAppPal::PrintLog(LogLevel::Debug, "[PanelServer]Revert attr buycnt=%d last_cost=%d", buycnt, last_cost);
-                   int revertCost = last_cost / 2;
-                   dataManager->AddAttribute(targetAttribute, -1);
-                   dataManager->AddAttribute("exp", revertCost);
-                   dataManager->AddAttribute("buycnt", -1);
-                   Notify("UPDATE");
-                 });
-  server->Get("/api/profile", [](const httplib::Request &req,
-                                 httplib::Response &res) {
-    auto json = nlohmann::json::object();
-    json["attributes"] = nlohmann::json::object();
-    auto dataManager = DataManager::GetInstance();
-    auto attributes = dataManager->GetAttributeList();
-    json["attributes"]["speed"] = attributes[0];
-    json["attributes"]["endurance"] = attributes[1];
-    json["attributes"]["strength"] = attributes[2];
-    json["attributes"]["will"] = attributes[3];
-    json["attributes"]["intellect"] = attributes[4];
-    json["attributes"]["exp"] = attributes[5];
-    json["attributes"]["buycnt"] = attributes[6];
-    json["clothes"]["current"] = dataManager->GetWithDefault("clothes.current", 0);
-    json["clothes"]["unlock"] =
-        nlohmann::json::array({true, dataManager->GetWithDefault("clothes.1.active", 0) == 1,
-                               dataManager->GetWithDefault("clothes.2.active", 0) == 1});
-    json["expdiff"] = dataManager->CurrentExpDiff();
-    json["buffs"] = nlohmann::json::array();
-    json["starcnt"] = dataManager->GetWithDefault("starcnt", 0);
-    auto buffs_array = BuffManager::GetInstance()->GetBuffList();
-    for (const auto& buff : buffs_array) {
-      json["buffs"].push_back(buff);
+  auto gameAction = [this](httplib::Response& res, const nlohmann::json& action) {
+    auto error = CloudGame::GetInstance()->Command(action);
+    res.status = error.empty() ? 200 : 409;
+    res.set_content(error.empty() ? DataManager::GetInstance()->GetCloudProfile().dump()
+        : nlohmann::json{{"error", error}}.dump(), "application/json");
+  };
+  server->Post("/api/star", [gameAction](const auto&, auto& res) { gameAction(res, {{"type", "star"}}); });
+  server->Post("/api/attr/:attr", [gameAction](const auto& req, auto& res) { gameAction(res, {{"type", "attr.buy"}, {"attr", req.path_params.at("attr")}}); });
+  server->Delete("/api/attr/:attr", [gameAction](const auto& req, auto& res) { gameAction(res, {{"type", "attr.refund"}, {"attr", req.path_params.at("attr")}}); });
+  server->Get("/api/profile", [](const auto&, auto& res) {
+    res.set_content(DataManager::GetInstance()->GetCloudProfile().dump(), "application/json");
+  });
+  server->Get("/api/cloud", [](const auto&, auto& res) {
+    const auto env = std::getenv("JPET_CLOUD_URL");
+    auto state = CloudGame::GetInstance()->Status();
+    state["url"] = env ? std::string(env) : DataManager::GetInstance()->GetConfig<std::string>("cloud", "url", "");
+    state["environment_override"] = env != nullptr;
+    res.set_content(state.dump(), "application/json");
+  });
+  server->Post("/api/cloud", [](const auto& req, auto& res) {
+    try {
+      const auto payload = nlohmann::json::parse(req.body);
+      const auto url = payload.at("url").template get<std::string>();
+      if (!CloudGame::ValidUrl(url)) throw std::runtime_error("请填写 HTTPS 服务地址，本地调试可使用 http://127.0.0.1:8787");
+      DataManager::GetInstance()->UpdateCloudUrl(url);
+      CloudGame::GetInstance()->Wake(payload.value("take_over", false));
+      res.set_content("{\"success\":true}", "application/json");
+    } catch (const std::exception& e) {
+      res.status = 400;
+      res.set_content(nlohmann::json{{"error", e.what()}}.dump(), "application/json");
     }
-    res.set_content(json.dump(), "application/json");
+  });
+  server->Get("/api/rank", [](const auto& req, auto& res) {
+    try {
+      const auto env = std::getenv("JPET_CLOUD_URL");
+      auto url = env ? std::string(env) : DataManager::GetInstance()->GetConfig<std::string>("cloud", "url", "");
+      if (url.empty() || !CloudGame::ValidUrl(url)) throw std::runtime_error("请先设置云端服务地址");
+      const auto split = url.find('/', url.find("://") + 3);
+      auto prefix = split == std::string::npos ? std::string{} : url.substr(split);
+      while (!prefix.empty() && prefix.back() == '/') prefix.pop_back();
+      httplib::Client client(split == std::string::npos ? url : url.substr(0, split));
+      client.set_connection_timeout(2, 0); client.set_read_timeout(4, 0);
+      const auto metric = req.has_param("metric") ? req.get_param_value("metric") : "starcnt";
+      const auto offset = req.has_param("offset") ? req.get_param_value("offset") : "0";
+      if (metric != "starcnt" && metric != "exp" && metric != "attr") throw std::runtime_error("无效榜单");
+      if (offset.empty() || offset.size() > 5 || offset.find_first_not_of("0123456789") != std::string::npos) throw std::runtime_error("无效分页");
+      const auto uid = DataManager::GetInstance()->GetWithDefault("uid", std::string{});
+      auto response = client.Get(prefix + "/v1/rank?metric=" + metric + "&offset=" + offset + "&uid=" + uid);
+      if (!response) throw std::runtime_error("排行榜连接失败，请稍后重试");
+      res.status = response->status;
+      res.set_content(response->body, "application/json");
+    } catch (const std::exception& e) {
+      res.status = 503; res.set_content(nlohmann::json{{"error", e.what()}}.dump(), "application/json");
+    }
   });
   server->Get("/api/achievements", [](const httplib::Request&, httplib::Response& res) {
     try {
@@ -420,7 +392,9 @@ void PanelServer::doServe() {
     }
   });
   server->Post("/api/data/reset", [](const httplib::Request &req, httplib::Response &res) {
-    DataManager::GetInstance()->SetResetMark();
+    auto error = CloudGame::GetInstance()->Command({{"type", "reset"}});
+    res.status = error.empty() ? 200 : 409;
+    res.set_content(error.empty() ? "{\"success\":true}" : nlohmann::json{{"error", error}}.dump(), "application/json");
   });
   server->Get("/api/parts", [](const httplib::Request& req, httplib::Response& res){
     const map<string, bool> part_status = PartStateManager::GetInstance()->GetStatus();
@@ -448,18 +422,9 @@ void PanelServer::doServe() {
       res.status = 400;
       return;
     }
-    // check id valid, 0 is actived by default
-    bool unlock = true;
-    if (id > 0) {
-      unlock = DataManager::GetInstance()->GetWithDefault("clothes."+ std::to_string(id) + ".active", 0) == 1;
-    }
-    if (!unlock) {
-      LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]Clothes id not active");
-      res.status = 400;
-      return;
-    }
-    DataManager::GetInstance()->SetRaw("clothes.current", id);
-    Notify("UPDATE");
+    auto error = CloudGame::GetInstance()->Command({{"type", "clothes"}, {"id", id}});
+    res.status = error.empty() ? 200 : 409;
+    res.set_content(error.empty() ? "{\"success\":true}" : nlohmann::json{{"error", error}}.dump(), "application/json");
   });
   server->Get("/api/task",
               [&](const httplib::Request &req, httplib::Response &res) {
@@ -477,7 +442,6 @@ void PanelServer::doServe() {
                              const std::function<std::string()>& action) {
     try {
       auto dm = DataManager::GetInstance();
-      std::lock_guard<std::recursive_mutex> lock(dm->GameMutex());
       auto error = action();
       if (!error.empty()) {
         res.status = 409;
@@ -739,6 +703,9 @@ void PanelServer::doServe() {
   server->Delete("/api/account", [&](const httplib::Request &req,
                                      httplib::Response &res) {
     string cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
+    DataManager::GetInstance()->SetRaw("cookies", string(""));
+    DataManager::GetInstance()->SetRaw("uid", string(""));
+    CloudGame::GetInstance()->Disconnect();
     httplib::Headers headers = {{"cookie", cookies}};
     const auto bili_jct = CookieValue(cookies, "bili_jct");
     if (!bili_jct.empty()) {
@@ -770,8 +737,6 @@ void PanelServer::doServe() {
       LAppPal::PrintLog(LogLevel::Warn,
                         "[PanelServer]bili_jct not found during logout");
     }
-    DataManager::GetInstance()->SetRaw("cookies", string(""));
-    DataManager::GetInstance()->SetRaw("uid", string(""));
     avatarCache_.ClearAccount();
     BuffManager::GetInstance()->Update();
     res.set_content(R"({"success":true})", "application/json");
@@ -813,7 +778,10 @@ void PanelServer::doServe() {
         if (loggedIn && data.contains("mid") && !data.at("mid").is_null() &&
             data.at("mid").get<long long>() > 0) {
           const auto uid = std::to_string(data.at("mid").get<long long>());
+          const auto previousUid = DataManager::GetInstance()->GetWithDefault("uid", std::string{});
           DataManager::GetInstance()->SetRaw("uid", uid);
+          DataManager::GetInstance()->SetRaw("uname", data.value("uname", std::string{"用户 "} + uid));
+          if (previousUid != uid) CloudGame::GetInstance()->Wake();
           resp_json["login"] = true;
           resp_json["info"]["uname"] =
               data.value("uname", std::string{});
@@ -962,8 +930,15 @@ void PanelServer::doServe() {
   });
   server->Post("/api/account/share",
                [](const httplib::Request &req, httplib::Response &res) {
-                 DataManager::GetInstance()->SetRaw("data-share", 1);
+                 auto error = CloudGame::GetInstance()->Command({{"type", "share"}, {"enabled", true}});
+                 res.status = error.empty() ? 200 : 409;
+                 res.set_content(error.empty() ? "{\"success\":true}" : nlohmann::json{{"error", error}}.dump(), "application/json");
                });
+  server->Delete("/api/account/share", [](const auto&, auto& res) {
+    auto error = CloudGame::GetInstance()->Command({{"type", "share"}, {"enabled", false}});
+    res.status = error.empty() ? 200 : 409;
+    res.set_content(error.empty() ? "{\"success\":true}" : nlohmann::json{{"error", error}}.dump(), "application/json");
+  });
 
   initSSE();
   if (!_stopping) server->listen("127.0.0.1", 8053);

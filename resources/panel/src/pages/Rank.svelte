@@ -1,202 +1,62 @@
 <script>
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_KEY;
-  import { Tabs, TabItem } from "flowbite-svelte";
-  import {
-    Button,
-    Table,
-    TableBody,
-    TableBodyCell,
-    TableBodyRow,
-    TableHead,
-    TableHeadCell,
-  } from "flowbite-svelte";
-  import { createClient } from "@supabase/supabase-js";
-  export let account_info = {
-    login: false,
-    info: {
-      confirm: false,
-    }
-  };
-  export let attributes = null;
-  export let starcnt = 0;
-  // Ranking is optional in local desktop builds. Vite leaves these values
-  // undefined when no .env file is present; do not let that blank the entire
-  // settings WebView during development.
-  const supabase =
-    supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
-  let rank_data = [];
-  let rank_star = [];
-  let rank_exp = [];
-  let rank_attr = [];
-
-  function update() {
-    if (!supabase) {
-      rank_data = [];
-      return;
-    }
-    supabase
-      .from("rankboard")
-      .select(
-        "uid, name, ts, starcnt, speed, endurance, strength, will, intellect, exp",
-      )
-      .then((d) => {
-        rank_data = d.data;
-        rank_star = rank_data
-          .map((e) => {
-            return {
-              name: e.name,
-              starcnt: e.starcnt,
-            };
-          })
-          .sort((a, b) => {
-            return b.starcnt - a.starcnt;
-          });
-        rank_exp = rank_data
-          .map((e) => {
-            return {
-              name: e.name,
-              exp: e.exp,
-            };
-          })
-          .sort((a, b) => {
-            return b.exp - a.exp;
-          });
-        rank_attr = rank_data
-          .map((e) => {
-            return {
-              name: e.name,
-              attr: e.speed + e.endurance + e.strength + e.will + e.intellect,
-            };
-          })
-          .sort((a, b) => {
-            return b.attr - a.attr;
-          });
-      });
+  import { onMount } from "svelte";
+  import { Button, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell } from "flowbite-svelte";
+  export let account_info = null;
+  const boards = [{ key: "starcnt", title: "星级榜", label: "星级" }, { key: "exp", title: "经验榜", label: "持有经验" }, { key: "attr", title: "属性榜", label: "总属性值" }];
+  let metric = "starcnt", entries = [], me = null, offset = 0, loading = false, error = "";
+  $: board = boards.find(b => b.key === metric);
+  async function load() {
+    if (loading) return;
+    loading = true; error = "";
+    try {
+      const response = await fetch(`/api/rank?metric=${metric}&offset=${offset}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "排行榜加载失败");
+      entries = data.entries; me = data.me;
+    } catch (failure) { error = failure.message; }
+    finally { loading = false; }
   }
-
-  function confirm() {
-    fetch(`/api/account/share`, { method: "POST" });
-    account_info.info.confirm = true;
-    push_data();
+  async function confirm(enabled = true) {
+    error = "";
+    try {
+      const response = await fetch("/api/account/share", { method: enabled ? "POST" : "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "参与排行榜失败");
+      account_info.info.confirm = enabled;
+      await load();
+    } catch (failure) { error = failure.message; }
   }
-
-  function push_data() {
-    if (!supabase || !attributes) {
-      return;
-    }
-    supabase
-      .from("rankboard")
-      .upsert({
-        uid: parseInt(account_info.info.uid),
-        name: account_info.info.uname,
-        starcnt: starcnt,
-        speed: attributes.speed,
-        endurance: attributes.endurance,
-        strength: attributes.strength,
-        will: attributes.will,
-        intellect: attributes.intellect,
-        exp: attributes.exp,
-        ts: new Date().toISOString(),
-      })
-      .then(() => {
-        update();
-      });
-  }
-
-  let refresh = false;
-  let last_refresh = parseInt(sessionStorage.getItem('last_refresh')) || 0;
-  function update_data() {
-    push_data();
-    last_refresh = Date.now();
-    sessionStorage.setItem("last_refresh", last_refresh.toString());
-    refresh = true;
-  }
-  update();
-
-  setInterval(()=>{
-    if (account_info && account_info.info.confirm) {
-      push_data();
-    }
-  }, 10 * 60 * 1000);
-
-  setInterval(()=>{
-    if (Date.now() - last_refresh >= 60 * 1000) {
-      refresh = false;
-    } else {
-      refresh = true;
-    }
-  }, 1000);
+  function select(key) { metric = key; offset = 0; load(); }
+  function page(direction) { offset = Math.max(0, offset + direction * 100); load(); }
+  onMount(load);
 </script>
 
-{#if account_info}
-  {#if !account_info.login}
-    <p class="p-4">排行榜需要登录才能进行查看，请前往设置进行登录。</p>
-  {:else if !account_info.info.confirm}
-    <p class="p-4">
-      查看排行榜将会认为你愿意共享游戏数据与部分账号数据(仅 uid
-      和用户名)，数据将自动每 10 分钟进行一次同步，确认查看吗？
-    </p>
-    <Button class="w-full" on:click={confirm}>确认查看</Button>
-  {:else}
-    <Button class="w-full mb-2" on:click={update_data} disabled={refresh}>刷新排行榜</Button>
-    <Tabs contentClass="bg-gray-50 rounded-lg dark:bg-gray-800 mt-2">
-      <TabItem open title="星级榜">
-        <Table>
-          <TableHead>
-            <TableHeadCell>排名</TableHeadCell>
-            <TableHeadCell>用户名</TableHeadCell>
-            <TableHeadCell>星级</TableHeadCell>
-          </TableHead>
-          <TableBody tableBodyClass="divide-y">
-            {#each rank_star as item, i}
-              <TableBodyRow>
-                <TableBodyCell>{i + 1}</TableBodyCell>
-                <TableBodyCell>{item.name}</TableBodyCell>
-                <TableBodyCell>{item.starcnt}</TableBodyCell>
-              </TableBodyRow>
-            {/each}
-          </TableBody>
-        </Table>
-      </TabItem>
-      <TabItem title="经验榜">
-        <Table>
-          <TableHead>
-            <TableHeadCell>排名</TableHeadCell>
-            <TableHeadCell>用户名</TableHeadCell>
-            <TableHeadCell>持有经验</TableHeadCell>
-          </TableHead>
-          <TableBody tableBodyClass="divide-y">
-            {#each rank_exp as item, i}
-              <TableBodyRow>
-                <TableBodyCell>{i + 1}</TableBodyCell>
-                <TableBodyCell>{item.name}</TableBodyCell>
-                <TableBodyCell>{item.exp}</TableBodyCell>
-              </TableBodyRow>
-            {/each}
-          </TableBody>
-        </Table>
-      </TabItem>
-      <TabItem title="属性榜">
-        <Table>
-          <TableHead>
-            <TableHeadCell>排名</TableHeadCell>
-            <TableHeadCell>用户名</TableHeadCell>
-            <TableHeadCell>总属性值</TableHeadCell>
-          </TableHead>
-          <TableBody tableBodyClass="divide-y">
-            {#each rank_attr as item, i}
-              <TableBodyRow>
-                <TableBodyCell>{i + 1}</TableBodyCell>
-                <TableBodyCell>{item.name}</TableBodyCell>
-                <TableBodyCell>{item.attr}</TableBodyCell>
-              </TableBodyRow>
-            {/each}
-          </TableBody>
-        </Table>
-      </TabItem>
-    </Tabs>
-  {/if}
-{:else}
-  加载中
+{#if error}<p class="mb-3 rounded bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</p>{/if}
+{#if account_info?.login && !account_info.info.confirm}
+  <p class="mb-3 text-sm text-gray-600">参与排行榜会公开你的 UID、用户名、星级、持有经验和总属性。排行由云端存档生成。</p>
+  <Button class="mb-4 w-full" disabled={loading} on:click={() => confirm(true)}>参与排行榜</Button>
+{:else if account_info?.login && account_info.info.confirm}
+  <Button class="mb-4" size="xs" color="alternative" disabled={loading} on:click={() => confirm(false)}>退出排行榜</Button>
+{:else if !account_info?.login}
+  <p class="mb-3 text-sm text-gray-500">登录并连接云端后，可以参与排行榜。</p>
 {/if}
+<div class="mb-3 flex gap-2">
+  {#each boards as item}<Button color={metric === item.key ? "primary" : "alternative"} size="sm" disabled={loading} on:click={() => select(item.key)}>{item.title}</Button>{/each}
+</div>
+<div class="mb-3 flex items-center justify-between gap-2">
+  <span class="text-sm text-gray-600">{me ? `我的排名：${me.rank} · ${board.label}：${me.value}` : "暂未上榜"}</span>
+  <Button size="xs" color="alternative" disabled={loading} on:click={load}>{loading ? "加载中…" : "刷新"}</Button>
+</div>
+<Table>
+  <TableHead><TableHeadCell>排名</TableHeadCell><TableHeadCell>用户名</TableHeadCell><TableHeadCell>{board.label}</TableHeadCell></TableHead>
+  <TableBody tableBodyClass="divide-y">
+    {#each entries as item, i}
+      <TableBodyRow><TableBodyCell>{offset + i + 1}</TableBodyCell><TableBodyCell>{item.name}</TableBodyCell><TableBodyCell>{item.value}</TableBodyCell></TableBodyRow>
+    {/each}
+  </TableBody>
+</Table>
+{#if !loading && entries.length === 0}<p class="p-4 text-sm text-gray-500">暂无排行数据。</p>{/if}
+<div class="mt-3 flex justify-between">
+  <Button size="xs" color="alternative" disabled={loading || offset === 0} on:click={() => page(-1)}>上一页</Button>
+  <Button size="xs" color="alternative" disabled={loading || entries.length < 100 || offset >= 10000} on:click={() => page(1)}>下一页</Button>
+</div>

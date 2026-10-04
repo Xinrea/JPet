@@ -42,6 +42,7 @@
 #include <stb_image_write.h>
 
 #include "DataManager.hpp"
+#include "CloudGame.hpp"
 #include "LAppDefine.hpp"
 #include "LAppLive2DManager.hpp"
 #include "LAppModel.hpp"
@@ -118,7 +119,17 @@ bool LAppDelegate::Initialize() {
   }
   // 记录显示器分辨率尺寸
   GLFWmonitor *pr = glfwGetPrimaryMonitor();
+  if (pr == NULL) {
+    LAppPal::PrintLog(LogLevel::Error, "[LAppDelegate]No display is available");
+    glfwTerminate();
+    return GL_FALSE;
+  }
   const GLFWvidmode *mode = glfwGetVideoMode(pr);
+  if (mode == NULL) {
+    LAppPal::PrintLog(LogLevel::Error, "[LAppDelegate]Can't read display mode");
+    glfwTerminate();
+    return GL_FALSE;
+  }
   _mHeight = mode->height;
   _mWidth = mode->width;
 
@@ -295,14 +306,7 @@ bool LAppDelegate::Initialize() {
   // check update
   if (!std::getenv("JPET_SMOKE_TEST")) _us->CheckUpdate(UpdateNotify);
 
-  // Init task scheduler and basic tasks
-  if (!std::getenv("JPET_SMOKE_TEST")) {
-  TaskScheduler *ts = TaskScheduler::GetInstance();
-  auto expTask = std::make_shared<ExpTask>();
-  auto checkTask = std::make_shared<CheckTask>();
-  ts->AddTask(expTask);
-  ts->AddTask(checkTask);
-  }
+  if (!std::getenv("JPET_SMOKE_TEST")) CloudGame::GetInstance()->Start();
 
   return GL_TRUE;
 }
@@ -334,9 +338,9 @@ void LAppDelegate::SetLimit(bool limit) {
 }
 
 void LAppDelegate::Release() {
+  if (!std::getenv("JPET_SMOKE_TEST")) CloudGame::GetInstance()->Stop();
 #ifdef __APPLE__
   MacDesktop::Shutdown();
-  if (!std::getenv("JPET_SMOKE_TEST")) TaskScheduler::GetInstance()->Stop();
   PanelServer::GetInstance()->Stop();
   delete _us;
   _us = nullptr;

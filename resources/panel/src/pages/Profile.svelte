@@ -1,6 +1,5 @@
 <script>
-  import { onMount } from "svelte";
-  import { reportFrontend } from "../logger.js";
+  import { onMount, onDestroy } from "svelte";
   import { Tooltip, Button, Modal, Alert } from "flowbite-svelte";
   import speedIcon from "../assets/at-sp.png";
   import enduranceIcon from "../assets/at-end.png";
@@ -62,66 +61,36 @@
   export let buffs = ["live", "dynamic", "guard"];
 
   export let starcnt = 0;
+  export let online = false;
+  export let expProgress = 0;
+  export let buycost = 0;
+  export let revertgain = 0;
+  export let starAvailable = false;
+  let error = "";
+  let busy = false;
 
   $: currentExp = attributes.exp;
-  $: buycost =
-    attributes.buycnt < 25
-      ? Math.ceil(10 * Math.pow(1.41, attributes.buycnt))
-      : 53000;
-  $: revertgain =
-    (attributes.buycnt < 26
-      ? Math.ceil(10 * Math.pow(1.41, Math.max(attributes.buycnt - 1, 0)))
-      : 53000) / 2;
-  $: starAvailable = [
-    "speed",
-    "endurance",
-    "strength",
-    "will",
-    "intellect",
-  ].every((attr) => attributes[attr] >= 53);
-
-  // Update the experience ring frequently enough to make the movement
-  // continuous while deriving the value from the wall clock so timer drift
-  // cannot accumulate.
-  let timeToNextPoint = 60 - (Date.now() / 1000) % 60;
+  let timeToNextPoint = 60;
+  let receivedAt = 0;
+  $: { expProgress; receivedAt = performance.now(); }
+  function updateTimeToNextPoint() {
+    const elapsed = online ? (performance.now() - receivedAt) / 1000 : 0;
+    timeToNextPoint = Math.max(0, 60 - expProgress - elapsed);
+  }
   onMount(() => {
-    let tickCount = 0;
-    let lastReportAt = 0;
-    const now = () =>
-      typeof performance !== "undefined" && typeof performance.now === "function"
-        ? performance.now()
-        : Date.now();
-    let previousTickAt = now();
-    const updateTimeToNextPoint = () => {
-      const currentTime = now();
-      timeToNextPoint = 60 - (Date.now() / 1000) % 60;
-      tickCount += 1;
-      if (tickCount === 1 || currentTime - lastReportAt >= 5000) {
-        reportFrontend(
-          tickCount === 1 ? "info" : "debug",
-          "[Profile] experience timer tick",
-          {
-            tickCount,
-            intervalMs: Math.round(currentTime - previousTickAt),
-            timeToNextPoint,
-            value: 60 - timeToNextPoint,
-            visibilityState: document.visibilityState,
-            hidden: document.hidden,
-          },
-        );
-        lastReportAt = currentTime;
-      }
-      previousTickAt = currentTime;
-    };
-    updateTimeToNextPoint();
-    const timer = setInterval(updateTimeToNextPoint, 50);
-    reportFrontend("info", "[Profile] experience timer started", {
-      intervalMs: 50,
-      visibilityState: document.visibilityState,
-      hidden: document.hidden,
-    });
+    const timer = setInterval(updateTimeToNextPoint, 100);
     return () => clearInterval(timer);
   });
+  async function gameAction(url, method = "POST") {
+    if (!online || busy) return;
+    busy = true; error = "";
+    try {
+      const response = await fetch(url, { method });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "操作失败，请重试");
+    } catch (failure) { error = failure.message; }
+    finally { busy = false; }
+  }
 
   // modal
   let addModal = false;
@@ -134,34 +103,33 @@
     if (attributes[targetAttr] >= 100 + 10 * starcnt) {
       return;
     }
-    fetch(`/api/attr/${targetAttr}`, { method: "POST" });
+    gameAction(`/api/attr/${targetAttr}`);
   }
   function revertHandle() {
     if (attributes[targetAttr] <= 0) {
-      alert("属性值不足");
+      error = "属性值不足"; return;
     }
-    fetch(`/api/attr/${targetAttr}`, { method: "DELETE" });
+    gameAction(`/api/attr/${targetAttr}`, "DELETE");
   }
 
   function changeClothes(id) {
     if (!clothes.unlock[id] || id == clothes.current) {
       return;
     }
-    clothes.current = id;
-    fetch(`/api/clothes/${id}`, { method: "POST" });
+    gameAction(`/api/clothes/${id}`);
   }
 
   let starModal = false;
 
   function fetchStar() {
-    fetch(`/api/star`, { method: "POST" });
+    gameAction("/api/star");
     starModal = false;
   }
 
   const tooltips = [
     "前期智力对经验值的加成非常可观",
     "一些任务是可重复完成的",
-    "就算我没有在运行，任务倒计时也是在进行的",
+    "关闭或断网时，任务与经验进度会暂停",
     "我的头围是 53cm",
     "经验值可用于加点，但加点的消耗会越来越多",
     "装扮完可以试试给我拍张照",
@@ -173,12 +141,14 @@
     "鼠标中键点击加点可以跳过确认",
   ];
   let cur_tip = 0;
-  setInterval(() => {
+  const tipTimer = setInterval(() => {
     cur_tip = Math.floor(Math.random() * tooltips.length);
   }, 10000);
+  onDestroy(() => clearInterval(tipTimer));
 </script>
 
 <div>
+  {#if error}<p class="mb-3 text-sm text-red-600" role="alert">{error}</p>{/if}
   <div class="w-full mb-4 rounded overflow-hidden">
     <!-- table of attributes -->
     <table class="w-full">
@@ -213,7 +183,7 @@
         {#each attributeArray as attr}
           <td
             ><span class="flex justify-center align-middle"
-              ><button
+              ><button disabled={busy || !online}
                 on:mousedown={(e) => {
                   if (e.button == 1) {
                     targetAttr = attr;
@@ -227,7 +197,7 @@
                 ><img class="icon-button mr-2" src={minusIcon} alt="" /></button
               >
               <span>{attributes[attr]}</span>
-              <button
+              <button disabled={busy || !online}
                 on:mousedown={(e) => {
                   if (e.button == 1) {
                     targetAttr = attr;
@@ -249,9 +219,9 @@
         此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？
       </h3>
       <Button
-        disabled={currentExp < buycost ||
-          attributes[targetAttr] >= 100 + 10 * starcnt}
-        on:click={attrHandle}>确认</Button
+          disabled={busy || !online || currentExp < buycost ||
+            attributes[targetAttr] >= 100 + 10 * starcnt}
+          on:click={attrHandle}>确认</Button
       >
       <Button color="alternative">取消</Button>
     </Modal>
@@ -259,7 +229,7 @@
       <h3 class="mb-5 text-lg font-normal text-gray-500">
         此次操作会返还 {revertgain} EXP，确认撤销吗？
       </h3>
-      <Button on:click={revertHandle}>确认</Button>
+      <Button disabled={busy || !online} on:click={revertHandle}>确认</Button>
       <Button color="alternative">取消</Button>
     </Modal>
   </div>
@@ -272,7 +242,7 @@
         <h3 class="mb-5 text-lg font-normal text-gray-500">
           此次操作会消耗所有属性各 53 点换取一颗星，要换取吗？
         </h3>
-        <Button disabled={!starAvailable} on:click={fetchStar}>确认</Button>
+        <Button disabled={!starAvailable || !online || busy} on:click={fetchStar}>确认</Button>
         <Button color="alternative">取消</Button>
       </Modal>
       <a
@@ -330,7 +300,7 @@
           tabindex={i}
           on:keypress={() => {}}
           role="button"
-          on:click={() => changeClothes(i)}
+          aria-disabled={busy || !online} on:click={() => changeClothes(i)}
           class="choice-item"
           class:disabled={!clothes.unlock[i]}
           style="background-image: url({clothesImages[i]});"

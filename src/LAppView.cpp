@@ -99,12 +99,7 @@ void LAppView::Render() {
     task_progress_->Hide();
   }
 
-  time_t now = time(nullptr);
-  float p = 0;
-  auto task = DataManager::GetInstance()->GetCurrentTask();
-  if (task) {
-    p = min(float(now - task->start_time) / task->cost_snapshot, 1.0f);
-  }
+  float p = DataManager::GetInstance()->CloudTaskProgress();
   task_progress_->UpdateProgress(p);
 #ifndef __APPLE__
   // save vao

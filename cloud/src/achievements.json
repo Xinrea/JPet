@@ -1,0 +1,452 @@
+[
+  {
+    "id": "hello",
+    "title": "初次相伴",
+    "description": "累计陪伴 1 分钟",
+    "category": "陪伴",
+    "icon": "hello",
+    "metric": "minutes",
+    "target": 1
+  },
+  {
+    "id": "hour",
+    "title": "一小时的约定",
+    "description": "累计陪伴 60 分钟",
+    "category": "陪伴",
+    "icon": "hour",
+    "metric": "minutes",
+    "target": 60
+  },
+  {
+    "id": "ten_hours",
+    "title": "桌边老朋友",
+    "description": "累计陪伴 600 分钟",
+    "category": "陪伴",
+    "icon": "ten_hours",
+    "metric": "minutes",
+    "target": 600
+  },
+  {
+    "id": "fifty_hours",
+    "title": "长久的陪伴",
+    "description": "累计陪伴 3000 分钟",
+    "category": "陪伴",
+    "icon": "fifty_hours",
+    "metric": "minutes",
+    "target": 3000
+  },
+  {
+    "id": "days_3",
+    "title": "常来看看",
+    "description": "在 3 个不同的自然日陪伴至少 1 分钟",
+    "category": "陪伴",
+    "icon": "days_3",
+    "metric": "days",
+    "target": 3
+  },
+  {
+    "id": "days_7",
+    "title": "一周的回忆",
+    "description": "在 7 个不同的自然日陪伴至少 1 分钟",
+    "category": "陪伴",
+    "icon": "days_7",
+    "metric": "days",
+    "target": 7
+  },
+  {
+    "id": "days_30",
+    "title": "月光下的约定",
+    "description": "在 30 个不同的自然日陪伴至少 1 分钟",
+    "category": "陪伴",
+    "icon": "days_30",
+    "metric": "days",
+    "target": 30
+  },
+  {
+    "id": "touch_1",
+    "title": "打个招呼",
+    "description": "点击轴伊的身体部位 1 次",
+    "category": "互动",
+    "icon": "touch_1",
+    "metric": "touches",
+    "target": 1
+  },
+  {
+    "id": "touch_50",
+    "title": "熟悉的温度",
+    "description": "累计点击轴伊的身体部位 50 次",
+    "category": "互动",
+    "icon": "touch_50",
+    "metric": "touches",
+    "target": 50
+  },
+  {
+    "id": "touch_200",
+    "title": "默契满分",
+    "description": "累计点击轴伊的身体部位 200 次",
+    "category": "互动",
+    "icon": "touch_200",
+    "metric": "touches",
+    "target": 200
+  },
+  {
+    "id": "speed_10",
+    "title": "轻快步伐",
+    "description": "速度达到 10",
+    "category": "成长",
+    "icon": "speed_10",
+    "metric": "speed",
+    "target": 10
+  },
+  {
+    "id": "speed_50",
+    "title": "追风少女",
+    "description": "速度达到 50",
+    "category": "成长",
+    "icon": "speed_50",
+    "metric": "speed",
+    "target": 50
+  },
+  {
+    "id": "endurance_10",
+    "title": "再坚持一下",
+    "description": "耐力达到 10",
+    "category": "成长",
+    "icon": "endurance_10",
+    "metric": "endurance",
+    "target": 10
+  },
+  {
+    "id": "endurance_50",
+    "title": "永不疲倦",
+    "description": "耐力达到 50",
+    "category": "成长",
+    "icon": "endurance_50",
+    "metric": "endurance",
+    "target": 50
+  },
+  {
+    "id": "strength_10",
+    "title": "小小力量",
+    "description": "力量达到 10",
+    "category": "成长",
+    "icon": "strength_10",
+    "metric": "strength",
+    "target": 10
+  },
+  {
+    "id": "strength_50",
+    "title": "力能扛鼎",
+    "description": "力量达到 50",
+    "category": "成长",
+    "icon": "strength_50",
+    "metric": "strength",
+    "target": 50
+  },
+  {
+    "id": "will_10",
+    "title": "坚定的心",
+    "description": "毅力达到 10",
+    "category": "成长",
+    "icon": "will_10",
+    "metric": "will",
+    "target": 10
+  },
+  {
+    "id": "will_50",
+    "title": "不灭的决心",
+    "description": "毅力达到 50",
+    "category": "成长",
+    "icon": "will_50",
+    "metric": "will",
+    "target": 50
+  },
+  {
+    "id": "intellect_10",
+    "title": "灵光一现",
+    "description": "智力达到 10",
+    "category": "成长",
+    "icon": "intellect_10",
+    "metric": "intellect",
+    "target": 10
+  },
+  {
+    "id": "intellect_50",
+    "title": "聪明的轴伊",
+    "description": "智力达到 50",
+    "category": "成长",
+    "icon": "intellect_50",
+    "metric": "intellect",
+    "target": 50
+  },
+  {
+    "id": "balanced_10",
+    "title": "均衡发展",
+    "description": "五项属性同时达到 10",
+    "category": "成长",
+    "icon": "balanced_10",
+    "metric": "balanced",
+    "target": 10
+  },
+  {
+    "id": "balanced_50",
+    "title": "五角星战士",
+    "description": "五项属性同时达到 50",
+    "category": "成长",
+    "icon": "balanced_50",
+    "metric": "balanced",
+    "target": 50
+  },
+  {
+    "id": "balanced_100",
+    "title": "完美五边形",
+    "description": "五项属性同时达到 100",
+    "category": "成长",
+    "icon": "balanced_100",
+    "metric": "balanced",
+    "target": 100
+  },
+  {
+    "id": "exp_10000",
+    "title": "经验储蓄罐",
+    "description": "持有经验达到 10000",
+    "category": "成长",
+    "icon": "exp_10000",
+    "metric": "exp",
+    "target": 10000
+  },
+  {
+    "id": "exp_100000",
+    "title": "经验小富翁",
+    "description": "持有经验达到 100000",
+    "category": "成长",
+    "icon": "exp_100000",
+    "metric": "exp",
+    "target": 100000
+  },
+  {
+    "id": "success_1",
+    "title": "旗开得胜",
+    "description": "成功完成 1 次任务",
+    "category": "任务",
+    "icon": "success_1",
+    "metric": "successes",
+    "target": 1
+  },
+  {
+    "id": "success_10",
+    "title": "渐入佳境",
+    "description": "累计成功完成 10 次任务",
+    "category": "任务",
+    "icon": "success_10",
+    "metric": "successes",
+    "target": 10
+  },
+  {
+    "id": "success_50",
+    "title": "任务达人",
+    "description": "累计成功完成 50 次任务",
+    "category": "任务",
+    "icon": "success_50",
+    "metric": "successes",
+    "target": 50
+  },
+  {
+    "id": "queued_5",
+    "title": "井井有条",
+    "description": "成功完成 5 次从队列自动开始的任务",
+    "category": "任务",
+    "icon": "queued_5",
+    "metric": "queued_successes",
+    "target": 5
+  },
+  {
+    "id": "failure_1",
+    "title": "成长的学费",
+    "description": "经历 1 次任务失败",
+    "category": "任务",
+    "icon": "failure_1",
+    "metric": "failures",
+    "target": 1
+  },
+  {
+    "id": "recovery",
+    "title": "重新站起来",
+    "description": "任务失败后，下一次结算的任务成功",
+    "category": "任务",
+    "icon": "recovery",
+    "metric": "recoveries",
+    "target": 1
+  },
+  {
+    "id": "streak_5",
+    "title": "势如破竹",
+    "description": "连续成功完成 5 次任务（失败会中断连胜）",
+    "category": "任务",
+    "icon": "streak_5",
+    "metric": "best_streak",
+    "target": 5
+  },
+  {
+    "id": "variety_7",
+    "title": "多面手",
+    "description": "成功完成 7 种不同的任务",
+    "category": "任务",
+    "icon": "variety_7",
+    "metric": "variety",
+    "target": 7
+  },
+  {
+    "id": "task_1",
+    "title": "瓶盖克星",
+    "description": "成功完成「拧瓶盖」",
+    "category": "任务",
+    "icon": "task_1",
+    "metric": "task.1",
+    "target": 1
+  },
+  {
+    "id": "task_2",
+    "title": "起跑线",
+    "description": "成功完成「跑步 800m」",
+    "category": "任务",
+    "icon": "task_2",
+    "metric": "task.2",
+    "target": 1
+  },
+  {
+    "id": "task_3",
+    "title": "哈喽哈喽",
+    "description": "成功完成「日常直播」",
+    "category": "任务",
+    "icon": "task_3",
+    "metric": "task.3",
+    "target": 1
+  },
+  {
+    "id": "task_4",
+    "title": "健身环重启",
+    "description": "成功完成「健身环直播」",
+    "category": "任务",
+    "icon": "task_4",
+    "metric": "task.4",
+    "target": 1
+  },
+  {
+    "id": "task_5",
+    "title": "夜行电台",
+    "description": "成功完成「困困夜行电台直播」",
+    "category": "任务",
+    "icon": "task_5",
+    "metric": "task.5",
+    "target": 1
+  },
+  {
+    "id": "task_6",
+    "title": "采集卡没有延迟",
+    "description": "成功完成「游戏直播」",
+    "category": "任务",
+    "icon": "task_6",
+    "metric": "task.6",
+    "target": 1
+  },
+  {
+    "id": "task_7",
+    "title": "歌声与回忆",
+    "description": "成功完成「歌回直播」",
+    "category": "任务",
+    "icon": "task_7",
+    "metric": "task.7",
+    "target": 1
+  },
+  {
+    "id": "task_9",
+    "title": "舞步飞扬",
+    "description": "成功完成「舞蹈课」",
+    "category": "任务",
+    "icon": "task_9",
+    "metric": "task.9",
+    "target": 1
+  },
+  {
+    "id": "task_10",
+    "title": "世界那么大",
+    "description": "成功完成「旅游」",
+    "category": "任务",
+    "icon": "task_10",
+    "metric": "task.10",
+    "target": 1
+  },
+  {
+    "id": "task_11",
+    "title": "联动策划人",
+    "description": "成功完成「策划联动直播」",
+    "category": "任务",
+    "icon": "task_11",
+    "metric": "task.11",
+    "target": 1
+  },
+  {
+    "id": "task_13",
+    "title": "全能之主",
+    "description": "成功完成「全能之主」",
+    "category": "任务",
+    "icon": "task_13",
+    "metric": "task.13",
+    "target": 1
+  },
+  {
+    "id": "dress",
+    "title": "盛装登场",
+    "description": "解锁礼服衣装",
+    "category": "衣装",
+    "icon": "dress",
+    "metric": "dress",
+    "target": 1
+  },
+  {
+    "id": "winter",
+    "title": "冬日暖意",
+    "description": "解锁冬装衣装",
+    "category": "衣装",
+    "icon": "winter",
+    "metric": "winter",
+    "target": 1
+  },
+  {
+    "id": "wardrobe",
+    "title": "衣橱收藏家",
+    "description": "集齐默认、礼服和冬装三套衣装",
+    "category": "衣装",
+    "icon": "wardrobe",
+    "metric": "clothes",
+    "target": 3
+  },
+  {
+    "id": "star_1",
+    "title": "第一颗星",
+    "description": "完成 1 次升星",
+    "category": "升星",
+    "icon": "star_1",
+    "metric": "stars",
+    "target": 1
+  },
+  {
+    "id": "star_3",
+    "title": "星光闪耀",
+    "description": "达到 3 星",
+    "category": "升星",
+    "icon": "star_3",
+    "metric": "stars",
+    "target": 3
+  },
+  {
+    "id": "star_5",
+    "title": "璀璨星河",
+    "description": "达到 5 星",
+    "category": "升星",
+    "icon": "star_5",
+    "metric": "stars",
+    "target": 5
+  }
+]

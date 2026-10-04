@@ -1,6 +1,5 @@
 #include "DataManager.hpp"
 
-#include "BuffManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
 #include "LAppLive2DManager.hpp"
@@ -49,22 +48,15 @@ bool DataManager::init() {
     return false;
   }
   if (firstData) {
-    AddAttribute("speed", 2);
-    AddAttribute("strength", 1);
-    AddAttribute("endurance", 1);
-    AddAttribute("will", 3);
-    AddAttribute("intellect", 4);
+    gameData->UpdateBatch({{"attr.speed", 2}, {"attr.strength", 1},
+        {"attr.endurance", 1}, {"attr.will", 3}, {"attr.intellect", 4}});
   }
-  
-  // check attributes that more than limit by adding 0
-  // details are in AddAttribute()
-  for (const auto &attr :
-       {"speed", "endurance", "strength", "will", "intellect"}) {
-    AddAttribute(attr, 0);
+  legacyBootstrap = nlohmann::json::parse(GetWithDefault("cloud.legacy_bootstrap", std::string{}), nullptr, false);
+  if (!legacyBootstrap.is_object()) {
+    legacyBootstrap = ExportCloudBootstrap("");
+    gameData->UpdateBatch({}, {{"cloud.legacy_bootstrap", legacyBootstrap.dump()}});
   }
-  
-  RefreshAchievements(time(nullptr), false);
-  achievementsReady = true;
+  LoadCloudCache(GetWithDefault("uid", std::string{}));
   return true;
 }
 
@@ -81,6 +73,7 @@ DataManager* DataManager::GetInstance() {
 }
 
 void DataManager::GetWindowPos(int* x, int* y) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   // get x,y from data
   if (!data.contains("window")) {
     // update x,y in data
@@ -92,11 +85,13 @@ void DataManager::GetWindowPos(int* x, int* y) {
 }
 
 void DataManager::UpdateWindowPos(int x, int y) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   // update x,y in data
   data.insert_or_assign("window", toml::table{{"x", x}, {"y", y}});
 }
 
 void DataManager::GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touch_audio) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   // if audio doesn't exist, create it
   if (!data.contains("audio")) {
     data.insert("audio", toml::table{{"volume", 20},
@@ -112,6 +107,7 @@ void DataManager::GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touc
 }
 
 void DataManager::UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   // update volume in data
   data.insert_or_assign("audio", toml::table{{"volume", volume},
                                              {"mute", mute},
@@ -120,6 +116,7 @@ void DataManager::UpdateAudio(int volume, bool mute, bool idle_audio, bool touch
 }
 
 void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   if (!data.contains("display")) {
     // update scale, green, rateLimit in data
     data.insert_or_assign(
@@ -134,6 +131,7 @@ void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
 }
 
 void DataManager::UpdateDisplay(float scale, bool green, bool rateLimit) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   // update scale, green, rateLimit in data
   data.insert_or_assign("display", toml::table{{"scale", scale},
                                                {"green", green},
@@ -141,6 +139,7 @@ void DataManager::UpdateDisplay(float scale, bool green, bool rateLimit) {
 }
 
 bool DataManager::GetDropFile() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   if (!data.contains("other")) {
     data.insert_or_assign("other", toml::table{});
     return true;
@@ -154,6 +153,7 @@ bool DataManager::GetDropFile() {
 }
 
 void DataManager::UpdateDropFile(bool enable) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   if (!data.contains("other")) {
     data.insert_or_assign("other", toml::table{});
   }
@@ -162,6 +162,7 @@ void DataManager::UpdateDropFile(bool enable) {
 }
 
 bool DataManager::IsTracking() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   if (!data.contains("other")) {
     data.insert_or_assign("other", toml::table{});
     return true;
@@ -175,6 +176,7 @@ bool DataManager::IsTracking() {
 }
 
 void DataManager::IsTracking(bool enable) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   if (!data.contains("other")) {
     data.insert_or_assign("other", toml::table{});
   }
@@ -183,6 +185,7 @@ void DataManager::IsTracking(bool enable) {
 }
 
 void DataManager::initNotifySection() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   if (!data.contains("notify")) {
     data.insert("notify", toml::table{});
     auto notifyTable = data.at("notify").as_table();
@@ -194,6 +197,7 @@ void DataManager::initNotifySection() {
 }
 
 void DataManager::GetNotify(bool *dynamic, bool *live, bool *update) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   initNotifySection();
   // get followList, dynamic, live, update from data
   *dynamic = GetConfig("notify", "dynamic", true);
@@ -202,6 +206,7 @@ void DataManager::GetNotify(bool *dynamic, bool *live, bool *update) {
 }
 
 void DataManager::UpdateNotify(bool dynamic, bool live, bool update) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   // update followList, dynamic, live, update in data
   initNotifySection();
   auto notifyTable = data.at("notify").as_table();
@@ -211,6 +216,7 @@ void DataManager::UpdateNotify(bool dynamic, bool live, bool update) {
 }
 
 std::vector<std::string> DataManager::GetFollowList() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   std::vector<std::string> ret;
   initNotifySection();
   auto notifyTable = data.at("notify").as_table();
@@ -222,6 +228,7 @@ std::vector<std::string> DataManager::GetFollowList() {
 }
 
 void DataManager::AddFollow(const std::string& uid) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   auto notifyTable = data.at("notify").as_table();
   auto& followListArray = *notifyTable->get_as<toml::array>("followList");
   // check exist
@@ -234,6 +241,7 @@ void DataManager::AddFollow(const std::string& uid) {
 }
 
 void DataManager::RemoveFollow(const std::string& uid) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   auto notifyTable = data.at("notify").as_table();
   auto& followListArray = *notifyTable->get_as<toml::array>("followList");
   auto iter = followListArray.cbegin();
@@ -247,6 +255,7 @@ void DataManager::RemoveFollow(const std::string& uid) {
 }
 
 void DataManager::Save() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
   const std::filesystem::path configPath = std::filesystem::path(LAppDefine::documentPath) / "jpet.toml";
   std::ofstream file(configPath);
   if (!file.is_open()) {
@@ -258,42 +267,7 @@ void DataManager::Save() {
 }
 
 int DataManager::CurrentExpDiff() {
-  std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  int currentExp = GetAttribute("exp");
-  int intellect = GetAttribute("intellect");
-  int starcnt = GetWithDefault("starcnt", 0);
-  int medal = BuffManager::GetInstance()->MedalLevel();
-  double exp = 1 + ceil(499 * LAppPal::EaseOut(intellect + medal / 3 - 4) / 100);
-  BuffManager* bf = BuffManager::GetInstance();
-  if (bf->IsLive()) {
-    exp *= 2;
-  }
-  if (bf->IsDynamic()) {
-    exp *= 1.5f;
-  }
-  if (bf->IsGuard()) {
-    exp *= 1.25f;
-  }
-  if (bf->IsMonday()) {
-    exp *= 1.25f;
-  }
-  if (bf->IsFail()) {
-    exp *= 1.25f;
-  }
-  if (bf->IsBirthday()) {
-    exp *= 3.5f;
-  }
-  exp *= (1 + 0.1 * starcnt);
-  return std::min(static_cast<int>(exp), 99999999);
-}
-
-void DataManager::AddExp() {
-  std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  int diff = CurrentExpDiff();
-  AddAttribute("exp", diff);
-  RecordAchievementEvent("minute");
-  LAppPal::PrintLog(LogLevel::Debug, "[DataManager]Added %d exp", diff);
-  PanelServer::GetInstance()->Notify("UPDATE");
+  return GetCloudProfile().value("expdiff", 0);
 }
 
 std::vector<int> DataManager::GetAttributeList() {
@@ -305,28 +279,6 @@ std::vector<int> DataManager::GetAttributeList() {
     attributes.push_back(value);
   }
   return attributes;
-}
-
-void DataManager::FetchStar() {
-  std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  for (const auto &attr :
-       {"speed", "endurance", "strength", "will", "intellect"}) {
-    int value = GetAttribute(attr);
-    if (value < 53) {
-      return;
-    }
-  }
-
-  RefreshAchievements();
-
-  for (const auto &attr :
-       {"speed", "endurance", "strength", "will", "intellect"}) {
-    AddAttribute(attr, -53);
-  }
-  int current = 0;
-  gameData->Get("starcnt", current);
-  gameData->Update("starcnt", current + 1);
-  RefreshAchievements();
 }
 
 int DataManager::GetWithDefault(const std::string& key, int default_value) {
@@ -374,31 +326,6 @@ int DataManager::GetAttribute(const std::string& key) {
   return value;
 }
 
-int DataManager::GetAttrLimit() {
-  std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  int starcnt = GetWithDefault("starcnt", 0);
-  return 100 + starcnt * 10;
-}
-
-void DataManager::AddAttribute(const std::string& key, int value) {
-  std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  int current = 0;
-  gameData->Get("attr." + key, current);
-  // WARN not support negative value yet
-  int new_value = std::min(std::max(current + value, 0), 99999999);
-  // normal attributes are limited
-  if (key != "exp" && key != "buycnt") {
-    // extra is returned as exp
-    int limit = GetAttrLimit();
-    if (new_value > limit) {
-      AddAttribute("exp", (new_value - limit) * 53000 / 2);
-      new_value = limit;
-    }
-  }
-  gameData->Update("attr." + key, new_value);
-  if (achievementsReady) RefreshAchievements();
-}
-
 std::vector<int> DataManager::TaskStatus(int id) {
   std::vector<int> status_vec;
   int start_time = 0;
@@ -417,16 +344,6 @@ std::vector<int> DataManager::TaskStatus(int id) {
   status_vec.push_back(status);
   status_vec.push_back(cost_snapshot);
   return status_vec;
-}
-
-void DataManager::DumpTask(int id, int start_time, int end_time, int success,
-                           int status, int cost_snapshot) {
-  gameData->Update("task." + std::to_string(id) + ".start_time", start_time);
-  gameData->Update("task." + std::to_string(id) + ".end_time", end_time);
-  gameData->Update("task." + std::to_string(id) + ".success", success);
-  gameData->Update("task." + std::to_string(id) + ".status", status);
-  gameData->Update("task." + std::to_string(id) + ".cost_snapshot",
-                   cost_snapshot);
 }
 
 void DataManager::SetResetMark() {

@@ -8,8 +8,8 @@
   import { reportFrontendError } from "../logger.js";
 
   export let attributes = { exp: 0, speed: 0, endurance: 0, strength: 0, will: 0, intellect: 0 };
-  export let starcnt = 0;
-  export let expdiff = 0;
+  export let online = false;
+  let stateReceivedAt = 0;
 
   let currentTask = null;
   let taskList = [];
@@ -27,13 +27,13 @@
   let unsubscribe;
 
   function updateClock() {
-    timeRemain = currentTask
-      ? Math.max(0, currentTask.cost - (Math.floor(Date.now() / 1000) - currentTask.start_time))
-      : 0;
+    const elapsed = online && currentTask && !currentTask.paused ? (performance.now() - stateReceivedAt) / 1000 : 0;
+    timeRemain = currentTask ? Math.max(0, currentTask.remaining_seconds - elapsed) : 0;
   }
 
   function applyState(data) {
     currentTask = data.current ?? null;
+    stateReceivedAt = performance.now();
     taskList = data.list ?? [];
     queue = data.queue ?? [];
     queueCapacity = data.queue_capacity ?? 2;
@@ -82,19 +82,8 @@
     }
   }
 
-  function calcRate(task) {
-    let lack = Object.entries(task.requirements).reduce(
-      (sum, [key, value]) => sum + Math.max(0, value - attributes[key]), 0,
-    );
-    lack = lack * 12 + 120 + 20 * starcnt;
-    if (lack >= 400) return 0;
-    return (400 - Math.max(20, lack - attributes.will)) / 4;
-  }
-
-  function calcCost(cost) {
-    const p = Math.max(0, Math.min(attributes.speed - 2, 100)) / 100;
-    return Math.floor(cost * (1 - 0.75 * (1 - (1 - p) * (1 - p))));
-  }
+  function calcRate(task) { return task.rate ?? 0; }
+  function calcCost(task) { return task.cost ?? 0; }
 
   function formatRemain(seconds) {
     const s = Math.max(0, Math.floor(seconds));
@@ -104,7 +93,7 @@
   }
 
   function canQueue(task) {
-    return queue.length < queueCapacity && task.status !== 3 &&
+    return online && queue.length < queueCapacity && task.status !== 3 &&
       (task.repeatable || (!queue.some((entry) => entry.id === task.id) && currentTask?.id !== task.id));
   }
 
@@ -140,8 +129,8 @@
   {#if currentTask}
     <div class="task mb-4">
       <div class="header">
-        <span>正在执行 · {currentTask.title}</span>
-        <span class="text-sm">{timeRemain > 0 ? formatRemain(timeRemain) : "正在结算…"}</span>
+        <span>{online ? "正在执行" : "已暂停"} · {currentTask.title}</span>
+        <span class="text-sm">{timeRemain > 0 ? formatRemain(timeRemain) : online ? "正在结算…" : "已暂停"}</span>
       </div>
       <div class="content text-gray-600">
         <p class="mb-3 text-sm">{currentTask.desc}</p>
@@ -154,7 +143,7 @@
         <div class="mb-2 flex flex-wrap items-center gap-1">
           <span class="badge warn">奖励</span>
           {#if currentTask.id === 1}
-            <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
+            <AttributeIcon attribute="exp" value={currentTask.rewards.exp} fullfill />
           {:else}
             {#each Object.entries(currentTask.rewards) as [key, value]}
               <AttributeIcon attribute={key} {value} fullfill />
@@ -169,7 +158,7 @@
               <Button color="alternative" size="xs" disabled={busy || !canQueue(currentTask)}
                 on:click={() => taskAction(`/api/task/${currentTask.id}/queue`)}>再排一次</Button>
             {/if}
-            <Button color="alternative" size="xs" disabled={busy}
+            <Button color="alternative" size="xs" disabled={busy || !online}
               on:click={() => taskAction(`/api/task/${currentTask.id}/cancel`)}>中止</Button>
           </span>
         </div>
@@ -196,15 +185,15 @@
                 <span class="queue-position">{index + 1}</span>
                 <div>
                   <p class="text-sm">{task.title}</p>
-                  <p class="text-xs text-gray-400">预计 {formatRemain(calcCost(task.cost))} · 当前成功率 {calcRate(task)}%</p>
+                  <p class="text-xs text-gray-400">预计 {formatRemain(calcCost(task))} · 当前成功率 {calcRate(task)}%</p>
                 </div>
               </div>
               <div class="flex gap-1">
-                <Button color="alternative" size="xs" aria-label={`上移${task.title}`} disabled={busy || index === 0}
+                <Button color="alternative" size="xs" aria-label={`上移${task.title}`} disabled={busy || !online || index === 0}
                   on:click={() => taskAction(`/api/task/queue/${task.entry_id}/move`, "POST", { direction: -1 })}>↑</Button>
-                <Button color="alternative" size="xs" aria-label={`下移${task.title}`} disabled={busy || index === queue.length - 1}
+                <Button color="alternative" size="xs" aria-label={`下移${task.title}`} disabled={busy || !online || index === queue.length - 1}
                   on:click={() => taskAction(`/api/task/queue/${task.entry_id}/move`, "POST", { direction: 1 })}>↓</Button>
-                <Button color="alternative" size="xs" disabled={busy}
+                <Button color="alternative" size="xs" disabled={busy || !online}
                   on:click={() => taskAction(`/api/task/queue/${task.entry_id}`, "DELETE")}>移除</Button>
               </div>
             </li>
@@ -251,7 +240,7 @@
             <div class="mb-2 flex items-center justify-between gap-2 text-gray-600">
               <div>
                 <p class="text-sm"><span class="mr-2 text-green-600">T{task.id}</span>{task.title}</p>
-                <p class="mt-1 text-xs text-gray-400"><img class="inline" width="12" height="12" src={ClockIcon} alt="" /> {formatRemain(calcCost(task.cost))}</p>
+                <p class="mt-1 text-xs text-gray-400"><img class="inline" width="12" height="12" src={ClockIcon} alt="" /> {formatRemain(calcCost(task))}</p>
               </div>
               {#if task.status === 3}
                 <span class="text-xs text-gray-400">已完成</span>
@@ -271,7 +260,7 @@
               <div class="mb-2 flex flex-wrap items-center gap-1 text-gray-500">
                 <span class="badge warn">奖励</span>
                 {#if task.id === 1}
-                  <AttributeIcon attribute="exp" value={10 * expdiff} fullfill />
+                  <AttributeIcon attribute="exp" value={task.rewards.exp} fullfill />
                 {:else}
                   {#each Object.entries(task.rewards) as [key, value]}
                     <AttributeIcon attribute={key} {value} fullfill />

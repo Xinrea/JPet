@@ -17,6 +17,17 @@
   import fanAvatar from "../assets/fan.png";
   import { sse } from "../sse.js";
   import { onDestroy } from "svelte";
+  let cloudUrl = "", cloudError = "", cloudMessage = "", cloudBusy = false, cloudOverride = false;
+  async function saveCloud(takeOver = false) {
+    cloudBusy = true; cloudError = ""; cloudMessage = "";
+    try {
+      const response = await fetch("/api/cloud", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: cloudUrl.trim(), take_over: takeOver }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "连接设置失败");
+      cloudMessage = "已保存，正在连接云端";
+    } catch (failure) { cloudError = failure.message; }
+    finally { cloudBusy = false; }
+  }
   // audio
   let _volume = "20";
   let _mute = false;
@@ -47,6 +58,7 @@
     { value: 3, name: "设置面板" },
   ];
   function init() {
+    fetch("/api/cloud").then(res => res.json()).then(data => { cloudUrl = data.url || ""; cloudOverride = data.environment_override; }).catch(() => {});
     // get from server
     fetch("/api/config/audio")
       .then((res) => res.json())
@@ -199,9 +211,13 @@
   }
   let _reset = false;
   let resetModal = false;
-  function resetData() {
-    _reset = true;
-    fetch("/api/data/reset", { method: "POST" });
+  async function resetData() {
+    try {
+      const response = await fetch("/api/data/reset", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "重置失败");
+      _reset = true;
+    } catch (failure) { cloudError = failure.message; }
   }
   // acount
   export let account_info = null;
@@ -350,6 +366,19 @@
   });
   $: if (!account_modal) stopQrPolling();
 </script>
+
+<div class="mb-5 rounded border border-gray-200 bg-white p-4">
+  <Label class="mb-2" for="cloud-url">云端游戏服务</Label>
+  <Input id="cloud-url" bind:value={cloudUrl} placeholder="https://你的服务.workers.dev" disabled={cloudOverride} />
+  <p class="mt-2 text-xs text-gray-500">连接后同步云端存档。关闭或断网时，任务和经验暂停。首次连接会导入本机旧存档。</p>
+  {#if cloudOverride}<p class="mt-2 text-xs text-gray-500">服务地址由启动配置指定。</p>{/if}
+  <div class="mt-3 flex gap-2">
+    <Button size="sm" disabled={cloudBusy} on:click={() => saveCloud()}>保存并连接</Button>
+    <Button size="sm" color="alternative" disabled={cloudBusy} on:click={() => saveCloud(true)}>接管其他设备会话</Button>
+  </div>
+  {#if cloudError}<p class="mt-2 text-sm text-red-600" role="alert">{cloudError}</p>{/if}
+  {#if cloudMessage}<p class="mt-2 text-sm text-green-600" role="status">{cloudMessage}</p>{/if}
+</div>
 
 <Modal bind:open={account_modal} on:open={doLogin}>
   <div class="flex justify-center">
@@ -561,12 +590,12 @@
   disabled={_reset}
   on:click={() => {
     resetModal = true;
-  }}>{!_reset ? "重置数据" : "已标记重置"}</Button
+  }}>{!_reset ? "重置云端游戏数据" : "已重置"}</Button
 >
-<Tooltip placement="right">数据将会在重启后清除</Tooltip>
+<Tooltip placement="right">重置当前账号的云端存档，立即生效</Tooltip>
 <Modal title="确认重置" bind:open={resetModal} size="xs" autoclose>
   <h3 class="mb-5 text-lg font-normal text-gray-500">
-    此次操作无法取消，确认要进行吗？
+    将清空当前账号的云端成长、任务和成就，确认重置吗？
   </h3>
   <Button
     color="red"

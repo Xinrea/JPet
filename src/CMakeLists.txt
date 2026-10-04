@@ -34,6 +34,9 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/BilibiliDynamic.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerCloud.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/CloudGame.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/CloudGame.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerTasks.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerAchievements.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Achievements.hpp
