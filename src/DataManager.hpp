@@ -84,7 +84,6 @@ class DataManager {
   void ApplyCloudSnapshot(const nlohmann::json& snapshot);
   void PauseCloudView();
   void LoadCloudCache(const std::string& uid, const std::string& endpoint = "");
-  void UpdateCloudUrl(const std::string& url);
   float CloudTaskProgress();
   void RecordAchievementEvent(const std::string& event, time_t now = time(nullptr));
   int CurrentExpDiff();

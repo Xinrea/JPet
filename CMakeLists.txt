@@ -31,6 +31,9 @@ set(FRAMEWORK_PATH ${SDK_ROOT_PATH}/Framework)
 # Set project.
 project(${APP_NAME} CXX)
 
+include(cmake/CloudConfig.cmake)
+jpet_configure_cloud("${CMAKE_CURRENT_BINARY_DIR}/generated/JPetCloudConfig.hpp")
+
 if(APPLE)
   enable_language(OBJCXX)
   set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "JPet supports Apple Silicon only")
@@ -77,8 +80,8 @@ set(CMAKE_CONFIGURATION_TYPES Debug Release
   CACHE STRING "Configurations" FORCE
 )
 
-# Suppress generation of ZERO_CHECK project.
-set(CMAKE_SUPPRESS_REGENERATION ON)
+# Reconfigure when build inputs, including the cloud domain, change.
+set(CMAKE_SUPPRESS_REGENERATION OFF)
 
 # Surpress GLEW and GLFW process.
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -231,7 +234,8 @@ target_link_libraries(${APP_NAME}
 )
 
 # Specify include directories.
-target_include_directories(${APP_NAME} PRIVATE ${GLEW_INCLUDE_DIRS} ${Stb_INCLUDE_DIR} ${TOMLPLUSPLUS_INCLUDE_DIR})
+target_include_directories(${APP_NAME} PRIVATE ${GLEW_INCLUDE_DIRS} ${Stb_INCLUDE_DIR} ${TOMLPLUSPLUS_INCLUDE_DIR}
+  "${CMAKE_CURRENT_BINARY_DIR}/generated")
 if(APPLE)
   target_link_libraries(${APP_NAME} PRIVATE RocksDB::rocksdb
     "-framework AppKit" "-framework WebKit" "-framework AVFoundation"

@@ -10,7 +10,7 @@
 class CloudGame {
  public:
   static CloudGame* GetInstance();
-  static bool ValidUrl(const std::string& url);
+  static std::string ServiceUrl();
   void Start();
   void Stop();
   void Wake(bool takeOver = false);

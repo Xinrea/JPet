@@ -17,14 +17,14 @@
   import fanAvatar from "../assets/fan.png";
   import { sse } from "../sse.js";
   import { onDestroy } from "svelte";
-  let cloudUrl = "", cloudError = "", cloudMessage = "", cloudBusy = false, cloudOverride = false;
-  async function saveCloud(takeOver = false) {
+  let cloudError = "", cloudMessage = "", cloudBusy = false;
+  async function reconnectCloud(takeOver = false) {
     cloudBusy = true; cloudError = ""; cloudMessage = "";
     try {
-      const response = await fetch("/api/cloud", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: cloudUrl.trim(), take_over: takeOver }) });
+      const response = await fetch("/api/cloud/reconnect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ take_over: takeOver }) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "连接设置失败");
-      cloudMessage = "已保存，正在连接云端";
+      if (!response.ok) throw new Error(data.error || "重新连接失败");
+      cloudMessage = "正在连接云端";
     } catch (failure) { cloudError = failure.message; }
     finally { cloudBusy = false; }
   }
@@ -58,7 +58,6 @@
     { value: 3, name: "设置面板" },
   ];
   function init() {
-    fetch("/api/cloud").then(res => res.json()).then(data => { cloudUrl = data.url || ""; cloudOverride = data.environment_override; }).catch(() => {});
     // get from server
     fetch("/api/config/audio")
       .then((res) => res.json())
@@ -368,13 +367,11 @@
 </script>
 
 <div class="mb-5 rounded border border-gray-200 bg-white p-4">
-  <Label class="mb-2" for="cloud-url">云端游戏服务</Label>
-  <Input id="cloud-url" bind:value={cloudUrl} placeholder="https://你的服务.workers.dev" disabled={cloudOverride} />
+  <P class="mb-2">云端游戏服务</P>
   <p class="mt-2 text-xs text-gray-500">连接后同步云端存档。关闭或断网时，任务和经验暂停。首次连接会导入本机旧存档。</p>
-  {#if cloudOverride}<p class="mt-2 text-xs text-gray-500">服务地址由启动配置指定。</p>{/if}
   <div class="mt-3 flex gap-2">
-    <Button size="sm" disabled={cloudBusy} on:click={() => saveCloud()}>保存并连接</Button>
-    <Button size="sm" color="alternative" disabled={cloudBusy} on:click={() => saveCloud(true)}>接管其他设备会话</Button>
+    <Button size="sm" disabled={cloudBusy} on:click={() => reconnectCloud()}>重新连接</Button>
+    <Button size="sm" color="alternative" disabled={cloudBusy} on:click={() => reconnectCloud(true)}>接管其他设备会话</Button>
   </div>
   {#if cloudError}<p class="mt-2 text-sm text-red-600" role="alert">{cloudError}</p>{/if}
   {#if cloudMessage}<p class="mt-2 text-sm text-green-600" role="status">{cloudMessage}</p>{/if}

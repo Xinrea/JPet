@@ -1,11 +1,10 @@
 #include "CloudGame.hpp"
+#include "JPetCloudConfig.hpp"
 #include "DataManager.hpp"
 #include "BuffManager.hpp"
 #include "PanelServer.hpp"
 #include <httplib.h>
 #include <openssl/rand.h>
-#include <regex>
-#include <cstdlib>
 
 namespace {
 std::string NewId() {
@@ -16,18 +15,11 @@ std::string NewId() {
   for (auto b : bytes) { result += hex[b >> 4]; result += hex[b & 15]; }
   return result;
 }
-std::string Endpoint() {
-  if (const auto value = std::getenv("JPET_CLOUD_URL")) return value;
-  return DataManager::GetInstance()->GetConfig<std::string>("cloud", "url", "");
-}
 }
 
 CloudGame* CloudGame::GetInstance() { static CloudGame instance; return &instance; }
 CloudGame::~CloudGame() { Stop(); }
-bool CloudGame::ValidUrl(const std::string& url) {
-  return url.empty() || (url.size() <= 512 && std::regex_match(url,
-    std::regex(R"((https://[A-Za-z0-9.-]+(:[0-9]{1,5})?|http://(127\.0\.0\.1|localhost)(:[0-9]{1,5})?)(/[A-Za-z0-9_./-]*)?)")));
-}
+std::string CloudGame::ServiceUrl() { return JPetCloudConfig::ServiceUrl; }
 void CloudGame::Start() {
   if (running_.exchange(true)) return;
   worker_ = std::thread(&CloudGame::Run, this);
@@ -58,9 +50,8 @@ void CloudGame::SetStatus(bool ready, const std::string& error) {
 }
 bool CloudGame::Online() { std::lock_guard<std::mutex> lock(statusMutex_); return ready_; }
 nlohmann::json CloudGame::Status() {
-  const bool configured = !Endpoint().empty();
   std::lock_guard<std::mutex> lock(statusMutex_);
-  return {{"configured", configured}, {"online", ready_}, {"error", error_},
+  return {{"configured", true}, {"online", ready_}, {"error", error_},
     {"heartbeat_seconds", 15}, {"lease_seconds", 30}};
 }
 void CloudGame::Touch() { if (Online()) ++touches_; }
@@ -126,10 +117,9 @@ void CloudGame::Disconnect() {
 void CloudGame::Sync() {
   std::lock_guard<std::mutex> lock(networkMutex_);
   auto dm = DataManager::GetInstance();
-  auto endpoint = Endpoint();
+  const auto endpoint = ServiceUrl();
   auto uid = dm->GetWithDefault("uid", std::string{});
   if (dm->GetWithDefault("cookies", std::string{}).empty()) uid.clear();
-  if (endpoint.empty() || !ValidUrl(endpoint)) { Close(); SetStatus(false, endpoint.empty() ? "请在设置中填写云端服务地址" : "云端服务地址无效"); return; }
   if (uid.empty()) { Close(); SetStatus(false, "请先登录账号"); return; }
   if (uid_ != uid || url_ != endpoint) {
     Close();

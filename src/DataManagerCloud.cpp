@@ -2,13 +2,8 @@
 #include "CloudGame.hpp"
 #include "PanelServer.hpp"
 #include "Platform.hpp"
-#include <cstdlib>
 
 namespace {
-std::string ConfiguredCloudUrl(DataManager& manager) {
-  if (const auto value = std::getenv("JPET_CLOUD_URL")) return value;
-  return manager.GetConfig<std::string>("cloud", "url", "");
-}
 std::string CloudCacheKey(const std::string& endpoint, const std::string& uid) {
   return "cloud.cache." + uid + "." + endpoint;
 }
@@ -46,7 +41,7 @@ nlohmann::json DataManager::ExportCloudBootstrap(const std::string& uid) {
 
 void DataManager::LoadCloudCache(const std::string& uid, const std::string& endpoint) {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  cloudCacheUrl = endpoint.empty() ? ConfiguredCloudUrl(*this) : endpoint;
+  cloudCacheUrl = endpoint.empty() ? CloudGame::ServiceUrl() : endpoint;
   auto cached = nlohmann::json::parse(GetWithDefault(CloudCacheKey(cloudCacheUrl, uid), std::string{}), nullptr, false);
   cloudSnapshot = cached.is_object() && cached.value("uid", std::string{}) == uid ? cached : nlohmann::json{};
   if (!cloudSnapshot.is_null()) cloudSnapshot["online"] = false;
@@ -110,7 +105,7 @@ void DataManager::ApplyCloudSnapshot(const nlohmann::json& snapshot) {
 nlohmann::json DataManager::GetCloudSnapshot() {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
   if (!cloudSnapshot.is_object() || !cloudSnapshot.contains("profile")) return nullptr;
-  if (cloudCacheUrl != ConfiguredCloudUrl(*this)) return nullptr;
+  if (cloudCacheUrl != CloudGame::ServiceUrl()) return nullptr;
   const auto uid = GetWithDefault("uid", std::string{});
   if (!uid.empty() && cloudSnapshot.value("uid", std::string{}) != uid) return nullptr;
   auto result = cloudSnapshot;
@@ -168,9 +163,4 @@ float DataManager::CloudTaskProgress() {
   if (state.is_null() || state["tasks"]["current"].is_null()) return 0;
   const auto& task = state["tasks"]["current"];
   return task.value("cost", 0.0) > 0 ? static_cast<float>(task.value("elapsed_seconds", 0.0) / task["cost"].get<double>()) : 0;
-}
-void DataManager::UpdateCloudUrl(const std::string& url) {
-  std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  data.insert_or_assign("cloud", toml::table{{"url", url}});
-  Save();
 }

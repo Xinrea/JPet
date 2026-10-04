@@ -1,0 +1,5 @@
+#pragma once
+
+namespace JPetCloudConfig {
+inline constexpr char ServiceUrl[] = "@JPET_COMPILED_CLOUD_URL@";
+}

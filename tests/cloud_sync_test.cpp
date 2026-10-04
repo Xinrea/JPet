@@ -6,6 +6,7 @@
 #include "Platform.hpp"
 #include <cassert>
 #include <codecvt>
+#include <cstdlib>
 #include <iostream>
 #include <locale>
 #include <set>
@@ -22,6 +23,7 @@ void Platform::Notify(const std::wstring&, const std::wstring&, const std::strin
 void BuffManager::thread() {}
 std::vector<std::string> BuffManager::GetBuffList() { return {"live"}; }
 DataManager::DataManager() {
+  data.insert("cloud", toml::table{{"url", "https://ignored.invalid/from-toml"}});
   std::filesystem::create_directories(std::filesystem::path(LAppDefine::documentPath));
   gameData = std::make_shared<GameData>(LAppDefine::documentPath + L"/unused.dat");
   assert(gameData->Initialized());
@@ -77,14 +79,16 @@ int main(int argc, char** argv) {
     state["online"] = kind != "close";
     res.set_content(Json{{"snapshot", state}}.dump(), "application/json");
   });
-  const int port = server.bind_to_any_port("127.0.0.1");
-  assert(port > 0);
-  const auto url = "http://127.0.0.1:" + std::to_string(port);
-  setenv("JPET_CLOUD_URL", url.c_str(), 1);
+  const auto url = CloudGame::ServiceUrl();
+  const std::string testOrigin = "http://127.0.0.1:";
+  assert(url.rfind(testOrigin, 0) == 0);
+  const int port = std::stoi(url.substr(testOrigin.size()));
+  assert(server.bind_to_port("127.0.0.1", port));
+  setenv("JPET_CLOUD_URL", "https://ignored.invalid/from-environment", 1);
+  assert(dm->GetConfig("cloud", "url", std::string{}) == "https://ignored.invalid/from-toml");
   std::thread serving([&] { server.listen_after_bind(); });
   auto client = CloudGame::GetInstance();
-  assert(CloudGame::ValidUrl(url)); assert(CloudGame::ValidUrl("https://jpet.example.com/api"));
-  assert(!CloudGame::ValidUrl("http://example.com")); assert(!CloudGame::ValidUrl("https://user:secret@example.com"));
+  assert(client->Status()["configured"] == true);
   client->Start();
   assert(waitUntil([&] { return client->Online(); }));
   assert(dm->GetCloudProfile()["attributes"]["exp"] == 100);
@@ -110,17 +114,17 @@ int main(int argc, char** argv) {
   assert(expired["online"] == false && expired["attributes"]["exp"] == 90);
   assert(expired["exp_progress_seconds"].get<double>() >= 10.02);
   setenv("JPET_CLOUD_URL", "https://other.example.com", 1);
-  assert(dm->GetCloudSnapshot().is_null());
-  dm->LoadCloudCache("123");
+  assert(CloudGame::ServiceUrl() == url);
+  assert(dm->GetCloudProfile()["attributes"]["exp"] == 90);
+  dm->LoadCloudCache("123", "https://other.example.com");
   auto otherService = state; otherService["revision"] = 1; otherService["profile"]["attributes"]["exp"] = 5;
   dm->ApplyCloudSnapshot(otherService);
-  assert(dm->GetCloudProfile()["attributes"]["exp"] == 5);
-  setenv("JPET_CLOUD_URL", url.c_str(), 1);
+  assert(dm->GetCloudSnapshot().is_null());
   dm->LoadCloudCache("123");
   assert(dm->GetCloudProfile()["attributes"]["exp"] == 90);
   assert(dm->GetCloudProfile()["online"] == false);
   client->Disconnect();
   assert(!client->Online());
   client->Stop(); server.stop(); serving.join();
-  std::cout << "PASS native cloud transport: retry, cache, account isolation, offline pause\n";
+  std::cout << "PASS native cloud transport: compiled endpoint, ignored runtime overrides, retry, cache isolation, offline pause\n";
 }

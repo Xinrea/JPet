@@ -73,6 +73,9 @@ jobs:
         run: |
           npm ci --legacy-peer-deps --no-audit --no-fund
           npm run build
+      - name: Test cloud build configuration
+        shell: bash
+        run: python3 tests/cloud_config_test.py
       - name: Check out pinned vcpkg
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

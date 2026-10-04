@@ -20,11 +20,18 @@ npm run db:local
 npm run dev
 ```
 
-在 JPet 设置页的「云端游戏服务」中填写 `http://127.0.0.1:8787`，保存并登录 B 站账号。
-也可在启动时设置 `JPET_CLOUD_URL`；该变量优先于设置页和 `jpet.toml` 的 `[cloud].url`。
-生产地址使用 HTTPS，HTTP 仅允许 localhost 和 127.0.0.1。
+开发客户端连接本地 Worker 时，在 CMake 配置阶段指定地址并重新构建，例如：
 
-未配置服务、未登录或连接失败时，面板展示缓存，成长与游戏操作暂停。声音、桌面交互等本地功能照常工作。
+```sh
+cmake -S . -B build/macos-arm64 -DJPET_CLOUD_URL=http://127.0.0.1:8787
+cmake --build build/macos-arm64
+```
+
+`JPET_CLOUD_URL` 是构建参数。客户端不再读取同名运行时环境变量或 `jpet.toml` 的 `[cloud].url`，
+设置页只提供重新连接与接管会话。地址必须使用 HTTPS，HTTP 仅允许 localhost 和 127.0.0.1。
+恢复生产构建时，将 CMake 参数设为空：`-DJPET_CLOUD_URL=`。
+
+未登录或连接失败时，面板展示缓存，成长与游戏操作暂停。声音、桌面交互等本地功能照常工作。
 
 ## 在线与暂停
 
@@ -48,7 +55,7 @@ Alarm 按最早任务完成或租约到期时间安排；结算状态持久化�
 旧版本的运行任务按迁移时可恢复的剩余时间导入，旧的待结算奖励在首次创建时结算一次。
 本机旧存档不会自动复制给后续登录的其他 UID。
 
-云端快照按 UID 与服务地址保存为 `cloud.cache.<uid>.<url>`，切换服务时单独保存缓存和版本。
+云端快照按 UID 与服务地址保存为 `cloud.cache.<uid>.<url>`，不同地址的构建使用各自的缓存和版本。
 客户端检查 UID 和递增版本，丢弃旧响应；
 重启后缓存保持暂停状态，直到云端连接成功。重置操作清空当前账号的云端游戏数据，立即生效，
 保留账号、连接会话及排行榜参与设置。重新连接不会恢复重置前的本地数据。
@@ -89,6 +96,7 @@ npm run typecheck
 npm test
 npm run deploy:check
 cd ..
+python3 tests/cloud_config_test.py
 bash build-scripts/test_cloud_sync_macos.sh
 bash build-scripts/test_achievements_macos.sh
 ```
@@ -101,8 +109,14 @@ bash build-scripts/test_achievements_macos.sh
 
 ### 生产环境
 
-生产服务地址为 `https://s.jpet.powerlive.io`。在 JPet 设置页的「云端游戏服务」中填写此地址，
-或在启动时设置 `JPET_CLOUD_URL=https://s.jpet.powerlive.io`。
+生产服务地址为 `https://s.jpet.powerlive.io`。CMake 在构建时读取 `cloud/wrangler.jsonc` 顶层
+启用的 Custom Domain，生成 `JPetCloudConfig.hpp` 并将 HTTPS 地址编入客户端。
+配置须包含唯一的启用域名；缺失或有歧义时构建报错。
+修改生产域名后需要重新构建客户端，构建系统会重新生成地址。
+生成头文件只包含服务地址，不包含账号 ID、数据库 ID 或凭据。
+
+GitHub Actions 的 Windows x64 和 macOS ARM64 发布构建都使用这一流程，默认连接生产域名。
+该工作流构建客户端；Worker 更新仍通过下文的部署命令执行。
 
 `cloud/wrangler.jsonc` 的顶层配置对应生产环境，固定以下资源：
 
@@ -162,7 +176,8 @@ npm run db:remote
 npm run deploy
 ```
 
-将部署返回的 Worker HTTPS 地址填到 JPet 设置页，或设置 `JPET_CLOUD_URL`。
+确认 `wrangler.jsonc` 已设置目标 Custom Domain 后，重新构建客户端；
+也可在 CMake 配置阶段用 `-DJPET_CLOUD_URL=https://目标服务域名` 指定构建地址。
 `npm run deploy:check` 仅检查打包与配置，不创建云端资源，也不证明远程数据库已迁移。
 游戏逻辑后续升级时需要保留状态字段和成就 ID，并按存档 schema 处理迁移。
 

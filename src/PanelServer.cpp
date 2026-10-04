@@ -341,18 +341,13 @@ void PanelServer::doServe() {
     res.set_content(DataManager::GetInstance()->GetCloudProfile().dump(), "application/json");
   });
   server->Get("/api/cloud", [](const auto&, auto& res) {
-    const auto env = std::getenv("JPET_CLOUD_URL");
     auto state = CloudGame::GetInstance()->Status();
-    state["url"] = env ? std::string(env) : DataManager::GetInstance()->GetConfig<std::string>("cloud", "url", "");
-    state["environment_override"] = env != nullptr;
+    state["url"] = CloudGame::ServiceUrl();
     res.set_content(state.dump(), "application/json");
   });
-  server->Post("/api/cloud", [](const auto& req, auto& res) {
+  server->Post("/api/cloud/reconnect", [](const auto& req, auto& res) {
     try {
       const auto payload = nlohmann::json::parse(req.body);
-      const auto url = payload.at("url").template get<std::string>();
-      if (!CloudGame::ValidUrl(url)) throw std::runtime_error("请填写 HTTPS 服务地址，本地调试可使用 http://127.0.0.1:8787");
-      DataManager::GetInstance()->UpdateCloudUrl(url);
       CloudGame::GetInstance()->Wake(payload.value("take_over", false));
       res.set_content("{\"success\":true}", "application/json");
     } catch (const std::exception& e) {
@@ -362,9 +357,7 @@ void PanelServer::doServe() {
   });
   server->Get("/api/rank", [](const auto& req, auto& res) {
     try {
-      const auto env = std::getenv("JPET_CLOUD_URL");
-      auto url = env ? std::string(env) : DataManager::GetInstance()->GetConfig<std::string>("cloud", "url", "");
-      if (url.empty() || !CloudGame::ValidUrl(url)) throw std::runtime_error("请先设置云端服务地址");
+      const auto url = CloudGame::ServiceUrl();
       const auto split = url.find('/', url.find("://") + 3);
       auto prefix = split == std::string::npos ? std::string{} : url.substr(split);
       while (!prefix.empty() && prefix.back() == '/') prefix.pop_back();

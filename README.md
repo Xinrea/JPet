@@ -95,7 +95,8 @@ VCPKG_INSTALLED_DIR=/path/to/vcpkg_installed \
 BUILD_TYPE=Debug ./build-scripts/build_and_run_macos.sh
 ```
 
-游戏规则和存档已迁移到 Cloudflare。启动后在设置中填写云端服务地址并登录账号。
+游戏规则和存档已迁移到 Cloudflare。构建时从 `cloud/wrangler.jsonc` 读取生产域名，
+Windows 和 macOS 发布版默认连接 `https://s.jpet.powerlive.io`，登录账号后自动同步。
 未连接时显示缓存，任务与挂机经验保持暂停。服务开发、部署和协议见
 [云端游戏服务说明](doc/cloud-game.md)。
 
@@ -107,6 +108,7 @@ npm ci
 npm run types
 npm test
 cd ..
+python3 tests/cloud_config_test.py
 bash build-scripts/test_cloud_sync_macos.sh
 ```
 
