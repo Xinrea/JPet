@@ -11,7 +11,7 @@ set(APP_NAME JPet)
 
 # JVERSION can be set by -D option.
 if(NOT DEFINED JVERSION)
-  set(JVERSION "3.0.0")
+  set(JVERSION "3.0.1-beta.1")
 endif()
 
 message(STATUS "JPet version: ${JVERSION}")
