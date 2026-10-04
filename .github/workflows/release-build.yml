@@ -45,16 +45,19 @@ jobs:
         include:
           - os: windows-2022
             platform: windows-x64
-            triplet: x64-windows
+            triplet: x64-windows-release
           - os: macos-14
             platform: macos-arm64
-            triplet: arm64-osx
+            triplet: arm64-osx-release
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
       RELEASE_VERSION: ${{ needs.version.outputs.version }}
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/build/vcpkg-cache
       VCPKG_DISABLE_METRICS: '1'
+      VCPKG_REVISION: 5dd2e1600d049b498ff9fb9fe15997533ae0c804
+      # Legacy dependency CMakeLists require policies removed by CMake 4.
+      CMAKE_POLICY_VERSION_MINIMUM: '3.5'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,14 +77,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: microsoft/vcpkg
-          ref: 0bc3f04da6cb8ae1dbd5e2051032c596bb03cffa
+          ref: ${{ env.VCPKG_REVISION }}
           path: build/vcpkg
+          fetch-depth: 0
           persist-credentials: false
       - name: Restore C++ binary cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/vcpkg-cache
-          key: vcpkg-${{ matrix.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-${{ matrix.os }}-${{ matrix.triplet }}-${{ env.VCPKG_REVISION }}-${{ hashFiles('vcpkg.json', 'build-scripts/triplets/*') }}
           restore-keys: vcpkg-${{ matrix.os }}-${{ matrix.triplet }}-
       - name: Create binary cache directory
         shell: bash
@@ -96,7 +100,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release "-DJVERSION=$env:RELEASE_VERSION" `
             "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/build/vcpkg/scripts/buildsystems/vcpkg.cmake" `
             "-DVCPKG_INSTALLED_DIR=$env:GITHUB_WORKSPACE/build/vcpkg_installed" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows -DVCPKG_BUILD_TYPE=release `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-release `
+            "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/build-scripts/triplets" `
             -DJPET_BUILD_UPDATE_TESTS=ON -DFAIL_ON_WARNINGS=OFF -DPORTABLE=1
       - name: Configure macOS ARM
         if: runner.os == 'macOS'
@@ -108,7 +113,8 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/build/vcpkg/scripts/buildsystems/vcpkg.cmake" \
             -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/build/vcpkg_installed" \
-            -DVCPKG_TARGET_TRIPLET=arm64-osx -DVCPKG_BUILD_TYPE=release \
+            -DVCPKG_TARGET_TRIPLET=arm64-osx-release \
+            -DVCPKG_OVERLAY_TRIPLETS="$GITHUB_WORKSPACE/build-scripts/triplets" \
             -DJPET_BUILD_UPDATE_TESTS=ON
       - name: Build and test
         run: |
@@ -122,7 +128,7 @@ jobs:
           Copy-Item build/release/bin/JPet/Release/* build/package/JPet -Recurse -Force
           Get-ChildItem build/package/JPet -Filter *.pdb | Remove-Item
           Get-ChildItem build/package/JPet -Filter update_release_test.exe | Remove-Item
-          Copy-Item build/vcpkg_installed/x64-windows/bin/*.dll build/package/JPet -Force
+          Copy-Item build/vcpkg_installed/x64-windows-release/bin/*.dll build/package/JPet -Force
           Copy-Item dll/* build/package/JPet -Force
           Copy-Item "$env:WINDIR/System32/msvcp140*.dll" build/package/JPet -Force
           Copy-Item "$env:WINDIR/System32/vcruntime140*.dll" build/package/JPet -Force
@@ -154,6 +160,15 @@ jobs:
           name: release-${{ matrix.platform }}
           path: dist/*
           if-no-files-found: error
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: diagnostics-${{ matrix.platform }}
+          path: |
+            build/vcpkg/buildtrees/**/*.log
+            build/release/vcpkg-manifest-install.log
+          if-no-files-found: ignore
 
   release:
     if: github.event_name == 'push'
