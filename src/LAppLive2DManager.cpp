@@ -7,6 +7,7 @@
  */
 
 #include "LAppLive2DManager.hpp"
+#include "VoiceChat.hpp"
 
 #ifdef __APPLE__
 #include <OpenGL/gl.h>
@@ -138,7 +139,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
       DataManager::GetInstance()->RecordAchievementEvent("touch");
     }
     // no need to check other hitareas
-    if (!DataManager::GetInstance()->GetConfig<bool>("audio", "touch_audio",
+    if (VoiceChat::GetInstance()->IsBusy() || !DataManager::GetInstance()->GetConfig<bool>("audio", "touch_audio",
                                                     true)) {
       return;
     }

@@ -7,7 +7,7 @@ on:
     inputs:
       version:
         description: 'Build version (manual runs only build artifacts; push a tag to publish)'
-        default: '3.0.1-beta.1'
+        default: '3.0.1-beta.2'
         required: true
         type: string
 
@@ -106,7 +106,7 @@ jobs:
             "-DVCPKG_INSTALLED_DIR=$env:GITHUB_WORKSPACE/build/vcpkg_installed" `
             -DVCPKG_TARGET_TRIPLET=x64-windows-release `
             "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/build-scripts/triplets" `
-            -DJPET_BUILD_UPDATE_TESTS=ON -DFAIL_ON_WARNINGS=OFF -DPORTABLE=1
+            -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON -DFAIL_ON_WARNINGS=OFF -DPORTABLE=1
       - name: Configure macOS ARM
         if: runner.os == 'macOS'
         run: |
@@ -119,7 +119,7 @@ jobs:
             -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/build/vcpkg_installed" \
             -DVCPKG_TARGET_TRIPLET=arm64-osx-release \
             -DVCPKG_OVERLAY_TRIPLETS="$GITHUB_WORKSPACE/build-scripts/triplets" \
-            -DJPET_BUILD_UPDATE_TESTS=ON
+            -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON
       - name: Build and test
         run: |
           cmake --build build/release --config Release --parallel 3

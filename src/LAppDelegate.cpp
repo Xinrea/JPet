@@ -53,6 +53,7 @@
 #include "PartStateManager.h"
 #include "TaskScheduler.hpp"
 #include "UpdateManager.hpp"
+#include "VoiceChat.hpp"
 #include "resource.h"
 
 #ifdef _WIN32
@@ -344,6 +345,7 @@ void LAppDelegate::SetLimit(bool limit) {
 }
 
 void LAppDelegate::Release() {
+  VoiceChat::GetInstance()->Stop();
   UpdateManager::GetInstance()->Stop();
   if (!std::getenv("JPET_SMOKE_TEST")) CloudGame::GetInstance()->Stop();
   PanelServer::GetInstance()->Stop();
@@ -490,8 +492,9 @@ void LAppDelegate::Run() {
   render_end:
     // Poll for and process events
     glfwPollEvents();
+    VoiceChat::GetInstance()->Tick(_window);
 
-    if (dataManager->GetConfig<bool>("audio", "idle_audio", true)) {
+    if (!VoiceChat::GetInstance()->IsBusy() && dataManager->GetConfig<bool>("audio", "idle_audio", true)) {
       if (glfwGetTime() - initial_audio_idle_time > 30.0f) {
         initial_audio_idle_time = glfwGetTime();
         if (rand() % 100 >= 90) {

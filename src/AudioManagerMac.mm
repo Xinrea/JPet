@@ -124,6 +124,14 @@ bool AudioManager::IsPlay() {
   }
 }
 
+void AudioManager::Stop() {
+  @autoreleasepool {
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    [impl_->player stop];
+    impl_->player = nil;
+  }
+}
+
 void AudioManager::Play3dSound(AudioType type) {
   @autoreleasepool {
     std::lock_guard<std::mutex> lock(impl_->mutex);

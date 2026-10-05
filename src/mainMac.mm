@@ -7,16 +7,24 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <chrono>
+#include <thread>
 
+#include "DataManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppDelegate.hpp"
 #include "LAppPal.hpp"
+#include "PanelServer.hpp"
+#include "VoiceChat.hpp"
 
 int main(int argc, char** argv) {
   @autoreleasepool {
-    [NSApplication sharedApplication];
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-    const bool smokeTest = argc == 2 && std::strcmp(argv[1], "--smoke-test") == 0;
+    const bool panelSmokeTest = argc == 2 && std::strcmp(argv[1], "--panel-smoke-test") == 0;
+    const bool smokeTest = panelSmokeTest || (argc == 2 && std::strcmp(argv[1], "--smoke-test") == 0);
+    if (!panelSmokeTest) {
+      [NSApplication sharedApplication];
+      [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    }
     if (smokeTest) setenv("JPET_SMOKE_TEST", "1", 1);
 
     NSString* resources = NSBundle.mainBundle.resourcePath;
@@ -29,7 +37,7 @@ int main(int argc, char** argv) {
 
     const char* overridePath = std::getenv("JPET_DATA_DIR");
     if (smokeTest && (!overridePath || !*overridePath)) {
-      std::cerr << "--smoke-test requires JPET_DATA_DIR pointing to an isolated test directory.\n";
+      std::cerr << "Smoke tests require JPET_DATA_DIR pointing to an isolated test directory.\n";
       return 1;
     }
     NSString* data = overridePath ? [NSString stringWithUTF8String:overridePath] :
@@ -53,7 +61,12 @@ int main(int argc, char** argv) {
     LAppPal::Init();
     int result = 0;
     try {
-      if (!LAppDelegate::GetInstance()->Initialize()) {
+      if (panelSmokeTest) {
+        // Exercise the real settings routes without a display or microphone.
+        DataManager::GetInstance();
+        PanelServer::GetInstance()->Start();
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+      } else if (!LAppDelegate::GetInstance()->Initialize()) {
         result = 1;
       } else {
         if (smokeTest) {
@@ -68,7 +81,10 @@ int main(int argc, char** argv) {
       std::cerr << "JPet startup failed: " << e.what() << '\n';
       result = 1;
     }
-    LAppDelegate::ReleaseInstance();
+    if (panelSmokeTest) {
+      PanelServer::GetInstance()->Stop();
+      VoiceChat::GetInstance()->Stop();
+    } else LAppDelegate::ReleaseInstance();
     LAppPal::ReleaseLog();
     flock(lock, LOCK_UN);
     close(lock);

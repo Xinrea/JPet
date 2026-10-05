@@ -19,6 +19,12 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSession.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSession.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoicePlatform.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceEventQueue.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.h
   ${CMAKE_CURRENT_SOURCE_DIR}/UserStateManager.h
   ${CMAKE_CURRENT_SOURCE_DIR}/UserStateManager.cpp
@@ -62,9 +68,9 @@ target_sources(${APP_NAME}
 
 if(APPLE)
   target_sources(${APP_NAME} PRIVATE
-    mainMac.mm PlatformMac.mm MacDesktop.mm MacWebViews.mm AudioManagerMac.mm)
+    mainMac.mm PlatformMac.mm MacDesktop.mm MacWebViews.mm AudioManagerMac.mm VoicePlatformMac.mm)
 else()
   target_sources(${APP_NAME} PRIVATE
     main.cpp PlatformWin.cpp AudioManager.cpp WinToastEventHandler.cpp
-    GamePanel.cpp CookieWindow.cpp JPet.rc)
+    GamePanel.cpp CookieWindow.cpp JPet.rc VoicePlatformWin.cpp)
 endif()

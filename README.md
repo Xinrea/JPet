@@ -125,6 +125,10 @@ Cookie 存储。
 
 ## 桌面宠物轴伊
 
+支持千问实时语音对话：在设置中保存北京地域的百炼 API Key 和业务空间 ID，
+按住 Option（Mac）或 Ctrl（Windows）说话，松开发送；再次按住可打断回复。
+详情见 [语音对话说明](doc/voice-chat.md)。
+
 更新发布网站: [https://pet.vjoi.cn](https://pet.vjoi.cn)
 
 ![img](screenshots/jpet.png)

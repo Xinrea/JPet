@@ -10,7 +10,9 @@
 #include "Wbi.hpp"
 #include "Platform.hpp"
 #include "UpdateManager.hpp"
+#include "VoiceChat.hpp"
 
+#include <cstdlib>
 #include <map>
 #include <string_view>
 
@@ -506,6 +508,40 @@ void PanelServer::doServe() {
                 json["touch_audio"] = touch_audio;
                 res.set_content(json.dump(), "application/json");
               });
+  server->Get("/api/config/voice", [](const httplib::Request&, httplib::Response& res) {
+    res.set_header("Cache-Control", "no-store");
+    res.set_content(DataManager::GetInstance()->GetVoiceSettings().dump(), "application/json");
+  });
+  server->Post("/api/config/voice", [](const httplib::Request& req, httplib::Response& res) {
+    res.set_header("Cache-Control", "no-store");
+    if (req.body.size() > 2048 || req.get_header_value("Content-Type").find("application/json") != 0) {
+      res.status = 400;
+      res.set_content(R"({"error":"语音设置格式不正确"})", "application/json");
+      return;
+    }
+    try {
+      const auto payload = nlohmann::json::parse(req.body);
+      const auto workspace = Voice::Trim(payload.at("workspace_id").get<std::string>());
+      std::string key, error;
+      const bool clear = payload.value("clear_api_key", false);
+      const bool updateKey = clear || payload.contains("api_key");
+      if (!clear && updateKey) key = Voice::Trim(payload.at("api_key").get<std::string>());
+      if (!DataManager::GetInstance()->UpdateVoiceSettings(workspace, updateKey ? &key : nullptr, error)) {
+        res.status = 400;
+        res.set_content(nlohmann::json{{"error", error}}.dump(), "application/json");
+        return;
+      }
+      VoiceChat::GetInstance()->ConfigurationChanged();
+      res.set_content(DataManager::GetInstance()->GetVoiceSettings().dump(), "application/json");
+    } catch (const nlohmann::json::exception&) {
+      res.status = 400;
+      res.set_content(R"({"error":"语音设置格式不正确"})", "application/json");
+    }
+  });
+  server->Get("/api/voice", [](const httplib::Request&, httplib::Response& res) {
+    res.set_header("Cache-Control", "no-store");
+    res.set_content(VoiceChat::GetInstance()->Status().dump(), "application/json");
+  });
   server->Post("/api/config/audio",
                [](const httplib::Request &req, httplib::Response &res) {
                  LAppPal::PrintLog("POST /api/config/audio");
@@ -953,6 +989,15 @@ void PanelServer::doServe() {
   });
 
   initSSE();
-  if (!_stopping) server->listen("127.0.0.1", 8053);
+  int port = 8053;
+  // A smoke test can run beside the user's app with an isolated profile/port.
+  if (std::getenv("JPET_SMOKE_TEST")) {
+    if (const auto* testPort = std::getenv("JPET_SMOKE_PORT")) {
+      char* end = nullptr;
+      const auto parsed = std::strtol(testPort, &end, 10);
+      if (*testPort && !*end && parsed > 0 && parsed <= 65535) port = static_cast<int>(parsed);
+    }
+  }
+  if (!_stopping) server->listen("127.0.0.1", port);
   LAppPal::PrintLog(LogLevel::Info, "[PanelServer]Worker exit");
 }

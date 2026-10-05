@@ -55,6 +55,10 @@ bool AudioManager::IsPlay() {
   return false;
 }
 
+void AudioManager::Stop() {
+  if (_channel) _channel->stop();
+}
+
 
 void AudioManager::Play3dSound(AudioType t) {
   Play3dSound(t, rand() % 100);

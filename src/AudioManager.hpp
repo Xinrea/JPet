@@ -24,6 +24,7 @@ class AudioManager {
   static void ReleaseInstance();
   bool Initialize();
   bool IsPlay();
+  void Stop();
   void Play3dSound(AudioType t, int no);
   void Play3dSound(AudioType t);
   void Play3dSound(const wstring& file);

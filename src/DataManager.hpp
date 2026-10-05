@@ -47,6 +47,10 @@ class DataManager {
   void GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touch_audio);
   void UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio);
 
+  nlohmann::json GetVoiceSettings();
+  bool UpdateVoiceSettings(const std::string& workspace,
+                           const std::string* apiKey, std::string& error);
+
   void GetDisplay(float* scale, bool* green, bool* rateLimit);
   void UpdateDisplay(float scale, bool green, bool rateLimit);
 

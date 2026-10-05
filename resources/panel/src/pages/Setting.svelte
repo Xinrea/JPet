@@ -33,6 +33,59 @@
   let _mute = false;
   let _touch_audio = false;
   let _idle_audio = false;
+  // Voice credentials are write-only; the API never returns the saved key.
+  let voiceApiKey = "", voiceWorkspace = "", voiceHasKey = false;
+  let voiceLoading = true, voiceSaving = false, voiceError = "", voiceMessage = "";
+  let voiceStatus = null, voiceTimer = null, voiceDisposed = false, voiceRefreshing = false;
+  async function refreshVoiceStatus() {
+    if (voiceDisposed || voiceRefreshing || document.hidden) return;
+    voiceRefreshing = true;
+    try {
+      const response = await fetch("/api/voice", { cache: "no-store" });
+      if (!response.ok) return;
+      const status = await response.json();
+      if (!voiceDisposed) voiceStatus = status;
+    } catch (_) { /* The next refresh retries a temporarily unavailable panel. */ }
+    finally { voiceRefreshing = false; }
+  }
+  async function loadVoiceSettings() {
+    try {
+      const response = await fetch("/api/config/voice", { cache: "no-store" });
+      if (!response.ok) throw new Error("无法读取语音设置");
+      const settings = await response.json();
+      if (voiceDisposed) return;
+      voiceWorkspace = settings.workspace_id || "";
+      voiceHasKey = settings.has_api_key;
+      await refreshVoiceStatus();
+    } catch (error) {
+      if (!voiceDisposed) voiceError = error.message;
+    } finally {
+      if (!voiceDisposed) voiceLoading = false;
+    }
+  }
+  async function saveVoiceSettings(clearKey = false) {
+    voiceSaving = true; voiceError = ""; voiceMessage = "";
+    const payload = { workspace_id: voiceWorkspace.trim() };
+    if (clearKey) payload.clear_api_key = true;
+    else if (voiceApiKey.trim()) payload.api_key = voiceApiKey.trim();
+    try {
+      const response = await fetch("/api/config/voice", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const settings = await response.json();
+      if (!response.ok) throw new Error(settings.error || "保存语音设置失败");
+      if (voiceDisposed) return;
+      voiceWorkspace = settings.workspace_id;
+      voiceHasKey = settings.has_api_key;
+      voiceApiKey = "";
+      voiceMessage = clearKey ? "API Key 已移除" : "语音设置已保存";
+      await refreshVoiceStatus();
+    } catch (error) {
+      if (!voiceDisposed) voiceError = error.message;
+    } finally {
+      if (!voiceDisposed) voiceSaving = false;
+    }
+  }
   // display
   let _green = false;
   let _limit = false;
@@ -58,6 +111,8 @@
     { value: 3, name: "设置面板" },
   ];
   function init() {
+    loadVoiceSettings();
+    voiceTimer = setInterval(refreshVoiceStatus, 800);
     // get from server
     fetch("/api/config/audio")
       .then((res) => res.json())
@@ -358,6 +413,8 @@
   }
   init();
   onDestroy(() => {
+    voiceDisposed = true;
+    if (voiceTimer) clearInterval(voiceTimer);
     stopQrPolling();
     if (account_refresh_timer) clearInterval(account_refresh_timer);
     if (account_initial_timer) clearTimeout(account_initial_timer);
@@ -458,6 +515,56 @@
   max={100}
   step={1}
 />
+<Hr />
+<P class="mb-2">语音对话</P>
+<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+  按住 {voiceStatus?.shortcut || "Option（Mac）/ Ctrl（Windows）"} 说话，松开发送。
+  回复时再次按住可打断并继续对话。
+</p>
+<Label for="voice-api-key" class="mb-2">百炼 API Key</Label>
+<Input
+  id="voice-api-key"
+  type="password"
+  bind:value={voiceApiKey}
+  placeholder={voiceHasKey ? "已保存；输入新 Key 可替换" : "sk-…"}
+  autocomplete="off"
+  spellcheck="false"
+  maxlength={512}
+  disabled={voiceLoading || voiceSaving}
+  class="mb-4"
+/>
+<Label for="voice-workspace" class="mb-2">业务空间 ID</Label>
+<Input
+  id="voice-workspace"
+  bind:value={voiceWorkspace}
+  placeholder="填写 API Key 所属的业务空间 ID"
+  autocomplete="off"
+  spellcheck="false"
+  maxlength={63}
+  disabled={voiceLoading || voiceSaving}
+  class="mb-2"
+/>
+<p class="mb-4 text-xs text-gray-500 dark:text-gray-400">
+  使用北京地域的 API Key 和业务空间。API Key 保存在本机系统凭据存储中。
+</p>
+<div class="flex items-center gap-3">
+  <Button on:click={() => saveVoiceSettings()}
+    disabled={voiceLoading || voiceSaving || !voiceWorkspace.trim() || (!voiceHasKey && !voiceApiKey.trim())}>
+    {voiceSaving ? "保存中…" : "保存语音设置"}
+  </Button>
+  {#if voiceHasKey}
+    <Button color="light" on:click={() => saveVoiceSettings(true)} disabled={voiceLoading || voiceSaving}>移除 Key</Button>
+  {/if}
+</div>
+{#if voiceError}<p class="mt-2 text-sm text-red-600" role="alert">{voiceError}</p>{/if}
+{#if voiceMessage}<p class="mt-2 text-sm text-green-600" role="status">{voiceMessage}</p>{/if}
+{#if voiceStatus?.message}
+  <p class="mt-3 text-sm" class:text-red-600={voiceStatus.state === "error"}
+    class:text-gray-500={voiceStatus.state !== "error"} aria-live="polite">{voiceStatus.message}</p>
+{/if}
+{#if voiceStatus?.reply}
+  <p class="mt-2 whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-300">{voiceStatus.reply}</p>
+{/if}
 <Hr />
 <P class="mb-4">显示设置</P>
 <Toggle class="mb-2" bind:checked={_green} on:change={updateDisplay}

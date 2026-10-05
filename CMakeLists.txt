@@ -11,7 +11,7 @@ set(APP_NAME JPet)
 
 # JVERSION can be set by -D option.
 if(NOT DEFINED JVERSION)
-  set(JVERSION "3.0.1-beta.1")
+  set(JVERSION "3.0.1-beta.2")
 endif()
 
 message(STATUS "JPet version: ${JVERSION}")
@@ -240,11 +240,13 @@ if(APPLE)
   target_link_libraries(${APP_NAME} PRIVATE RocksDB::rocksdb
     "-framework AppKit" "-framework WebKit" "-framework AVFoundation"
     "-framework Foundation" "-framework UserNotifications")
+  target_link_libraries(${APP_NAME} PRIVATE "-framework Security")
 else()
   target_link_libraries(${APP_NAME} PRIVATE GLEW::GLEW)
   target_include_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/inc)
   target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/)
   target_link_libraries(${APP_NAME} PRIVATE rocksdb fmod_vc Dbghelp Crypt32
+    Winhttp Winmm Advapi32
     unofficial::wintoast::wintoast unofficial::webview2::webview2)
 endif()
 
@@ -316,6 +318,16 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 option(JPET_BUILD_UPDATE_TESTS "Build release selection and checksum tests" OFF)
+option(JPET_BUILD_VOICE_TESTS "Build push-to-talk voice protocol tests" OFF)
+if(JPET_BUILD_VOICE_TESTS)
+  enable_testing()
+  add_executable(voice_session_test tests/voice_session_test.cpp src/VoiceSession.cpp)
+  set_target_properties(voice_session_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_session_test PRIVATE src)
+  target_compile_options(voice_session_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_session_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
+  add_test(NAME voice_session COMMAND voice_session_test)
+endif()
 if(JPET_BUILD_UPDATE_TESTS)
   enable_testing()
   add_executable(update_release_test tests/update_release_test.cpp)

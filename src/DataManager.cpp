@@ -4,6 +4,8 @@
 #include "LAppPal.hpp"
 #include "LAppLive2DManager.hpp"
 #include "PanelServer.hpp"
+#include "VoicePlatform.hpp"
+#include "VoiceSession.hpp"
 
 #include <filesystem>
 
@@ -128,6 +130,31 @@ void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
   *scale = GetConfig("display", "scale", 1.0f);
   *green = GetConfig("display", "green", false);
   *rateLimit = GetConfig("display", "rateLimit", false);
+}
+
+nlohmann::json DataManager::GetVoiceSettings() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
+  return {{"workspace_id", GetConfig<std::string>("voice", "workspace_id", "")},
+          {"has_api_key", GetConfig<bool>("voice", "has_api_key", false)},
+          {"model", Voice::Model}};
+}
+
+bool DataManager::UpdateVoiceSettings(const std::string& workspace,
+                                      const std::string* apiKey, std::string& error) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
+  if (!workspace.empty() && !Voice::ValidWorkspace(workspace)) {
+    error = "业务空间 ID 应为 1～63 位字母、数字或连字符，且不能以连字符开头或结尾";
+    return false;
+  }
+  if (apiKey && !apiKey->empty() && !Voice::ValidApiKey(*apiKey)) {
+    error = "API Key 格式不正确，请检查是否包含空格";
+    return false;
+  }
+  if (apiKey && !Voice::SaveApiKey(LAppPal::WStringToString(LAppDefine::documentPath), *apiKey, error)) return false;
+  const bool hasKey = apiKey ? !apiKey->empty() : GetConfig<bool>("voice", "has_api_key", false);
+  data.insert_or_assign("voice", toml::table{{"workspace_id", workspace}, {"has_api_key", hasKey}});
+  Save();
+  return true;
 }
 
 void DataManager::UpdateDisplay(float scale, bool green, bool rateLimit) {
