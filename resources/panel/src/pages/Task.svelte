@@ -4,6 +4,7 @@
   import { Button, Tooltip } from "flowbite-svelte";
   import ClockIcon from "../assets/clock.svg";
   import ClothesIcon from "../assets/clothes.svg";
+  import StarIcon from "../assets/star.png";
   import { sse } from "../sse.js";
   import { reportFrontendError } from "../logger.js";
 
@@ -15,6 +16,7 @@
   let taskList = [];
   let queue = [];
   let queueCapacity = 2;
+  let queueUpgrade = null;
   let history = [];
   let timeRemain = 0;
   let busy = false;
@@ -37,6 +39,7 @@
     taskList = data.list ?? [];
     queue = data.queue ?? [];
     queueCapacity = data.queue_capacity ?? 2;
+    queueUpgrade = data.queue_upgrade ?? null;
     history = data.history ?? [];
     updateClock();
   }
@@ -169,7 +172,19 @@
   <div class="task mb-4">
     <div class="header"><span>待执行队列</span><span>{queue.length} / {queueCapacity}</span></div>
     <div class="content">
-      <p class="mb-3 text-xs text-gray-500">基础 2 个位置，每颗星增加 1 个。运行中的任务不占位置，队列按顺序执行。</p>
+      <p class="mb-3 text-xs text-gray-500">基础 2 个位置，扩容依次消耗 1、2、5、10 颗星星，最多 6 个位置。运行中的任务不占位置。</p>
+      {#if queueUpgrade}
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-lime-100 bg-lime-50 p-3">
+          <span class="flex items-center gap-1 text-sm text-gray-600"><img src={StarIcon} class="h-4 w-4" alt="" />持有 {queueUpgrade.stars} 颗星星</span>
+          {#if queueUpgrade.cost !== null}
+            <Button color="alternative" size="xs" disabled={busy || !online || !queueUpgrade.available}
+              on:click={() => taskAction("/api/task/queue/upgrade")}>解锁第 {queueCapacity + 1} 个位置 · {queueUpgrade.cost} 颗星星</Button>
+            <p class="w-full text-xs text-gray-500">解锁后永久保留。{online && !queueUpgrade.available ? `星星不足，还需 ${queueUpgrade.cost - queueUpgrade.stars} 颗星星。` : ""}</p>
+          {:else}
+            <span class="text-sm text-lime-700">队列容量已全部解锁</span>
+          {/if}
+        </div>
+      {/if}
       {#if queueBlocked}
         <p class="mb-3 rounded bg-amber-50 p-2 text-sm text-amber-700" role="status">
           队首任务成功率为 0，已暂停启动。请提升属性、调整顺序或移除该任务。

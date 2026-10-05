@@ -268,7 +268,7 @@
           <img class="rank-icon" alt="" src={starOutlineIcon} />
         {/if}
       </a>
-      <Tooltip>经验获取量提升，任务成功率降低，任务队列增加 1 个位置</Tooltip>
+      <Tooltip>星星提升经验获取量和属性上限、降低任务成功率，也可消耗星星解锁任务队列容量</Tooltip>
       <Progress max={60} value={60 - timeToNextPoint}>
         <div
           style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); text-align: center;"

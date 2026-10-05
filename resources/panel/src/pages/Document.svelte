@@ -62,7 +62,7 @@
   <p class="font-medium text-sm">速度会缩短任务完成所需的时间，进行中的任务不受速度变化的影响。</p>
   <p class="font-medium text-lg mt-4">关于<b>任务队列</b></p>
   <p class="font-medium text-sm">任务结束后自动结算并发放奖励，随后执行队列中的下一项。每个排队任务只执行一次，队列为空时停止。</p>
-  <p class="font-medium text-sm">初始可排 2 个待执行任务，每颗星增加 1 个位置，运行中的任务不占队列容量。队列可调整顺序、移除，并会在退出后保留。</p>
+  <p class="font-medium text-sm">初始可排 2 个待执行任务，解锁第 3、4、5、6 个位置分别消耗 1、2、5、10 颗星星，解锁后永久保留。星星消耗后，成长加成按剩余星星计算。运行中的任务不占队列容量，队列可调整顺序、移除，并会在退出后保留。</p>
   <p class="font-medium text-sm">成功率为 0 的队首任务会等待属性提升，也可以将其他任务移到它前面。</p>
   <p class="font-medium text-lg mt-4">关于<b>毅力</b></p>
   <p class="font-medium text-sm">毅力会影响任务的成功率，当毅力为 0 的情况下，任务成功率最高为 70%；天有不测风云，任务成功率不会超过 95%。</p>

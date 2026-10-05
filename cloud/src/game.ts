@@ -4,6 +4,8 @@ import achievementCatalog from "./achievements.json";
 export const HEARTBEAT_MS = 15_000;
 export const LEASE_MS = 30_000;
 const MAX = 99_999_999;
+const BASE_QUEUE_CAPACITY = 2;
+export const QUEUE_UPGRADE_COSTS = [1, 2, 5, 10] as const;
 export const ATTRS = ["speed", "endurance", "strength", "will", "intellect"] as const;
 type Attribute = typeof ATTRS[number];
 type Numbers = Record<string, number>;
@@ -23,7 +25,7 @@ export interface GameState {
   attributes: Numbers; stars: number; clothes: { current: number; unlock: boolean[] };
   buffs: string[]; medal: number; failcount: number; achievements: AchievementState;
   archived: number[]; current: RunningTask | null;
-  queue: { entry_id: number; task_id: number }[]; nextEntry: number;
+  queue: { entry_id: number; task_id: number }[]; nextEntry: number; queueUpgrades: number;
   history: Record<string, unknown>[]; expProgressMs: number;
   session: string; leaseUntil: number; clockAt: number;
   touchTotal: number;
@@ -52,10 +54,10 @@ export function createGame(uid: string, name: string, now: number, bootstrap?: u
   const clothes = object(profile.clothes);
   const unlock = [true, Array.isArray(clothes.unlock) && clothes.unlock[1] === true, Array.isArray(clothes.unlock) && clothes.unlock[2] === true];
   const currentClothes = number(clothes.current, 0, 2);
-  const state: GameState = { schema: 1, uid, name, revision: 0, share: false, attributes,
+  const state: GameState = { schema: 2, uid, name, revision: 0, share: false, attributes,
     stars: number(profile.starcnt), clothes: { current: unlock[currentClothes] ? currentClothes : 0, unlock },
     buffs: [], medal: 0, failcount: number(source.failcount), achievements: achievementState(source.achievements),
-    archived: [], current: null, queue: [], nextEntry: 1, history: [], expProgressMs: 0,
+    archived: [], current: null, queue: [], nextEntry: 1, queueUpgrades: 0, history: [], expProgressMs: 0,
     session: "", leaseUntil: 0, clockAt: now, touchTotal: 0 };
   for (const attr of ATTRS) addAttribute(state, attr, 0);
   const legacyTasks = Array.isArray(source.tasks) ? source.tasks.map(object) : [];
@@ -76,7 +78,8 @@ export function createGame(uid: string, name: string, now: number, bootstrap?: u
     }
   }
   const legacyQueue = Array.isArray(source.queue) ? source.queue.map(object) : [];
-  for (const record of legacyQueue.slice(0, capacity(state))) {
+  // Retain tasks queued under the old star-based limit while new slots require payment.
+  for (const record of legacyQueue.slice(0, BASE_QUEUE_CAPACITY + state.stars)) {
     const id = number(record.task_id);
     const task = TASKS.find(t => t.id === id);
     if (!task || state.archived.includes(id) || (!task.repeatable && (state.current?.id === id || state.queue.some(e => e.task_id === id)))) continue;
@@ -97,7 +100,16 @@ export function createGame(uid: string, name: string, now: number, bootstrap?: u
   observe(state, now);
   return state;
 }
-export function capacity(state: GameState): number { return 2 + state.stars; }
+export function migrateGame(state: GameState): GameState {
+  if (state.schema === 1) {
+    state.queueUpgrades = 0;
+    state.schema = 2;
+  }
+  state.queueUpgrades = number(state.queueUpgrades, 0, QUEUE_UPGRADE_COSTS.length);
+  return state;
+}
+export function capacity(state: GameState): number { return BASE_QUEUE_CAPACITY + state.queueUpgrades; }
+export function queueUpgradeCost(state: GameState): number | null { return QUEUE_UPGRADE_COSTS[state.queueUpgrades] ?? null; }
 function easeOut(x: number): number { const p = Math.min(100, Math.max(0, x)) / 100; return 1 - (1 - p) ** 2; }
 export function expDiff(state: GameState): number {
   let exp = 1 + Math.ceil(499 * easeOut(state.attributes.intellect + Math.floor(state.medal / 3) - 4));
@@ -233,6 +245,17 @@ export function command(state: GameState, action: Command, now: number): void {
     case "clothes":
       if (!Number.isInteger(action.id) || !state.clothes.unlock[action.id!]) throw new GameError("衣装尚未解锁");
       state.clothes.current = action.id!; break;
+    case "queue.upgrade": {
+      const cost = queueUpgradeCost(state);
+      if (cost === null) throw new GameError("任务队列容量已全部解锁");
+      if (state.stars < cost) throw new GameError(`星星不足，解锁下一个队列位置需要 ${cost} 颗星星`);
+      observe(state, now);
+      state.stars -= cost;
+      state.queueUpgrades++;
+      // Spending stars lowers attribute limits; preserve overflow as experience.
+      for (const key of ATTRS) addAttribute(state, key, 0);
+      break;
+    }
     case "task.start": case "task.queue":
       if (!task) throw new GameError("任务不存在");
       if (state.archived.includes(task.id)) throw new GameError("该任务已经完成");
@@ -242,7 +265,8 @@ export function command(state: GameState, action: Command, now: number): void {
         if (successRate(state, task) === 0) throw new GameError("任务成功率为 0，请先提升属性");
         state.current = { id: task.id, durationMs: taskCost(state, task) * 1000, elapsedMs: 0, queued: false, startedAt: now };
       } else {
-        if (state.queue.length >= capacity(state)) throw new GameError("任务队列已满，升星可增加容量");
+        if (state.queue.length >= capacity(state)) throw new GameError(queueUpgradeCost(state) === null
+          ? "任务队列已满" : "任务队列已满，可消耗星星解锁更多位置");
         state.queue.push({ entry_id: state.nextEntry++, task_id: task.id });
       }
       break;
@@ -278,6 +302,7 @@ export function buyCost(state: GameState): number { return state.attributes.buyc
 export function refundGain(state: GameState): number { return Math.floor((state.attributes.buycnt < 26 ? Math.ceil(10 * 1.41 ** Math.max(0, state.attributes.buycnt - 1)) : 53000) / 2); }
 export function snapshot(state: GameState, now: number) {
   const online = !!state.session && state.leaseUntil > now;
+  const upgradeCost = queueUpgradeCost(state);
   const current = state.current && { ...describeTask(state, TASKS.find(t => t.id === state.current!.id)!),
     status: 1, cost: state.current.durationMs / 1000, elapsed_seconds: state.current.elapsedMs / 1000,
     remaining_seconds: (state.current.durationMs - state.current.elapsedMs) / 1000,
@@ -291,6 +316,7 @@ export function snapshot(state: GameState, now: number) {
     tasks: { current, list: TASKS.filter(t => t.id !== state.current?.id).map(t => describeTask(state, t)),
       queue: state.queue.map(e => ({ ...describeTask(state, TASKS.find(t => t.id === e.task_id)!), entry_id: e.entry_id })),
       queue_capacity: capacity(state), history: state.history,
+      queue_upgrade: { cost: upgradeCost, stars: state.stars, available: upgradeCost !== null && state.stars >= upgradeCost },
       queue_blocked: !state.current && state.queue.length > 0 && successRate(state, TASKS.find(t => t.id === state.queue[0].task_id)!) === 0 },
     achievements: { total: achievementCatalog.length, unlocked: achievementCatalog.filter(d => state.achievements.unlocked[d.id]).length,
       list: achievementCatalog.map(d => ({ ...d, progress: state.achievements.unlocked[d.id] ? d.target : Math.min(d.target, state.achievements.metrics[d.metric] || 0),

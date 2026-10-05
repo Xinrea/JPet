@@ -46,6 +46,63 @@ describe("Worker and durable storage", () => {
     await seed(p.uid, s => { s.attributes.exp = 100; });
     expect((await request("command", purchase)).status).toBe(409);
   });
+  it("persists queue upgrades and deducts stars only once across retries, eviction and reconnects", async () => {
+    const p = payload("10012");
+    await request("open", { ...p, bootstrap: { profile: { starcnt: 3 } } });
+    const purchase = { ...p, request_id: crypto.randomUUID(), action: { type: "queue.upgrade" } };
+    const first = await request("command", purchase);
+    expect(first.status).toBe(200);
+    expect(first.data.snapshot.tasks).toMatchObject({ queue_capacity: 3, queue_upgrade: { cost: 2, stars: 2, available: true } });
+    await evictDurableObject(env.PLAYERS.getByName(p.uid));
+    const replay = await request("command", purchase);
+    expect(replay.status).toBe(200); expect(replay.data.snapshot.profile.starcnt).toBe(2);
+    expect(replay.data.snapshot.tasks.queue_capacity).toBe(3);
+    await runInDurableObject(env.PLAYERS.getByName(p.uid), (_instance, ctx) => {
+      const saved = JSON.parse(ctx.storage.sql.exec<{ state: string }>("SELECT state FROM game WHERE id=1").one().state) as GameState;
+      expect(saved.queueUpgrades).toBe(1); expect(saved.stars).toBe(2);
+    });
+    expect(await env.RANK.prepare("SELECT starcnt FROM rankboard WHERE uid=?").bind(p.uid).first("starcnt")).toBe(2);
+    await request("close", { ...p, request_id: crypto.randomUUID() });
+    const replacement = payload(p.uid);
+    const reopened = await request("open", replacement);
+    expect(reopened.data.snapshot.tasks.queue_capacity).toBe(3);
+    const next = await request("command", { ...replacement, request_id: crypto.randomUUID(), action: { type: "queue.upgrade" } });
+    expect(next.status).toBe(200);
+    expect(next.data.snapshot.tasks).toMatchObject({ queue_capacity: 4, queue_upgrade: { cost: 5, stars: 0, available: false } });
+  });
+  it("replays an unaffordable queue upgrade as a failure after stars become available", async () => {
+    const p = payload("10013"); await request("open", p);
+    const purchase = { ...p, request_id: crypto.randomUUID(), action: { type: "queue.upgrade" } };
+    const first = await request("command", purchase);
+    expect(first.status).toBe(409); expect(first.data.error).toContain("星星不足");
+    expect(first.data.snapshot.tasks.queue_capacity).toBe(2);
+    await seed(p.uid, s => { s.stars = 1; });
+    const replay = await request("command", purchase);
+    expect(replay.status).toBe(409); expect(replay.data.snapshot.profile.starcnt).toBe(1);
+    const next = await request("command", { ...purchase, request_id: crypto.randomUUID() });
+    expect(next.status).toBe(200); expect(next.data.snapshot.profile.starcnt).toBe(0);
+    expect(next.data.snapshot.tasks.queue_capacity).toBe(3);
+  });
+  it("migrates old cloud saves without spending stars or removing queued tasks", async () => {
+    const p = payload("10014"); await request("open", p);
+    await seed(p.uid, s => {
+      s.schema = 1; s.stars = 3; delete (s as Partial<GameState>).queueUpgrades;
+      s.current = { id: 1, durationMs: 300_000, elapsedMs: 0, queued: false, startedAt: Date.now() };
+      s.queue = [2, 4, 6].map((task_id, i) => ({ entry_id: i + 1, task_id })); s.nextEntry = 4;
+    });
+    await evictDurableObject(env.PLAYERS.getByName(p.uid));
+    const migrated = await request("heartbeat", { ...p, request_id: crypto.randomUUID() });
+    expect(migrated.status).toBe(200); expect(migrated.data.snapshot.schema).toBe(1);
+    expect(migrated.data.snapshot.profile.starcnt).toBe(3);
+    expect(migrated.data.snapshot.tasks.queue_capacity).toBe(2);
+    expect(migrated.data.snapshot.tasks.queue.map((e: { id: number }) => e.id)).toEqual([2, 4, 6]);
+    await runInDurableObject(env.PLAYERS.getByName(p.uid), (_instance, ctx) => {
+      const saved = JSON.parse(ctx.storage.sql.exec<{ state: string }>("SELECT state FROM game WHERE id=1").one().state) as GameState;
+      expect(saved.schema).toBe(2); expect(saved.queueUpgrades).toBe(0);
+    });
+    const full = await request("command", { ...p, request_id: crypto.randomUUID(), action: { type: "task.queue", id: 1 } });
+    expect(full.status).toBe(409); expect(full.data.error).toContain("队列已满");
+  });
   it("pauses at lease expiry, keeps fractions in SQLite, and resumes without backfill", async () => {
     const p = payload("10005"); await request("open", p);
     await seed(p.uid, s => { s.clockAt = Date.now() - 3600_000; s.leaseUntil = s.clockAt + 30_000; });

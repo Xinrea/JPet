@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { advance, command, createGame, GameError, LEASE_MS, number, recordTouches, resumeGame, snapshot, updateBuffs, type Command, type GameState } from "./game";
+import { advance, command, createGame, GameError, LEASE_MS, migrateGame, number, recordTouches, resumeGame, snapshot, updateBuffs, type Command, type GameState } from "./game";
 
 type Kind = "open" | "heartbeat" | "command" | "close";
 interface PlayerRequest {
@@ -18,7 +18,7 @@ export class Player extends DurableObject<Env> {
 
   private read(): GameState | null {
     const rows = this.ctx.storage.sql.exec<{ state: string }>("SELECT state FROM game WHERE id = 1").toArray();
-    return rows.length ? JSON.parse(rows[0].state) as GameState : null;
+    return rows.length ? migrateGame(JSON.parse(rows[0].state) as GameState) : null;
   }
   private write(state: GameState): void {
     const previous = this.read();

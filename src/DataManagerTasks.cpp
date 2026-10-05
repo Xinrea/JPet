@@ -23,6 +23,7 @@ std::shared_ptr<GameTask> DataManager::GetCurrentTask() {
   return task;
 }
 int DataManager::TaskQueueCapacity() { return GetTaskState().value("queue_capacity", 2); }
+std::string DataManager::UpgradeTaskQueue() { return CloudGame::GetInstance()->Command({{"type", "queue.upgrade"}}); }
 std::string DataManager::StartTask(int id, time_t) { return CloudGame::GetInstance()->Command({{"type", "task.start"}, {"id", id}}); }
 std::string DataManager::QueueTask(int id, time_t) { return CloudGame::GetInstance()->Command({{"type", "task.queue"}, {"id", id}}); }
 std::string DataManager::CancelTask(int id, time_t) { return CloudGame::GetInstance()->Command({{"type", "task.cancel"}, {"id", id}}); }

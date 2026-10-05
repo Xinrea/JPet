@@ -449,6 +449,10 @@ void PanelServer::doServe() {
       LAppPal::PrintLog(LogLevel::Warn, "[Tasks]API request failed: %s", e.what());
     }
   };
+  server->Post("/api/task/queue/upgrade", [taskResponse](const httplib::Request&,
+                                                      httplib::Response& res) {
+    taskResponse(res, [] { return DataManager::GetInstance()->UpgradeTaskQueue(); });
+  });
   server->Post("/api/task/:id/start", [taskResponse](const httplib::Request& req,
                                                    httplib::Response& res) {
     taskResponse(res, [&] {

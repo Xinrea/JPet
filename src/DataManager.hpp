@@ -110,6 +110,7 @@ class DataManager {
   std::shared_ptr<GameTask> GetCurrentTask();
   nlohmann::json GetTaskState();
   int TaskQueueCapacity();
+  std::string UpgradeTaskQueue();
   std::string StartTask(int id, time_t now = time(nullptr));
   std::string QueueTask(int id, time_t now = time(nullptr));
   std::string RemoveQueuedTask(int64_t entryId);
