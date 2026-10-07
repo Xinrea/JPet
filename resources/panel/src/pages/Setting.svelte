@@ -521,6 +521,10 @@
   按住 {voiceStatus?.shortcut || "Option（Mac）/ Ctrl（Windows）"} 说话，松开发送。
   回复时再次按住可打断并继续对话。
 </p>
+<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+  可查看桌面、查询游戏数据、安排或取消任务、升级属性，搜索网页和 B 站，以及用默认浏览器打开网页。
+  B 站搜索使用当前登录账号；查看桌面时会截图并发送给千问，Mac 首次使用需允许录屏权限。
+</p>
 <Label for="voice-api-key" class="mb-2">百炼 API Key</Label>
 <Input
   id="voice-api-key"
@@ -564,6 +568,20 @@
 {/if}
 {#if voiceStatus?.reply}
   <p class="mt-2 whitespace-pre-wrap text-sm text-gray-600 dark:text-gray-300">{voiceStatus.reply}</p>
+{/if}
+{#if voiceStatus?.last_tool}
+  <div class="mt-3 text-sm text-gray-600 dark:text-gray-300">
+    <p>{voiceStatus.last_tool.label}：{voiceStatus.last_tool.ok ? "完成" : "失败"}</p>
+    {#if voiceStatus.last_tool.error}<p class="mt-1 text-red-600">{voiceStatus.last_tool.error}</p>{/if}
+    {#if voiceStatus.last_tool.url}
+      <p class="mt-1"><a class="text-blue-600 hover:underline" href={voiceStatus.last_tool.url} target="_blank" rel="noopener noreferrer">{voiceStatus.last_tool.url}</a></p>
+    {/if}
+    {#each (voiceStatus.last_tool.sources || voiceStatus.last_tool.results || []) as source}
+      {#if source.url}
+        <p class="mt-1"><a class="text-blue-600 hover:underline" href={source.url} target="_blank" rel="noopener noreferrer">{source.title || source.url}</a></p>
+      {/if}
+    {/each}
+  </div>
 {/if}
 <Hr />
 <P class="mb-4">显示设置</P>

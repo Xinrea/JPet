@@ -7,6 +7,10 @@
 #include "PanelServer.hpp"
 #include <unistd.h>
 #include <fcntl.h>
+#include <condition_variable>
+#include <chrono>
+#include <memory>
+#include <mutex>
 
 namespace {
 NSString* Text(const std::wstring& text) {
@@ -51,6 +55,48 @@ void Platform::Open(const std::string& pathOrURL) {
     NSURL* url = [value hasPrefix:@"/"] ? [NSURL fileURLWithPath:value] : [NSURL URLWithString:value];
     if (url) [[NSWorkspace sharedWorkspace] openURL:url];
   });
+}
+
+bool Platform::OpenWebURL(const std::string& address, std::string& error) {
+  @autoreleasepool {
+    NSURL* url = [NSURL URLWithString:[NSString stringWithUTF8String:address.c_str()]];
+    NSString* scheme = url.scheme.lowercaseString;
+    if (!url.host.length || (!([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]))) {
+      error = "网页地址格式不正确";
+      return false;
+    }
+    struct Request {
+      std::mutex mutex;
+      std::condition_variable completed;
+      bool done = false, abandoned = false, opened = false;
+    };
+    auto request = std::make_shared<Request>();
+    dispatch_block_t launch = ^{
+      {
+        std::lock_guard<std::mutex> lock(request->mutex);
+        if (request->abandoned) return;
+      }
+      const bool opened = [[NSWorkspace sharedWorkspace] openURL:url];
+      {
+        std::lock_guard<std::mutex> lock(request->mutex);
+        request->opened = opened;
+        request->done = true;
+      }
+      request->completed.notify_one();
+    };
+    if ([NSThread isMainThread]) launch();
+    else dispatch_async(dispatch_get_main_queue(), launch);
+    std::unique_lock<std::mutex> lock(request->mutex);
+    // Stop() joins the tool worker on the main thread. A bounded wait prevents
+    // a deadlock and prevents a queued launch from opening after shutdown.
+    if (!request->completed.wait_for(lock, std::chrono::seconds(5), [&] { return request->done; })) {
+      request->abandoned = true;
+      error = "浏览器打开请求超时，请检查浏览器后重试";
+      return false;
+    }
+    if (!request->opened) error = "无法启动系统默认浏览器，请检查默认浏览器设置";
+    return request->opened;
+  }
 }
 
 void Platform::Alert(const std::wstring& title, const std::wstring& message) {

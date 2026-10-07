@@ -241,12 +241,13 @@ if(APPLE)
     "-framework AppKit" "-framework WebKit" "-framework AVFoundation"
     "-framework Foundation" "-framework UserNotifications")
   target_link_libraries(${APP_NAME} PRIVATE "-framework Security")
+  target_link_libraries(${APP_NAME} PRIVATE "-weak_framework ScreenCaptureKit" "-framework ImageIO")
 else()
   target_link_libraries(${APP_NAME} PRIVATE GLEW::GLEW)
   target_include_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/inc)
   target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/)
   target_link_libraries(${APP_NAME} PRIVATE rocksdb fmod_vc Dbghelp Crypt32
-    Winhttp Winmm Advapi32
+    Winhttp Winmm Advapi32 Gdiplus Ole32 Gdi32
     unofficial::wintoast::wintoast unofficial::webview2::webview2)
 endif()
 
@@ -327,6 +328,41 @@ if(JPET_BUILD_VOICE_TESTS)
   target_compile_options(voice_session_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
   target_link_libraries(voice_session_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
   add_test(NAME voice_session COMMAND voice_session_test)
+  add_executable(voice_tools_test tests/voice_tools_test.cpp src/VoiceTools.cpp src/VoiceSession.cpp)
+  set_target_properties(voice_tools_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_tools_test PRIVATE src)
+  target_compile_options(voice_tools_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_tools_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads cpr::cpr)
+  add_test(NAME voice_tools COMMAND voice_tools_test)
+  if(APPLE)
+    add_executable(voice_audio_mac_test tests/voice_audio_mac_test.mm)
+    set_target_properties(voice_audio_mac_test PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests"
+      OBJCXX_STANDARD 17 OBJCXX_STANDARD_REQUIRED ON)
+    target_include_directories(voice_audio_mac_test PRIVATE src)
+    target_compile_options(voice_audio_mac_test PRIVATE -fobjc-arc)
+    target_link_libraries(voice_audio_mac_test PRIVATE "-framework AVFoundation" "-framework Foundation" objc)
+    add_test(NAME voice_audio_mac COMMAND voice_audio_mac_test)
+    add_executable(voice_desktop_mac_test tests/voice_desktop_mac_test.mm src/VoiceDesktopMac.mm)
+    set_target_properties(voice_desktop_mac_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests"
+      OBJCXX_STANDARD 17 OBJCXX_STANDARD_REQUIRED ON)
+    target_include_directories(voice_desktop_mac_test PRIVATE src)
+    target_compile_options(voice_desktop_mac_test PRIVATE -fobjc-arc)
+    target_link_libraries(voice_desktop_mac_test PRIVATE "-framework AppKit" "-framework ImageIO" "-weak_framework ScreenCaptureKit" objc)
+    add_test(NAME voice_desktop_mac COMMAND voice_desktop_mac_test)
+    option(JPET_BUILD_VOICE_NETWORK_PROBE "Build opt-in read-only voice tool integration probe (uses configured accounts)" OFF)
+    if(JPET_BUILD_VOICE_NETWORK_PROBE)
+      add_executable(voice_tools_network_probe tests/voice_tools_network_probe.mm src/VoiceToolsNetwork.cpp
+        src/VoiceTools.cpp src/VoiceSession.cpp src/VoiceDesktopMac.mm)
+      set_target_properties(voice_tools_network_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests"
+        OBJCXX_STANDARD 17 OBJCXX_STANDARD_REQUIRED ON)
+      target_include_directories(voice_tools_network_probe PRIVATE src ${TOMLPLUSPLUS_INCLUDE_DIR})
+      target_compile_options(voice_tools_network_probe PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
+      target_link_libraries(voice_tools_network_probe PRIVATE nlohmann_json::nlohmann_json cpr::cpr httplib::httplib
+        cryptopp::cryptopp OpenSSL::SSL OpenSSL::Crypto RocksDB::rocksdb Threads::Threads "-framework Foundation" "-framework Security" "-framework LocalAuthentication"
+        "-framework AppKit" "-framework ImageIO" "-weak_framework ScreenCaptureKit" objc)
+    endif()
+  endif()
 endif()
 if(JPET_BUILD_UPDATE_TESTS)
   enable_testing()

@@ -2,6 +2,7 @@
 
 #include "VoicePlatform.hpp"
 #include "VoiceSession.hpp"
+#include "VoiceTools.hpp"
 #include <atomic>
 #include <chrono>
 #include <mutex>
@@ -19,11 +20,13 @@ class VoiceChat {
   using Clock = std::chrono::steady_clock;
   VoiceChat();
   void Begin();
+  void End();
   void Drain();
   void Close();
   void Fail(const std::string& error);
   void SetState(const std::string& state, const std::string& message = "");
   std::unique_ptr<Voice::Platform> platform_;
+  std::unique_ptr<Voice::ToolExecutor> tools_;
   Voice::Session session_;
   std::atomic<bool> resetRequested_{false};
   std::atomic<bool> busy_{false};
@@ -35,6 +38,11 @@ class VoiceChat {
   bool turnStarted_ = false;
   bool waitForRelease_ = false;
   bool failurePending_ = false;
+  size_t capturedBytes_ = 0;
+  size_t sentBytes_ = 0;
+  size_t sentChunks_ = 0;
+  double capturedEnergy_ = 0;
+  int capturedPeak_ = 0;
   std::string error_;
   std::string indicator_;
   bool indicatorError_ = false;

@@ -9,7 +9,7 @@ struct GLFWwindow;
 
 namespace Voice {
 struct Event {
-  enum class Type { Message, Microphone, Error };
+  enum class Type { Message, Microphone, Error, Diagnostic };
   Type type;
   std::string data;
 };

@@ -23,6 +23,12 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSession.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSession.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTools.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTools.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolsRuntime.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolsNetwork.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolsNetwork.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceDesktop.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoicePlatform.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceEventQueue.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/WinToastEventHandler.h
@@ -68,9 +74,9 @@ target_sources(${APP_NAME}
 
 if(APPLE)
   target_sources(${APP_NAME} PRIVATE
-    mainMac.mm PlatformMac.mm MacDesktop.mm MacWebViews.mm AudioManagerMac.mm VoicePlatformMac.mm)
+    mainMac.mm PlatformMac.mm MacDesktop.mm MacWebViews.mm AudioManagerMac.mm VoicePlatformMac.mm VoiceDesktopMac.mm)
 else()
   target_sources(${APP_NAME} PRIVATE
     main.cpp PlatformWin.cpp AudioManager.cpp WinToastEventHandler.cpp
-    GamePanel.cpp CookieWindow.cpp JPet.rc VoicePlatformWin.cpp)
+    GamePanel.cpp CookieWindow.cpp JPet.rc VoicePlatformWin.cpp VoiceDesktopWin.cpp)
 endif()

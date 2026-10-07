@@ -12,10 +12,63 @@ API Key 存在 macOS 钥匙串或 Windows 凭据管理器中；配置文件只�
 - 同一连接保留对话上下文；空闲两分钟后断开，下次说话开始新会话。
 - 单次录音最长一分钟，松开快捷键后可继续下一轮。回复音量跟随音频设置。
 
-当前使用 `qwen3.8-omni-flash-realtime` 的 WebSocket Manual 模式，仅发送语音。
+当前使用 `qwen3.8-omni-flash-realtime` 的 WebSocket Manual 模式。
 输入为 16 kHz、单声道、16 bit PCM；输出为 24 kHz PCM。
+Mac 使用系统默认输入设备，并显式选择第 1 路输入作为麦克风，避免多输入声卡的离散声道
+在默认声道映射下变成静音，也避免混入其他输入和回环声音。
 按键释放后发送 `input_audio_buffer.commit` 和 `response.create`。
 打断时取消尚在生成的回复并停止本地播放，同一连接继续保留对话上下文。
+
+## 语音工具
+
+可直接说「看看我的桌面」「现在有多少经验，哪些任务能做」「把读书加入队列」
+「取消当前任务」「智力升一点」「搜一下今天的新闻」「去B站搜千问教程」「用浏览器打开B站」
+「打开刚才搜索的第一个结果」。
+工具执行状态显示在宠物旁边和语音设置中，设置页还会显示最近一次搜索的来源链接。
+
+| 工具 | 能力 |
+| --- | --- |
+| `view_desktop` | 按需获取桌面JPEG截图，视觉模型读取画面并返回观察。主屏为0，可指定附加屏。 |
+| `get_game_state` | 查询属性/经验/价格/上限、星星、Buff/轴芯、服装、完整任务目录与成功率/耗时/奖励、当前任务进度、队列/扩容、历史、成就进度与统计、排行榜。支持按类别查询，离线时明确标记缓存或不可用。 |
+| `game_action` | 开始/安排/取消任务，移除/移动队列项，队列扩容，属性加点/退点，升星和换衣服。任务ID和队列entry_id从游戏状态读取，每次属性操作为一点。 |
+| `web_search` | 独立调用千问联网搜索，返回摘要、引用编号和真实来源链接。 |
+| `bilibili_search` | 复用JPet登录Cookie，验证账号、获取WBI密钥并签名搜索，支持视频、用户、直播间、专栏、番剧和影视，以及视频的最新/播放量/收藏排序。 |
+| `open_url` | 将完整HTTP/HTTPS地址交给系统默认浏览器打开，可打开用户提供的链接或搜索结果；返回系统是否接受打开请求，不判断网页加载状态。 |
+
+打开网页使用系统原生API，URL不作为命令执行。支持域名、IP、端口、查询参数与片段；
+保留原始路径和查询参数，拒绝非网页协议、空域名、无效端口、控制字符与带账号密码的URL。
+
+游戏操作复用现有云端命令、幂等重放和费用校验，只有云端确认成功才报告成功，随后返回实际游戏状态。
+工具在独立线程顺序执行；每轮最多16次调用。重复的服务端函数事件只执行一次。
+重新按住快捷键会取消排队中的工具，并关闭旧函数调用、丢弃旧结果；已经发出的云端操作可能生效，
+应查询实际状态，不能自动重复执行。关闭应用会等待工具线程结束后才销毁游戏数据。
+
+查看桌面时，截图只在内存中压缩和传输，不保存到磁盘或日志。Mac首次使用需允许JPet录屏，
+授权后重启应用再试。macOS 14及以后使用ScreenCaptureKit，11–13使用旧系统截图接口；
+Windows使用GDI捕获。图片最长边不超过1920像素，JPEG不超过512KB。
+截图发送到已配置的北京业务空间，通过 `qwen-vl-plus` 读取后，将观察文本交给语音模型。
+网页搜索使用同一API Key调用 `qwen-plus`；该业务空间还需允许访问这两个模型。
+[千问实时接口](https://help.aliyun.com/zh/model-studio/client-events)的自定义工具与内置联网搜索不能同时启用，
+因此这里使用独立的[联网搜索请求](https://help.aliyun.com/zh/model-studio/web-search)。
+视觉请求格式参见[图像理解文档](https://help.aliyun.com/zh/model-studio/vision)。
+
+B站Cookie仅用于发往 `api.bilibili.com` 的HTTPS请求，不交给千问、不写入日志，也不跟随重定向。
+搜索服务限流、Cookie过期、录屏权限或模型权限不足时，工具返回可读错误，不能编造搜索或画面结果。
+截图与搜索中的文字按外部数据处理，不作为额外操作指令。
+
+## 验证
+
+启用 `JPET_BUILD_VOICE_TESTS=ON` 后运行 `ctest -R voice_`，覆盖PCM声道转换、语音会话、
+工具参数与云端操作映射、重复事件/多工具续接/打断取消、搜索解析和合成图片JPEG编码。
+`python3 tests/voice_panel_smoke_test.py` 使用临时资料目录测试原生启动、设置持久化与工具目录。
+
+macOS可额外启用 `JPET_BUILD_VOICE_NETWORK_PROBE=ON`，手动运行
+`build/macos-arm64/tests/voice_tools_network_probe "JPet资料目录"`。
+这是显式运行的联网检查，不加入自动测试：只读打开游戏数据库，复用当前登录账号搜索，
+验证实时工具配置、联网搜索和合成图片的视觉请求，不修改游戏数据、不获取实际桌面截图、不打印凭据。
+若系统钥匙串不能在无交互情况下读取API Key，则跳过千问检查。
+可加 `--bilibili-only` 检查全部B站搜索分类；加 `--realtime-call 合成语音.pcm` 检查语音输入、
+实际函数调用、工具结果回传和语音续答，PCM需为16kHz单声道s16le，游戏结果使用测试夹具，不执行真实游戏操作。
 当前千问 WebSocket 文档未提供按播放时长截断消息的事件，已生成但未播放的内容仍可能保留在上下文中。
 
 接口说明：[调用指南](https://help.aliyun.com/zh/model-studio/realtime)、
@@ -26,8 +79,16 @@ API Key 存在 macOS 钥匙串或 Windows 凭据管理器中；配置文件只�
 ```sh
 cmake -S . -B build/macos-arm64 -DJPET_BUILD_VOICE_TESTS=ON
 cmake --build build/macos-arm64
-ctest --test-dir build/macos-arm64 -R voice_session --output-on-failure
+ctest --test-dir build/macos-arm64 -R 'voice_(session|audio_mac)' --output-on-failure
 ```
 
 macOS 原生设置接口检查：`python3 tests/voice_panel_smoke_test.py`。
 该检查使用临时数据目录和独立端口，验证启动、退出、配置保存和参数校验，不写入 API Key。
+
+语音诊断记录在用户数据目录的 `jpet.log`，以 `[Voice]` 为前缀：
+记录采集格式与选中声道、每轮音频字节数/时长/RMS/峰值、提交时的上传队列字节数和包数，
+以及会话配置、服务端提交确认、回复完成状态和错误码。
+`rms=0 peak=0` 表示采集到的是静音；`Upload queued` 表示本地已交给发送层，
+需结合服务端 `input_audio_buffer.committed` 判断提交是否成功。
+日志不保存 API Key、音频内容或对话文本。Mac 数据目录默认为
+`~/Library/Application Support/JPet/`。

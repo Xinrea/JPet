@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <atomic>
 
 #include "BilibiliDynamic.hpp"
 #include "httplib.h"
@@ -11,7 +12,7 @@ private:
   bool is_live_ = false;
   bool is_dynamic_ = false;
   bool is_guard_ = false;
-  int medal_level_ = 0;
+  std::atomic<int> medal_level_{0};
   long long latest_dynamic_ = 0;
   time_t dynamic_retry_at_ = 0;
   std::shared_ptr<WbiConfig> wbi_config_;
@@ -61,6 +62,6 @@ public:
   bool IsBirthday();
 
   int MedalLevel() {
-    return medal_level_;
+    return medal_level_.load();
   }
 };

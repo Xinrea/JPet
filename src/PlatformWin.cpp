@@ -12,6 +12,13 @@ void Platform::Open(const std::string& pathOrURL) {
   ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 }
 
+bool Platform::OpenWebURL(const std::string& url, std::string& error) {
+  const auto address = LAppPal::StringToWString(url);
+  const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", address.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+  if (result <= 32) error = "无法启动系统默认浏览器，请检查默认浏览器设置";
+  return result > 32;
+}
+
 namespace {
 std::filesystem::path InstallPath() {
   std::vector<wchar_t> path(32768);

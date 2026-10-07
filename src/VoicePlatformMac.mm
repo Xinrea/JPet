@@ -1,5 +1,7 @@
 #include "VoicePlatform.hpp"
 #include "VoiceEventQueue.hpp"
+#include "VoiceAudioMac.hpp"
+#include "LAppPal.hpp"
 
 #import <AppKit/AppKit.h>
 #import <AVFoundation/AVFoundation.h>
@@ -42,6 +44,9 @@ struct MacState : std::enable_shared_from_this<MacState> {
         const auto state = weak.lock();
         if (!state || state->queue->connection != generation) return;
         if (error) {
+          state->queue->Network(generation, Event::Type::Diagnostic,
+              "[Voice] WebSocket receive failed code=" + std::to_string(error.code) +
+              " close_code=" + std::to_string(task.closeCode));
           NSString* description = error.localizedDescription.lowercaseString;
           const bool auth = [description containsString:@"401"] || [description containsString:@"403"];
           state->queue->Network(generation, Event::Type::Error, auth
@@ -68,13 +73,15 @@ struct MacState : std::enable_shared_from_this<MacState> {
         queue->Push(Event::Type::Error, "没有可用的麦克风，请检查系统声音设置");
         return;
       }
-      AVAudioFormat* target = [[AVAudioFormat alloc] initWithCommonFormat:AVAudioPCMFormatInt16
-          sampleRate:16000 channels:1 interleaved:YES];
-      AVAudioConverter* converter = [[AVAudioConverter alloc] initFromFormat:hardware toFormat:target];
+      AVAudioConverter* converter = MakeInputConverter(hardware);
       if (!converter) {
         queue->Push(Event::Type::Error, "无法转换麦克风音频，请更换输入设备后重试");
         return;
       }
+      AVAudioFormat* target = converter.outputFormat;
+      LAppPal::PrintLog("[Voice] Capture format input_rate=%.0f input_channels=%u input_layout=0x%x "
+          "selected_channel=1 output_rate=16000 output_channels=1 sample_format=s16le",
+          hardware.sampleRate, hardware.channelCount, hardware.channelLayout.layoutTag);
       const auto events = queue;
       const auto generation = ++events->capture;
       queue->capturing = true;
@@ -166,7 +173,11 @@ class MacPlatform final : public Platform {
     const auto events = state_->queue;
     NSURLSessionWebSocketMessage* payload = [[NSURLSessionWebSocketMessage alloc] initWithString:Text(message)];
     [state_->socket sendMessage:payload completionHandler:^(NSError* error) {
-      if (error) events->Network(generation, Event::Type::Error, "千问语音发送失败，请检查网络后重试");
+      if (error) {
+        events->Network(generation, Event::Type::Diagnostic,
+            "[Voice] WebSocket send failed code=" + std::to_string(error.code));
+        events->Network(generation, Event::Type::Error, "千问语音发送失败，请检查网络后重试");
+      }
     }];
   }
 

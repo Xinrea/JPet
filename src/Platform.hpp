@@ -6,6 +6,8 @@
 // System integration; UI work is marshalled to the AppKit main thread on macOS.
 namespace Platform {
 void Open(const std::string& pathOrURL);
+// Only for validated HTTP(S) URLs; reports whether the system accepted launch.
+bool OpenWebURL(const std::string& url, std::string& error);
 bool ExtractUpdate(const std::filesystem::path& archive,
                    const std::filesystem::path& stage, std::string& error);
 bool LaunchUpdate(const std::filesystem::path& staged,
