@@ -1,6 +1,7 @@
 #include "VoicePlatform.hpp"
 #include "VoiceEventQueue.hpp"
 #include "VoiceAudioMac.hpp"
+#include "VoiceIndicatorStyle.hpp"
 #include "LAppPal.hpp"
 
 #import <AppKit/AppKit.h>
@@ -13,6 +14,76 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+
+@interface JPetVoiceIndicatorView : NSView
+@property(nonatomic) BOOL error;
+@end
+
+@implementation JPetVoiceIndicatorView
+- (BOOL)isFlipped { return YES; }
+- (void)drawRect:(NSRect)dirtyRect {
+  (void)dirtyRect;
+  using namespace Voice::Indicator;
+  const auto color = [](Color value) {
+    return [NSColor colorWithRed:value.red / 255.0 green:value.green / 255.0
+                           blue:value.blue / 255.0 alpha:1];
+  };
+  const Color accent = self.error ? ErrorAccent : Accent;
+  const Color soft = self.error ? ErrorSoft : Soft;
+  [NSGraphicsContext saveGraphicsState];
+  NSBezierPath* card = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds, .5, .5)
+      xRadius:Radius yRadius:Radius];
+  [card addClip];
+  [color(Background) setFill];
+  [card fill];
+  NSGradient* gradient = [[NSGradient alloc] initWithStartingColor:color(self.error ? ErrorTop : AccentTop)
+                                                    endingColor:color(accent)];
+  [gradient drawInRect:NSMakeRect(0, 0, Width, 28) angle:90];
+  // Small diagonal bars echo the section ribbons in the settings panel.
+  [[NSColor colorWithWhite:1 alpha:.22] setStroke];
+  for (int x = 220; x < Width; x += 10) {
+    NSBezierPath* stripe = [NSBezierPath bezierPath];
+    [stripe moveToPoint:NSMakePoint(x, 0)];
+    [stripe lineToPoint:NSMakePoint(x - 14, 28)];
+    stripe.lineWidth = 3;
+    [stripe stroke];
+  }
+  [@"JPet · 语音对话" drawAtPoint:NSMakePoint(14, 6) withAttributes:@{
+    NSFontAttributeName:[NSFont systemFontOfSize:11 weight:NSFontWeightBold],
+    NSForegroundColorAttributeName:NSColor.whiteColor
+  }];
+  [NSColor.whiteColor setFill];
+  [[NSBezierPath bezierPathWithRoundedRect:NSMakeRect(277, 5, 49, 18) xRadius:7 yRadius:7] fill];
+  [@"Option" drawAtPoint:NSMakePoint(285, 7) withAttributes:@{
+    NSFontAttributeName:[NSFont systemFontOfSize:10 weight:NSFontWeightBold],
+    NSForegroundColorAttributeName:color(self.error ? Error : Ink)
+  }];
+  [color(soft) setFill];
+  [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(14, 39, 34, 34)] fill];
+  [color(self.error ? Error : Accent) setStroke];
+  NSBezierPath* mic = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(28, 46, 6, 12) xRadius:3 yRadius:3];
+  mic.lineWidth = 1.8;
+  [mic stroke];
+  NSBezierPath* stand = [NSBezierPath bezierPath];
+  [stand moveToPoint:NSMakePoint(24, 53)];
+  [stand lineToPoint:NSMakePoint(24, 56)];
+  [stand curveToPoint:NSMakePoint(38, 56) controlPoint1:NSMakePoint(24, 66) controlPoint2:NSMakePoint(38, 66)];
+  [stand lineToPoint:NSMakePoint(38, 53)];
+  [stand moveToPoint:NSMakePoint(31, 63)];
+  [stand lineToPoint:NSMakePoint(31, 67)];
+  [stand moveToPoint:NSMakePoint(27, 67)];
+  [stand lineToPoint:NSMakePoint(35, 67)];
+  stand.lineWidth = 1.8;
+  stand.lineCapStyle = NSLineCapStyleRound;
+  [stand stroke];
+  [color(soft) setFill];
+  NSRectFill(NSMakeRect(0, Height - 5, Width, 5));
+  [color(self.error ? ErrorTop : Border) setStroke];
+  card.lineWidth = 1;
+  [card stroke];
+  [NSGraphicsContext restoreGraphicsState];
+}
+@end
 
 namespace Voice {
 namespace {
@@ -272,32 +343,38 @@ class MacPlatform final : public Platform {
   void ShowIndicator(GLFWwindow* window, const std::string& text, bool error) override {
     if (text.empty()) { [state_->indicator orderOut:nil]; return; }
     if (!state_->indicator) {
-      state_->indicator = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 320, 56)
+      state_->indicator = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, Indicator::Width, Indicator::Height)
           styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
           backing:NSBackingStoreBuffered defer:NO];
       state_->indicator.releasedWhenClosed = NO;
       state_->indicator.level = NSFloatingWindowLevel;
       state_->indicator.opaque = NO;
-      state_->indicator.backgroundColor = [NSColor colorWithWhite:0.12 alpha:0.94];
+      state_->indicator.backgroundColor = NSColor.clearColor;
       state_->indicator.hasShadow = YES;
       state_->indicator.ignoresMouseEvents = YES;
       state_->indicator.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
           NSWindowCollectionBehaviorFullScreenAuxiliary;
-      state_->indicator.contentView.wantsLayer = YES;
-      state_->indicator.contentView.layer.cornerRadius = 12;
+      state_->indicator.contentView = [[JPetVoiceIndicatorView alloc] initWithFrame:
+          NSMakeRect(0, 0, Indicator::Width, Indicator::Height)];
       state_->label = [NSTextField wrappingLabelWithString:@""];
-      state_->label.frame = NSMakeRect(14, 8, 292, 40);
+      state_->label.frame = NSMakeRect(60, 34, 264, 46);
       state_->label.font = [NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
-      state_->label.alignment = NSTextAlignmentCenter;
+      state_->label.alignment = NSTextAlignmentLeft;
+      state_->label.maximumNumberOfLines = 3;
       [state_->indicator.contentView addSubview:state_->label];
     }
-    state_->label.stringValue = Text(text);
-    state_->label.textColor = error ? [NSColor colorWithRed:1 green:0.65 blue:0.65 alpha:1] : NSColor.whiteColor;
+    NSString* value = Text(text);
+    if (![state_->label.stringValue isEqualToString:value]) state_->label.stringValue = value;
+    const auto ink = error ? Indicator::Error : Indicator::Ink;
+    state_->label.textColor = [NSColor colorWithRed:ink.red / 255.0 green:ink.green / 255.0
+                                            blue:ink.blue / 255.0 alpha:1];
+    JPetVoiceIndicatorView* view = (JPetVoiceIndicatorView*)state_->indicator.contentView;
+    if (view.error != error) { view.error = error; view.needsDisplay = YES; }
     NSWindow* pet = glfwGetCocoaWindow(window);
     NSRect frame = pet.frame;
     NSRect screen = (pet.screen ?: NSScreen.mainScreen).visibleFrame;
-    const CGFloat x = std::clamp(NSMidX(frame) - 160, NSMinX(screen), NSMaxX(screen) - 320);
-    const CGFloat y = std::clamp(NSMaxY(frame) + 8, NSMinY(screen), NSMaxY(screen) - 56);
+    const CGFloat x = std::clamp(NSMidX(frame) - Indicator::Width / 2.0, NSMinX(screen), NSMaxX(screen) - Indicator::Width);
+    const CGFloat y = std::clamp(NSMaxY(frame) + 8, NSMinY(screen), NSMaxY(screen) - Indicator::Height);
     [state_->indicator setFrameOrigin:NSMakePoint(x, y)];
     [state_->indicator orderFrontRegardless];
   }

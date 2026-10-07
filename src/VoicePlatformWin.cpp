@@ -1,5 +1,6 @@
 #include "VoicePlatform.hpp"
 #include "VoiceEventQueue.hpp"
+#include "VoiceIndicatorStyle.hpp"
 
 #include <windows.h>
 #include <winhttp.h>
@@ -54,7 +55,10 @@ struct WinState {
   std::list<std::unique_ptr<OutputBuffer>> outputBuffers;
   HWND indicator = nullptr;
   bool indicatorError = false;
+  std::wstring indicatorText;
   HFONT font = nullptr;
+  HFONT titleFont = nullptr;
+  HFONT shortcutFont = nullptr;
 };
 
 void Receive(const std::shared_ptr<WinState>& state, uint64_t generation,
@@ -136,22 +140,87 @@ LRESULT CALLBACK IndicatorProc(HWND window, UINT message, WPARAM wparam, LPARAM 
   auto* state = reinterpret_cast<WinState*>(GetWindowLongPtrW(window, GWLP_USERDATA));
   if (message == WM_NCHITTEST) return HTTRANSPARENT;
   if (message == WM_MOUSEACTIVATE) return MA_NOACTIVATE;
+  if (message == WM_ERASEBKGND) return 1;
   if (message == WM_PAINT && state) {
+    using namespace Indicator;
+    const auto color = [](Color value) { return RGB(value.red, value.green, value.blue); };
     PAINTSTRUCT paint;
-    HDC dc = BeginPaint(window, &paint);
+    HDC target = BeginPaint(window, &paint);
     RECT rect;
     GetClientRect(window, &rect);
-    HBRUSH brush = CreateSolidBrush(RGB(31, 31, 34));
+    HDC dc = CreateCompatibleDC(target);
+    HBITMAP bitmap = CreateCompatibleBitmap(target, rect.right, rect.bottom);
+    const auto oldBitmap = SelectObject(dc, bitmap);
+    const int saved = SaveDC(dc);
+    SetMapMode(dc, MM_ANISOTROPIC);
+    SetWindowExtEx(dc, Width, Height, nullptr);
+    SetViewportExtEx(dc, rect.right, rect.bottom, nullptr);
+    rect = {0, 0, Width, Height};
+    HBRUSH brush = CreateSolidBrush(color(Background));
     FillRect(dc, &rect, brush);
     DeleteObject(brush);
+    const Color accent = state->indicatorError ? ErrorAccent : Accent;
+    const Color top = state->indicatorError ? ErrorTop : AccentTop;
+    const Color soft = state->indicatorError ? ErrorSoft : Soft;
+    // Paint the small header gradient without introducing another graphics dependency.
+    for (int y = 0; y < 28; ++y) {
+      const auto blend = [y](int a, int b) { return a + (b - a) * y / 27; };
+      brush = CreateSolidBrush(RGB(blend(top.red, accent.red), blend(top.green, accent.green), blend(top.blue, accent.blue)));
+      RECT line{0, y, Width, y + 1};
+      FillRect(dc, &line, brush);
+      DeleteObject(brush);
+    }
+    HPEN stripePen = CreatePen(PS_SOLID, 3, state->indicatorError ? RGB(246, 181, 198) : RGB(183, 224, 122));
+    const auto oldPen = SelectObject(dc, stripePen);
+    for (int x = 220; x < Width; x += 10) { MoveToEx(dc, x, 0, nullptr); LineTo(dc, x - 14, 28); }
+    SelectObject(dc, oldPen);
+    DeleteObject(stripePen);
     SetBkMode(dc, TRANSPARENT);
-    SetTextColor(dc, state->indicatorError ? RGB(255, 165, 165) : RGB(255, 255, 255));
-    const auto old = SelectObject(dc, state->font);
+    SetTextColor(dc, RGB(255, 255, 255));
+    SelectObject(dc, state->titleFont);
+    RECT title{14, 5, 220, 24};
+    DrawTextW(dc, L"JPet · 语音对话", -1, &title, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+    SelectObject(dc, GetStockObject(DC_BRUSH));
+    SelectObject(dc, GetStockObject(NULL_PEN));
+    SetDCBrushColor(dc, RGB(255, 255, 255));
+    RoundRect(dc, 277, 5, 326, 23, 14, 14);
+    SetTextColor(dc, color(state->indicatorError ? Error : Ink));
+    SelectObject(dc, state->shortcutFont);
+    RECT shortcut{277, 5, 326, 23};
+    DrawTextW(dc, L"Ctrl", -1, &shortcut, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    SetDCBrushColor(dc, color(soft));
+    Ellipse(dc, 14, 39, 48, 73);
+    HPEN micPen = CreatePen(PS_SOLID, 2, color(state->indicatorError ? Error : Accent));
+    SelectObject(dc, micPen);
+    SelectObject(dc, GetStockObject(NULL_BRUSH));
+    RoundRect(dc, 28, 46, 35, 59, 6, 6);
+    MoveToEx(dc, 24, 53, nullptr); LineTo(dc, 24, 56);
+    Arc(dc, 24, 49, 39, 64, 24, 56, 39, 56);
+    MoveToEx(dc, 38, 56, nullptr); LineTo(dc, 38, 53);
+    MoveToEx(dc, 31, 63, nullptr); LineTo(dc, 31, 67);
+    MoveToEx(dc, 27, 67, nullptr); LineTo(dc, 35, 67);
+    SelectObject(dc, oldPen);
+    DeleteObject(micPen);
+    brush = CreateSolidBrush(color(soft));
+    RECT footer{0, Height - 5, Width, Height};
+    FillRect(dc, &footer, brush);
+    DeleteObject(brush);
+    HPEN border = CreatePen(PS_SOLID, 1, color(state->indicatorError ? ErrorTop : Border));
+    SelectObject(dc, border);
+    RoundRect(dc, 0, 0, Width, Height, Radius * 2, Radius * 2);
+    SelectObject(dc, oldPen);
+    DeleteObject(border);
+    SelectObject(dc, state->font);
     wchar_t text[512]{};
     GetWindowTextW(window, text, 512);
-    InflateRect(&rect, -12, -10);
-    DrawTextW(dc, text, -1, &rect, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
-    SelectObject(dc, old);
+    RECT body{60, 34, 324, 80};
+    DrawTextW(dc, text, -1, &body, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX | DT_END_ELLIPSIS);
+    RestoreDC(dc, saved);
+    GetClientRect(window, &rect);
+    BitBlt(target, 0, 0, rect.right, rect.bottom, dc, 0, 0, SRCCOPY);
+    SelectObject(dc, oldBitmap);
+    DeleteObject(bitmap);
+    DeleteDC(dc);
     EndPaint(window, &paint);
     return 0;
   }
@@ -165,6 +234,8 @@ class WinPlatform final : public Platform {
     if (state_->output) waveOutClose(state_->output);
     if (state_->indicator) DestroyWindow(state_->indicator);
     if (state_->font) DeleteObject(state_->font);
+    if (state_->titleFont) DeleteObject(state_->titleFont);
+    if (state_->shortcutFont) DeleteObject(state_->shortcutFont);
   }
   bool ShortcutHeld() const override { return (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0; }
 
@@ -358,24 +429,41 @@ class WinPlatform final : public Platform {
       type.hInstance = GetModuleHandleW(nullptr);
       type.lpszClassName = L"JPetVoiceIndicator";
       RegisterClassW(&type);
-      state_->font = CreateFontW(-14, 0, 0, 0, FW_MEDIUM, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+      state_->font = CreateFontW(-13, 0, 0, 0, FW_MEDIUM, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+          OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+      state_->titleFont = CreateFontW(-11, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+          OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+      state_->shortcutFont = CreateFontW(-10, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
           OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
       state_->indicator = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-          type.lpszClassName, L"", WS_POPUP, 0, 0, 340, 64, nullptr, nullptr, type.hInstance, state_.get());
-      SetWindowRgn(state_->indicator, CreateRoundRectRgn(0, 0, 340, 64, 16, 16), TRUE);
+          type.lpszClassName, L"", WS_POPUP, 0, 0, Indicator::Width, Indicator::Height, nullptr, nullptr, type.hInstance, state_.get());
+      SetWindowRgn(state_->indicator, CreateRoundRectRgn(0, 0, Indicator::Width, Indicator::Height,
+          Indicator::Radius * 2, Indicator::Radius * 2), TRUE);
     }
+    const auto wideText = Wide(text);
+    const bool changed = state_->indicatorError != error || state_->indicatorText != wideText;
     state_->indicatorError = error;
-    SetWindowTextW(state_->indicator, Wide(text).c_str());
+    if (state_->indicatorText != wideText) {
+      state_->indicatorText = wideText;
+      SetWindowTextW(state_->indicator, wideText.c_str());
+    }
     RECT pet, screen;
     GetWindowRect(glfwGetWin32Window(window), &pet);
     MONITORINFO monitor{};
     monitor.cbSize = sizeof(monitor);
     GetMonitorInfoW(MonitorFromRect(&pet, MONITOR_DEFAULTTONEAREST), &monitor);
     screen = monitor.rcWork;
-    const LONG x = std::clamp((pet.left + pet.right - 340) / 2, screen.left, screen.right - 340);
-    const LONG y = std::clamp(pet.top - 72, screen.top, screen.bottom - 64);
-    SetWindowPos(state_->indicator, HWND_TOPMOST, x, y, 340, 64, SWP_NOACTIVATE | SWP_SHOWWINDOW);
-    InvalidateRect(state_->indicator, nullptr, TRUE);
+    const UINT dpi = GetDpiForWindow(glfwGetWin32Window(window));
+    const int width = MulDiv(Indicator::Width, dpi, 96), height = MulDiv(Indicator::Height, dpi, 96);
+    RECT previous;
+    GetWindowRect(state_->indicator, &previous);
+    if (previous.right - previous.left != width || previous.bottom - previous.top != height)
+      SetWindowRgn(state_->indicator, CreateRoundRectRgn(0, 0, width, height,
+          MulDiv(Indicator::Radius * 2, dpi, 96), MulDiv(Indicator::Radius * 2, dpi, 96)), TRUE);
+    const LONG x = std::clamp((pet.left + pet.right - width) / 2, screen.left, screen.right - width);
+    const LONG y = std::clamp(pet.top - height - MulDiv(8, dpi, 96), screen.top, screen.bottom - height);
+    SetWindowPos(state_->indicator, HWND_TOPMOST, x, y, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    if (changed) InvalidateRect(state_->indicator, nullptr, FALSE);
   }
 
  private:

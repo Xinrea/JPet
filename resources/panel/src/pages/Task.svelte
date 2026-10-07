@@ -137,6 +137,7 @@
       </div>
       <div class="content text-gray-600">
         <p class="mb-3 text-sm">{currentTask.desc}</p>
+        <progress class="task-progress" value={Math.max(0, currentTask.cost - timeRemain)} max={Math.max(1, currentTask.cost)} aria-label="当前任务完成进度"></progress>
         <div class="mb-2 flex flex-wrap items-center gap-1">
           <span class="badge info">要求</span>
           {#each Object.entries(currentTask.requirements) as [key, value]}
@@ -301,12 +302,16 @@
 </div>
 
 <style>
-  .task { border-radius: 0.25rem; border: 1px solid #e2e8f0; background: white; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); overflow: hidden; }
-  .header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: white; background: #79ca2e; padding: 6px 12px; font-size: 1rem; font-weight: bold; }
-  .content { padding: 12px; }
-  .badge { padding: 4px 8px; border-radius: 4px; color: #fff; text-align: center; font-size: 12px; }
-  .badge.info { background: #79ca2e; }
-  .badge.warn { background: #ff666b; }
+  .task { border-radius: 14px; border: 1px solid var(--line); background: white; box-shadow: var(--card-shadow); overflow: hidden; }
+  .header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink); background: linear-gradient(110deg, #edf7dc, #f9fcf4); border-bottom: 1px solid #e4ecd6; padding: 14px 18px; font-size: 14px; font-weight: 900; }
+  .content { padding: 18px; }
+  .task-progress { display: block; width: 100%; height: 8px; border: 0; border-radius: 8px; overflow: hidden; margin-bottom: 18px; background: #edf2e4; }
+  .task-progress::-webkit-progress-bar { background: #edf2e4; border-radius: 8px; }
+  .task-progress::-webkit-progress-value { background: var(--green-gradient); border-radius: 8px; }
+  .task-progress::-moz-progress-bar { background: #8dce38; border-radius: 8px; }
+  .badge { padding: 4px 8px; border-radius: 5px; text-align: center; font-size: 10px; font-weight: 800; }
+  .badge.info { background: #edf7df; color: #7b9c53; }
+  .badge.warn { background: #fff0df; color: #c29555; }
   .queue-position { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #eef8e5; color: #579c1c; font-size: 12px; }
   .history-item { padding: 8px 0; }
   .history-item + .history-item { border-top: 1px solid #f3f4f6; }

@@ -1,23 +1,25 @@
 <script>
   import { onMount, onDestroy } from "svelte";
-  import { Tooltip, Button, Modal, Alert } from "flowbite-svelte";
+  import { Tooltip, Button, Modal } from "flowbite-svelte";
   import speedIcon from "../assets/at-sp.png";
   import enduranceIcon from "../assets/at-end.png";
   import strengthIcon from "../assets/at-str.png";
   import willIcon from "../assets/at-will.png";
   import intellectIcon from "../assets/at-int.png";
-  import addIcon from "../assets/add.svg";
-  import minusIcon from "../assets/minus.svg";
   import imgClothes1 from "../assets/c1.png";
   import imgClothes2 from "../assets/c2.png";
   import imgClothes3 from "../assets/c3.png";
   import starIcon from "../assets/star.png";
   import crownIcon from "../assets/crown.png";
   import starOutlineIcon from "../assets/star_outline.png";
+  import UiIcon from "../components/UiIcon.svelte";
   import Progress from "../components/Progress.svelte";
   import BuffIcon from "../components/BuffIcon.svelte";
 
   const clothesImages = [imgClothes1, imgClothes2, imgClothes3];
+  const attributeNames = ["速度", "耐力", "力量", "毅力", "智力"];
+  const attributeIcons = [speedIcon, enduranceIcon, strengthIcon, willIcon, intellectIcon];
+  const attributeDescriptions = ["影响任务完成所需的时间", "任务所需的基础属性", "任务所需的基础属性", "影响任务完成的成功率", "影响经验获取的效率"];
   const attributeArray = [
     "speed",
     "endurance",
@@ -147,242 +149,84 @@
   onDestroy(() => clearInterval(tipTimer));
 </script>
 
-<div>
-  {#if error}<p class="mb-3 text-sm text-red-600" role="alert">{error}</p>{/if}
-  <div class="w-full mb-4 rounded overflow-hidden">
-    <!-- table of attributes -->
-    <table class="w-full">
-      <tr class="at-table">
-        <th>
-          <span><img class="icon" src={speedIcon} alt="" />速度</span><Tooltip
-            class="z-30">影响任务完成所需的时间</Tooltip
-          ></th
-        >
-        <th>
-          <span>
-            <img class="icon" src={enduranceIcon} alt="" />耐力
-          </span><Tooltip class="z-30">任务所需的基础属性</Tooltip></th
-        >
-        <th>
-          <span>
-            <img class="icon" src={strengthIcon} alt="" />力量
-          </span><Tooltip class="z-30">任务所需的基础属性</Tooltip></th
-        >
-        <th>
-          <span>
-            <img class="icon" src={willIcon} alt="" />毅力
-          </span><Tooltip class="z-30">影响任务完成的成功率</Tooltip></th
-        >
-        <th>
-          <span>
-            <img class="icon" src={intellectIcon} alt="" />智力
-          </span><Tooltip class="z-30">影响经验获取的效率</Tooltip></th
-        >
-      </tr>
-      <tr>
-        {#each attributeArray as attr}
-          <td
-            ><span class="flex justify-center align-middle"
-              ><button disabled={busy || !online}
-                on:mousedown={(e) => {
-                  if (e.button == 1) {
-                    targetAttr = attr;
-                    revertHandle();
-                  }
-                }}
-                on:click={() => {
-                  revertModal = true;
-                  targetAttr = attr;
-                }}
-                ><img class="icon-button mr-2" src={minusIcon} alt="" /></button
-              >
-              <span>{attributes[attr]}</span>
-              <button disabled={busy || !online}
-                on:mousedown={(e) => {
-                  if (e.button == 1) {
-                    targetAttr = attr;
-                    attrHandle();
-                  }
-                }}
-                on:click={() => {
-                  addModal = true;
-                  targetAttr = attr;
-                }}><img class="icon-button ml-2" src={addIcon} alt="" /></button
-              ></span
-            ></td
-          >
-        {/each}
-      </tr>
-    </table>
-    <Modal title="属性加点" bind:open={addModal} size="xs" autoclose>
-      <h3 class="mb-5 text-lg font-normal text-gray-500">
-        此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？
-      </h3>
-      <Button
-          disabled={busy || !online || currentExp < buycost ||
-            attributes[targetAttr] >= 100 + 10 * starcnt}
-          on:click={attrHandle}>确认</Button
-      >
-      <Button color="alternative">取消</Button>
-    </Modal>
-    <Modal title="属性撤销" bind:open={revertModal} size="xs" autoclose>
-      <h3 class="mb-5 text-lg font-normal text-gray-500">
-        此次操作会返还 {revertgain} EXP，确认撤销吗？
-      </h3>
-      <Button disabled={busy || !online} on:click={revertHandle}>确认</Button>
-      <Button color="alternative">取消</Button>
-    </Modal>
-  </div>
-  <div class="flex relative items-center justify-center mb-4">
-    <div class="w-32 h-64 overflow-hidden">
-      <img src={clothesImages[clothes.current]} alt="avatar" />
+<div class="profile-page">
+  {#if error}<p class="feedback error" role="alert">{error}</p>{/if}
+  <section class="companion-card game-card">
+    <div class="character-stage"><span class="character-spark spark-one">✦</span><span class="character-spark spark-two">✧</span><img src={clothesImages[clothes.current]} alt="轴伊的当前衣装" /><span class="character-name">轴伊 <small>Joi</small></span></div>
+    <div class="growth-summary"><span class="growth-eyebrow">一起积攒的成长</span>
+      <div class="exp-ring"><Progress max={60} value={60 - timeToNextPoint}><div class="exp-value"><strong>{currentExp.toLocaleString()}</strong><span>EXP</span></div></Progress></div>
+      <p class="next-exp">{online ? `下次获得 +${expdiff} EXP` : "连接云端后继续成长"}</p>
+      <div class="stars-row"><span>当前星级</span><button class="star-button" aria-label="提升星级" disabled={!online || busy} on:click={() => starModal = true}>
+        {#if starcnt > 0}{#each { length: Math.floor(starcnt / 5) } as _}<img alt="五星" src={crownIcon} />{/each}{#each { length: starcnt % 5 } as _}<img alt="一星" src={starIcon} />{/each}{:else}<img alt="零星" src={starOutlineIcon} />{/if}<span>＋</span>
+      </button><Tooltip>星星提升经验获取量和属性上限、降低任务成功率，也可消耗星星解锁任务队列容量</Tooltip></div>
+      <div id="buff-ref" class="buff-row">{#each buffs as buff}<BuffIcon type={buff} />{:else}<span>期待下一次成长加成</span>{/each}</div>
     </div>
-    <div style="height: 128px; width: 128px; margin-left: 2rem;">
-      <Modal title="星级提升" bind:open={starModal} size="xs" autoclose>
-        <h3 class="mb-5 text-lg font-normal text-gray-500">
-          此次操作会消耗所有属性各 53 点换取一颗星，要换取吗？
-        </h3>
-        <Button disabled={!starAvailable || !online || busy} on:click={fetchStar}>确认</Button>
-        <Button color="alternative">取消</Button>
-      </Modal>
-      <a
-        href={"#"}
-        on:click={() => {
-          starModal = true;
-        }}
-        class="flex justify-center absolute cursor-pointer flex-col"
-        style="width: 128px; scale: 0.9; top: 0;"
-      >
-        {#if starcnt > 0}
-          <div class="justify-center flex">
-            {#each { length: Math.floor(starcnt / 5) } as _, i}
-              <img class="rank-icon" alt="" src={crownIcon} />
-            {/each}
-          </div>
-          <div class="justify-center flex">
-            {#each { length: starcnt % 5 } as _, i}
-              <img class="rank-icon" alt="" src={starIcon} />
-            {/each}
-          </div>
-        {:else}
-          <img class="rank-icon" alt="" src={starOutlineIcon} />
-        {/if}
-      </a>
-      <Tooltip>星星提升经验获取量和属性上限、降低任务成功率，也可消耗星星解锁任务队列容量</Tooltip>
-      <Progress max={60} value={60 - timeToNextPoint}>
-        <div
-          style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); text-align: center;"
-        >
-          <span style="border-bottom: 1px solid black; font-size: 1.5rem;"
-            >{currentExp}</span
-          >
-          <div style="font-size: 0.8rem;">EXP</div>
-        </div>
-      </Progress>
-      <Tooltip>下次增加{expdiff}点经验</Tooltip>
-      <div id="buff-ref" class="flex items-center justify-center mt-4">
-        {#each buffs as buff}
-          <BuffIcon type={buff} />
-        {/each}
-      </div>
-    </div>
-  </div>
-  <div class="flex flex-col justify-center w-full -ml-4 fixed bottom-8">
-    <div class="flex justify-center w-full mb-8 px-2">
-      <Alert border color="green" dismissable>
-        <span class="font-medium">小提示：</span>
-        {tooltips[cur_tip]}
-      </Alert>
-    </div>
-    <div class="flex justify-center w-full">
-      {#each clothesList as c, i}
-        <div
-          tabindex={i}
-          on:keypress={() => {}}
-          role="button"
-          aria-disabled={busy || !online} on:click={() => changeClothes(i)}
-          class="choice-item"
-          class:disabled={!clothes.unlock[i]}
-          style="background-image: url({clothesImages[i]});"
-        ></div>
-        {#if !clothes.unlock[i]}
-          <Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>
-        {/if}
-      {/each}
-    </div>
-  </div>
+  </section>
+
+  <section class="attribute-section"><div class="section-title"><UiIcon name="spark" size={18} /><h2>成长属性</h2><span>上限 {100 + 10 * starcnt}</span></div>
+    <div class="attribute-grid">{#each attributeArray as attr, i}<div class="attribute-card game-card" style={`--attribute-color: ${["#6bb8c5", "#e58ca4", "#e8ad51", "#9e9bd0", "#80b554"][i]}`}>
+      <div class="attribute-name"><img src={attributeIcons[i]} alt="" /><span>{attributeNames[i]}</span></div><Tooltip>{attributeDescriptions[i]}</Tooltip>
+      <strong class="attribute-value">{attributes[attr]}</strong>
+      <div class="attribute-actions"><button aria-label={`撤销${attributeNames[i]}属性`} disabled={busy || !online} on:mousedown={(event) => { if (event.button === 1) { targetAttr = attr; revertHandle(); } }} on:click={() => { revertModal = true; targetAttr = attr; }}>−</button><button aria-label={`增加${attributeNames[i]}属性`} disabled={busy || !online} on:mousedown={(event) => { if (event.button === 1) { targetAttr = attr; attrHandle(); } }} on:click={() => { addModal = true; targetAttr = attr; }}>＋</button></div>
+    </div>{/each}</div>
+  </section>
+
+  <section class="outfit-section game-card"><div class="section-title"><UiIcon name="dress" size={18} /><h2>今日衣装</h2><span>选择你喜欢的样子</span></div>
+    <div class="outfit-grid">{#each clothesList as outfit, i}<button class="outfit-choice" class:selected={clothes.current === i} disabled={busy || !online || !clothes.unlock[i]} aria-pressed={clothes.current === i} on:click={() => changeClothes(i)}><img src={clothesImages[i]} alt="" /><span><strong>{outfit.name}</strong><small>{!clothes.unlock[i] ? "尚未解锁" : clothes.current === i ? "正在穿着" : "点击换装"}</small></span>{#if clothes.current === i}<UiIcon name="check" size={15} />{/if}</button>{#if !clothes.unlock[i]}<Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>{/if}{/each}</div>
+  </section>
+  <div class="profile-tip"><UiIcon name="spark" size={18} /><p><strong>陪伴小贴士</strong>{tooltips[cur_tip]}</p></div>
 </div>
 
+<Modal title="属性加点" bind:open={addModal} size="xs" autoclose><p class="mb-5 text-sm leading-relaxed text-gray-500">此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？</p><div class="setting-actions"><Button disabled={busy || !online || currentExp < buycost || attributes[targetAttr] >= 100 + 10 * starcnt} on:click={attrHandle}>确认</Button><Button color="alternative">取消</Button></div></Modal>
+<Modal title="属性撤销" bind:open={revertModal} size="xs" autoclose><p class="mb-5 text-sm leading-relaxed text-gray-500">此次操作会返还 {revertgain} EXP，确认撤销吗？</p><div class="setting-actions"><Button disabled={busy || !online} on:click={revertHandle}>确认</Button><Button color="alternative">取消</Button></div></Modal>
+<Modal title="星级提升" bind:open={starModal} size="xs" autoclose><p class="mb-5 text-sm leading-relaxed text-gray-500">此次操作会消耗所有属性各 53 点换取一颗星，要换取吗？</p><div class="setting-actions"><Button disabled={!starAvailable || !online || busy} on:click={fetchStar}>确认</Button><Button color="alternative">取消</Button></div></Modal>
+
 <style>
-  .at-table {
-    width: 100%;
-    background-color: #79ca2e;
-    color: #ffffff;
-  }
-
-  .at-table th {
-    font-size: 0.8rem;
-    padding: 0.5rem;
-  }
-
-  tr {
-    border-radius: 0.25rem;
-    border: 1px solid #e2e8f0;
-  }
-
-  td {
-    padding: 0.2rem;
-    text-align: center;
-    background-color: rgb(255, 255, 255);
-    font-size: 0.8rem;
-  }
-
-  .icon {
-    display: inline;
-    width: 1.2rem;
-    height: 1.2rem;
-    margin-right: 0.5rem;
-  }
-
-  .icon-button {
-    visibility: hidden;
-    width: 1.2rem;
-    cursor: pointer;
-  }
-
-  .rank-icon {
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-    flex: 0 0 28px;
-  }
-
-  td:hover .icon-button {
-    visibility: visible;
-  }
-
-  .choice-item {
-    border-radius: 50%;
-    width: 80px;
-    height: 80px;
-    margin-right: 16px;
-    opacity: 0.5;
-    cursor: pointer;
-    transition: all 0.3s ease-in-out;
-    background-size: cover;
-  }
-
-  .choice-item.disabled {
-    filter: grayscale(100%);
-  }
-
-  .choice-item:hover {
-    opacity: 1;
-    margin-left: 24px;
-    margin-right: 24px;
-  }
-
-  .choice-item:last-child {
-    margin-right: 0;
-  }
+  .profile-page { display: flex; flex-direction: column; gap: 22px; }
+  .companion-card { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
+  .character-stage { position: relative; display: flex; align-items: center; justify-content: center; padding: 20px 20px 45px; min-height: 295px; background: radial-gradient(ellipse at 50% 50%, #fff 0 32%, transparent 32.3%), repeating-linear-gradient(135deg, #ffffff44 0 12px, transparent 12px 24px), linear-gradient(135deg, #e7f5d5, #f7f9e8); }
+  .character-stage > img { height: 235px; width: auto; filter: drop-shadow(0 7px 2px #94b16222); z-index: 1; }
+  .character-name { position: absolute; bottom: 16px; font-size: 16px; font-weight: 900; color: var(--ink); }
+  .character-name small { font-size: 10px; margin-left: 8px; color: #9aab81; letter-spacing: 2px; }
+  .character-spark { position: absolute; color: #b5d679; }
+  .spark-one { top: 25px; left: 20%; font-size: 26px; }
+  .spark-two { bottom: 70px; right: 14%; font-size: 30px; }
+  .growth-summary { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 18px; }
+  .growth-eyebrow { font-size: 11px; font-weight: 800; color: #9da488; margin-bottom: 13px; }
+  .exp-ring { width: 132px; height: 132px; --progress-trackcolor: #edf2e4; --progress-trackwidth: 7px; --progress-width: 7px; --progress-color: #94cf43; }
+  .exp-value { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .exp-value strong { font-size: 24px; color: var(--ink); font-weight: 900; font-variant-numeric: tabular-nums; }
+  .exp-value span { font-size: 11px; color: #bea370; font-weight: 900; letter-spacing: 2px; }
+  .next-exp { margin-top: 12px; font-size: 10px; color: var(--muted); }
+  .stars-row { display: flex; align-items: center; gap: 9px; margin-top: 18px; font-size: 10px; color: var(--muted); }
+  .star-button { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 4px 6px; border: 1px solid #f1e4c0; border-radius: 7px; background: #fffaf0; max-width: 150px; }
+  .star-button img { width: 18px; height: 18px; object-fit: contain; }
+  .star-button > span { font-size: 14px; color: #b99548; }
+  .buff-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 15px; min-height: 32px; }
+  .buff-row > span { color: #b2b99e; font-size: 10px; }
+  .section-title { display: flex; align-items: center; gap: 8px; color: #91b565; margin-bottom: 13px; }
+  .section-title h2 { font-size: 14px; font-weight: 900; color: var(--ink); }
+  .section-title > span { margin-left: auto; font-size: 10px; color: #a3a691; }
+  .attribute-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .attribute-card { text-align: center; overflow: hidden; }
+  .attribute-name { display: flex; align-items: center; justify-content: center; gap: 5px; background: var(--attribute-color); padding: 9px 2px; color: white; font-size: 12px; font-weight: 800; }
+  .attribute-name img { width: 15px; height: 15px; object-fit: contain; }
+  .attribute-value { display: block; padding: 12px 0 8px; font-size: 24px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .attribute-actions { display: flex; gap: 6px; justify-content: center; padding: 0 8px 10px; }
+  .attribute-actions button { flex: 1; max-width: 35px; border: 1px solid #e5e7da; border-radius: 5px; background: linear-gradient(#fff, #f5f6ed); color: #849b65; font-weight: 800; font-size: 14px; box-shadow: 0 2px 0 #e6e8db; }
+  .attribute-actions button:hover { background: #edf6df; }
+  .outfit-section { padding: 17px; }
+  .outfit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .outfit-choice { display: flex; align-items: center; position: relative; text-align: left; gap: 10px; border: 1px solid #e7e8db; border-radius: 10px; background: #fafbf5; padding: 9px; }
+  .outfit-choice img { height: 58px; width: 34px; object-fit: cover; object-position: top; }
+  .outfit-choice strong { display: block; font-size: 12px; font-weight: 800; }
+  .outfit-choice small { display: block; font-size: 10px; color: #a4ac91; margin-top: 5px; white-space: nowrap; }
+  .outfit-choice.selected { border-color: #abcf7b; background: #f2f9e7; box-shadow: inset 0 0 0 1px #daebc3; }
+  .outfit-choice :global(svg) { position: absolute; right: 7px; top: 7px; color: #79a844; }
+  .outfit-choice:disabled:not(.selected) img { filter: grayscale(.8); opacity: .5; }
+  .profile-tip { display: flex; align-items: center; gap: 10px; padding: 14px 17px; border: 1px dashed #cddcba; border-radius: 10px; background: #f9fcf2; color: #9aaf77; }
+  .profile-tip :global(svg) { flex-shrink: 0; }
+  .profile-tip p { font-size: 11px; line-height: 1.9; color: var(--muted); }
+  .profile-tip strong { margin-right: 9px; color: #839964; }
+  @media (max-width: 460px) { .attribute-grid { gap: 5px; } .attribute-name { font-size: 11px; gap: 2px; } .attribute-name img { width: 12px; } .attribute-value { font-size: 20px; } .attribute-actions { padding: 0 5px 9px; gap: 4px; } .character-stage { padding: 15px 10px 40px; min-height: 265px; } .character-stage > img { height: 200px; } .growth-summary { padding: 18px 8px; } .exp-ring { width: 112px; height: 112px; } .exp-value strong { font-size: 20px; } .outfit-grid { gap: 6px; } .outfit-choice { flex-direction: column; text-align: center; gap: 5px; padding: 10px 4px; } .outfit-section { padding: 14px; } }
 </style>

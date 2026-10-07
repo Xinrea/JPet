@@ -31,6 +31,7 @@
   onMount(load);
 </script>
 
+<div class="leaderboard">
 {#if error}<p class="mb-3 rounded bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</p>{/if}
 {#if account_info?.login && !account_info.info.confirm}
   <p class="mb-3 text-sm text-gray-600">参与排行榜会公开你的 UID、用户名、星级、持有经验和总属性。排行由云端存档生成。</p>
@@ -60,3 +61,14 @@
   <Button size="xs" color="alternative" disabled={loading || offset === 0} on:click={() => page(-1)}>上一页</Button>
   <Button size="xs" color="alternative" disabled={loading || entries.length < 100 || offset >= 10000} on:click={() => page(1)}>下一页</Button>
 </div>
+
+</div>
+<style>
+  .leaderboard :global(table) { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; color: var(--ink); }
+  .leaderboard :global(thead) { background: linear-gradient(110deg, #edf6df, #f7faef); color: #7a925b; font-size: 11px; }
+  .leaderboard :global(th) { padding: 12px 14px; font-weight: 800; white-space: nowrap; }
+  .leaderboard :global(td) { padding: 14px; font-size: 12px; }
+  .leaderboard :global(tbody tr:nth-child(even)) { background: #fafbf5; }
+  .leaderboard :global(tbody tr:nth-child(-n+3) td:first-child) { color: #c29b4c; font-size: 16px; font-weight: 900; }
+  .leaderboard :global(tbody tr td:first-child) { width: 60px; font-weight: 800; }
+</style>

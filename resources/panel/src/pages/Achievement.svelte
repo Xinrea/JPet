@@ -84,7 +84,7 @@
   <div class="collection">
     <div class="collection-top">
       <div>
-        <h1><span class="title-icon"><AchievementIcon name="trophy" size={21} /></span> 成就收藏</h1>
+        <h2 class="collection-title"><span class="title-icon"><AchievementIcon name="trophy" size={21} /></span> 成就收藏</h2>
         <p>记录和轴伊一起成长的每一步</p>
       </div>
       <div class="collection-count"><strong>{unlocked}</strong><span> / {total}</span></div>
@@ -148,60 +148,61 @@
 </section>
 
 <style>
-  .achievement-page { width: 100%; max-width: 800px; margin: 0 auto; color: #334155; }
-  .collection { padding: 16px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; }
+  .achievement-page { width: 100%; max-width: 800px; margin: 0 auto; color: var(--ink); }
+  .collection { padding: 16px; background: white; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--card-shadow); background: linear-gradient(120deg, #fff, #f8fceF); }
   .collection-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  h1 { display: flex; align-items: center; gap: 7px; font-size: 18px; font-weight: 700; color: #1e293b; }
+  .collection-title { display: flex; align-items: center; gap: 7px; font-size: 18px; font-weight: 700; color: var(--ink); }
   .title-icon { display: flex; color: #5f813b; }
-  .collection .complete { display: flex; align-items: center; gap: 6px; color: #4d7c0f; }
-  .collection p { margin-top: 5px; font-size: 12px; line-height: 1.5; color: #64748b; }
+  .collection .complete { display: flex; align-items: center; gap: 6px; color: var(--green-ink); }
+  .collection p { margin-top: 5px; font-size: 12px; line-height: 1.5; color: var(--muted); }
   .collection-count { white-space: nowrap; text-align: right; }
-  .collection-count strong { font-size: 28px; font-weight: 700; color: #4d7c0f; }
-  .collection-count span { font-size: 14px; color: #64748b; }
-  .progress-label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #64748b; margin-bottom: 7px; }
+  .collection-count strong { font-size: 28px; font-weight: 700; color: var(--green-ink); }
+  .collection-count span { font-size: 14px; color: var(--muted); }
+  .progress-label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 7px; }
   .collection .progress-label { margin-top: 14px; font-size: 11px; }
-  progress { display: block; width: 100%; height: 5px; border: 0; border-radius: 10px; overflow: hidden; background: #e2e8f0; }
-  progress::-webkit-progress-bar { background: #e2e8f0; border-radius: 10px; }
-  progress::-webkit-progress-value { background: #84a653; border-radius: 10px; }
-  progress::-moz-progress-bar { background: #84a653; border-radius: 10px; }
+  progress { display: block; width: 100%; height: 5px; border: 0; border-radius: 10px; overflow: hidden; background: var(--line); }
+  progress::-webkit-progress-bar { background: var(--line); border-radius: 10px; }
+  progress::-webkit-progress-value { background: #8dcb3f; border-radius: 10px; }
+  progress::-moz-progress-bar { background: #8dcb3f; border-radius: 10px; }
   .collection-progress { height: 6px; }
-  .categories { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 14px 0 12px; }
-  .categories button { padding: 9px 0; border-radius: 7px; font-size: 12px; color: #64748b; white-space: nowrap; }
+  .categories { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 20px 0 15px; background: #e9efdf; padding: 5px; border: 1px solid #dce5ce; border-radius: 10px; }
+  .categories button { padding: 9px 0; border-radius: 7px; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .category-count { margin-left: 4px; font-size: 10px; opacity: .75; }
-  .categories button.selected { color: #4d7c0f; background: #edf4e3; font-weight: 600; }
+  .categories button.selected { color: var(--green-ink); background: #fff; font-weight: 800; box-shadow: 0 2px 0 #d8e2cb; }
   .tools { display: flex; flex-direction: column; gap: 10px; }
-  input, select { border: 1px solid #e2e8f0; border-radius: 8px; background: white; padding: 8px 10px; font-size: 12px; }
+  input, select { border: 1px solid var(--line); border-radius: 8px; background: white; padding: 8px 10px; font-size: 12px; }
   input { width: 100%; min-width: 0; }
   select { width: 100%; padding-right: 30px; }
   .filter-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .status-tabs { display: flex; align-items: center; gap: 3px; background: #eaf0e6; padding: 3px; border-radius: 8px; }
-  .status-tabs button { padding: 6px 10px; font-size: 12px; white-space: nowrap; color: #64748b; border-radius: 5px; }
-  .status-tabs button.selected { background: white; color: #3f6212; box-shadow: 0 1px 3px #33415515; }
+  .status-tabs button { padding: 6px 10px; font-size: 12px; white-space: nowrap; color: var(--muted); border-radius: 5px; }
+  .status-tabs button.selected { background: white; color: #3f6212; box-shadow: 0 1px 3px var(--ink)15; }
   .sort { width: 115px; flex-shrink: 0; }
   button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #65a30d; outline-offset: 3px; }
-  .result-count { margin: 12px 0 8px; color: #64748b; font-size: 11px; }
+  .result-count { margin: 12px 0 8px; color: var(--muted); font-size: 11px; }
   .cards { display: flex; flex-direction: column; gap: 8px; }
-  .card { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: white; }
-  .card.unlocked { border-color: #d4dfbf; background: #fcfdf9; }
-  .badge { width: 42px; height: 42px; border-radius: 10px; background: #f1f5f9; display: grid; place-items: center; color: #94a3b8; }
-  .unlocked .badge { background: #edf4e3; color: #5f813b; }
+  .card { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: var(--card-shadow); }
+  .card.unlocked { border-color: #d4dfbf; background: #fafff2; }
+  .badge { width: 42px; height: 42px; border-radius: 10px; background: #f4f5ee; display: grid; place-items: center; color: #aaa997; }
+  .unlocked .badge { background: linear-gradient(#eff8dd, #e5f3cb); color: #75a640; border: 1px solid #d4e5b6; }
   .card-content { min-width: 0; }
   .card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-  h2 { font-size: 14px; line-height: 1.5; font-weight: 600; color: #1e293b; }
-  .category-label { display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 400; color: #64748b; vertical-align: middle; }
-  .state { display: flex; align-items: center; gap: 3px; flex-shrink: 0; padding-top: 2px; font-size: 10px; color: #94a3b8; }
-  .unlocked .state { color: #4d7c0f; }
-  .condition { font-size: 12px; line-height: 1.7; color: #64748b; margin: 4px 0 8px; overflow-wrap: anywhere; }
+  h2 { font-size: 14px; line-height: 1.5; font-weight: 600; color: var(--ink); }
+  .category-label { display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 400; color: var(--muted); vertical-align: middle; }
+  .state { display: flex; align-items: center; gap: 3px; flex-shrink: 0; padding-top: 2px; font-size: 10px; color: #aaa997; }
+  .unlocked .state { color: var(--green-ink); }
+  .condition { font-size: 12px; line-height: 1.7; color: var(--muted); margin: 4px 0 8px; overflow-wrap: anywhere; }
   .card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 15px; }
   .card-bottom progress { flex: 1; min-width: 0; }
-  .item-progress { font-size: 11px; color: #64748b; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .date { color: #64748b; font-size: 10px; }
-  .empty { padding: 40px 16px; text-align: center; color: #64748b; font-size: 13px; }
-  .rules { font-size: 11px; line-height: 1.9; color: #64748b; margin: 18px 0 10px; }
+  .item-progress { font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .date { color: var(--muted); font-size: 10px; }
+  .empty { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+  .rules { font-size: 11px; line-height: 1.9; color: var(--muted); margin: 18px 0 10px; }
   .rules summary { cursor: pointer; }
   .rules p { margin-top: 8px; }
   .error { display: flex; justify-content: space-between; align-items: center; background: #fff1f2; padding: 12px; border-radius: 10px; margin-top: 16px; font-size: 13px; color: #be123c; }
   .error button { text-decoration: underline; }
+  @media (min-width: 740px) { .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } .category-label { display: none; } }
   @media (max-width: 560px) { .category-count { display: none; } .card { padding: 12px; gap: 10px; } }
   @media (max-width: 380px) { .status-tabs button { padding: 6px 8px; } .sort { width: 103px; } .category-label { display: none; } }
 </style>

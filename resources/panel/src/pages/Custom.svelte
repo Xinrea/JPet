@@ -1,12 +1,15 @@
 <script>
   import {
-    Label,
     ButtonGroup,
     Tooltip,
     Button,
     CheckboxButton,
   } from "flowbite-svelte";
   import PhotoIcon from "../assets/photo.svg";
+  import imgClothes1 from "../assets/c1.png";
+  import imgClothes2 from "../assets/c2.png";
+  import imgClothes3 from "../assets/c3.png";
+  const clothesImages = [imgClothes1, imgClothes2, imgClothes3];
 
   export let current = 0;
 
@@ -90,7 +93,9 @@
   updatePartStatus();
 </script>
 
-<Label class="mb-2">发型</Label>
+<div class="dress-layout">
+  <div class="dress-preview game-card"><span>今日造型</span><img src={clothesImages[current]} alt="轴伊的当前衣装" /><strong>轴伊 Joi</strong><p>用喜欢的装扮点亮日常</p></div>
+  <div class="dress-grid"><section class="dress-card game-card"><h2>发型</h2>
 <ButtonGroup>
   <CheckboxButton
     bind:checked={parts_status.ParamHair}
@@ -105,7 +110,8 @@
     }}>短发</CheckboxButton
   >
 </ButtonGroup>
-<Label class="mt-4 mb-2">头饰</Label>
+</section>
+<section class="dress-card game-card"><h2>头饰</h2>
 <ButtonGroup>
   <CheckboxButton
     bind:checked={parts_status.ParamLEars}
@@ -128,7 +134,8 @@
     >
   {/if}
 </ButtonGroup>
-<Label class="mt-4 mb-2">眼部</Label>
+</section>
+<section class="dress-card game-card"><h2>眼部</h2>
 <ButtonGroup>
   <CheckboxButton
     bind:checked={parts_status.ParamDizzy}
@@ -149,7 +156,8 @@
     }}>眼镜</CheckboxButton
   >
 </ButtonGroup>
-<Label class="mt-4 mb-2">脸颊</Label>
+</section>
+<section class="dress-card game-card"><h2>脸颊</h2>
 <ButtonGroup>
   <CheckboxButton
     bind:checked={parts_status.ParamSweat}
@@ -170,7 +178,8 @@
     }}>脸红</CheckboxButton
   >
 </ButtonGroup>
-<Label class="mt-4 mb-2">嘴型</Label>
+</section>
+<section class="dress-card game-card"><h2>嘴型</h2>
 <ButtonGroup>
   <CheckboxButton
     bind:checked={parts_status.ParamMouth1}
@@ -209,7 +218,8 @@
     }}>嘴6</CheckboxButton
   >
 </ButtonGroup>
-<Label class="mt-4 mb-2">下身</Label>
+</section>
+<section class="dress-card game-card"><h2>下身</h2>
 <ButtonGroup>
   <CheckboxButton
     bind:checked={parts_status.ParamLegs}
@@ -230,7 +240,8 @@
     }}>尾巴</CheckboxButton
   >
 </ButtonGroup>
-<Label class="mt-4 mb-2">其它</Label>
+</section>
+<section class="dress-card game-card"><h2>其它</h2>
 <ButtonGroup>
   <CheckboxButton
     bind:checked={parts_status.ParamGun}
@@ -240,11 +251,25 @@
   >
 </ButtonGroup>
 
-<div class="flex justify-center w-full mt-8 fixed bottom-8">
-  <Button on:click={snapshot}
-    ><img src={PhotoIcon} height="24px" width="24px" alt="" /><span class="ml-2"
-      >拍张照</span
-    ></Button
-  >
-  <Tooltip>获取一张 PNG 截图</Tooltip>
+</section></div>
 </div>
+<div class="dress-photo"><Button on:click={snapshot}><img src={PhotoIcon} height="20" width="20" alt="" /><span class="ml-2">拍张照</span></Button><span>保存一张当前角色的 PNG 截图</span></div>
+<style>
+  .dress-layout { display: grid; grid-template-columns: 185px minmax(0, 1fr); gap: 18px; align-items: start; }
+  .dress-preview { position: sticky; top: 0; display: flex; flex-direction: column; align-items: center; padding: 20px 10px; background: repeating-linear-gradient(135deg, #ffffff55 0 12px, transparent 12px 24px), linear-gradient(#f4fae8, #fff); }
+  .dress-preview > span { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #9cab7f; }
+  .dress-preview > img { width: 115px; height: auto; margin: 18px 0; filter: drop-shadow(0 5px 2px #adc79122); }
+  .dress-preview strong { font-size: 14px; font-weight: 900; color: var(--ink); }
+  .dress-preview p { font-size: 10px; color: var(--muted); margin-top: 8px; }
+  .dress-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .dress-card { padding: 16px; min-width: 0; }
+  .dress-card h2 { font-size: 13px; font-weight: 900; margin-bottom: 13px; padding-left: 9px; border-left: 3px solid #b7d986; }
+  .dress-card :global(div.inline-flex) { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dress-card :global(label) { border-radius: 7px !important; margin: 0 !important; padding: 7px 11px; font-size: 12px; }
+  .dress-card :global(label.text-primary-700) { background: #eff8e1; color: #619332; border-color: #aecd89; box-shadow: inset 0 0 0 1px #d8e8c0; }
+  .dress-card :global(label:has(input:focus-visible)) { outline: 3px solid #84bb49; outline-offset: 3px; }
+  .dress-photo { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 26px 0 8px; }
+  .dress-photo > span { font-size: 10px; color: var(--muted); }
+  @media (max-width: 680px) { .dress-layout { grid-template-columns: minmax(0, 1fr); } .dress-preview { position: relative; } .dress-preview > img { height: 165px; width: auto; } }
+  @media (max-width: 460px) { .dress-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+</style>

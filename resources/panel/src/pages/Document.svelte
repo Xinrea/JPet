@@ -34,8 +34,7 @@
   }
 </script>
 
-<div>
-  <p class="font-medium text-lg">版本信息</p>
+<div class="guide-grid"><section class="guide-card game-card"><h2>版本信息</h2>
   <p class="font-medium text-sm">当前版本：{updater.local_version || "加载中"}</p>
   <p class="font-medium text-sm">最新版本：{updater.latest_version || "待检查"}</p>
   <div class="update-controls">
@@ -55,29 +54,41 @@
   {#if updater.release_notes}
     <details class="mt-3 text-sm"><summary>更新说明</summary><p class="release-notes">{updater.release_notes}</p></details>
   {/if}
-  <p class="font-medium text-lg mt-4">关于<b>经验值</b></p>
+  </section>
+<section class="guide-card game-card"><h2>关于<b>经验值</b></h2>
   <p class="font-medium text-sm">经验获取：1 经验 = 挂机 1 分钟。</p>
   <p class="font-medium text-sm">随着智力的提升，每分钟获取的经验值会逐渐增加，最多 500 点。</p>
-  <p class="font-medium text-lg mt-4">关于<b>速度</b></p>
+  </section>
+<section class="guide-card game-card"><h2>关于<b>速度</b></h2>
   <p class="font-medium text-sm">速度会缩短任务完成所需的时间，进行中的任务不受速度变化的影响。</p>
-  <p class="font-medium text-lg mt-4">关于<b>任务队列</b></p>
+  </section>
+<section class="guide-card game-card"><h2>关于<b>任务队列</b></h2>
   <p class="font-medium text-sm">任务结束后自动结算并发放奖励，随后执行队列中的下一项。每个排队任务只执行一次，队列为空时停止。</p>
   <p class="font-medium text-sm">初始可排 2 个待执行任务，解锁第 3、4、5、6 个位置分别消耗 1、2、5、10 颗星星，解锁后永久保留。星星消耗后，成长加成按剩余星星计算。运行中的任务不占队列容量，队列可调整顺序、移除，并会在退出后保留。</p>
   <p class="font-medium text-sm">成功率为 0 的队首任务会等待属性提升，也可以将其他任务移到它前面。</p>
-  <p class="font-medium text-lg mt-4">关于<b>毅力</b></p>
+  </section>
+<section class="guide-card game-card"><h2>关于<b>毅力</b></h2>
   <p class="font-medium text-sm">毅力会影响任务的成功率，当毅力为 0 的情况下，任务成功率最高为 70%；天有不测风云，任务成功率不会超过 95%。</p>
-  <p class="font-medium text-lg mt-4">配置文件与游戏数据</p>
-  <p class="font-medium text-sm">本程序配置文件与游戏数据均在本地存储，位于用户文档目录下，点击 <a class="underline decoration-green-500 decoration-2 font-bold" href={"#"} on:click={()=>openDataFolder()}>此处</a> 打开目录。</p>
-  <p class="font-medium text-lg mt-4">动态与直播提醒</p>
+  </section>
+<section class="guide-card game-card"><h2>配置文件与游戏数据</h2>
+  <p class="font-medium text-sm">本地配置与缓存保存在用户数据目录，游戏进度由云端同步，点击 <a class="underline decoration-green-500 decoration-2 font-bold" href={"#"} on:click={()=>openDataFolder()}>此处</a> 打开目录。</p>
+  </section>
+<section class="guide-card game-card"><h2>动态与直播提醒</h2>
   <p class="font-medium text-sm">由于 B 站风控机制的限制，添加太多监控目标会导致状态更新不及时，请尽量登录使用。</p>
-  <p class="font-medium text-lg mt-4">轴芯等级</p>
-  <p class="font-medium text-sm">轴伊直播间粉丝勋章等级。</p>
-</div>
+  </section>
+<section class="guide-card game-card"><h2>轴芯等级</h2>
+  <p class="font-medium text-sm">轴伊直播间粉丝勋章等级。</p></section></div>
 
 <style>
+  .guide-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .guide-card { padding: 19px; min-width: 0; }
+  .guide-card:first-child { grid-column: 1 / -1; }
+  .guide-card h2 { color: var(--ink); font-size: 14px; font-weight: 900; padding-left: 10px; border-left: 3px solid #add47b; margin-bottom: 12px; }
+  .guide-card > p { font-size: 12px; font-weight: 400; color: var(--muted); line-height: 1.9; margin-top: 6px; }
+  @media (max-width: 560px) { .guide-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; } }
   .update-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
-  .update-controls button { padding: 7px 12px; border: 1px solid #d1d5db; border-radius: 7px; background: white; font-size: 13px; }
-  .update-controls button.primary { background: #4d7c0f; color: white; border-color: #4d7c0f; }
+  .update-controls button { padding: 7px 12px; border: 1px solid #deded1; border-radius: 8px; background: linear-gradient(#fff, #f6f6f1); box-shadow: 0 2px 0 #dcdfd3; color: var(--ink); font-size: 12px; font-weight: 800; }
+  .update-controls button.primary { background: var(--green-gradient); border-color: #72b72d; box-shadow: 0 3px 0 #579e22; color: white; border-color: #4d7c0f; }
   .update-controls button.release-link { padding-inline: 4px; border-color: transparent; background: transparent; text-decoration: underline; color: #4d7c0f; }
   .update-controls button:disabled { opacity: .5; cursor: not-allowed; }
   .update-progress { display: block; width: 100%; height: 8px; margin-top: 10px; accent-color: #4d7c0f; }
