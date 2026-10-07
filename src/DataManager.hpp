@@ -85,7 +85,7 @@ class DataManager {
   nlohmann::json GetCloudProfile();
   nlohmann::json GetCloudSnapshot();
   nlohmann::json ExportCloudBootstrap(const std::string& uid);
-  void ApplyCloudSnapshot(const nlohmann::json& snapshot);
+  bool ApplyCloudSnapshot(const nlohmann::json& snapshot);
   void PauseCloudView();
   void LoadCloudCache(const std::string& uid, const std::string& endpoint = "");
   float CloudTaskProgress();

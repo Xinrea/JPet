@@ -8,12 +8,32 @@ interface PlayerRequest {
   share?: boolean; touch_total?: number;
 }
 interface Result { status: number; body: Record<string, unknown> }
+interface SocketIdentity { uid: string; session: string }
+const MAX_REQUEST_BYTES = 128 * 1024;
+
+function validUid(uid: unknown): uid is string { return typeof uid === "string" && /^[1-9]\d{0,19}$/.test(uid); }
+function validate(value: unknown): PlayerRequest {
+  const p = value as PlayerRequest | null;
+  if (!p || typeof p !== "object" || !validUid(p.uid) ||
+    typeof p.name !== "string" || !p.name.trim() || p.name.length > 80 ||
+    typeof p.session_id !== "string" || !/^[\w-]{16,80}$/.test(p.session_id) ||
+    typeof p.request_id !== "string" || !/^[\w-]{16,80}$/.test(p.request_id)) throw new GameError("身份或会话格式无效", "BAD_REQUEST", 400);
+  return p;
+}
 
 export class Player extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS game (id INTEGER PRIMARY KEY CHECK (id = 1), state TEXT NOT NULL, rank_dirty INTEGER NOT NULL DEFAULT 1);
-      CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created_at INTEGER NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result TEXT NOT NULL, created_at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS requests_created_at ON requests(created_at, id);
+      CREATE TABLE IF NOT EXISTS request_history (id INTEGER PRIMARY KEY CHECK (id = 1), count INTEGER NOT NULL);`);
+    // Count existing history only once when upgrading an older object.
+    ctx.storage.transactionSync(() => {
+      if (!ctx.storage.sql.exec("SELECT count FROM request_history WHERE id=1").toArray().length) {
+        ctx.storage.sql.exec("INSERT INTO request_history(id, count) SELECT 1, COUNT(*) FROM requests");
+      }
+    });
   }
 
   private read(): GameState | null {
@@ -29,7 +49,82 @@ export class Player extends DurableObject<Env> {
     this.ctx.storage.sql.exec("INSERT INTO game(id, state, rank_dirty) VALUES(1, ?, 1) ON CONFLICT(id) DO UPDATE SET state=excluded.state, rank_dirty=MAX(game.rank_dirty, ?)", JSON.stringify(state), +dirty);
   }
 
+  async fetch(request: Request): Promise<Response> {
+    const uid = new URL(request.url).searchParams.get("uid");
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket" || !validUid(uid)) return json({ error: "无效 WebSocket 请求" }, 400);
+    const [client, server] = Object.values(new WebSocketPair());
+    server.serializeAttachment({ uid, session: "" } satisfies SocketIdentity);
+    this.ctx.acceptWebSocket(server);
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    let requestId = "";
+    try {
+      if (typeof message !== "string") { ws.close(1003, "JSON text required"); return; }
+      if (new TextEncoder().encode(message).length > MAX_REQUEST_BYTES) { ws.close(1009, "Message too large"); return; }
+      let envelope: PlayerRequest & { type: Kind };
+      try { envelope = JSON.parse(message); } catch { throw new GameError("无效 JSON", "BAD_REQUEST", 400); }
+      const payload = validate(envelope);
+      requestId = payload.request_id;
+      const kind = envelope.type;
+      if (!["open", "heartbeat", "command", "close"].includes(kind)) throw new GameError("无效消息类型", "BAD_REQUEST", 400);
+      if (kind === "command" && (!payload.action || typeof payload.action !== "object" || typeof payload.action.type !== "string")) throw new GameError("缺少操作指令", "BAD_REQUEST", 400);
+      const identity = ws.deserializeAttachment() as SocketIdentity;
+      if (payload.uid !== identity.uid) throw new GameError("连接账号不匹配", "BAD_REQUEST", 400);
+      if (identity.session && identity.session !== payload.session_id) throw new GameError("连接会话不匹配", "SESSION_REPLACED", 409);
+      const result = await this.execute(kind, payload);
+      if (kind === "open" && result.status === 200) {
+        // Attachments survive hibernation. Only an opened session receives pushes.
+        identity.session = payload.session_id;
+        ws.serializeAttachment(identity);
+        for (const other of this.ctx.getWebSockets()) {
+          if (other !== ws && (other.deserializeAttachment() as SocketIdentity).session === identity.session) other.close(1000, "Reconnected");
+        }
+      }
+      ws.send(JSON.stringify({ type: "response", request_id: requestId, status: result.status, ...result.body }));
+      const acknowledged = result.body.snapshot as ReturnType<typeof snapshot> | undefined;
+      if (acknowledged) this.broadcast(ws, acknowledged.revision);
+      if (kind === "close" && result.status === 200) ws.close(1000, "Session closed");
+    } catch (error) {
+      const known = error instanceof GameError;
+      if (!known) console.error(JSON.stringify({ message: "WebSocket request failed", error: String(error) }));
+      try { ws.send(JSON.stringify({ type: "response", request_id: requestId, status: known ? error.status : 503,
+        error: known ? error.message : "云端服务暂时不可用，请稍后重试", code: known ? error.code : "SERVER_ERROR" })); } catch { /* Disconnected; request can be replayed. */ }
+    }
+  }
+
+  webSocketClose(ws: WebSocket, code: number): void {
+    // An abrupt transport loss keeps the last lease, allowing uncertain commands
+    // to be replayed on reconnect. A normal client exit sends an explicit close.
+    ws.close(code === 1005 || code === 1006 ? 1000 : code);
+  }
+  webSocketError(ws: WebSocket): void { ws.close(1011, "Connection error"); }
+
+  private broadcast(source?: WebSocket, acknowledgedRevision?: number): void {
+    const state = this.read();
+    if (!state) return;
+    const message = JSON.stringify({ type: "snapshot", snapshot: snapshot(state, Date.now()) });
+    for (const ws of this.ctx.getWebSockets()) {
+      const identity = ws.deserializeAttachment() as SocketIdentity;
+      if (!identity.session) continue;
+      if (ws === source && state.revision === acknowledgedRevision && identity.session === state.session) continue;
+      try {
+        if (state.session && identity.session !== state.session) {
+          ws.send(JSON.stringify({ type: "session", code: "SESSION_REPLACED", error: "会话已被其他设备接管" }));
+          ws.close(4001, "Session replaced");
+        } else ws.send(message);
+      } catch { /* A dead socket must not prevent a committed game update. */ }
+    }
+  }
+
   async run(kind: Kind, payload: PlayerRequest): Promise<string> {
+    const result = await this.execute(kind, payload);
+    if (result.body.snapshot) this.broadcast();
+    return JSON.stringify(result);
+  }
+
+  private async execute(kind: Kind, payload: PlayerRequest): Promise<Result> {
     const now = Date.now();
     const fingerprint = JSON.stringify([kind, payload.session_id, payload.action || null]);
     const result = this.ctx.storage.transactionSync((): Result => {
@@ -81,13 +176,16 @@ export class Player extends DurableObject<Env> {
       this.write(state);
       this.ctx.storage.sql.exec("INSERT INTO requests(id, fingerprint, result, created_at) VALUES(?, ?, ?, ?)", payload.request_id, fingerprint, JSON.stringify({ status, body }), now);
       // Keep a bounded replay window, including rejected business operations.
-      this.ctx.storage.sql.exec("DELETE FROM requests WHERE created_at < ?", now - 7 * 86400_000);
-      this.ctx.storage.sql.exec("DELETE FROM requests WHERE id IN (SELECT id FROM requests ORDER BY created_at DESC LIMIT -1 OFFSET 4096)");
+      const expired = this.ctx.storage.sql.exec("DELETE FROM requests WHERE created_at < ? RETURNING id", now - 7 * 86400_000).toArray().length;
+      const count = this.ctx.storage.sql.exec<{ count: number }>("SELECT count FROM request_history WHERE id=1").one().count + 1 - expired;
+      const excess = Math.max(0, count - 4096);
+      if (excess) this.ctx.storage.sql.exec("DELETE FROM requests WHERE id IN (SELECT id FROM requests ORDER BY created_at ASC, id ASC LIMIT ?)", excess);
+      this.ctx.storage.sql.exec("UPDATE request_history SET count=? WHERE id=1", count - excess);
       return { status, body: { ...body, snapshot: snapshot(state, now) } };
     });
     await this.schedule();
     await this.publishRank();
-    return JSON.stringify(result);
+    return result;
   }
 
   private async schedule(): Promise<void> {
@@ -95,6 +193,7 @@ export class Player extends DurableObject<Env> {
     if (!state) return;
     const now = Date.now();
     let due = state.session && state.leaseUntil > now ? state.leaseUntil : Infinity;
+    if (due !== Infinity) due = Math.min(due, state.clockAt + 60_000 - state.expProgressMs);
     if (due !== Infinity && state.current) due = Math.min(due, state.clockAt + state.current.durationMs - state.current.elapsedMs);
     const dirty = this.ctx.storage.sql.exec<{ rank_dirty: number }>("SELECT rank_dirty FROM game WHERE id=1").one().rank_dirty;
     if (dirty) due = Math.min(due, now + 30_000);
@@ -128,6 +227,7 @@ export class Player extends DurableObject<Env> {
     });
     // Persist retry scheduling before doing external I/O.
     await this.schedule();
+    this.broadcast();
     await this.publishRank();
     await this.schedule();
   }
@@ -144,18 +244,14 @@ async function body(request: Request): Promise<PlayerRequest> {
     const part = await reader.read();
     if (part.done) break;
     size += part.value.length;
-    if (size > 128 * 1024) { await reader.cancel(); throw new GameError("请求内容过大", "BODY_TOO_LARGE", 413); }
+    if (size > MAX_REQUEST_BYTES) { await reader.cancel(); throw new GameError("请求内容过大", "BODY_TOO_LARGE", 413); }
     chunks.push(part.value);
   }
   const data = new Uint8Array(size); let offset = 0;
   for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
   let value: PlayerRequest;
   try { value = JSON.parse(new TextDecoder().decode(data)); } catch { throw new GameError("无效 JSON", "BAD_REQUEST", 400); }
-  if (!value || typeof value !== "object" || typeof value.uid !== "string" || !/^[1-9]\d{0,19}$/.test(value.uid) ||
-    typeof value.name !== "string" || !value.name.trim() || value.name.length > 80 ||
-    typeof value.session_id !== "string" || !/^[\w-]{16,80}$/.test(value.session_id) ||
-    typeof value.request_id !== "string" || !/^[\w-]{16,80}$/.test(value.request_id)) throw new GameError("身份或会话格式无效", "BAD_REQUEST", 400);
-  return value;
+  return validate(value);
 }
 
 export default {
@@ -163,6 +259,12 @@ export default {
     try {
       const url = new URL(request.url);
       if (request.method === "GET" && url.pathname === "/health") return json({ ok: true, protocol: 1 });
+      if (request.method === "GET" && url.pathname === "/v1/socket") {
+        const uid = url.searchParams.get("uid");
+        if (!validUid(uid)) throw new GameError("账号格式无效", "BAD_REQUEST", 400);
+        if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return json({ error: "需要 WebSocket 升级" }, 426);
+        return env.PLAYERS.getByName(uid).fetch(request);
+      }
       if (request.method === "GET" && url.pathname === "/v1/rank") {
         const metric = url.searchParams.get("metric") || "starcnt";
         if (!["starcnt", "exp", "attr"].includes(metric)) throw new GameError("无效榜单", "BAD_REQUEST", 400);

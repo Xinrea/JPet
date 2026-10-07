@@ -3,7 +3,6 @@
 #include "DataManager.hpp"
 #include "BuffManager.hpp"
 #include "PanelServer.hpp"
-#include <httplib.h>
 #include <openssl/rand.h>
 
 namespace {
@@ -26,13 +25,14 @@ void CloudGame::Start() {
 }
 void CloudGame::Stop() {
   if (!running_.exchange(false)) return;
-  wake_.notify_all();
+  { std::lock_guard<std::mutex> lock(waitMutex_); wake_.notify_all(); }
   if (worker_.joinable()) worker_.join();
   std::lock_guard<std::mutex> lock(networkMutex_);
   Close();
   SetStatus(false, "已暂停");
 }
 void CloudGame::Wake(bool takeOver) {
+  std::lock_guard<std::mutex> lock(waitMutex_);
   if (takeOver) takeOver_ = true;
   requested_ = true;
   wake_.notify_all();
@@ -52,7 +52,7 @@ bool CloudGame::Online() { std::lock_guard<std::mutex> lock(statusMutex_); retur
 nlohmann::json CloudGame::Status() {
   std::lock_guard<std::mutex> lock(statusMutex_);
   return {{"configured", true}, {"online", ready_}, {"error", error_},
-    {"heartbeat_seconds", 15}, {"lease_seconds", 30}};
+    {"transport", "websocket"}, {"heartbeat_seconds", 15}, {"lease_seconds", 30}};
 }
 void CloudGame::Touch() { if (Online()) ++touches_; }
 nlohmann::json CloudGame::Payload() {
@@ -63,33 +63,69 @@ nlohmann::json CloudGame::Payload() {
 std::string CloudGame::Request(const std::string& kind, const nlohmann::json& payload, bool* received) {
   if (received) *received = false;
   try {
-    const auto split = url_.find('/', url_.find("://") + 3);
-    const auto origin = split == std::string::npos ? url_ : url_.substr(0, split);
-    auto prefix = split == std::string::npos ? std::string{} : url_.substr(split);
-    while (!prefix.empty() && prefix.back() == '/') prefix.pop_back();
-    httplib::Client client(origin);
-    client.set_connection_timeout(2, 0);
-    client.set_read_timeout(4, 0);
-    client.set_write_timeout(2, 0);
-    client.enable_server_certificate_verification(true);
-    auto response = client.Post(prefix + "/v1/" + kind, payload.dump(), "application/json");
-    if (!response) return "云端连接中断，游戏已暂停，正在重试";
-    auto data = nlohmann::json::parse(response->body);
-    if (data.contains("snapshot")) {
-      const auto& state = data.at("snapshot");
-      if (state.value("uid", std::string{}) != uid_) return "云端返回了不匹配的存档";
-      DataManager::GetInstance()->ApplyCloudSnapshot(state);
+    if (!socket_) {
+      auto endpoint = url_;
+      while (!endpoint.empty() && endpoint.back() == '/') endpoint.pop_back();
+      if (endpoint.rfind("https://", 0) == 0) endpoint.replace(0, 8, "wss://");
+      else if (endpoint.rfind("http://", 0) == 0) endpoint.replace(0, 7, "ws://");
+      else throw std::runtime_error("Invalid cloud service URL");
+      socket_ = CreateCloudSocket();
+      socket_->Connect(endpoint + "/v1/socket?uid=" + uid_, [this] {
+        std::lock_guard<std::mutex> lock(waitMutex_);
+        incoming_ = true; wake_.notify_all();
+      });
     }
-    if (response->status >= 500) return data.value("error", std::string{"云端服务暂时不可用"});
-    if (received) *received = true;
-    if (response->status >= 200 && response->status < 300) return {};
-    const auto code = data.value("code", std::string{});
-    if (code == "SESSION_REPLACED" || code == "SESSION_REQUIRED") opened_ = false;
-    if (code == "SESSION_REPLACED" || code == "SESSION_BUSY") SetStatus(false, data.value("error", std::string{"会话已暂停"}));
-    return data.value("error", std::string{"云端服务暂时不可用"});
+    auto message = payload; message["type"] = kind;
+    if (!socket_->Send(message.dump())) {
+      DropConnection("云端消息发送失败，游戏已暂停，正在重试");
+      return "云端消息发送失败，游戏已暂停，正在重试";
+    }
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+    while (std::chrono::steady_clock::now() < deadline) {
+      CloudSocketEvent event;
+      if (!socket_->Receive(event, std::chrono::milliseconds(100))) continue;
+      if (event.type == CloudSocketEvent::Type::Error) { DropConnection(event.text); return event.text; }
+      const auto data = nlohmann::json::parse(event.text);
+      ApplyMessage(data);
+      if (data.value("type", std::string{}) != "response" || data.value("request_id", std::string{}) != payload.at("request_id").get<std::string>()) continue;
+      const int status = data.at("status").get<int>();
+      if (status >= 500) return data.value("error", std::string{"云端服务暂时不可用"});
+      if (received) *received = true;
+      if (status >= 200 && status < 300) return {};
+      const auto code = data.value("code", std::string{});
+      if (code == "SESSION_REPLACED" || code == "SESSION_REQUIRED" || code == "SESSION_EXPIRED") opened_ = false;
+      if (code == "SESSION_REPLACED" || code == "SESSION_BUSY") SetStatus(false, data.value("error", std::string{"会话已暂停"}));
+      return data.value("error", std::string{"云端服务暂时不可用"});
+    }
+    DropConnection("云端响应超时，游戏已暂停，正在重试");
+    return "云端响应超时，游戏已暂停，正在重试";
   } catch (const std::exception& e) {
     LAppPal::PrintLog(LogLevel::Warn, "[CloudGame]Request failed: %s", e.what());
+    DropConnection("云端响应不可用，游戏已暂停，正在重试");
     return "云端响应不可用，游戏已暂停，正在重试";
+  }
+}
+void CloudGame::DropConnection(const std::string& error) {
+  if (socket_) { socket_->Close(); socket_.reset(); }
+  opened_ = false;
+  SetStatus(false, error);
+}
+void CloudGame::ApplyMessage(const nlohmann::json& message) {
+  if (message.contains("snapshot")) {
+    const auto& state = message.at("snapshot");
+    if (state.value("uid", std::string{}) != uid_) throw std::runtime_error("Cloud snapshot UID mismatch");
+    if (DataManager::GetInstance()->ApplyCloudSnapshot(state) && !state.value("online", false)) SetStatus(false, "游戏已暂停，正在重新连接");
+  }
+  if (message.value("type", std::string{}) == "session") {
+    opened_ = false;
+    SetStatus(false, message.value("error", std::string{"会话已暂停"}));
+  }
+}
+void CloudGame::DrainMessages() {
+  CloudSocketEvent event;
+  while (socket_ && socket_->Receive(event, std::chrono::milliseconds(0))) {
+    if (event.type == CloudSocketEvent::Type::Error) { DropConnection(event.text); break; }
+    ApplyMessage(nlohmann::json::parse(event.text));
   }
 }
 bool CloudGame::ReplayPending() {
@@ -102,10 +138,12 @@ bool CloudGame::ReplayPending() {
   return true;
 }
 void CloudGame::Close() {
-  if (!opened_ || url_.empty()) return;
-  // Settle a possible committed command before sending the terminal close.
-  ReplayPending();
-  Request("close", Payload());
+  if (opened_ && !url_.empty()) {
+    // Settle a possible committed command before sending the terminal close.
+    ReplayPending();
+    if (opened_) Request("close", Payload());
+  }
+  if (socket_) { socket_->Close(); socket_.reset(); }
   opened_ = false;
 }
 void CloudGame::Disconnect() {
@@ -145,14 +183,23 @@ void CloudGame::Sync() {
   SetStatus(true, "");
 }
 void CloudGame::Run() {
+  auto nextSync = std::chrono::steady_clock::now();
   while (running_) {
-    requested_ = false;
-    try { Sync(); } catch (const std::exception& e) {
+    try {
+      if (requested_.exchange(false) || std::chrono::steady_clock::now() >= nextSync) {
+        Sync();
+        nextSync = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+      }
+      std::lock_guard<std::mutex> lock(networkMutex_);
+      incoming_ = false;
+      DrainMessages();
+    } catch (const std::exception& e) {
       LAppPal::PrintLog(LogLevel::Warn, "[CloudGame]Sync failed: %s", e.what());
-      SetStatus(false, "同步失败，游戏已暂停，正在重试");
+      std::lock_guard<std::mutex> lock(networkMutex_);
+      DropConnection("同步失败，游戏已暂停，正在重试");
     }
     std::unique_lock<std::mutex> lock(waitMutex_);
-    wake_.wait_for(lock, std::chrono::seconds(15), [&] { return !running_ || requested_; });
+    wake_.wait_until(lock, nextSync, [&] { return !running_ || requested_ || incoming_; });
   }
 }
 std::string CloudGame::Command(const nlohmann::json& action) {

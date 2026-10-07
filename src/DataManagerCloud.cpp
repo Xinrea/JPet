@@ -48,13 +48,16 @@ void DataManager::LoadCloudCache(const std::string& uid, const std::string& endp
   cloudReceivedAt = std::chrono::steady_clock::now();
 }
 
-void DataManager::ApplyCloudSnapshot(const nlohmann::json& snapshot) {
+bool DataManager::ApplyCloudSnapshot(const nlohmann::json& snapshot) {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
   if (snapshot.at("schema").get<int>() != 1) throw std::runtime_error("Unsupported cloud protocol");
   const auto uid = snapshot.at("uid").get<std::string>();
-  if (uid != GetWithDefault("uid", std::string{})) return;
+  if (uid != GetWithDefault("uid", std::string{})) return false;
   const auto revision = snapshot.at("revision").get<int64_t>();
-  if (cloudSnapshot.is_object() && cloudSnapshot.value("uid", std::string{}) == uid && revision < cloudSnapshot.value("revision", int64_t{0})) return;
+  if (cloudSnapshot.is_object() && cloudSnapshot.value("uid", std::string{}) == uid && revision < cloudSnapshot.value("revision", int64_t{0})) return false;
+  if (cloudSnapshot.is_object() && revision == cloudSnapshot.value("revision", int64_t{0}) &&
+      snapshot.contains("server_time") && cloudSnapshot.contains("server_time") &&
+      snapshot.at("server_time").get<int64_t>() <= cloudSnapshot.at("server_time").get<int64_t>()) return false;
   const auto& profile = snapshot.at("profile");
   const auto& clothes = profile.at("clothes");
   const auto& attributes = profile.at("attributes");
@@ -100,6 +103,7 @@ void DataManager::ApplyCloudSnapshot(const nlohmann::json& snapshot) {
 #endif
   }
   PanelServer::GetInstance()->Notify("UPDATE");
+  return true;
 }
 
 nlohmann::json DataManager::GetCloudSnapshot() {

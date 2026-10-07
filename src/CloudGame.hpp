@@ -5,6 +5,7 @@
 #include <mutex>
 #include <thread>
 #include <nlohmann/json.hpp>
+#include "CloudSocket.hpp"
 
 // Only this transport writes cloud snapshots. All gameplay mutations are commands.
 class CloudGame {
@@ -27,11 +28,13 @@ class CloudGame {
   std::condition_variable wake_;
   std::thread worker_;
   std::atomic<bool> running_{false}, requested_{false}, takeOver_{false};
+  std::atomic<bool> incoming_{false};
   std::atomic<int> touches_{0};
   std::string uid_, name_, session_, url_;
   bool opened_ = false, ready_ = false;
   std::string error_;
   nlohmann::json pending_;
+  std::unique_ptr<CloudSocket> socket_;
   void Run();
   void Sync();
   void Close();
@@ -39,4 +42,7 @@ class CloudGame {
   std::string Request(const std::string& kind, const nlohmann::json& payload, bool* received = nullptr);
   void SetStatus(bool ready, const std::string& error);
   bool ReplayPending();
+  void DropConnection(const std::string& error);
+  void ApplyMessage(const nlohmann::json& message);
+  void DrainMessages();
 };

@@ -98,7 +98,8 @@ BUILD_TYPE=Debug ./build-scripts/build_and_run_macos.sh
 ```
 
 游戏规则和存档已迁移到 Cloudflare。构建时从 `cloud/wrangler.jsonc` 读取生产域名，
-Windows 和 macOS 发布版默认连接 `https://s.jpet.powerlive.io`，登录账号后自动同步。
+Windows 和 macOS 发布版默认通过 `wss://s.jpet.powerlive.io/v1/socket` 长连接，登录账号后自动同步；
+任务完成、经验结算和会话接管会由云端主动推送。
 未连接时显示缓存，任务与挂机经验保持暂停。服务开发、部署和协议见
 [云端游戏服务说明](doc/cloud-game.md)。
 

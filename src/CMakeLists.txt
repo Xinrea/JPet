@@ -52,6 +52,8 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerCloud.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/CloudGame.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/CloudGame.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/CloudSocket.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/CloudSocketInbox.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerTasks.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerAchievements.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Achievements.hpp
@@ -74,9 +76,9 @@ target_sources(${APP_NAME}
 
 if(APPLE)
   target_sources(${APP_NAME} PRIVATE
-    mainMac.mm PlatformMac.mm MacDesktop.mm MacWebViews.mm AudioManagerMac.mm VoicePlatformMac.mm VoiceDesktopMac.mm)
+    mainMac.mm PlatformMac.mm MacDesktop.mm MacWebViews.mm AudioManagerMac.mm VoicePlatformMac.mm VoiceDesktopMac.mm CloudSocketMac.mm)
 else()
   target_sources(${APP_NAME} PRIVATE
     main.cpp PlatformWin.cpp AudioManager.cpp WinToastEventHandler.cpp
-    GamePanel.cpp CookieWindow.cpp JPet.rc VoicePlatformWin.cpp VoiceDesktopWin.cpp)
+    GamePanel.cpp CookieWindow.cpp JPet.rc VoicePlatformWin.cpp VoiceDesktopWin.cpp CloudSocketWin.cpp)
 endif()

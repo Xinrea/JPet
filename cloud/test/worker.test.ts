@@ -21,6 +21,43 @@ async function seed(uid: string, change: (s: GameState) => void) {
 }
 
 describe("Worker and durable storage", () => {
+  it("upgrades existing replay history and prunes it with bounded indexed reads", async () => {
+    const p = payload("30001");
+    await request("open", p);
+    const now = Date.now();
+    await runInDurableObject(env.PLAYERS.getByName(p.uid), (_instance, ctx) => {
+      ctx.storage.transactionSync(() => {
+        ctx.storage.sql.exec("DELETE FROM requests");
+        for (let i = 0; i < 4096; i++) {
+          ctx.storage.sql.exec("INSERT INTO requests VALUES(?, ?, ?, ?)", `history-${i}`, "seed", '{"status":200,"body":{}}', now - 10000 + i);
+        }
+        ctx.storage.sql.exec("INSERT INTO requests VALUES('expired', 'seed', '{}', ?)", now - 8 * 86400_000);
+        ctx.storage.sql.exec("DROP TABLE request_history");
+        ctx.storage.sql.exec("DROP INDEX requests_created_at");
+      });
+    });
+    await evictDurableObject(env.PLAYERS.getByName(p.uid));
+    const beat = { ...p, request_id: crypto.randomUUID() };
+    expect((await request("heartbeat", beat)).status).toBe(200);
+    await runInDurableObject(env.PLAYERS.getByName(p.uid), (_instance, ctx) => {
+      expect(ctx.storage.sql.exec<{ count: number }>("SELECT count FROM request_history").one().count).toBe(4096);
+      expect(ctx.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM requests").one().count).toBe(4096);
+      expect(ctx.storage.sql.exec("SELECT id FROM requests WHERE id IN ('expired', 'history-0')").toArray()).toHaveLength(0);
+      expect(ctx.storage.sql.exec("SELECT id FROM requests WHERE id=?", beat.request_id).toArray()).toHaveLength(1);
+      const expiry = ctx.storage.sql.exec("DELETE FROM requests WHERE created_at < ? RETURNING id", now - 7 * 86400_000);
+      expect(expiry.toArray()).toHaveLength(0);
+      expect(expiry.rowsRead).toBeLessThan(10);
+      const oldest = ctx.storage.sql.exec("SELECT id FROM requests ORDER BY created_at ASC, id ASC LIMIT 1");
+      expect(oldest.toArray()).toHaveLength(1);
+      expect(oldest.rowsRead).toBeLessThan(10);
+      console.log(JSON.stringify({ cleanupExpiryRowsRead: expiry.rowsRead, cleanupOldestRowsRead: oldest.rowsRead }));
+    });
+    await evictDurableObject(env.PLAYERS.getByName(p.uid));
+    expect((await request("heartbeat", beat)).status).toBe(200);
+    await runInDurableObject(env.PLAYERS.getByName(p.uid), (_instance, ctx) => {
+      expect(ctx.storage.sql.exec<{ count: number }>("SELECT count FROM request_history").one().count).toBe(4096);
+    });
+  });
   it("opens isolated per-player saves and imports only on first creation", async () => {
     const p = payload("10001");
     const first = await request("open", { ...p, bootstrap: { profile: { attributes: { exp: 100 } } } });
