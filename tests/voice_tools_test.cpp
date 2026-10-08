@@ -156,7 +156,7 @@ int main() {
     first.Arguments();
     first.session.Receive({{"type", "response.output_item.done"}, {"response_id", "r1"}, {"item", first.Item()}});
     Check(first.calls.empty(), "tool waits for complete response before execution");
-    first.Done({first.Item()});
+    first.Done(json::array({first.Item()}));
     Check(first.calls.size() == 1 && first.session.Busy() && first.state == "tool", "three duplicate delivery forms execute once");
     Check(first.history.Snapshot()["list"][0]["state"] == "pending", "tool invocation does not finish the history turn");
     first.session.BeginInput();
@@ -200,7 +200,7 @@ int main() {
     stale.Arguments("old", "old-response"); stale.Done();
     Check(stale.calls.empty(), "other response cannot enqueue tools");
     SessionFixture fallback;
-    fallback.Done({fallback.Item()});
+    fallback.Done(json::array({fallback.Item()}));
     Check(fallback.calls.size() == 1, "response.done output fallback works without argument event");
     SessionFixture reset;
     reset.Arguments(); reset.Done(); reset.session.Reset(); reset.session.CompleteTool("c1", {{"ok", true}});
