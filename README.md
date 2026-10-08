@@ -1,197 +1,132 @@
-# JPet
+# JPet · 桌面宠物轴伊
 
-## 自动构建与更新
+![GitHub Tag](https://img.shields.io/github/v/tag/Xinrea/JPet)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Xinrea/JPet/release-build.yml)
+![GitHub last commit](https://img.shields.io/github/last-commit/Xinrea/JPet)
 
-推送版本 tag（如 `3.0.0` 或 `v3.0.0`）会触发
-[发布工作流](.github/workflows/release-build.yml)，构建 Windows x64 和 macOS ARM64。
-两个平台都通过构建与更新测试后，工作流自动创建 GitHub Release，上传：
+让轴伊 Joi 陪你度过桌面上的每一天。JPet 是一款基于 Live2D 的桌面宠物，支持桌面互动、养成任务、衣装搭配和千问实时语音对话，运行于 Windows x64 和 macOS Apple Silicon。
 
-- `jpet-<版本>-windows-x64.zip`：完整便携包，也是 Windows 自动更新包。
-- `jpet-<版本>-windows-x64-setup.exe`：当前用户安装程序。
-- `jpet-<版本>-macos-arm64.zip`：包含 `JPet.app` 的完整应用包。
-- `SHA256SUMS`：下载文件的 SHA-256 校验值。
+[下载发行版](https://github.com/Xinrea/JPet/releases) · [项目网站](https://pet.vjoi.cn) · [语音使用指南](doc/voice-chat.md) · [开发与发布说明](doc/development.md)
+
+## 功能
+
+- **桌面陪伴**：Live2D 角色、点击互动、声音反馈和显示设置。
+- **成长养成**：积攒经验，提升速度、耐力、力量、毅力和智力，升星获得成长加成。
+- **任务与成就**：安排任务队列，使用星星扩容；收集 50 个成就，查看进度、解锁条件和日期。
+- **衣装搭配**：解锁衣装，调整发型、头饰、表情和配件，保存角色 PNG 截图。
+- **实时语音**：按住快捷键与轴伊聊天，通过语音查询成长、安排任务、搜索网页和查看桌面；在面板中回看对话记录。
+- **云端存档**：登录 B 站账号后同步成长与任务，可选择参与排行榜。
+
+## 界面预览
+
+当前面板包含总览、任务、成就、装扮、设置、对话记录、排行榜和说明八个页面。
+
+![JPet 总览：经验、星级、成长属性与衣装](screenshots/overview.jpg)
+
+| 成就收藏 | 装扮设置 |
+| --- | --- |
+| ![成就分类、搜索、筛选与解锁进度](screenshots/achievements.jpg) | ![发型、表情、配件与角色拍照](screenshots/customization.jpg) |
+
+## 下载与使用
+
+从 [GitHub Releases](https://github.com/Xinrea/JPet/releases) 选择对应平台的文件：
+
+| 平台 | 下载文件 | 使用方式 |
+| --- | --- | --- |
+| Windows 10 及以上 · x64 | `jpet-<版本>-windows-x64-setup.exe` | 运行安装程序，安装到当前用户目录 |
+| Windows 10 及以上 · x64 | `jpet-<版本>-windows-x64.zip` | 完整解压便携包后运行 `JPet.exe` |
+| macOS 11 及以上 · Apple Silicon | `jpet-<版本>-macos-arm64.zip` | 解压，将 `JPet.app` 移到可写的应用目录后运行 |
+
+macOS 发布包采用 ad-hoc 签名，未进行 Apple Developer ID 签名和公证。
+当前 macOS 版本的透明区域仍会接收鼠标事件。
+
+### 开始陪伴
+
+1. 启动 JPet，从 Windows 托盘或 macOS 菜单栏的 JPet 菜单打开「设置」。
+2. 在面板「设置」中登录 B 站账号，等待状态栏显示云端已连接。
+3. 在「总览」查看成长，在「任务」安排训练，在「装扮」调整喜欢的造型。
+
+成长与任务按有效在线时间推进。未登录、断网或退出时暂停，重新连接后继续，离线时间不补算。
+同一账号同时只能由一个会话推进游戏，切换设备时可在设置中接管会话。详见[云端游戏说明](doc/cloud-game.md)。
+
+### 语音对话
+
+在「设置 → 语音对话」保存北京地域的百炼 API Key 和对应业务空间 ID。
+Mac 按住 **Option**、Windows 按住 **Ctrl** 说话，松开结束录音；回复时再次说话可打断回复。
+首次使用需允许麦克风权限，查看桌面还需要录屏权限。
+
+API Key 保存在 macOS 钥匙串或 Windows 凭据管理器，不上传到 JPet 云端。
+最近 200 轮对话文字保存在本机。配置、语音工具和数据处理细节见[语音对话说明](doc/voice-chat.md)。
+
+### 应用更新
+
+启动时检查正式发行版，之后每 6 小时检查一次，也可在「说明」页面手动检查。
+下载完成并通过 SHA-256 与文件大小校验后，点击「重启并更新」安装；本地用户数据会保留。
+预发布版本不会被自动更新选中。
+
+## 开发构建
+
+客户端使用 C++17、CMake 和 Live2D Cubism，面板使用 Svelte + Vite，云端游戏服务使用 Cloudflare Workers。
+前端构建产物会随应用一起打包，需先构建面板再配置 CMake。
+
+先克隆仓库并初始化子模块：
 
 ```sh
-git tag 3.0.0
-git push origin 3.0.0
+git clone --recurse-submodules https://github.com/Xinrea/JPet.git
+cd JPet
 ```
 
-也可以在 Actions 中手动运行工作流，输入 `3.0.0` 进行构建测试；手动运行只上传
-Actions artifacts。`3.0.0-rc.1` 等预发布 tag 会创建 prerelease，程序仅自动检查正式 Release。
-版本号带 beta、alpha、rc 等预发布后缀的 Release 即使未标记为 prerelease，也会被跳过；
-若最新 Release 为测试版，程序会继续查找正式版本。
+已有 checkout 可运行 `git submodule update --init --recursive`。
 
-启动时会在后台检查 [GitHub Releases](https://github.com/Xinrea/JPet/releases)，之后每 6 小时
-自动检查一次。设置面板的「说明」页面支持手动检查、查看更新说明、下载和「重启并更新」。
-更新包会通过 HTTPS 下载，并验证 GitHub Release asset 的 SHA-256 和文件大小。
-下载、校验及解压完成后，点击重启才会安装；安装助手等待旧进程正常退出，替换应用后
-重新启动。替换或启动失败会尝试恢复旧版本，本地用户数据保留在原数据目录中。
+### macOS · Apple Silicon
 
-macOS 应先将 `JPet.app` 移到可写的应用目录再运行。发布包使用 ad-hoc 签名，未进行
-Apple Developer ID 签名和公证。Windows 旧版若安装在 Program Files，更新时会请求 UAC 授权。
-失败信息会保存在用户数据目录的 `updates/last-error.txt`，Mac 助手详细日志位于相应下载目录。
-
-更新校验与 Mac 安装助手回归检查：
-
-```sh
-cmake -S . -B build/macos-arm64 -DJPET_BUILD_UPDATE_TESTS=ON
-cmake --build build/macos-arm64
-ctest --test-dir build/macos-arm64 --output-on-failure
-python3 tests/update_helper_test.py
-```
-
-## macOS（Apple Silicon）
-
-项目现在支持使用 Apple Silicon（`arm64`）的 macOS。macOS 版本使用 GLFW/Cocoa
-透明窗口、WKWebView 设置和登录窗口、AVFoundation 音频以及菜单栏状态项；透明区域
-暂时仍属于 JPet 窗口并会接收鼠标事件。
-
-依赖准备和构建：
-
-```sh
-cd resources/panel
-npm ci --legacy-peer-deps
-npm run build
-cd ../..
-
-./build/vcpkg/bootstrap-vcpkg.sh -disableMetrics
-./build/vcpkg/vcpkg install --triplet arm64-osx
-
-cmake -S . -B build/macos-arm64 -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DCMAKE_TOOLCHAIN_FILE=build/vcpkg/scripts/buildsystems/vcpkg.cmake \
-  -DVCPKG_TARGET_TRIPLET=arm64-osx
-cmake --build build/macos-arm64
-open build/macos-arm64/bin/JPet/JPet.app
-```
-
-也可以使用一键脚本完成前端构建、CMake 配置、C++ 依赖安装、编译和启动：
-
-```sh
-./build-scripts/build_and_run_macos.sh
-```
-
-如果是第一次在本机设置开发环境，可以先运行准备脚本。它会自动检查工具、
-下载并初始化 vcpkg、安装前端依赖和 C++ 依赖：
+准备 Xcode Command Line Tools、CMake 3.27+、Ninja 和 Node.js 22+，然后运行：
 
 ```sh
 ./.agents/prepare
 ./build-scripts/build_and_run_macos.sh
 ```
 
-`.agents/linked` 会将 `build/vcpkg` 链接到本机的共享目录，因此多个 Delta
-工作区不会重复保存 vcpkg。首次使用时如果共享目录还没有 vcpkg，准备脚本会自动
-下载并初始化；之后的工作区会复用同一份 checkout。脚本默认使用
-`build/vcpkg` 和 `build/vcpkg_installed`。如果 vcpkg 位于其他位置，可以通过环境变量覆盖：
+准备脚本会初始化 vcpkg 并安装前端与 C++ 依赖；构建脚本默认编译 Release 并启动应用。
+调试构建使用 `BUILD_TYPE=Debug ./build-scripts/build_and_run_macos.sh`。
 
-```sh
-VCPKG_DIR=/path/to/vcpkg \
-VCPKG_INSTALLED_DIR=/path/to/vcpkg_installed \
-./build-scripts/build_and_run_macos.sh
-```
+### Windows · x64
 
-默认构建 Release 版本；开发调试时可以使用：
-
-```sh
-BUILD_TYPE=Debug ./build-scripts/build_and_run_macos.sh
-```
-
-游戏规则和存档已迁移到 Cloudflare。构建时从 `cloud/wrangler.jsonc` 读取生产域名，
-Windows 和 macOS 发布版默认通过 `wss://s.jpet.powerlive.io/v1/socket` 长连接，登录账号后自动同步；
-任务完成、经验结算和会话接管会由云端主动推送。
-未连接时显示缓存，任务与挂机经验保持暂停。服务开发、部署和协议见
-[云端游戏服务说明](doc/cloud-game.md)。
-
-云端任务与存储回归检查：
-
-```sh
-cd cloud
-npm ci
-npm run types
-npm test
-cd ..
-python3 tests/cloud_config_test.py
-bash build-scripts/test_cloud_sync_macos.sh
-```
-
-Apple 已弃用 OpenGL，但当前 Live2D OpenGL 渲染路径仍可运行；后续如需长期支持，
-应另行评估 Cubism Metal 渲染后端。macOS 的登录页会使用系统持久化的 WebKit
-Cookie 存储。
-
-![GitHub Tag](https://img.shields.io/github/v/tag/Xinrea/JPet)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Xinrea/JPet/release-build.yml)
-![GitHub last commit](https://img.shields.io/github/last-commit/Xinrea/JPet)
-
-
-## 桌面宠物轴伊
-
-支持千问实时语音对话：在设置中保存北京地域的百炼 API Key 和业务空间 ID，
-按住 Option（Mac）或 Ctrl（Windows）说话，松开发送；再次按住可打断回复。
-详情见 [语音对话说明](doc/voice-chat.md)。
-
-更新发布网站: [https://pet.vjoi.cn](https://pet.vjoi.cn)
-
-![img](screenshots/jpet.png)
-
-## Live2d 模型
-
-模型绘制：轴伊 Joi
-
-\*该 Live2d 模型不可用于其他用途
-
-## 编译
-
-> Windows 构建需要 Win10 及以上；Mac ARM 构建方式见上文。
-
-该项目需要的部分依赖已经置于`thirdparty`下，包括：
-
-- GLFW
-- FMOD CORE
-- CubismSdkForNative
-
-其余依赖定义在 vcpkg.json 中。
-
-执行以下命令进行构建并运行：
+准备 Visual Studio 2022 的 C++ 桌面开发组件、Windows SDK、CMake 3.27+、Node.js 22+ 和 vcpkg。
+在仓库根目录的 PowerShell 中执行，按本机位置修改 `$vcpkgDir`：
 
 ```powershell
-git submodule update --init
-.\build-scripts\build_and_run.ps1
+Push-Location resources/panel
+npm ci --legacy-peer-deps
+npm run build
+Pop-Location
+
+$vcpkgDir = "D:/vcpkg"
+cmake -S . -B build/windows-x64 -G "Visual Studio 17 2022" -A x64 `
+  -DCMAKE_BUILD_TYPE=Release `
+  "-DCMAKE_TOOLCHAIN_FILE=$vcpkgDir/scripts/buildsystems/vcpkg.cmake" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake --build build/windows-x64 --config Release --parallel
+& ./build/windows-x64/bin/JPet/Release/JPet.exe
 ```
 
-详细的构建过程可见 `build_and_run.ps1` 的内容，主要分为三步：
+完整依赖说明、macOS 手动构建、回归检查和自动发布流程见[开发与发布说明](doc/development.md)。
 
-1. 前端构建（GamePanel 使用 Webview2 加载页面作为窗口内容）
-2. CMake 配置
-3. 构建以及运行
+## 相关文档
 
-## 游戏设计
+| 文档 | 内容 |
+| --- | --- |
+| [语音对话](doc/voice-chat.md) | 配置、快捷键、对话记录、语音工具与诊断 |
+| [云端游戏服务](doc/cloud-game.md) | 在线规则、存档迁移、任务队列、协议与部署 |
+| [成就系统](doc/achievements.md) | 50 个成就及解锁条件 |
+| [数值设计草案](doc/attributes.md) | 属性与成长机制的设计参考；实际规则以程序为准 |
+| [开发与发布](doc/development.md) | 本地构建、验证、发布包与更新排查 |
 
-- [数值设计文档](doc/attributes.md)
-- [成就系统：50 个成就与解锁条件](doc/achievements.md)
-- [Cloudflare 云端游戏服务与部署](doc/cloud-game.md)
+## 模型与许可
 
-面板新增「成就」页面，展示收集比例、分类、解锁条件、单项进度和解锁日期，
-支持搜索、状态筛选和排序。成就会自动解锁并提示；升星或消耗属性不会撤销成就。
-旧存档按现存记录补发可确认的成就，陪伴时长和互动次数从更新后开始累计。
+模型绘制：**轴伊 Joi**。本项目中的 Live2D 模型不可用于其他用途。
 
-成就条件与持久化检查（使用独立临时存档）：
+项目代码采用 [MIT License](LICENSE)；Live2D 组件与 Core 分别适用以下许可，模型和第三方组件不由项目 MIT 许可授权：
 
-```sh
-bash build-scripts/test_achievements_macos.sh
-bash build-scripts/test_task_queue_macos.sh
-```
-
-## Live2D Open Software License
-
-Live2D Cubism Components is available under Live2D Open Software License.
-
-- [Live2D Open Software License Agreement](https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html)
-- [Live2D Open Software 使用許諾契約書](https://www.live2d.com/eula/live2d-open-software-license-agreement_jp.html)
-
-## Live2D Proprietary Software License
-
-Live2D Cubism Core is available under Live2D Proprietary Software License.
-
-- [Live2D Proprietary Software License Agreement](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html)
-- [Live2D Proprietary Software 使用許諾契約書](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_jp.html)
+- Cubism Components：[Live2D Open Software License](https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html)（[日文](https://www.live2d.com/eula/live2d-open-software-license-agreement_jp.html)）。
+- Cubism Core：[Live2D Proprietary Software License](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html)（[日文](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_jp.html)）。
