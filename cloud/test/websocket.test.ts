@@ -84,7 +84,7 @@ describe("Game WebSocket", () => {
     await socket.request("open", p);
     await evictDurableObject(env.PLAYERS.getByName(p.uid));
     expect((await socket.request("heartbeat", { ...p, request_id: crypto.randomUUID() })).status).toBe(200);
-    expect((await socket.request("command", { ...p, uid: "50005", request_id: crypto.randomUUID(), action: { type: "reset" } })).status).toBe(400);
+    expect((await socket.request("command", { ...p, uid: "50005", request_id: crypto.randomUUID(), action: { type: "share", enabled: true } })).status).toBe(400);
     expect((await socket.request("heartbeat", { ...p, session_id: crypto.randomUUID(), request_id: crypto.randomUUID() })).code).toBe("SESSION_REPLACED");
     await runInDurableObject(env.PLAYERS.getByName(p.uid), (_instance, ctx) => {
       expect(ctx.getWebSockets()[0].deserializeAttachment()).toEqual({ uid: p.uid, session: p.session_id });
@@ -97,8 +97,34 @@ describe("Game WebSocket", () => {
     expect((await newSocket.request("open", second)).code).toBe("SESSION_BUSY");
     expect((await newSocket.request("open", { ...second, request_id: crypto.randomUUID(), take_over: true })).status).toBe(200);
     expect((await oldSocket.next(frame => frame.type === "session")).code).toBe("SESSION_REPLACED");
-    const response = await worker.fetch(new Request("https://jpet.test/v1/command", { method: "POST", body: JSON.stringify({ ...first, request_id: crypto.randomUUID(), action: { type: "reset" } }) }), env);
+    const response = await worker.fetch(new Request("https://jpet.test/v1/command", { method: "POST", body: JSON.stringify({ ...first, request_id: crypto.randomUUID(), action: { type: "share", enabled: true } }) }), env);
     expect(response.status).toBe(409);
+  });
+  it("rejects WebSocket reset and retains progress when replayed after hibernation", async () => {
+    const p = payload("50011"), socket = await connect(p.uid);
+    await socket.request("open", { ...p, share: true, bootstrap: {
+      profile: { starcnt: 3, attributes: { exp: 888, speed: 60, endurance: 60, strength: 60, will: 60, intellect: 60 },
+        clothes: { current: 1, unlock: [true, true, true] } },
+    } });
+    await socket.request("command", { ...p, request_id: crypto.randomUUID(), action: { type: "queue.upgrade" } });
+    await socket.request("command", { ...p, request_id: crypto.randomUUID(), action: { type: "task.start", id: 2 } });
+    const queued = await socket.request("command", { ...p, request_id: crypto.randomUUID(), action: { type: "task.queue", id: 4 } });
+    expect(queued.status).toBe(200);
+    const before = queued.snapshot!;
+    const reset = { ...p, request_id: crypto.randomUUID(), action: { type: "reset" } };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const rejected = await socket.request("command", reset);
+      expect(rejected.status).toBe(400); expect(rejected.code).toBe("INVALID_ACTION");
+      const after = rejected.snapshot!;
+      expect(after.profile.attributes).toEqual(before.profile.attributes);
+      expect(after.profile.starcnt).toBe(before.profile.starcnt);
+      expect(after.profile.clothes).toEqual(before.profile.clothes);
+      expect(after.tasks).toMatchObject({ queue: before.tasks.queue, queue_capacity: 3,
+        queue_upgrade: before.tasks.queue_upgrade, current: { id: 2, start_time: before.tasks.current!.start_time } });
+      expect(after.tasks.current!.elapsed_seconds).toBeGreaterThanOrEqual(before.tasks.current!.elapsed_seconds);
+      expect(after.save).toEqual(before.save); expect(after.share).toBe(true);
+      if (attempt === 0) await evictDurableObject(env.PLAYERS.getByName(p.uid));
+    }
   });
   it("keeps the last lease after transport loss and pushes pause on expiry", async () => {
     const p = payload("50007"), socket = await connect(p.uid);

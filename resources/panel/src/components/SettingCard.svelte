@@ -3,10 +3,9 @@
   export let title;
   export let description = "";
   export let icon = "settings";
-  export let tone = "green";
 </script>
 
-<section class="setting-card game-card" class:danger-card={tone === "danger"}>
+<section class="setting-card game-card">
   <div class="setting-card-heading">
     <span class="setting-card-icon"><UiIcon name={icon} size={20} /></span>
     <div><h2>{title}</h2>{#if description}<p>{description}</p>{/if}</div>

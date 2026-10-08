@@ -192,12 +192,34 @@ describe("Worker and durable storage", () => {
     expect(withdrawn.data.snapshot.share).toBe(false);
     expect(await env.RANK.prepare("SELECT visible FROM rankboard WHERE uid=?").bind(p.uid).first("visible")).toBe(0);
   });
-  it("clears cloud state on reset and never re-imports a stale local bootstrap", async () => {
-    const p = payload("10008"); await request("open", { ...p, bootstrap: { profile: { attributes: { exp: 888 } } } });
-    const reset = await request("command", { ...p, request_id: crypto.randomUUID(), action: { type: "reset" } });
-    expect(reset.data.snapshot.profile.attributes.exp).toBe(0);
-    const retry = await request("open", { ...p, request_id: crypto.randomUUID(), bootstrap: { profile: { attributes: { exp: 888 } } } });
-    expect(retry.data.snapshot.profile.attributes.exp).toBe(0);
+  it("rejects HTTP reset and preserves the save across retries and eviction", async () => {
+    const p = payload("10008");
+    await request("open", { ...p, share: true, bootstrap: {
+      profile: { starcnt: 3, attributes: { exp: 888, speed: 60, endurance: 60, strength: 60, will: 60, intellect: 60 },
+        clothes: { current: 1, unlock: [true, true, true] } },
+      tasks: [{ id: 2, status: 1, cost_snapshot: 200, elapsed_seconds: 25 }, { id: 8, status: 3 }],
+      queue: [{ task_id: 4 }], history: [{ id: 1, success: true, end_time: 1 }],
+    } });
+    const upgraded = await request("command", { ...p, request_id: crypto.randomUUID(), action: { type: "queue.upgrade" } });
+    expect(upgraded.status).toBe(200);
+    const before = upgraded.data.snapshot;
+    const reset = { ...p, request_id: crypto.randomUUID(), action: { type: "reset" } };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const rejected = await request("command", reset);
+      expect(rejected.status).toBe(400); expect(rejected.data.code).toBe("INVALID_ACTION");
+      await evictDurableObject(env.PLAYERS.getByName(p.uid));
+    }
+    const reopened = await request("open", { ...p, request_id: crypto.randomUUID(), bootstrap: { profile: { attributes: { exp: 0 } } } });
+    expect(reopened.status).toBe(200);
+    const after = reopened.data.snapshot;
+    expect(after.profile.attributes).toEqual(before.profile.attributes);
+    expect(after.profile.starcnt).toBe(before.profile.starcnt);
+    expect(after.profile.clothes).toEqual(before.profile.clothes);
+    expect(after.tasks).toMatchObject({ queue: before.tasks.queue, history: before.tasks.history,
+      list: before.tasks.list, queue_capacity: 3, queue_upgrade: before.tasks.queue_upgrade,
+      current: { id: 2, cost: 200, start_time: before.tasks.current.start_time } });
+    expect(after.tasks.current.elapsed_seconds).toBeGreaterThanOrEqual(before.tasks.current.elapsed_seconds);
+    expect(after.save).toEqual(before.save); expect(after.share).toBe(true);
   });
   it("rejects malformed requests and oversized payloads", async () => {
     expect((await request("open", { ...payload(), uid: "../123" })).status).toBe(400);

@@ -32,16 +32,8 @@ bool DataManager::init() {
     }
   }
 
-  // check reset marker
-  const std::wstring markerPath = LAppDefine::documentPath + L"/.reset";
   const std::wstring oldDataPath = LAppDefine::documentPath + L"/jpet.dat";
   const std::wstring dataPath = LAppDefine::documentPath + L"/GameData";
-  if (IsResetMarked()) {
-    std::filesystem::remove(std::filesystem::path(markerPath));
-    std::filesystem::remove(std::filesystem::path(oldDataPath));
-    std::filesystem::remove_all(std::filesystem::path(dataPath));
-    LAppPal::PrintLog(LogLevel::Info, "[DataManager]Data reseted due to marker");
-  }
   // initialize game data
   bool firstData = !std::filesystem::exists(std::filesystem::path(dataPath)) && !std::filesystem::exists(std::filesystem::path(oldDataPath));
   gameData = std::make_shared<GameData>(oldDataPath);
@@ -381,26 +373,4 @@ std::vector<int> DataManager::TaskStatus(int id) {
   status_vec.push_back(status);
   status_vec.push_back(cost_snapshot);
   return status_vec;
-}
-
-void DataManager::SetResetMark() {
-  const std::wstring markerPath = LAppDefine::documentPath + L"/.reset";
-  // check file existence
-  if (!std::filesystem::exists(std::filesystem::path(markerPath))) {
-    // create a new config file
-    std::ofstream file{std::filesystem::path(markerPath)};
-    if (!file.is_open()) {
-      LAppPal::PrintLog(LogLevel::Error, L"[DataManager]Failed to create marker file: %ls", markerPath.c_str());
-      return;
-    }
-    file.close();
-    // initialize with default values
-    LAppPal::PrintLog(LogLevel::Debug, L"[DataManager]Created marker file: %ls", markerPath.c_str());
-  }
-}
-
-bool DataManager::IsResetMarked() {
-  const std::wstring markerPath = LAppDefine::documentPath + L"/.reset";
-  // check file existence
-  return std::filesystem::exists(std::filesystem::path(markerPath));
 }

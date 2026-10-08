@@ -189,14 +189,13 @@ describe("server-owned progression", () => {
     expect(s.queue).toHaveLength(1);
     advance(s, epoch + 3600_000); expect(s.current!.elapsedMs).toBe(25_000);
   });
-  it("resets gameplay but retains session identity and ranking consent", () => {
+  it("rejects reset without changing any gameplay or session state", () => {
     const s = trained(); s.share = true; s.stars = 1;
     command(s, { type: "queue.upgrade" }, epoch);
     command(s, { type: "task.start", id: 2 }, epoch);
-    command(s, { type: "reset" }, epoch);
-    expect(s.current).toBeNull(); expect(s.attributes.speed).toBe(2); expect(s.share).toBe(true);
-    expect(s.session).toBe("session-1234567890"); expect(snapshot(s, epoch).achievements.unlocked).toBe(0);
-    expect(s.queueUpgrades).toBe(0); expect(snapshot(s, epoch).tasks.queue_capacity).toBe(2);
-    expect(snapshot(s, epoch).tasks.queue_upgrade.cost).toBe(1);
+    command(s, { type: "task.queue", id: 4 }, epoch);
+    const before = structuredClone(s);
+    expect(() => command(s, { type: "reset" }, epoch)).toThrow("未知操作");
+    expect(s).toEqual(before);
   });
 });

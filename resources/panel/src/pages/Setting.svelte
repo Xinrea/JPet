@@ -10,7 +10,6 @@
     { id: "sound", label: "声音", icon: "sound" },
     { id: "notify", label: "通知", icon: "bell" },
     { id: "shortcut", label: "轮盘", icon: "wheel" },
-    { id: "data", label: "数据", icon: "data" },
   ];
   import QRCode from "qrcode";
   import fanAvatar from "../assets/fan.png";
@@ -261,16 +260,6 @@
         _uid = "";
         console.log(_watch_list);
       });
-  }
-  let _reset = false;
-  let resetModal = false;
-  async function resetData() {
-    try {
-      const response = await fetch("/api/data/reset", { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "重置失败");
-      _reset = true;
-    } catch (failure) { cloudError = failure.message; }
   }
   // acount
   export let account_info = null;
@@ -531,13 +520,6 @@
     </SettingCard>
   </div>
 
-  <div class:section-hidden={category !== "data"}>
-    <SettingCard title="游戏数据" description="管理当前账号的成长存档" icon="data" tone="danger">
-      <div class="data-warning"><strong>重置云端游戏数据</strong><p>清空当前账号的云端成长、任务和成就，立即生效。请确认后再操作。</p></div>
-      <Button color="red" size="sm" disabled={_reset} on:click={() => resetModal = true}>{_reset ? "已重置" : "重置云端游戏数据"}</Button>
-      {#if cloudError}<p class="feedback error" role="alert">{cloudError}</p>{/if}
-    </SettingCard>
-  </div>
 </div>
 
 <Modal title="Bilibili 扫码登录" bind:open={account_modal} on:open={doLogin} size="sm">
@@ -545,8 +527,4 @@
     {#if qr_status}<p role="status">{qr_status}</p>{/if}
     {#if qr_error}<p class="feedback error" role="alert">{qr_error}</p><Button on:click={doLogin}>重试</Button>{:else if qr_status === "二维码已过期，请点击重试"}<Button on:click={doLogin}>重新生成二维码</Button>{/if}
   </div>
-</Modal>
-<Modal title="确认重置" bind:open={resetModal} size="xs" autoclose>
-  <p class="mb-5 text-sm leading-relaxed text-gray-600">将清空当前账号的云端成长、任务和成就，确认重置吗？</p>
-  <div class="setting-actions"><Button color="red" on:click={resetData}>确认重置</Button><Button color="alternative">取消</Button></div>
 </Modal>

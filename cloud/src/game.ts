@@ -287,12 +287,6 @@ export function command(state: GameState, action: Command, now: number): void {
     }
     case "touch": recordTouches(state, number(action.count, 1, 1000), now); break;
     case "share": state.share = action.enabled === true; break;
-    case "reset": {
-      const fresh = createGame(state.uid, state.name, now);
-      const { session, leaseUntil, revision, share, buffs, medal, touchTotal } = state;
-      Object.assign(state, fresh, { session, leaseUntil, revision, share, buffs, medal, touchTotal });
-      break;
-    }
     default: throw new GameError("未知操作", "INVALID_ACTION", 400);
   }
   observe(state, now);

@@ -120,12 +120,6 @@ kbd { font-family: inherit; font-size: 10px; font-weight: 700; padding: 2px 5px;
 .shortcut-target { display: flex; gap: 9px; min-width: 0; }
 .shortcut-target > div { min-width: 0; flex: 1; }
 .shortcut-target > button { padding: 8px 10px; }
-.danger-card .setting-card-heading { background: linear-gradient(110deg, #fff0f4, #fffaf9); border-bottom-color: #f3e4e7; }
-.danger-card .setting-card-icon { color: #cc7e93; border-color: #f0dce4; box-shadow: 0 2px 0 #f2dfe4; }
-.danger-card .heading-stripes { background: repeating-linear-gradient(90deg, #edd0d9 0 4px, transparent 4px 7px); }
-.data-warning { padding: 16px 0 3px; }
-.data-warning strong { font-size: 13px; }
-.data-warning p { color: var(--muted); font-size: 12px; line-height: 1.9; margin-top: 7px; }
 .qr-login { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; color: var(--muted); font-size: 13px; }
 .qr-frame { padding: 10px; border: 1px solid #dce6ce; border-radius: 14px; background: #f8fbf1; }
 .qr-frame canvas { max-width: 100%; }

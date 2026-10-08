@@ -387,11 +387,6 @@ void PanelServer::doServe() {
       res.set_content("{\"error\":\"成就加载失败，请重试\"}", "application/json");
     }
   });
-  server->Post("/api/data/reset", [](const httplib::Request &req, httplib::Response &res) {
-    auto error = CloudGame::GetInstance()->Command({{"type", "reset"}});
-    res.status = error.empty() ? 200 : 409;
-    res.set_content(error.empty() ? "{\"success\":true}" : nlohmann::json{{"error", error}}.dump(), "application/json");
-  });
   server->Get("/api/parts", [](const httplib::Request& req, httplib::Response& res){
     const map<string, bool> part_status = PartStateManager::GetInstance()->GetStatus();
     auto json = nlohmann::json::object();
