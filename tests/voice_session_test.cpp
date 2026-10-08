@@ -35,10 +35,16 @@ struct Fixture {
     for (const auto& event : sent) if (event["type"] == type) ++count;
     return count;
   }
-  void Turn() {
+  void Speech(const std::string& item = "u1") {
+    session.Receive({{"type", "input_audio_buffer.speech_started"}, {"item_id", item}});
+    session.Receive({{"type", "input_audio_buffer.speech_stopped"}, {"item_id", item}});
+    session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", item}});
+  }
+  void Turn(const std::string& item = "u1") {
     session.BeginInput();
     session.AppendInput(std::string(6400, '\0'));
     session.EndInput();
+    Speech(item);
   }
   void Reply(const std::string& id = "r1", const std::string& item = "i1") {
     session.Receive({{"type", "response.created"}, {"response", {{"id", id}}}});
@@ -73,50 +79,72 @@ int main() {
     first.session.EndInput();
     Check(first.sent.empty(), "no audio before session is configured");
     first.Connect();
-    Check(first.Count("session.update") == 1 && first.Count("input_audio_buffer.commit") == 1 && first.Count("response.create") == 1, "first turn survives release before connect");
+    Check(first.Count("session.update") == 1 && first.Count("input_audio_buffer.commit") == 0 && first.Count("response.create") == 0, "release before connection uploads audio without forcing a reply");
     const auto setup = first.sent.front()["session"];
-    Check(setup["turn_detection"].is_null() && setup["audio"]["input"]["format"]["sample_rate"] == 16000 &&
-        setup["audio"]["output"]["format"]["sample_rate"] == 24000, "manual PCM protocol");
+    Check(setup["turn_detection"]["type"] == "semantic_vad" && setup["turn_detection"]["silence_duration_ms"] == Voice::InputSilenceMs && setup["audio"]["input"]["format"]["sample_rate"] == 16000 &&
+        setup["audio"]["output"]["format"]["sample_rate"] == 24000, "server semantic VAD and PCM protocol");
     Check(setup["input_audio_transcription"]["model"] == "qwen3-asr-flash-realtime", "user speech transcription is enabled");
-    Check(first.history.Snapshot()["list"].size() == 1, "a submitted turn creates one history entry");
+    Check(first.history.Snapshot()["list"].empty(), "upload alone does not create a history entry");
     std::string uploaded;
     for (const auto& event : first.sent) if (event["type"] == "input_audio_buffer.append") uploaded += Voice::DecodeBase64(event["audio"]);
-    Check(uploaded == std::string(6400, '\x12'), "all first-turn samples are uploaded in order");
+    Check(uploaded == std::string(6400, '\x12') + std::string(Voice::InputTailBytes, '\0'), "all first-turn samples are uploaded in order");
+    const auto firstChunks = first.Count("input_audio_buffer.append");
     first.session.AppendInput(std::string(6400, '\x34'));
-    Check(first.Count("input_audio_buffer.append") == 2, "microphone is gated after release");
+    Check(first.Count("input_audio_buffer.append") == firstChunks, "microphone is gated after release");
 
     Fixture tap;
     tap.Connect();
     tap.session.BeginInput();
     tap.session.AppendInput(std::string(640, '\0'));
     tap.session.EndInput();
-    Check(tap.Count("response.create") == 0 && tap.Count("input_audio_buffer.clear") == 1, "short accidental tap does not submit a turn");
+    Check(tap.Count("response.create") == 0 && tap.Count("input_audio_buffer.clear") == 0, "short audio is left to server VAD without clearing its buffer");
     Check(tap.history.Snapshot()["list"].empty(), "accidental taps do not create history");
+
+    first.Speech(); first.Reply();
+    Check(first.history.Snapshot()["list"].size() == 1, "server commit starts one history turn");
+
+    Fixture buffered;
+    buffered.session.BeginInput(); buffered.session.AppendInput(std::string(6400, '\1')); buffered.session.EndInput();
+    buffered.session.BeginInput(); buffered.session.AppendInput(std::string(6400, '\2')); buffered.session.EndInput();
+    buffered.Connect();
+    std::string queued;
+    for (const auto& event : buffered.sent) if (event["type"] == "input_audio_buffer.append") queued += Voice::DecodeBase64(event["audio"]);
+    Check(queued == std::string(6400, '\1') + std::string(Voice::InputTailBytes, '\0') +
+        std::string(6400, '\2') + std::string(Voice::InputTailBytes, '\0'), "repeated presses during connection preserve all samples");
 
     Fixture interrupt;
     interrupt.Connect(); interrupt.Turn(); interrupt.Reply();
     interrupt.session.Receive({{"type", "response.audio.delta"}, {"delta", Voice::EncodeBase64(std::string(4800, '\0'))}});
+    const auto sentBeforePress = interrupt.sent.size();
     interrupt.session.BeginInput();
-    Check(!interrupt.playing && interrupt.Count("response.cancel") == 1, "press stops speaker and cancels generation");
-    Check(interrupt.sent.back()["type"] == "response.cancel" && interrupt.sent.back().size() == 2,
-        "cancellation uses the documented Qwen event fields");
-    const auto played = interrupt.played;
+    Check(interrupt.playing && interrupt.sent.size() == sentBeforePress, "press leaves playback and generation untouched");
     interrupt.session.Receive({{"type", "response.audio.delta"}, {"delta", Voice::EncodeBase64(std::string(4800, '\1'))}});
-    Check(interrupt.played == played, "late canceled speech is not played");
-    interrupt.session.AppendInput(std::string(6400, '\0'));
-    interrupt.session.EndInput();
-    Check(interrupt.Count("response.create") == 1, "new response waits for old cancellation acknowledgement");
-    interrupt.session.Receive({{"type", "response.done"}, {"response", {{"id", "r1"}, {"status", "cancelled"}}}});
-    Check(interrupt.Count("response.create") == 2 && interrupt.Count("input_audio_buffer.commit") == 2, "pending next turn starts exactly once");
-    Check(interrupt.Count("session.update") == 1, "successive turns reuse the conversation");
+    interrupt.session.Receive({{"type", "response.audio_transcript.delta"}, {"delta", "继续回复"}});
+    Check(interrupt.played.size() == 9600 && interrupt.transcript == "继续回复", "reply streams while the microphone is open");
+    interrupt.session.AppendInput(std::string(640, '\0')); interrupt.session.EndInput();
+    Check(interrupt.playing && interrupt.Count("response.cancel") == 0 && interrupt.Count("response.create") == 0 &&
+        interrupt.Count("input_audio_buffer.commit") == 0 && interrupt.Count("input_audio_buffer.clear") == 0,
+        "silent press and release do not affect the reply or force a new turn");
+    Check(interrupt.history.Snapshot()["list"].size() == 1 && interrupt.history.Snapshot()["list"][0]["state"] == "pending",
+        "silent key press does not interrupt history");
+    interrupt.session.BeginInput(); interrupt.session.AppendInput(std::string(6400, '\2'));
+    interrupt.session.Receive({{"type", "input_audio_buffer.speech_started"}, {"item_id", "u2"}});
+    Check(!interrupt.playing && interrupt.Count("response.cancel") == 0, "server speech event stops playback without client cancellation");
+    const auto played = interrupt.played;
+    interrupt.session.Receive({{"type", "response.audio.delta"}, {"response_id", "r1"}, {"delta", Voice::EncodeBase64(std::string(4800, '\1'))}});
+    Check(interrupt.played == played, "audio from a server-interrupted reply is ignored");
+    interrupt.session.Receive({{"type", "input_audio_buffer.speech_stopped"}, {"item_id", "u2"}});
+    interrupt.session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", "u2"}});
     interrupt.Reply("r2", "i2");
-    interrupt.session.Receive({{"type", "response.audio.delta"}, {"response_id", "r1"},
-        {"delta", Voice::EncodeBase64(std::string(4800, '\1'))}});
-    Check(interrupt.played == played, "old response audio cannot enter a new reply");
-    interrupt.session.Receive({{"type", "response.done"}, {"response", {{"id", "r1"}, {"status", "completed"}}}});
-    Check(interrupt.session.Busy(), "old response completion cannot finish a new reply");
+    interrupt.session.Receive({{"type", "response.done"}, {"response", {{"id", "r1"}, {"status", "cancelled"}}}});
+    Check(interrupt.session.Busy() && interrupt.Count("session.update") == 1, "late old completion cannot finish the new server response");
     interrupt.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r2"}, {"transcript", "你好"}});
     Check(interrupt.transcript == "你好", "complete response transcript is visible");
+    interrupt.session.Receive({{"type", "response.done"}, {"response", {{"id", "r2"}, {"status", "completed"}}}});
+    Check(interrupt.session.Recording() && interrupt.history.Snapshot()["list"][0]["state"] == "completed", "server can complete a turn while the key is held");
+    interrupt.Speech("u3"); interrupt.Reply("r3", "i3"); interrupt.session.EndInput();
+    Check(interrupt.history.Snapshot()["list"].size() == 3 && interrupt.Count("response.create") == 0,
+        "multiple server turns can share one key hold");
 
     Fixture conversation;
     conversation.Connect(); conversation.Turn(); conversation.Reply();
@@ -125,6 +153,7 @@ int main() {
     Check(conversation.history.Snapshot()["list"][0]["assistant"] == "第一轮回复", "streaming reply is visible in history");
     conversation.session.BeginInput();
     conversation.session.AppendInput(std::string(6400, '\0')); conversation.session.EndInput();
+    conversation.Speech("u2");
     conversation.session.Receive({{"type", "response.done"}, {"response", {{"id", "r1"}, {"status", "cancelled"}}}});
     conversation.Reply("r2", "i2");
     conversation.session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", "u2"}});
@@ -140,7 +169,12 @@ int main() {
     Check(history[1]["user"] == "第一轮问题" && history[1]["assistant"] == "第一轮回复" &&
         history[1]["state"] == "interrupted", "late ASR and canceled replies cannot corrupt adjacent rounds");
 
-    conversation.Turn(); conversation.Reply("r3", "i3");
+    conversation.session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", "u2"}});
+    conversation.session.Receive({{"type", "input_audio_buffer.speech_stopped"}, {"item_id", "u2"}});
+    Check(conversation.history.Snapshot()["list"].size() == 2 && !conversation.session.Busy(),
+        "duplicate server input events after ASR cannot create ghost turns or keep the session busy");
+
+    conversation.Turn("u3"); conversation.Reply("r3", "i3");
     conversation.session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", "u3"}});
     conversation.session.Receive({{"type", "conversation.item.input_audio_transcription.failed"}, {"item_id", "u3"},
         {"error", {{"message", "private upstream data"}}}});
@@ -181,12 +215,9 @@ int main() {
 
     Fixture early;
     early.Connect(); early.Turn();
-    early.session.BeginInput();
-    Check(early.Count("response.cancel") == 0, "early cancellation waits for response creation");
-    early.Reply();
-    Check(early.Count("response.cancel") == 1, "pending creation is canceled exactly once after ID arrives");
-    early.session.BeginInput();
-    Check(early.Count("response.cancel") == 1, "repeated presses do not send duplicate cancellations");
+    early.session.BeginInput(); early.session.BeginInput(); early.Reply();
+    early.session.Receive({{"type", "response.audio.delta"}, {"delta", Voice::EncodeBase64(std::string(4800, '\0'))}});
+    Check(early.playing && early.Count("response.cancel") == 0, "press before response creation does not queue a cancellation");
 
     Fixture failed;
     failed.Connect(); failed.Turn(); failed.Reply();
@@ -215,7 +246,7 @@ int main() {
     queue.Push(Voice::Event::Type::Microphone, std::string(8 * 1024 * 1024 + 1, '\0'));
     events = queue.Poll();
     Check(events.size() == 1 && events[0].type == Voice::Event::Type::Error, "audio callback backlog is bounded");
-    std::cout << "PASS voice protocol: first connection, release, multi-turn context, cancellation, credentials and bounded callbacks\n";
+    std::cout << "PASS voice protocol: first connection, release, multi-turn context, server VAD, credentials and bounded callbacks\n";
   } catch (const std::exception& error) {
     std::cerr << "FAIL: " << error.what() << '\n';
     return 1;

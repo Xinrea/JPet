@@ -14,17 +14,20 @@ struct SessionFixture {
   std::vector<json> sent;
   std::vector<Voice::ToolCall> calls;
   std::string state;
+  size_t interruptions = 0;
   Voice::History history;
   Voice::Session session{{
     [this](const json& value) { sent.push_back(value); }, [](const std::string&) {}, [] { return false; }, [] {},
     [this](const std::string& value, const std::string&) { state = value; }, [](const std::string&) {},
     [this](const std::vector<Voice::ToolCall>& value) { calls.insert(calls.end(), value.begin(), value.end()); },
-    [this](const Voice::ConversationEvent& event) { history.Apply(event); }
+    [this](const Voice::ConversationEvent& event) { history.Apply(event); },
+    [this] { ++interruptions; }
   }, Voice::ToolDefinitions()};
   SessionFixture() {
     session.Receive({{"type", "session.created"}});
     session.Receive({{"type", "session.updated"}});
     session.BeginInput(); session.AppendInput(std::string(6400, '\0')); session.EndInput();
+    session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", "u1"}});
     Created("r1");
   }
   void Created(const char* id) { session.Receive({{"type", "response.created"}, {"response", {{"id", id}}}}); }
@@ -156,10 +159,11 @@ int main() {
     first.Done({first.Item()});
     Check(first.calls.size() == 1 && first.session.Busy() && first.state == "tool", "three duplicate delivery forms execute once");
     Check(first.history.Snapshot()["list"][0]["state"] == "pending", "tool invocation does not finish the history turn");
+    first.session.BeginInput();
     first.session.CompleteTool("c1", {{"ok", true}});
-    Check(first.Count("conversation.item.create") == 1 && first.Count("response.create") == 2, "tool output precedes one continuation");
+    Check(first.Count("conversation.item.create") == 1 && first.Count("response.create") == 1, "tool output precedes one continuation");
     first.session.CompleteTool("c1", {{"ok", true}});
-    Check(first.Count("response.create") == 2, "duplicate tool completion ignored");
+    Check(first.Count("response.create") == 1, "duplicate tool completion ignored");
     first.Created("r2");
     first.session.Receive({{"type", "response.audio_transcript.delta"}, {"response_id", "r2"}, {"delta", "结果是"}});
     first.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r2"}, {"transcript", "结果是 100 经验。"}});
@@ -170,9 +174,9 @@ int main() {
     SessionFixture multiple;
     multiple.Arguments("c1"); multiple.Arguments("c2"); multiple.Done();
     multiple.session.CompleteTool("c2", {{"ok", false}, {"error", "失败"}});
-    Check(multiple.Count("response.create") == 1 && multiple.session.Busy(), "all tool results required before continuation");
+    Check(multiple.Count("response.create") == 0 && multiple.session.Busy(), "all tool results required before continuation");
     multiple.session.CompleteTool("c1", {{"ok", true}});
-    Check(multiple.Count("response.create") == 2, "one continuation for multiple calls");
+    Check(multiple.Count("response.create") == 1, "one continuation for multiple calls");
     multiple.Created("r2"); multiple.Arguments("c3", "r2"); multiple.Done(json::array(), "completed", "r2");
     Check(multiple.calls.size() == 3, "subsequent tool round supported");
     multiple.session.CompleteTool("c3", {{"ok", true}});
@@ -186,6 +190,9 @@ int main() {
     Check(cancelled.calls.empty(), "cancelled response cannot invoke mutation");
     SessionFixture interrupted;
     interrupted.Arguments(); interrupted.Done(); interrupted.session.BeginInput();
+    Check(interrupted.Count("conversation.item.create") == 0 && interrupted.interruptions == 0, "press does not cancel pending tools");
+    interrupted.session.Receive({{"type", "input_audio_buffer.speech_started"}, {"item_id", "u2"}});
+    Check(interrupted.interruptions == 1, "server speech event cancels the tool executor");
     const auto sent = interrupted.sent.size();
     interrupted.session.CompleteTool("c1", {{"ok", true}});
     Check(interrupted.sent.size() == sent && interrupted.calls.size() == 1 && interrupted.Count("conversation.item.create") == 1, "interrupted call is closed and stale completion ignored");

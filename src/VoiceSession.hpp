@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <functional>
-#include <deque>
 #include <map>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -12,6 +11,8 @@
 namespace Voice {
 constexpr const char* Model = "qwen3.8-omni-flash-realtime";
 constexpr size_t InputBytesPerSecond = 16000 * 2;
+constexpr int InputSilenceMs = 800;
+constexpr size_t InputTailBytes = InputBytesPerSecond;  // 1s of silence closes the gated stream for VAD.
 
 std::string Trim(const std::string& value);
 bool ValidWorkspace(const std::string& value);
@@ -32,7 +33,7 @@ struct ConversationEvent {
   std::string text;
 };
 
-// Push-to-talk protocol, independent of devices and credentials. The same
+// Microphone-gated, server-VAD protocol, independent of devices and credentials. The same
 // state machine is used by both native backends and deterministic tests.
 class Session {
  public:
@@ -45,6 +46,7 @@ class Session {
     std::function<void(const std::string&)> transcript;
     std::function<void(const std::vector<ToolCall>&)> tools;
     std::function<void(const ConversationEvent&)> history;
+    std::function<void()> interruptTools;
   };
   explicit Session(Callbacks callbacks, nlohmann::json tools = nlohmann::json::array());
   void Reset(bool failed = false);
@@ -55,15 +57,18 @@ class Session {
   void CompleteTool(const std::string& callId, const nlohmann::json& result);
   bool Ready() const { return ready_; }
   bool Recording() const { return inputOpen_; }
-  bool Busy() const { return inputOpen_ || submitPending_ || responseActive_ || !pendingTools_.empty(); }
+  bool Busy() const {
+    return inputOpen_ || speechActive_ || awaitingResponse_ || responseActive_ ||
+        !pendingTools_.empty() || !bufferedInput_.empty();
+  }
 
  private:
   void Send(nlohmann::json event);
   void FlushInput();
-  void Submit();
+  void StartTurn();
   void Status(const std::string& state, const std::string& message = "");
   void Interrupt();
-  void CancelResponse();
+  void RetireResponse(const std::string& id);
   void CollectTool(const nlohmann::json& item);
   void ContinueResponse();
   void Record(ConversationEvent::Type type, const std::string& text = "", uint64_t turn = 0);
@@ -72,10 +77,10 @@ class Session {
   uint64_t eventId_ = 0;
   bool ready_ = false;
   bool inputOpen_ = false;
-  bool submitPending_ = false;
+  bool speechActive_ = false;
+  bool awaitingResponse_ = false;
   bool responseActive_ = false;
   bool acceptReply_ = false;
-  bool cancelRequested_ = false;
   size_t inputBytes_ = 0;
   std::string bufferedInput_;
   std::string responseId_;
@@ -83,8 +88,9 @@ class Session {
   std::string replyPrefix_;
   uint64_t turnId_ = 0;
   bool turnActive_ = false;
-  std::deque<uint64_t> submittedTurns_;
+  std::string speechItem_;
   std::map<std::string, uint64_t> inputTurns_;
+  std::set<std::string> committedInputs_;
   nlohmann::json tools_;
   std::vector<ToolCall> toolCalls_;
   std::set<std::string> seenTools_, pendingTools_;

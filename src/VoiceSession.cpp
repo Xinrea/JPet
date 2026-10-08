@@ -111,14 +111,15 @@ void Session::FinishTurn(ConversationEvent::Type type) {
 void Session::Reset(bool failed) {
   FinishTurn(failed ? ConversationEvent::Type::Failed : ConversationEvent::Type::Interrupted);
   callbacks_.stopPlayback();
-  ready_ = inputOpen_ = submitPending_ = responseActive_ = acceptReply_ = cancelRequested_ = false;
+  ready_ = inputOpen_ = speechActive_ = awaitingResponse_ = responseActive_ = acceptReply_ = false;
   inputBytes_ = 0;
   bufferedInput_.clear();
   responseId_.clear();
   reply_.clear();
   replyPrefix_.clear();
-  submittedTurns_.clear();
+  speechItem_.clear();
   inputTurns_.clear();
+  committedInputs_.clear();
   toolCalls_.clear();
   seenTools_.clear();
   pendingTools_.clear();
@@ -126,20 +127,20 @@ void Session::Reset(bool failed) {
   toolCount_ = 0;
 }
 
-void Session::CancelResponse() {
-  // Qwen accepts only type/event_id. Wait for creation so a fast second press
-  // does not try to cancel a response that the server has not started yet.
-  if (ready_ && responseActive_ && !responseId_.empty() && !cancelRequested_) {
-    Send({{"type", "response.cancel"}});
-    cancelRequested_ = true;
-  }
+void Session::RetireResponse(const std::string& id) {
+  if (id.empty()) return;
+  if (retiredResponses_.size() >= 64) retiredResponses_.erase(retiredResponses_.begin());
+  retiredResponses_.insert(id);
 }
 
 void Session::Interrupt() {
   FinishTurn(ConversationEvent::Type::Interrupted);
   callbacks_.stopPlayback();
   acceptReply_ = false;
-  CancelResponse();
+  RetireResponse(responseId_);
+  responseId_.clear();
+  responseActive_ = awaitingResponse_ = false;
+  if (callbacks_.interruptTools) callbacks_.interruptTools();
   // Close every outstanding function call in the conversation before the next
   // user turn. In-flight results are subsequently ignored by CompleteTool.
   for (const auto& id : pendingTools_) {
@@ -153,19 +154,17 @@ void Session::Interrupt() {
 }
 
 void Session::BeginInput() {
-  Interrupt();
-  if (ready_ && inputBytes_) Send({{"type", "input_audio_buffer.clear"}});
+  if (inputOpen_) return;
   inputOpen_ = true;
-  submitPending_ = false;
   inputBytes_ = 0;
-  bufferedInput_.clear();
   Status("listening");
 }
 
 void Session::AppendInput(const std::string& pcm) {
   if (!inputOpen_ || pcm.empty()) return;
   // 60 seconds also bounds the first-turn buffer while a connection is opening.
-  if (inputBytes_ + pcm.size() > InputBytesPerSecond * 60) return;
+  if (inputBytes_ + pcm.size() > InputBytesPerSecond * 60 ||
+      bufferedInput_.size() + pcm.size() > InputBytesPerSecond * 60) return;
   inputBytes_ += pcm.size();
   bufferedInput_ += pcm;
   FlushInput();
@@ -184,39 +183,33 @@ void Session::FlushInput() {
 void Session::EndInput() {
   if (!inputOpen_) return;
   inputOpen_ = false;
-  if (inputBytes_ < InputBytesPerSecond / 10) {
-    if (ready_ && inputBytes_) Send({{"type", "input_audio_buffer.clear"}});
-    inputBytes_ = 0;
-    bufferedInput_.clear();
-    Status("idle");
-    return;
+  // VAD needs trailing silence even when the key is released immediately after
+  // speech. Send silence, never commit/clear the server's audio buffer or ask
+  // for a reply: semantic VAD still decides whether this is a meaningful turn.
+  if (inputBytes_) {
+    if (bufferedInput_.size() + InputTailBytes <= InputBytesPerSecond * 61)
+      bufferedInput_.append(InputTailBytes, '\0');
+    FlushInput();
   }
-  submitPending_ = true;
-  Status(ready_ ? "thinking" : "connecting");
-  Submit();
+  inputBytes_ = 0;
+  if (callbacks_.isPlaying()) Status("speaking");
+  else if (responseActive_ || awaitingResponse_ || speechActive_) Status("thinking");
+  else if (!pendingTools_.empty()) Status("tool", "正在执行工具…");
+  else Status(ready_ ? "idle" : "connecting");
 }
 
-void Session::Submit() {
-  if (!ready_ || !submitPending_ || responseActive_) return;
-  FlushInput();
+void Session::StartTurn() {
+  if (turnActive_) Interrupt();
   ++turnId_;
   turnActive_ = true;
   Record(ConversationEvent::Type::Started);
-  submittedTurns_.push_back(turnId_);
-  if (submittedTurns_.size() > 64) submittedTurns_.pop_front();
-  Send({{"type", "input_audio_buffer.commit"}});
-  Send({{"type", "response.create"}});
-  submitPending_ = false;
-  inputBytes_ = 0;
-  responseActive_ = acceptReply_ = true;
-  cancelRequested_ = false;
+  awaitingResponse_ = acceptReply_ = true;
   responseId_.clear();
   reply_.clear();
   replyPrefix_.clear();
   callbacks_.transcript("");
   seenTools_.clear();
   toolCount_ = 0;
-  Status("thinking");
 }
 
 void Session::CollectTool(const nlohmann::json& item) {
@@ -234,7 +227,7 @@ void Session::CollectTool(const nlohmann::json& item) {
 
 void Session::ContinueResponse() {
   responseActive_ = true;
-  cancelRequested_ = false;
+  awaitingResponse_ = false;
   responseId_.clear();
   // A tool response and its continuation belong to the same user turn.
   replyPrefix_ = reply_;
@@ -251,7 +244,7 @@ void Session::CompleteTool(const std::string& callId, const nlohmann::json& resu
   Send({{"type", "conversation.item.create"}, {"item", {
     {"type", "function_call_output"}, {"call_id", callId}, {"output", output}
   }}});
-  if (pendingTools_.empty() && !responseActive_ && !inputOpen_ && !submitPending_) ContinueResponse();
+  if (pendingTools_.empty() && !responseActive_ && !awaitingResponse_ && !speechActive_) ContinueResponse();
 }
 
 void Session::Receive(const nlohmann::json& event) {
@@ -260,7 +253,7 @@ void Session::Receive(const nlohmann::json& event) {
     const auto id = type == "response.done" || type == "response.created" ?
       event.at("response").value("id", std::string{}) : event.value("response_id", std::string{});
     if (!id.empty() && retiredResponses_.count(id)) return;
-    if (!responseActive_) return;
+    if (type != "response.created" && !responseActive_) return;
   }
   if (!responseId_.empty() && type.compare(0, 9, "response.") == 0 && type != "response.created") {
     const auto id = type == "response.done" ? event.at("response").value("id", std::string{}) :
@@ -269,7 +262,8 @@ void Session::Receive(const nlohmann::json& event) {
   }
   if (type == "session.created") {
     Send({{"type", "session.update"}, {"session", {
-      {"modalities", {"text", "audio"}}, {"turn_detection", nullptr},
+      {"modalities", {"text", "audio"}},
+      {"turn_detection", {{"type", "semantic_vad"}, {"threshold", 0.5}, {"silence_duration_ms", InputSilenceMs}}},
       {"input_audio_transcription", {{"model", "qwen3-asr-flash-realtime"}}},
       {"instructions", "你是桌面宠物轴伊（Joi），用中文和用户自然对话。回答简短、亲切、清晰，适合直接朗读。"
         "查询游戏数据必须调用 get_game_state；操作前先查询任务ID、队列entry_id、属性价格和条件，只有用户要求操作时才调用 game_action。"
@@ -287,18 +281,37 @@ void Session::Receive(const nlohmann::json& event) {
     ready_ = true;
     FlushInput();
     if (inputOpen_) Status("listening");
-    else if (submitPending_) Submit();
     else Status("idle");
+  } else if (type == "input_audio_buffer.speech_started") {
+    const auto id = event.value("item_id", std::string{});
+    if ((!id.empty() && (id == speechItem_ || committedInputs_.count(id))) || (id.empty() && speechActive_)) return;
+    // Only a server speech event can interrupt playback and invalidate tools.
+    // The server cancels generation itself; never send response.cancel.
+    Interrupt();
+    speechItem_ = id;
+    speechActive_ = true;
+    Status("listening");
+  } else if (type == "input_audio_buffer.speech_stopped") {
+    if (!speechActive_) return;
+    const auto id = event.value("item_id", std::string{});
+    if (!speechItem_.empty() && !id.empty() && id != speechItem_) return;
+    speechActive_ = false;
+    awaitingResponse_ = true;
+    Status("thinking");
   } else if (type == "input_audio_buffer.committed") {
     const auto id = event.value("item_id", std::string{});
-    if (!id.empty() && id.size() <= 256 && !submittedTurns_.empty() && !inputTurns_.count(id)) {
-      inputTurns_[id] = submittedTurns_.front();
-      submittedTurns_.pop_front();
+    if (!id.empty() && id.size() <= 256 && !committedInputs_.count(id)) {
+      if (committedInputs_.size() >= 200) committedInputs_.erase(committedInputs_.begin());
+      committedInputs_.insert(id);
+      speechActive_ = false;
+      StartTurn();
+      inputTurns_[id] = turnId_;
       if (inputTurns_.size() > 200) {
         auto oldest = std::min_element(inputTurns_.begin(), inputTurns_.end(),
             [](const auto& a, const auto& b) { return a.second < b.second; });
         inputTurns_.erase(oldest);
       }
+      Status("thinking");
     }
   } else if (type == "conversation.item.input_audio_transcription.completed" ||
              type == "conversation.item.input_audio_transcription.failed") {
@@ -311,8 +324,12 @@ void Session::Receive(const nlohmann::json& event) {
       inputTurns_.erase(input);
     }
   } else if (type == "response.created") {
-    responseId_ = event.at("response").value("id", std::string{});
-    if (!acceptReply_) CancelResponse();
+    const auto id = event.at("response").value("id", std::string{});
+    if (responseActive_ && !responseId_.empty() && id != responseId_) return;
+    if (!turnActive_) { RetireResponse(id); return; }
+    responseId_ = id;
+    responseActive_ = acceptReply_ = true;
+    awaitingResponse_ = false;
   } else if (type == "response.function_call_arguments.done") {
     auto item = event;
     item["type"] = "function_call";
@@ -343,11 +360,7 @@ void Session::Receive(const nlohmann::json& event) {
       for (const auto& item : response["output"]) CollectTool(item);
     responseActive_ = false;
     const auto completedId = response.value("id", std::string{});
-    if (!completedId.empty()) {
-      // IDs are opaque; cap history for long lived connections.
-      if (retiredResponses_.size() >= 64) retiredResponses_.erase(retiredResponses_.begin());
-      retiredResponses_.insert(completedId);
-    }
+    RetireResponse(completedId);
     const auto outcome = response.value("status", std::string{});
     if (outcome == "failed") {
       FinishTurn(ConversationEvent::Type::Failed);
@@ -359,8 +372,7 @@ void Session::Receive(const nlohmann::json& event) {
       // Never execute partially generated or cancelled commands.
       Interrupt();
     }
-    if (submitPending_) Submit();
-    else if (acceptReply_ && !toolCalls_.empty()) {
+    if (acceptReply_ && !toolCalls_.empty()) {
       auto calls = std::move(toolCalls_);
       toolCalls_.clear();
       Status("tool", "正在执行工具…");

@@ -469,8 +469,8 @@
       <div class="setting-field"><label for="volume">音量<span>{_volume}%</span></label><div class="volume-control"><input aria-label="音量滑块" type="range" min="0" max="100" step="1" bind:value={_volume} on:change={updateAudio} /><Input id="volume" bind:value={_volume} on:change={updateAudio} type="number" min={0} max={100} step={1} /></div></div>
     </SettingCard>
 
-    <SettingCard title="语音对话" description="按住说话，松开发送" icon="mic">
-      <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong><p>按住 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 说话；回复时再次按住可打断。</p></div></div>
+    <SettingCard title="语音对话" description="按住开启麦克风，松开关闭" icon="mic">
+      <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong><p>按住 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 说话；由模型服务端判断语音结束和是否打断回复。</p></div></div>
       <div class="setting-field"><label for="voice-api-key">百炼 API Key<span>{voiceHasKey ? "已保存" : "待设置"}</span></label><Input id="voice-api-key" type="password" bind:value={voiceApiKey} placeholder={voiceHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
       <div class="setting-field"><label for="voice-workspace">业务空间 ID</label><Input id="voice-workspace" bind:value={voiceWorkspace} placeholder="填写 API Key 所属的业务空间 ID" autocomplete="off" spellcheck="false" maxlength={63} disabled={voiceLoading || voiceSaving} /></div>
       <p class="setting-help">使用北京地域的 API Key 和业务空间。API Key 保存在本机系统凭据存储中。</p>

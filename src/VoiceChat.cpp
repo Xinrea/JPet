@@ -1,6 +1,5 @@
 #include "VoiceChat.hpp"
 
-#include "AudioManager.hpp"
 #include "DataManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
@@ -48,9 +47,6 @@ VoiceChat::VoiceChat() : platform_(Voice::MakePlatform()),
       } else {
         LAppPal::PrintLog("[Voice] Send type=%s event_id=%s", type.c_str(),
             event.at("event_id").get_ref<const std::string&>().c_str());
-        if (type == "input_audio_buffer.commit")
-          LAppPal::PrintLog("[Voice] Upload queued chunks=%zu bytes=%zu audio_ms=%.1f",
-              sentChunks_, sentBytes_, sentBytes_ * 1000.0 / Voice::InputBytesPerSecond);
       }
       platform_->Send(event.dump());
     },
@@ -82,7 +78,8 @@ VoiceChat::VoiceChat() : platform_(Voice::MakePlatform()),
       tools_->Submit(calls);
       lastActivity_ = Clock::now();
     },
-    [this](const Voice::ConversationEvent& event) { history_.Apply(event); }
+    [this](const Voice::ConversationEvent& event) { history_.Apply(event); },
+    [this] { if (tools_) tools_->Cancel(); }
 }, Voice::ToolDefinitions()) {
   lastActivity_ = stateChangedAt_ = Clock::now();
 }
@@ -90,7 +87,7 @@ VoiceChat::VoiceChat() : platform_(Voice::MakePlatform()),
 void VoiceChat::SetState(const std::string& state, const std::string& message) {
   std::string text = message;
   if (text.empty()) {
-    if (state == "listening") text = std::string("正在听… 松开 ") + Shortcut + " 发送";
+    if (state == "listening") text = std::string("正在听… 松开 ") + Shortcut + " 关闭麦克风";
     else if (state == "connecting") text = "正在连接千问…";
     else if (state == "thinking") text = "千问正在思考…";
     else if (state == "speaking") text = "千问正在回复…";
@@ -142,9 +139,7 @@ void VoiceChat::Begin() {
     connected_ = true;
     connectedAt_ = Clock::now();
   }
-  AudioManager::GetInstance()->Stop();
   if (!tools_) tools_ = std::make_unique<Voice::ToolExecutor>(Voice::MakeToolDependencies());
-  tools_->Cancel();
   capturedBytes_ = sentBytes_ = sentChunks_ = 0;
   capturedEnergy_ = 0;
   capturedPeak_ = 0;
@@ -156,12 +151,14 @@ void VoiceChat::Begin() {
 
 void VoiceChat::End() {
   platform_->StopCapture();
-  Drain();  // Include the microphone's final queued samples before commit.
+  Drain();  // Include the microphone's final queued samples before closing input.
   if (session_.Recording()) {
     const double rms = capturedBytes_ ? std::sqrt(capturedEnergy_ / (capturedBytes_ / 2)) : 0;
     LAppPal::PrintLog("[Voice] Capture end bytes=%zu audio_ms=%.1f rms=%.1f peak=%d",
         capturedBytes_, capturedBytes_ * 1000.0 / Voice::InputBytesPerSecond, rms, capturedPeak_);
     session_.EndInput();
+    LAppPal::PrintLog("[Voice] Upload queued chunks=%zu bytes=%zu audio_ms=%.1f",
+        sentChunks_, sentBytes_, sentBytes_ * 1000.0 / Voice::InputBytesPerSecond);
   }
   turnStarted_ = false;
   lastActivity_ = Clock::now();
@@ -193,7 +190,8 @@ void VoiceChat::Drain() {
         const auto message = nlohmann::json::parse(event.data);
         const auto type = DiagnosticCode(message, "type");
         if (type == "session.created" || type == "session.updated" ||
-            type == "input_audio_buffer.committed" || type == "response.created")
+            type == "input_audio_buffer.committed" || type == "response.created" ||
+            type == "input_audio_buffer.speech_started" || type == "input_audio_buffer.speech_stopped")
           LAppPal::PrintLog("[Voice] Receive type=%s", type.c_str());
         else if (type == "response.done")
           LAppPal::PrintLog("[Voice] Receive type=response.done status=%s",
