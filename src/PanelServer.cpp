@@ -542,6 +542,10 @@ void PanelServer::doServe() {
     res.set_header("Cache-Control", "no-store");
     res.set_content(VoiceChat::GetInstance()->Status().dump(), "application/json");
   });
+  server->Get("/api/voice/history", [](const httplib::Request&, httplib::Response& res) {
+    res.set_header("Cache-Control", "no-store");
+    res.set_content(VoiceChat::GetInstance()->History().dump(), "application/json");
+  });
   server->Post("/api/config/audio",
                [](const httplib::Request &req, httplib::Response &res) {
                  LAppPal::PrintLog("POST /api/config/audio");

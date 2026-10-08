@@ -7,6 +7,7 @@
   import Custom from "./pages/Custom.svelte";
   import Rank from "./pages/Rank.svelte";
   import Achievement from "./pages/Achievement.svelte";
+  import Conversation from "./pages/Conversation.svelte";
   import AchievementIcon from "./components/AchievementIcon.svelte";
   import { onDestroy } from "svelte";
   import UiIcon from "./components/UiIcon.svelte";
@@ -22,6 +23,7 @@
     { name: "成就", icon: "trophy", title: "闪闪发光的陪伴回忆", description: "收藏一路走来的每个小小里程碑。", label: "COLLECTION" },
     { name: "装扮", icon: "dress", title: "换上今天的好心情", description: "搭配喜欢的装扮，留下可爱的瞬间。", label: "DRESS UP" },
     { name: "设置", icon: "settings", title: "你的专属陪伴设置", description: "声音、互动与通知，都按你的喜好来。", label: "OPTIONS" },
+    { name: "对话记录", icon: "chat", title: "每一次聊天，都有迹可循", description: "回看你和轴伊的 AI 对话，找回聊过的点滴。", label: "CONVERSATIONS" },
     { name: "排行榜", icon: "rank", title: "一起见证成长", description: "查看大家的成长记录与自己的排名。", label: "RANKING" },
     { name: "说明", icon: "book", title: "陪伴指南", description: "了解成长规则，发现更多陪伴方式。", label: "GUIDE" },
   ];
@@ -115,7 +117,7 @@
       updateProfile();
     }
     if (e.data === "SOFTWARE_UPDATE") {
-      activeTab = 6;
+      activeTab = 7;
       fetchVersionInfo();
     }
     if (e.data.startsWith("{")) {
@@ -141,7 +143,7 @@
     {#each tabs as tab, index}
       <button class:active={activeTab === index} aria-current={activeTab === index ? "page" : undefined} on:click={() => selectTab(index)}>
         <UiIcon name={tab.icon} size={20} /><span>{tab.name}</span>
-        {#if index === 6 && need_update}<span class="update-dot" aria-label="有新版本"></span>{/if}
+        {#if index === 7 && need_update}<span class="update-dot" aria-label="有新版本"></span>{/if}
       </button>
     {/each}
   </nav>
@@ -157,8 +159,9 @@
       {#if activeTab === 2}<div class="page-view"><Achievement /></div>{/if}
       <div class="page-view custom-view" class:hide={activeTab !== 3}><Custom current={clothes.current} /></div>
       <div class="page-view" class:hide={activeTab !== 4}><Setting bind:account_info={account_info} online={game.online} /></div>
-      {#if activeTab === 5}<div class="page-view game-card rank-view"><Rank {account_info} /></div>{/if}
-      <div class="page-view document-view" class:hide={activeTab !== 6}><Document bind:updater on:refresh={fetchVersionInfo} /></div>
+      {#if activeTab === 5}<div class="page-view"><Conversation /></div>{/if}
+      {#if activeTab === 6}<div class="page-view game-card rank-view"><Rank {account_info} /></div>{/if}
+      <div class="page-view document-view" class:hide={activeTab !== 7}><Document bind:updater on:refresh={fetchVersionInfo} /></div>
       <footer class="panel-footer"><span class="footer-line"></span><UiIcon name="spark" size={12} /><span>和轴伊一起，把平凡的日子过得闪闪发光</span><span class="footer-line"></span></footer>
     </div>
   </div>

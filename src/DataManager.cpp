@@ -139,6 +139,16 @@ nlohmann::json DataManager::GetVoiceSettings() {
           {"model", Voice::Model}};
 }
 
+nlohmann::json DataManager::LoadVoiceHistory() {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
+  return nlohmann::json::parse(GetWithDefault("voice.history", std::string{}), nullptr, false);
+}
+
+void DataManager::SaveVoiceHistory(const nlohmann::json& history) {
+  std::lock_guard<std::recursive_mutex> lock(gameMutex);
+  gameData->UpdateBatch({}, {{"voice.history", history.dump()}});
+}
+
 bool DataManager::UpdateVoiceSettings(const std::string& workspace,
                                       const std::string* apiKey, std::string& error) {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);

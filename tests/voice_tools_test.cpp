@@ -1,4 +1,5 @@
 #include "VoiceTools.hpp"
+#include "VoiceHistory.hpp"
 #include <chrono>
 #include <atomic>
 #include <future>
@@ -13,10 +14,12 @@ struct SessionFixture {
   std::vector<json> sent;
   std::vector<Voice::ToolCall> calls;
   std::string state;
+  Voice::History history;
   Voice::Session session{{
     [this](const json& value) { sent.push_back(value); }, [](const std::string&) {}, [] { return false; }, [] {},
     [this](const std::string& value, const std::string&) { state = value; }, [](const std::string&) {},
-    [this](const std::vector<Voice::ToolCall>& value) { calls.insert(calls.end(), value.begin(), value.end()); }
+    [this](const std::vector<Voice::ToolCall>& value) { calls.insert(calls.end(), value.begin(), value.end()); },
+    [this](const Voice::ConversationEvent& event) { history.Apply(event); }
   }, Voice::ToolDefinitions()};
   SessionFixture() {
     session.Receive({{"type", "session.created"}});
@@ -146,15 +149,24 @@ int main() {
 
     SessionFixture first;
     Check(first.sent.front()["session"]["tools"] == definitions && !first.sent.front()["session"].contains("enable_search"), "custom tools configured without conflicting built-in search");
+    first.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r1"}, {"transcript", "我先查询一下。"}});
     first.Arguments();
     first.session.Receive({{"type", "response.output_item.done"}, {"response_id", "r1"}, {"item", first.Item()}});
     Check(first.calls.empty(), "tool waits for complete response before execution");
     first.Done({first.Item()});
     Check(first.calls.size() == 1 && first.session.Busy() && first.state == "tool", "three duplicate delivery forms execute once");
+    Check(first.history.Snapshot()["list"][0]["state"] == "pending", "tool invocation does not finish the history turn");
     first.session.CompleteTool("c1", {{"ok", true}});
     Check(first.Count("conversation.item.create") == 1 && first.Count("response.create") == 2, "tool output precedes one continuation");
     first.session.CompleteTool("c1", {{"ok", true}});
     Check(first.Count("response.create") == 2, "duplicate tool completion ignored");
+    first.Created("r2");
+    first.session.Receive({{"type", "response.audio_transcript.delta"}, {"response_id", "r2"}, {"delta", "结果是"}});
+    first.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r2"}, {"transcript", "结果是 100 经验。"}});
+    first.Done(json::array(), "completed", "r2");
+    const auto firstHistory = first.history.Snapshot()["list"];
+    Check(firstHistory.size() == 1 && firstHistory[0]["state"] == "completed" &&
+        firstHistory[0]["assistant"] == "我先查询一下。\n\n结果是 100 经验。", "tool continuations retain all reply text in one history round");
     SessionFixture multiple;
     multiple.Arguments("c1"); multiple.Arguments("c2"); multiple.Done();
     multiple.session.CompleteTool("c2", {{"ok", false}, {"error", "失败"}});

@@ -34,7 +34,10 @@ VoiceChat* VoiceChat::GetInstance() {
 }
 
 VoiceChat::VoiceChat() : platform_(Voice::MakePlatform()),
-    tools_(std::make_unique<Voice::ToolExecutor>(Voice::MakeToolDependencies())), session_({
+    tools_(std::make_unique<Voice::ToolExecutor>(Voice::MakeToolDependencies())),
+    history_(DataManager::GetInstance()->LoadVoiceHistory(), [](const nlohmann::json& history) {
+      DataManager::GetInstance()->SaveVoiceHistory(history);
+    }), session_({
     [this](const nlohmann::json& event) {
       const auto type = event.value("type", std::string{});
       if (type == "input_audio_buffer.append") {
@@ -78,7 +81,8 @@ VoiceChat::VoiceChat() : platform_(Voice::MakePlatform()),
       if (!calls.empty()) SetState("tool", Voice::ToolLabel(calls.front().name));
       tools_->Submit(calls);
       lastActivity_ = Clock::now();
-    }
+    },
+    [this](const Voice::ConversationEvent& event) { history_.Apply(event); }
 }, Voice::ToolDefinitions()) {
   lastActivity_ = stateChangedAt_ = Clock::now();
 }
@@ -208,11 +212,11 @@ void VoiceChat::Drain() {
   }
 }
 
-void VoiceChat::Close() {
+void VoiceChat::Close(bool failed) {
   if (tools_) tools_->Cancel();
   platform_->StopCapture();
   platform_->Disconnect();
-  session_.Reset();
+  session_.Reset(failed);
   connected_ = turnStarted_ = failurePending_ = false;
   busy_ = false;
 }
@@ -221,7 +225,7 @@ void VoiceChat::Fail(const std::string& error) {
   // error can refer to error_, which Close may modify in a future backend.
   const auto message = error;
   LAppPal::PrintLog(LogLevel::Error, "[Voice] Failure: %s", message.c_str());
-  Close();
+  Close(true);
   waitForRelease_ = rawHeld_;
   SetState("error", message);
 }

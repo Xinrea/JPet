@@ -98,13 +98,27 @@ void Session::Status(const std::string& state, const std::string& message) {
   callbacks_.status(state, message);
 }
 
-void Session::Reset() {
+void Session::Record(ConversationEvent::Type type, const std::string& text, uint64_t turn) {
+  if (callbacks_.history) callbacks_.history({type, turn ? turn : turnId_, text});
+}
+
+void Session::FinishTurn(ConversationEvent::Type type) {
+  if (!turnActive_) return;
+  turnActive_ = false;
+  Record(type);
+}
+
+void Session::Reset(bool failed) {
+  FinishTurn(failed ? ConversationEvent::Type::Failed : ConversationEvent::Type::Interrupted);
   callbacks_.stopPlayback();
   ready_ = inputOpen_ = submitPending_ = responseActive_ = acceptReply_ = cancelRequested_ = false;
   inputBytes_ = 0;
   bufferedInput_.clear();
   responseId_.clear();
   reply_.clear();
+  replyPrefix_.clear();
+  submittedTurns_.clear();
+  inputTurns_.clear();
   toolCalls_.clear();
   seenTools_.clear();
   pendingTools_.clear();
@@ -122,6 +136,7 @@ void Session::CancelResponse() {
 }
 
 void Session::Interrupt() {
+  FinishTurn(ConversationEvent::Type::Interrupted);
   callbacks_.stopPlayback();
   acceptReply_ = false;
   CancelResponse();
@@ -184,6 +199,11 @@ void Session::EndInput() {
 void Session::Submit() {
   if (!ready_ || !submitPending_ || responseActive_) return;
   FlushInput();
+  ++turnId_;
+  turnActive_ = true;
+  Record(ConversationEvent::Type::Started);
+  submittedTurns_.push_back(turnId_);
+  if (submittedTurns_.size() > 64) submittedTurns_.pop_front();
   Send({{"type", "input_audio_buffer.commit"}});
   Send({{"type", "response.create"}});
   submitPending_ = false;
@@ -192,6 +212,7 @@ void Session::Submit() {
   cancelRequested_ = false;
   responseId_.clear();
   reply_.clear();
+  replyPrefix_.clear();
   callbacks_.transcript("");
   seenTools_.clear();
   toolCount_ = 0;
@@ -215,6 +236,10 @@ void Session::ContinueResponse() {
   responseActive_ = true;
   cancelRequested_ = false;
   responseId_.clear();
+  // A tool response and its continuation belong to the same user turn.
+  replyPrefix_ = reply_;
+  if (!replyPrefix_.empty() && replyPrefix_.size() + 2 <= 16000) replyPrefix_ += "\n\n";
+  reply_ = replyPrefix_;
   Send({{"type", "response.create"}});
   Status("thinking");
 }
@@ -245,6 +270,7 @@ void Session::Receive(const nlohmann::json& event) {
   if (type == "session.created") {
     Send({{"type", "session.update"}, {"session", {
       {"modalities", {"text", "audio"}}, {"turn_detection", nullptr},
+      {"input_audio_transcription", {{"model", "qwen3-asr-flash-realtime"}}},
       {"instructions", "你是桌面宠物轴伊（Joi），用中文和用户自然对话。回答简短、亲切、清晰，适合直接朗读。"
         "查询游戏数据必须调用 get_game_state；操作前先查询任务ID、队列entry_id、属性价格和条件，只有用户要求操作时才调用 game_action。"
         "查看桌面时调用 view_desktop，仅在用户要求查看屏幕时截图。查实时网页或B站信息分别使用 web_search、bilibili_search。"
@@ -263,6 +289,27 @@ void Session::Receive(const nlohmann::json& event) {
     if (inputOpen_) Status("listening");
     else if (submitPending_) Submit();
     else Status("idle");
+  } else if (type == "input_audio_buffer.committed") {
+    const auto id = event.value("item_id", std::string{});
+    if (!id.empty() && id.size() <= 256 && !submittedTurns_.empty() && !inputTurns_.count(id)) {
+      inputTurns_[id] = submittedTurns_.front();
+      submittedTurns_.pop_front();
+      if (inputTurns_.size() > 200) {
+        auto oldest = std::min_element(inputTurns_.begin(), inputTurns_.end(),
+            [](const auto& a, const auto& b) { return a.second < b.second; });
+        inputTurns_.erase(oldest);
+      }
+    }
+  } else if (type == "conversation.item.input_audio_transcription.completed" ||
+             type == "conversation.item.input_audio_transcription.failed") {
+    const auto input = inputTurns_.find(event.value("item_id", std::string{}));
+    if (input != inputTurns_.end()) {
+      const auto text = event.value("transcript", std::string{});
+      const bool failed = type == "conversation.item.input_audio_transcription.failed" || text.empty() || text.size() > 16000;
+      Record(failed ? ConversationEvent::Type::InputFailed : ConversationEvent::Type::UserTranscript,
+          failed ? "" : text, input->second);
+      inputTurns_.erase(input);
+    }
   } else if (type == "response.created") {
     responseId_ = event.at("response").value("id", std::string{});
     if (!acceptReply_) CancelResponse();
@@ -284,10 +331,12 @@ void Session::Receive(const nlohmann::json& event) {
     // Keep complete UTF-8 fragments when bounding the visible transcript.
     if (reply_.size() + delta.size() <= 16000) reply_ += delta;
     callbacks_.transcript(reply_);
+    Record(ConversationEvent::Type::AssistantTranscript, reply_);
   } else if ((type == "response.audio_transcript.done" || type == "response.text.done") && acceptReply_) {
     const auto text = event.value(type == "response.text.done" ? "text" : "transcript", std::string{});
-    if (text.size() <= 16000) reply_ = text;
+    if (replyPrefix_.size() + text.size() <= 16000) reply_ = replyPrefix_ + text;
     callbacks_.transcript(reply_);
+    Record(ConversationEvent::Type::AssistantTranscript, reply_);
   } else if (type == "response.done") {
     const auto& response = event.at("response");
     if (response.contains("output") && response["output"].is_array())
@@ -301,6 +350,7 @@ void Session::Receive(const nlohmann::json& event) {
     }
     const auto outcome = response.value("status", std::string{});
     if (outcome == "failed") {
+      FinishTurn(ConversationEvent::Type::Failed);
       Status("error", "千问未能完成回复，请重新按住快捷键说话");
       acceptReply_ = false;
       return;
@@ -317,14 +367,17 @@ void Session::Receive(const nlohmann::json& event) {
       if (callbacks_.tools) callbacks_.tools(calls);
       else for (const auto& call : calls) CompleteTool(call.id, {{"ok", false}, {"error", "工具不可用"}});
     }
-    else if (!inputOpen_ && !callbacks_.isPlaying()) Status("idle");
+    else {
+      if (acceptReply_ && pendingTools_.empty()) FinishTurn(ConversationEvent::Type::Completed);
+      if (!inputOpen_ && !callbacks_.isPlaying()) Status("idle");
+    }
   } else if (type == "error") {
     const auto& error = event.at("error");
     const auto code = error.value("code", std::string{});
     // Cancellation can race a naturally completed response.
     if (code == "response_cancel_not_active" || code == "response_not_active") return;
     const auto message = FriendlyError(code);
-    Reset();
+    Reset(true);
     Status("error", message);
   }
 }

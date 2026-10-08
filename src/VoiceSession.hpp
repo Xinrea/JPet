@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <functional>
+#include <deque>
+#include <map>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <set>
@@ -23,6 +25,13 @@ struct ToolCall {
   std::string id, name, arguments;
 };
 
+struct ConversationEvent {
+  enum class Type { Started, UserTranscript, AssistantTranscript, InputFailed, Completed, Interrupted, Failed };
+  Type type;
+  uint64_t turn;
+  std::string text;
+};
+
 // Push-to-talk protocol, independent of devices and credentials. The same
 // state machine is used by both native backends and deterministic tests.
 class Session {
@@ -35,9 +44,10 @@ class Session {
     std::function<void(const std::string&, const std::string&)> status;
     std::function<void(const std::string&)> transcript;
     std::function<void(const std::vector<ToolCall>&)> tools;
+    std::function<void(const ConversationEvent&)> history;
   };
   explicit Session(Callbacks callbacks, nlohmann::json tools = nlohmann::json::array());
-  void Reset();
+  void Reset(bool failed = false);
   void BeginInput();
   void AppendInput(const std::string& pcm);
   void EndInput();
@@ -56,6 +66,8 @@ class Session {
   void CancelResponse();
   void CollectTool(const nlohmann::json& item);
   void ContinueResponse();
+  void Record(ConversationEvent::Type type, const std::string& text = "", uint64_t turn = 0);
+  void FinishTurn(ConversationEvent::Type type);
   Callbacks callbacks_;
   uint64_t eventId_ = 0;
   bool ready_ = false;
@@ -68,6 +80,11 @@ class Session {
   std::string bufferedInput_;
   std::string responseId_;
   std::string reply_;
+  std::string replyPrefix_;
+  uint64_t turnId_ = 0;
+  bool turnActive_ = false;
+  std::deque<uint64_t> submittedTurns_;
+  std::map<std::string, uint64_t> inputTurns_;
   nlohmann::json tools_;
   std::vector<ToolCall> toolCalls_;
   std::set<std::string> seenTools_, pendingTools_;

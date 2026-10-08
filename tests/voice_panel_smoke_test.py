@@ -65,6 +65,8 @@ def main(gui=False, app=APP):
             voice = request(port, "/api/voice")[1]
             assert voice["model"] == "qwen3.8-omni-flash-realtime"
             assert set(voice["available_tools"]) == {"view_desktop", "get_game_state", "game_action", "web_search", "bilibili_search", "open_url"}
+            code, history = request(port, "/api/voice/history")
+            assert code == 200 and history == {"list": [], "limit": 200, "error": ""}
             # These requests never create a credential in the real keychain.
             assert request(port, "/api/config/voice", {"workspace_id": "ws-123"})[0] == 200
             assert request(port, "/api/config/voice")[1]["workspace_id"] == "ws-123"

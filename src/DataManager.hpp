@@ -48,6 +48,8 @@ class DataManager {
   void UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio);
 
   nlohmann::json GetVoiceSettings();
+  nlohmann::json LoadVoiceHistory();
+  void SaveVoiceHistory(const nlohmann::json& history);
   bool UpdateVoiceSettings(const std::string& workspace,
                            const std::string* apiKey, std::string& error);
 

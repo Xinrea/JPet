@@ -2,6 +2,7 @@
 
 #include "VoicePlatform.hpp"
 #include "VoiceSession.hpp"
+#include "VoiceHistory.hpp"
 #include "VoiceTools.hpp"
 #include <atomic>
 #include <chrono>
@@ -14,6 +15,7 @@ class VoiceChat {
   void Stop();
   void ConfigurationChanged() { resetRequested_ = true; }
   nlohmann::json Status();
+  nlohmann::json History() { return history_.Snapshot(); }
   bool IsBusy() const;
 
  private:
@@ -22,11 +24,12 @@ class VoiceChat {
   void Begin();
   void End();
   void Drain();
-  void Close();
+  void Close(bool failed = false);
   void Fail(const std::string& error);
   void SetState(const std::string& state, const std::string& message = "");
   std::unique_ptr<Voice::Platform> platform_;
   std::unique_ptr<Voice::ToolExecutor> tools_;
+  Voice::History history_;
   Voice::Session session_;
   std::atomic<bool> resetRequested_{false};
   std::atomic<bool> busy_{false};

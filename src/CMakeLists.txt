@@ -23,6 +23,7 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSession.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSession.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceHistory.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTools.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTools.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolsRuntime.cpp
