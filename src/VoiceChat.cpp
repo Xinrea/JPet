@@ -116,7 +116,8 @@ nlohmann::json VoiceChat::Status() {
   auto status = status_;
   status["model"] = Voice::Model;
   status["shortcut"] = Shortcut;
-  status["available_tools"] = {"view_desktop", "get_game_state", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"};
+  status["available_tools"] = nlohmann::json::array();
+  for (const auto& definition : Voice::ToolDefinitions()) status["available_tools"].push_back(definition["function"]["name"]);
   return status;
 }
 
@@ -265,7 +266,7 @@ void VoiceChat::Tick(GLFWwindow* window) {
       std::lock_guard<std::mutex> lock(statusMutex_);
       nlohmann::json visible = {{"ok", result.value.value("ok", false)}};
       if (result.call.name == "view_desktop") visible["label"] = "查看桌面";
-      else if (result.call.name == "get_game_state") visible["label"] = "查询游戏";
+      else if (result.call.name.compare(0, 4, "get_") == 0) visible["label"] = "查询游戏";
       else if (result.call.name == "game_action") visible["label"] = "游戏操作";
       else if (result.call.name == "jpet_settings") visible["label"] = "JPet 设置";
       else if (result.call.name == "web_search") visible["label"] = "网页搜索";

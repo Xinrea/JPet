@@ -33,7 +33,7 @@ struct SessionFixture {
   }
   void Created(const char* id) { session.Receive({{"type", "response.created"}, {"response", {{"id", id}}}}); }
   json Item(const char* id = "c1") {
-    return {{"type", "function_call"}, {"call_id", id}, {"name", "get_game_state"}, {"arguments", R"({"section":"all"})"}};
+    return {{"type", "function_call"}, {"call_id", id}, {"name", "get_game_profile"}, {"arguments", "{}"}};
   }
   void Arguments(const char* id = "c1", const char* response = "r1") {
     auto event = Item(id); event["type"] = "response.function_call_arguments.done"; event["response_id"] = response;
@@ -49,7 +49,7 @@ struct SessionFixture {
 int main() {
   try {
     const auto definitions = Voice::ToolDefinitions();
-    Check(definitions.size() == 7, "seven tool families registered");
+    Check(definitions.size() == 15, "focused queries and action tools registered within relay limit");
     for (const auto& definition : definitions) Check(definition["type"] == "function" &&
       definition["function"]["parameters"]["additionalProperties"] == false, "nested Qwen schema with closed arguments");
     int mutations = 0, queries = 0, external = 0, opens = 0;
@@ -192,17 +192,31 @@ int main() {
     Check(run("open_url", {{"url", "https://example.com"}})["error"] == "默认浏览器无法打开", "OS launch rejection is reported as failure");
     dependencies.openUrl = {};
     Check(run("open_url", {{"url", "https://example.com"}})["ok"] == false, "unavailable browser adapter does not claim success");
-    Check(run("get_game_state", json::object())["ok"] == true && last["section"] == "all", "all-state default query");
-    for (const char* section : {"profile", "tasks", "achievements", "statistics", "rank"})
-      Check(run("get_game_state", {{"section", section}})["ok"] == true, "all query sections supported");
+    const std::pair<const char*, const char*> queriesByTool[] = {
+      {"get_game_profile", "profile"}, {"get_game_clothes", "clothes"}, {"get_task_catalog", "task_catalog"},
+      {"get_current_task", "current_task"}, {"get_task_queue", "task_queue"}, {"get_task_history", "task_history"},
+      {"get_game_achievements", "achievements"}, {"get_game_statistics", "statistics"}, {"get_game_rank", "rank"}
+    };
+    for (const auto& [tool, section] : queriesByTool)
+      Check(run(tool, json::object())["ok"] == true && last["section"] == section, "query dispatch selects only its own content");
+    for (const auto* tool : {"get_task_catalog", "get_task_history", "get_game_achievements", "get_game_rank"}) {
+      Check(run(tool, {{"offset", 5}, {"limit", 10}})["ok"] == true && last["offset"] == 5 && last["limit"] == 10, "pagination passed to adapter");
+      Check(run(tool, {{"limit", 11}})["ok"] == false && run(tool, {{"offset", -1}})["ok"] == false, "pagination bounds checked before read");
+    }
+    Check(run("get_game_rank", {{"metric", "exp"}})["ok"] == true && last["metric"] == "exp", "rank metric forwarded");
+    Check(run("get_game_profile", {{"section", "all"}})["ok"] == false, "focused tools reject extra content");
+    Check(run("get_game_state", json::object())["ok"] == false && run("get_game_state", {{"section", "all"}})["ok"] == false, "legacy full-state query cannot exceed budget");
+    Check(run("get_game_state", {{"section", "tasks"}})["ok"] == true && last["section"] == "task_catalog", "explicit legacy section migrates to paginated catalog");
     for (const auto& pair : {std::pair{"start_task", "task.start"}, {"queue_task", "task.queue"}, {"cancel_task", "task.cancel"}}) {
       dependencies.command = [&](const json& command) { ++mutations; Check(command["type"] == pair.second && command["id"] == 13, "task command has directory ID"); return std::string{}; };
       Check(run("game_action", {{"action", pair.first}, {"task_id", 13}})["ok"] == true, "task action succeeds");
+      Check(last["section"] == "task_status", "task actions only read execution and queue state");
     }
     dependencies.command = [&](const json& command) { ++mutations; last = command; return std::string{}; };
     for (const auto& pair : {std::pair{"upgrade_attribute", "attr.buy"}, {"refund_attribute", "attr.refund"}}) {
       dependencies.command = [&](const json& command) { ++mutations; Check(command["type"] == pair.second && command["attr"] == "intellect", "attribute command uses server validation"); return std::string{}; };
       Check(run("game_action", {{"action", pair.first}, {"attribute", "intellect"}})["ok"] == true, "attribute action succeeds");
+      Check(last["section"] == "attributes", "attribute operations omit task and achievement catalogs");
     }
     dependencies.command = [&](const json& command) { ++mutations; last = command; return std::string{}; };
     for (const auto& args : {json{{"action", "remove_queued_task"}, {"entry_id", 123456789012LL}},
@@ -237,14 +251,75 @@ int main() {
 
     auto snapshot = json{{"revision", 9}, {"server_time", 1000}, {"cookie", "secret-cookie"}, {"session", "secret-session"},
       {"save", {{"failcount", 2}, {"achievements", {{"metrics", {{"tasks", 3}}}, {"streak", 1}}}, {"private", "secret-private"}}}};
-    const auto game = Voice::GameView(snapshot, {{"attributes", {{"exp", 50}}}, {"buffs", {{{"name", "好运"}}}}, {"buycost", 11}, {"cloud", {{"session", "secret-cloud"}}}},
-      {{"current", nullptr}, {"list", {{{"id", 1}, {"success_rate", 0.8}}}}, {"queue", {{{"entry_id", 42}}}}, {"history", {{{"success", true}}}}},
-      {{"total", 20}, {"unlocked", 1}, {"list", {{{"id", "first-task"}, {"progress", 1}}}}},
-      {{"online", true}}, {{"uid", "123"}, {"name", "测试"}, {"cookies", "secret-account"}}, "all");
-    Check(game["profile"]["buycost"] == 11 && game["tasks"]["queue"][0]["entry_id"] == 42 &&
-      game["statistics"]["failcount"] == 2 && game["achievements"]["total"] == 20, "game data retains mechanics and IDs");
-    Check(game.dump().find("secret-") == std::string::npos, "game view excludes credentials and raw save/config");
-    Check(!Voice::GameView(snapshot, json::object(), json::object(), json::object(), {{"online", false}}, json::object(), "tasks").contains("profile"), "section query remains focused");
+    json profile = {{"attributes", {{"exp", 50}}}, {"buffs", {"guard"}}, {"buycost", 11},
+      {"clothes", {{"current", 0}, {"unlock", {true, true, false}}}}, {"cloud", {{"session", "secret-cloud"}}}};
+    json taskData = {{"current", {{"id", 13}, {"title", "current"}, {"remaining_seconds", 120}}},
+      {"list", json::array()}, {"queue", {{{"entry_id", 42}, {"id", 3}, {"title", "queued"}, {"desc", std::string(20000, 'x')}}}},
+      {"history", json::array()}, {"queue_capacity", 2}, {"queue_upgrade", {{"cost", 1}}}};
+    for (int i = 1; i <= 12; ++i) taskData["list"].push_back({{"id", i}, {"title", "任务"}, {"rate", 75}, {"cost", 300},
+      {"requirements", {{"intellect", 3}}}, {"rewards", {{"exp", 100}}}, {"desc", std::string(20000, 'x')}});
+    for (int i = 0; i < 10; ++i) taskData["history"].push_back({{"id", i}, {"success", true}, {"rewards", {{"exp", 100}}}, {"desc", std::string(20000, 'x')}});
+    json achievementData = {{"total", 50}, {"unlocked", 1}, {"list", json::array()}};
+    for (int i = 0; i < 50; ++i) achievementData["list"].push_back({{"id", std::to_string(i)}, {"title", "成就"},
+      {"description", "累计陪伴并完成指定任务"}, {"progress", i}, {"target", 50}, {"unlocked", false}, {"private", "secret-achievement"}});
+    auto view = [&](const std::string& section, size_t offset = 0, size_t limit = 5) {
+      return Voice::GameView(snapshot, profile, taskData, achievementData, {{"online", true}},
+        {{"uid", "123"}, {"name", "测试"}, {"cookies", "secret-account"}}, section, offset, limit);
+    };
+    Check(view("profile")["profile"]["buycost"] == 11 && !view("profile")["profile"].contains("clothes"), "profile excludes unrelated outfit state");
+    Check(view("task_queue")["queue"][0]["entry_id"] == 42 && !view("task_queue").contains("tasks"), "queue retains actionable IDs without catalogs");
+    Check(view("statistics")["statistics"]["failcount"] == 2, "statistics retain metrics without catalogs");
+    Check(view("clothes")["clothes"]["unlock"][1] == true && !view("clothes").contains("profile"), "outfit query retains unlock conditions");
+    for (const auto& [tool, section] : queriesByTool) if (std::string(section) != "rank") {
+      const auto result = view(section);
+      Check(result["ok"] == true && result.dump().size() < 16000, "every query fits the relay limit with large unrelated data");
+      Check(result.dump().find("secret-") == std::string::npos, "focused game queries exclude credentials and raw save/config");
+    }
+    json seen = json::array();
+    size_t offset = 0;
+    do {
+      const auto page = view("task_catalog", offset, 5)["tasks"];
+      Check(page["total"] == 13 && page["list"].size() <= 5, "catalog includes active task and respects page size");
+      for (const auto& item : page["list"]) { seen.push_back(item["id"]); Check(!item.contains("desc") && item.contains("id"), "catalog omits flavor text but keeps IDs"); }
+      if (!page["has_more"].get<bool>()) { Check(page["next_offset"].is_null(), "last page signals completion"); break; }
+      offset = page["next_offset"];
+    } while (true);
+    Check(seen.size() == 13 && seen.back() == 13, "all catalog pages preserve the active task once");
+    Check(view("task_catalog", 10000)["tasks"]["list"].empty() && view("task_catalog", 10000)["tasks"]["has_more"] == false, "past-end pagination terminates");
+    Check(view("achievements", 10, 10)["achievements"]["list"][0]["id"] == "10" &&
+      view("achievements", 10, 10)["achievements"]["unlocked"] == 1, "achievement page preserves progress and counts");
+    Check(view("task_history", 5)["history"]["list"].size() == 5 && !view("task_history").contains("current"), "history pages exclude active tasks");
+    achievementData["list"][0]["description"] = std::string(20000, 'x');
+    const auto oversizedPage = view("achievements", 0, 1)["achievements"];
+    Check(oversizedPage["list"][0]["id"] == "0" && oversizedPage["list"][0].contains("notice") &&
+      oversizedPage["next_offset"] == 1 && oversizedPage.dump().size() < 16000,
+      "oversized single record retains identity and pagination makes progress");
+    Check(view("all")["ok"] == false, "raw view cannot reconstruct an oversized all query");
+    auto focusedDependencies = dependencies;
+    int successfulCommands = 0;
+    focusedDependencies.command = [&](const json&) { ++successfulCommands; return std::string{}; };
+    focusedDependencies.game = [&](const json& query) { return view(query.at("section")); };
+    for (const auto& args : {json{{"action", "queue_task"}, {"task_id", 3}}, json{{"action", "start_task"}, {"task_id", 3}},
+      json{{"action", "move_queued_task"}, {"entry_id", 42}, {"direction", "up"}}, json{{"action", "upgrade_task_queue"}},
+      json{{"action", "upgrade_attribute"}, {"attribute", "speed"}}, json{{"action", "star_up"}}, json{{"action", "change_clothes"}, {"clothes_id", 1}}}) {
+      const auto result = Voice::ExecuteTool(Call("game_action", args), focusedDependencies);
+      Check(result["ok"] == true && result.dump().size() < 2000 && !result["state"].contains("achievements") && !result["state"].contains("tasks"),
+        "successful mutations carry only relevant state even with oversized catalogs");
+    }
+    for (int failure = 0; failure < 3; ++failure) {
+      focusedDependencies.game = [failure](const json&) -> json {
+        if (failure == 0) throw std::runtime_error("secret-read-error");
+        if (failure == 1) return {{"ok", false}, {"error", "secret-read-error"}};
+        return {{"ok", true}, {"oversized", std::string(16000, 'x')}};
+      };
+      const auto before = successfulCommands;
+      const auto result = Voice::ExecuteTool(Call("game_action", {{"action", "queue_task"}, {"task_id", 3}}), focusedDependencies);
+      Check(result["ok"] == true && result.contains("notice") && !result.contains("state") && successfulCommands == before + 1,
+        "state-read failure or oversize never reverses successful command acknowledgement");
+      Check(result.dump().find("secret-") == std::string::npos, "post-command read exceptions stay private");
+      Check(Voice::ExecuteTool(Call("jpet_settings", {{"action", "change_clothes"}, {"clothes_id", 1}}), focusedDependencies)["ok"] == true,
+        "settings clothing changes preserve command success if state read fails");
+    }
     auto bili = Voice::BilibiliSearchResults({{"code", 0}, {"data", {{"numResults", 10}, {"page", 2}, {"result", {
       {{"title", "<em class=\"keyword\">千问</em>&amp;教程"}, {"author", "作者"}, {"bvid", "BV1xx411c7mD"}, {"play", 30}},
       {{"title", "第二项"}, {"arcurl", "javascript:alert(1)"}}
@@ -259,6 +334,7 @@ int main() {
     Check(!Voice::WebSearchResults({{"output", {{"choices", {{{"message", {{"content", "没有来源"}}}}}}}}}, 5)["ok"].get<bool>(), "uncited generation is not represented as successful search");
 
     SessionFixture first;
+    Check(first.sent.front()["session"].dump().size() < 16000, "session instructions and fifteen tools fit the relay handshake limit");
     Check(first.sent.front()["session"]["tools"] == definitions && !first.sent.front()["session"].contains("enable_search"), "custom tools configured without conflicting built-in search");
     first.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r1"}, {"transcript", "我先查询一下。"}});
     first.Arguments();
@@ -337,10 +413,10 @@ int main() {
       return json{{"ok", true}};
     };
     Voice::ToolExecutor executor(dependencies);
-    executor.Submit({Call("get_game_state", json::object()), {"c2", "get_game_state", "{}"}});
+    executor.Submit({Call("get_game_profile", json::object()), {"c2", "get_game_profile", "{}"}});
     Check(started.get_future().wait_for(std::chrono::seconds(2)) == std::future_status::ready, "executor runs outside UI thread");
     executor.Cancel(); release.set_value();
-    executor.Submit({{"new", "get_game_state", "{}"}});
+    executor.Submit({{"new", "get_game_profile", "{}"}});
     std::vector<Voice::ToolExecutor::Result> results;
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
     while (results.empty() && std::chrono::steady_clock::now() < deadline) {

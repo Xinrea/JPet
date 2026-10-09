@@ -38,11 +38,11 @@ bool CheckRealtime(const std::string& workspace, const std::string& key, const s
     [&](const std::string& value) { transcript = value; },
     [&](const std::vector<Voice::ToolCall>& calls) {
       for (const auto& call : calls) {
-        if (call.name == "get_game_state") {
+        if (call.name == "get_game_profile") {
           ++toolCalls;
           session.CompleteTool(call.id, {{"ok", true}, {"online", true}, {"source", "integration_fixture"},
             {"profile", {{"attributes", {{"speed", 7}, {"endurance", 9}, {"strength", 5}, {"will", 11}, {"intellect", 13}, {"exp", 2468}}}}}});
-        } else session.CompleteTool(call.id, {{"ok", false}, {"error", "本次只读接口测试仅支持get_game_state"}});
+        } else session.CompleteTool(call.id, {{"ok", false}, {"error", "本次只读接口测试仅支持get_game_profile"}});
       }
     }
   }, Voice::ToolDefinitions()};

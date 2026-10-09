@@ -82,7 +82,7 @@ def main(gui=False, app=APP):
             voice = request(port, "/api/voice")[1]
             assert voice["microphone_on"] is False
             assert voice["model"] == "qwen3.8-omni-flash-realtime"
-            assert set(voice["available_tools"]) == {"view_desktop", "get_game_state", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"}
+            assert set(voice["available_tools"]) == {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "get_game_rank", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"}
             code, history = request(port, "/api/voice/history")
             assert code == 200 and history == {"list": [], "limit": 200, "error": ""}
             # These requests never create a credential in the real keychain.

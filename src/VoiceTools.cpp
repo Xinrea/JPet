@@ -110,16 +110,66 @@ json Selected(const json& object, std::initializer_list<const char*> keys) {
   for (const auto* key : keys) if (object.contains(key)) result[key] = object[key];
   return result;
 }
+const std::pair<const char*, const char*> GameQueries[] = {
+  {"get_game_profile", "profile"}, {"get_game_clothes", "clothes"},
+  {"get_task_catalog", "task_catalog"}, {"get_current_task", "current_task"},
+  {"get_task_queue", "task_queue"}, {"get_task_history", "task_history"},
+  {"get_game_achievements", "achievements"}, {"get_game_statistics", "statistics"},
+  {"get_game_rank", "rank"}
+};
+json ActionResult(const ToolDependencies& dependencies, const std::string& action, const char* section) {
+  json result = {{"ok", true}, {"action", action}};
+  // The command has already succeeded. A follow-up read must never invite a retry.
+  try {
+    auto state = dependencies.game({{"section", section}});
+    if (state.value("ok", false) && state.dump().size() <= 12000) result["state"] = std::move(state);
+    else result["notice"] = "操作已成功，暂时无法读取更新后的状态；请单独查询，不要重复操作";
+  } catch (const std::exception&) {
+    result["notice"] = "操作已成功，暂时无法读取更新后的状态；请单独查询，不要重复操作";
+  }
+  return result;
+}
+json Page(const json& items, size_t offset, size_t limit, std::initializer_list<const char*> keys) {
+  json list = json::array();
+  const auto total = items.is_array() ? items.size() : 0;
+  for (size_t i = std::min(offset, total); i < total && list.size() < limit; ++i) {
+    auto item = Selected(items[i], keys);
+    if (item.dump().size() > 10000) {
+      // Keep pagination advancing even if a single record is unexpectedly large.
+      item = Selected(items[i], {"id", "title"});
+      for (auto& field : item.items()) if (field.value().is_string())
+        field.value() = Plain(item, field.key().c_str(), 512);
+      item["notice"] = "该条记录详情过长，已省略";
+    }
+    // Leave room for metadata and the function-call envelope under the 16 KB relay limit.
+    if (list.dump().size() + item.dump().size() > 10000) break;
+    list.push_back(std::move(item));
+  }
+  const auto next = std::min(offset, total) + list.size();
+  return {{"list", list}, {"total", total}, {"offset", offset}, {"limit", limit},
+    {"has_more", next < total}, {"next_offset", next < total ? json(next) : json(nullptr)}};
+}
+
 } // namespace
 
 json ToolDefinitions() {
   return json::array({
     Definition("view_desktop", "获取当前桌面截图并读取画面内容。仅在用户要求查看屏幕时调用；display=0为主屏，其余为附加屏。返回视觉观察及截图尺寸，不执行鼠标键盘操作。",
       {{"question", String("想从截图中了解什么，默认描述当前桌面")}, {"display", Integer(0, 7)}}),
-    Definition("get_game_state", "读取JPet的真实游戏数据：属性、经验和升级价格、星星、Buff、服装、任务目录与成功率/收益、当前任务/进度、队列、历史、成就与统计，以及排行榜。操作前先用此工具查ID和条件。离线结果可能是缓存。",
-      {{"section", Enum({"all", "profile", "tasks", "achievements", "statistics", "rank"})},
-       {"metric", Enum({"starcnt", "exp", "attr"})}, {"offset", Integer(0, 10000)}, {"limit", Integer(1, 20)}}),
-    Definition("game_action", "按用户明确要求执行一个游戏操作，云端验证费用和条件。先查询游戏状态。task_id是任务目录ID；entry_id是队列实例ID。升级/退还属性每次一点评估真实价格；失败不要盲目重试。",
+    Definition("get_game_profile", "查询属性、经验、属性升级/退还价格、星星、Buff和轴芯等级。属性或升星操作前先查此工具；离线结果标记为缓存。", json::object()),
+    Definition("get_game_clothes", "查询当前服装和各服装解锁状态，换装前先查询。", json::object()),
+    Definition("get_task_catalog", "分页查询可选任务的ID、条件、成功率、耗时和收益；安排任务前查询，包含正在进行的任务。使用next_offset读取后续页。",
+      {{"offset", Integer(0, 10000)}, {"limit", Integer(1, 10)}}),
+    Definition("get_current_task", "查询当前正在执行的任务、进度和剩余时间；没有任务时current为null。", json::object()),
+    Definition("get_task_queue", "查询任务队列、entry_id、容量、阻塞状态及扩容费用。移动/移除队列项或扩容前查询。", json::object()),
+    Definition("get_task_history", "分页查询最近任务结算记录、成功/失败和奖励，使用next_offset读取后续页。",
+      {{"offset", Integer(0, 10000)}, {"limit", Integer(1, 10)}}),
+    Definition("get_game_achievements", "分页查询成就条件、进度和解锁情况，使用next_offset读取后续页。",
+      {{"offset", Integer(0, 10000)}, {"limit", Integer(1, 10)}}),
+    Definition("get_game_statistics", "查询游戏累计统计、连胜和陪伴日期，不返回成就目录。", json::object()),
+    Definition("get_game_rank", "分页查询排行榜，metric为starcnt星星/exp经验/attr属性。",
+      {{"metric", Enum({"starcnt", "exp", "attr"})}, {"offset", Integer(0, 10000)}, {"limit", Integer(1, 10)}}),
+    Definition("game_action", "按用户明确要求执行一个游戏操作，云端验证费用和条件。先用对应查询工具查任务、队列或属性。task_id是任务目录ID；entry_id是队列实例ID。升级/退还属性每次一点评估真实价格；失败不要盲目重试。",
       {{"action", Enum({"start_task", "queue_task", "cancel_task", "remove_queued_task", "move_queued_task", "upgrade_attribute", "refund_attribute", "upgrade_task_queue", "star_up", "change_clothes"})},
        {"task_id", Integer(1, 13)}, {"entry_id", Integer(1, INT64_MAX)}, {"direction", Enum({"up", "down"})},
        {"attribute", Enum({"speed", "endurance", "strength", "will", "intellect"})}, {"clothes_id", Integer(0, 2)}}, {"action"}),
@@ -152,6 +202,7 @@ json ToolDefinitions() {
 
 std::string ToolLabel(const std::string& name) {
   if (name == "view_desktop") return "正在查看桌面…";
+  for (const auto& query : GameQueries) if (name == query.first) return "正在查询游戏数据…";
   if (name == "get_game_state") return "正在查询游戏数据…";
   if (name == "game_action") return "正在执行游戏操作…";
   if (name == "jpet_settings") return "正在读取或调整设置…";
@@ -218,16 +269,33 @@ json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies, con
         const auto id = Number(args, "clothes_id", 0, 2);
         const auto error = dependencies.command({{"type", "clothes"}, {"id", id}});
         if (!error.empty()) return Fail(error);
-        return {{"ok", true}, {"action", action}, {"state", dependencies.game({{"section", "profile"}})}};
+        return ActionResult(dependencies, action, "clothes");
       }
       if (!dependencies.settings) return Fail("设置工具不可用");
       return dependencies.settings(request, cancelled);
     }
+    for (const auto& [name, section] : GameQueries) if (call.name == name) {
+      const std::string type = section;
+      json query = {{"section", type}};
+      if (type == "rank") {
+        Fields(args, {"metric", "offset", "limit"});
+        query["metric"] = Choice(args, "metric", {"starcnt", "exp", "attr"}, "starcnt");
+      } else if (type == "task_catalog" || type == "task_history" || type == "achievements")
+        Fields(args, {"offset", "limit"});
+      else Fields(args, {});
+      if (type == "rank" || type == "task_catalog" || type == "task_history" || type == "achievements") {
+        query["offset"] = Number(args, "offset", 0, 10000, 0);
+        query["limit"] = Number(args, "limit", 1, 10, 5);
+      }
+      return dependencies.game(query);
+    }
+    // Existing sessions may still issue the old tool. Never restore an unbounded all-state query.
     if (call.name == "get_game_state") {
       Fields(args, {"section", "metric", "offset", "limit"});
-      json query = {{"section", Choice(args, "section", {"all", "profile", "tasks", "achievements", "statistics", "rank"}, "all")},
-        {"metric", Choice(args, "metric", {"starcnt", "exp", "attr"}, "starcnt")},
-        {"offset", Number(args, "offset", 0, 10000, 0)}, {"limit", Number(args, "limit", 1, 20, 10)}};
+      const auto section = Choice(args, "section", {"profile", "clothes", "tasks", "task_catalog", "current_task", "task_queue", "task_history", "achievements", "statistics", "rank"});
+      json query = {{"section", section == "tasks" ? "task_catalog" : section},
+        {"offset", Number(args, "offset", 0, 10000, 0)}, {"limit", Number(args, "limit", 1, 10, 5)}};
+      if (section == "rank") query["metric"] = Choice(args, "metric", {"starcnt", "exp", "attr"}, "starcnt");
       return dependencies.game(query);
     }
     if (call.name == "game_action") {
@@ -254,7 +322,10 @@ json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies, con
       }
       const auto error = dependencies.command(command);
       if (!error.empty()) return Fail(error);
-      return {{"ok", true}, {"action", action}, {"state", dependencies.game({{"section", "all"}})}};
+      const char* section = action == "change_clothes" ? "clothes" :
+        action == "upgrade_attribute" || action == "refund_attribute" || action == "star_up" ? "attributes" :
+        action == "upgrade_task_queue" ? "task_queue" : "task_status";
+      return ActionResult(dependencies, action, section);
     }
     if (call.name == "view_desktop") {
       Fields(args, {"question", "display"});
@@ -294,32 +365,54 @@ json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies, con
 }
 
 json GameView(const json& snapshot, const json& profile, const json& tasks, const json& achievements,
-    const json& connection, const json& identity, const std::string& section) {
+    const json& connection, const json& identity, const std::string& section, size_t offset, size_t limit) {
   const bool confirmed = snapshot.contains("revision");
   json result = {{"ok", true}, {"online", connection.value("online", false)}, {"confirmed", confirmed},
-    {"source", connection.value("online", false) ? "cloud" : confirmed ? "cloud_cache" : "local_unconfirmed"}, {"account", Selected(identity, {"uid", "name"})},
-    {"attribute_names", {{"speed", "速度"}, {"endurance", "耐力"}, {"strength", "力量"}, {"will", "毅力"}, {"intellect", "智力"}, {"exp", "经验"}}},
-    {"clothes_names", {{"0", "绿色"}, {"1", "粉色"}, {"2", "冬装"}}}};
+    {"source", connection.value("online", false) ? "cloud" : confirmed ? "cloud_cache" : "local_unconfirmed"},
+    {"account", Selected(identity, {"uid", "name"})}};
   if (!confirmed) result["notice"] = "尚未同步云端游戏数据；以下仅是本地默认值或迁移资料，不能当作当前云端状态";
   for (const auto* key : {"revision", "server_time", "lease_remaining_ms"})
     if (snapshot.contains(key)) result[key] = snapshot[key];
-  if (snapshot.contains("share")) result["leaderboard_visible"] = snapshot["share"];
-  if (section == "all" || section == "profile") result["profile"] = Selected(profile, {
-    "attributes", "starcnt", "clothes", "expdiff", "buffs", "exp_progress_seconds", "buycost", "revertgain", "attr_limit", "star_available", "medal_level", "online"});
-  if (section == "all" || section == "profile") {
-    result["buff_descriptions"] = {{"live", "直播：经验增加100%"}, {"dynamic", "动态：经验增加50%"},
-      {"guard", "舰长：经验增加25%"}, {"fail", "连败：经验增加25%"}, {"monday", "周一：经验增加25%"}, {"birthday", "生日：经验增加250%"}};
-    result["rules"] = {{"exp_interval_seconds", 60}, {"star_up_cost_per_attribute", 53},
-      {"medal", "轴芯等级为本机最近一次B站观测值，每3级提升1点有效智力；经验速度以expdiff为准"},
-      {"offline", "断网或关闭游戏时任务与经验进度暂停"}};
-  }
-  if (section == "all" || section == "tasks") result["tasks"] = Selected(tasks, {
-    "current", "list", "queue", "queue_capacity", "history", "queue_upgrade", "queue_blocked", "online"});
-  if (section == "all" || section == "achievements") result["achievements"] = Selected(achievements, {"total", "unlocked", "list", "online"});
-  if (section == "all" || section == "statistics") {
+  limit = std::clamp<size_t>(limit, 1, 10);
+  if (section == "profile" || section == "attributes") {
+    result["attribute_names"] = {{"speed", "速度"}, {"endurance", "耐力"}, {"strength", "力量"}, {"will", "毅力"}, {"intellect", "智力"}, {"exp", "经验"}};
+    result["profile"] = Selected(profile, {"attributes", "starcnt", "buycost", "revertgain", "attr_limit", "star_available"});
+    if (section == "profile") {
+      result["profile"].update(Selected(profile, {"expdiff", "buffs", "exp_progress_seconds", "medal_level"}));
+      result["buff_descriptions"] = {{"live", "直播：经验增加100%"}, {"dynamic", "动态：经验增加50%"},
+        {"guard", "舰长：经验增加25%"}, {"fail", "连败：经验增加25%"}, {"monday", "周一：经验增加25%"}, {"birthday", "生日：经验增加250%"}};
+      result["rules"] = {{"exp_interval_seconds", 60}, {"star_up_cost_per_attribute", 53},
+        {"medal", "轴芯等级为本机最近一次B站观测值，每3级提升1点有效智力；经验速度以expdiff为准"},
+        {"offline", "断网或关闭游戏时任务与经验进度暂停"}};
+    }
+  } else if (section == "clothes") {
+    result["clothes"] = profile.value("clothes", json::object());
+    result["clothes_names"] = {{"0", "绿色"}, {"1", "粉色"}, {"2", "冬装"}};
+  } else if (section == "current_task" || section == "task_status") {
+    const auto current = tasks.value("current", json(nullptr));
+    result["current"] = current.is_object() ? Selected(current, {"id", "title", "cost", "rate", "requirements", "rewards", "elapsed_seconds", "remaining_seconds", "start_time", "paused"}) : json(nullptr);
+  } else if (section == "task_catalog") {
+    auto catalog = tasks.value("list", json::array());
+    // The cloud omits the active task from its catalog; it can still be queued again.
+    const auto current = tasks.value("current", json(nullptr));
+    if (current.is_object() && std::none_of(catalog.begin(), catalog.end(), [&](const json& item) { return item.value("id", 0) == current.value("id", 0); })) catalog.push_back(current);
+    std::sort(catalog.begin(), catalog.end(), [](const json& a, const json& b) { return a.value("id", 0) < b.value("id", 0); });
+    result["tasks"] = Page(catalog, offset, limit, {"id", "title", "cost", "rate", "requirements", "rewards", "repeatable"});
+  } else if (section == "task_history") {
+    result["history"] = Page(tasks.value("history", json::array()), offset, limit, {"id", "title", "success", "rewards", "end_time", "cost"});
+  } else if (section == "achievements") {
+    result["achievements"] = Page(achievements.value("list", json::array()), offset, limit, {"id", "title", "description", "category", "target", "progress", "unlocked", "unlocked_at"});
+    result["achievements"]["unlocked"] = achievements.value("unlocked", 0);
+  } else if (section == "statistics") {
     const auto save = snapshot.value("save", json::object());
     result["statistics"] = Selected(save, {"failcount"});
     if (save.contains("achievements")) result["statistics"]["achievements"] = Selected(save["achievements"], {"metrics", "streak", "last_failed", "dates"});
+  } else if (section != "task_queue") return Fail("请使用对应的游戏查询工具，不支持查询完整状态");
+  if (section == "task_queue" || section == "task_status") {
+    result["queue"] = json::array();
+    for (const auto& entry : tasks.value("queue", json::array()))
+      result["queue"].push_back(Selected(entry, {"entry_id", "id", "title", "cost", "rate", "requirements", "rewards"}));
+    result.update(Selected(tasks, {"queue_capacity", "queue_upgrade", "queue_blocked"}));
   }
   return result;
 }

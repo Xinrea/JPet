@@ -140,7 +140,7 @@ json ApplySettings(const json& request) {
 
 json ReadGame(const json& query) {
   auto* data = DataManager::GetInstance();
-  const auto section = query.value("section", std::string("all"));
+  const auto section = query.at("section").get<std::string>();
   if (section == "rank") {
     const auto uid = data->GetWithDefault("uid", std::string{});
     return ReadGameRank(query, CloudGame::ServiceUrl(), uid);
@@ -156,7 +156,7 @@ json ReadGame(const json& query) {
   return GameView(snapshot, profile,
     snapshot.contains("tasks") ? snapshot["tasks"] : data->GetTaskState(),
     snapshot.contains("achievements") ? snapshot["achievements"] : data->GetAchievementState(), connection,
-    {{"uid", data->GetWithDefault("uid", std::string{})}, {"name", data->GetWithDefault("uname", std::string{})}}, section);
+    {{"uid", data->GetWithDefault("uid", std::string{})}, {"name", data->GetWithDefault("uname", std::string{})}}, section, query.value("offset", size_t{0}), query.value("limit", size_t{5}));
 }
 
 struct AICredentials { std::string workspace, key, service, error; };
