@@ -134,7 +134,7 @@ json ActionResult(const ToolDependencies& dependencies, const std::string& actio
 json Page(const json& items, size_t offset, size_t limit, std::initializer_list<const char*> keys) {
   json list = json::array();
   const auto total = items.is_array() ? items.size() : 0;
-  for (size_t i = std::min(offset, total); i < total && list.size() < limit; ++i) {
+  for (size_t i = (std::min)(offset, total); i < total && list.size() < limit; ++i) {
     auto item = Selected(items[i], keys);
     if (item.dump().size() > 10000) {
       // Keep pagination advancing even if a single record is unexpectedly large.
@@ -147,7 +147,7 @@ json Page(const json& items, size_t offset, size_t limit, std::initializer_list<
     if (list.dump().size() + item.dump().size() > 10000) break;
     list.push_back(std::move(item));
   }
-  const auto next = std::min(offset, total) + list.size();
+  const auto next = (std::min)(offset, total) + list.size();
   return {{"list", list}, {"total", total}, {"offset", offset}, {"limit", limit},
     {"has_more", next < total}, {"next_offset", next < total ? json(next) : json(nullptr)}};
 }
