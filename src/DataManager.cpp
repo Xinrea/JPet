@@ -129,7 +129,8 @@ nlohmann::json DataManager::GetVoiceSettings() {
   return {{"workspace_id", GetConfig<std::string>("voice", "workspace_id", "")},
           {"has_api_key", GetConfig<bool>("voice", "has_api_key", false)},
           {"model", Voice::Model},
-          {"provider", GetConfig<std::string>("voice", "provider", "custom")}};
+          {"provider", GetConfig<std::string>("voice", "provider", "custom")},
+          {"input_mode", GetConfig<std::string>("voice", "input_mode", "toggle")}};
 }
 
 nlohmann::json DataManager::LoadVoiceHistory() {
@@ -144,9 +145,13 @@ void DataManager::SaveVoiceHistory(const nlohmann::json& history) {
 
 bool DataManager::UpdateVoiceSettings(const std::string& workspace,
                                       const std::string* apiKey, std::string& error,
-                                      const std::string& provider) {
+                                      const std::string& provider, const std::string& inputMode) {
   if (!provider.empty() && provider != "custom" && provider != "jpet") {
     error = "请选择有效的 AI 服务方式";
+    return false;
+  }
+  if (!inputMode.empty() && inputMode != "toggle" && inputMode != "hold") {
+    error = "请选择开关或按住的快捷键方式";
     return false;
   }
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
@@ -161,7 +166,8 @@ bool DataManager::UpdateVoiceSettings(const std::string& workspace,
   if (apiKey && !Voice::SaveApiKey(LAppPal::WStringToString(LAppDefine::documentPath), *apiKey, error)) return false;
   const bool hasKey = apiKey ? !apiKey->empty() : GetConfig<bool>("voice", "has_api_key", false);
   data.insert_or_assign("voice", toml::table{{"workspace_id", workspace}, {"has_api_key", hasKey},
-    {"provider", provider.empty() ? GetConfig<std::string>("voice", "provider", "custom") : provider}});
+    {"provider", provider.empty() ? GetConfig<std::string>("voice", "provider", "custom") : provider},
+    {"input_mode", inputMode.empty() ? GetConfig<std::string>("voice", "input_mode", "toggle") : inputMode}});
   Save();
   return true;
 }

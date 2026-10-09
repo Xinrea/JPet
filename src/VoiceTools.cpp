@@ -22,7 +22,7 @@ void Fields(const json& args, std::initializer_list<const char*> allowed) {
   if (!args.is_object()) throw std::invalid_argument("工具参数必须是对象");
   for (const auto& item : args.items())
     if (std::none_of(allowed.begin(), allowed.end(), [&](const char* key) { return item.key() == key; }))
-      throw std::invalid_argument("工具包含不支持的参数");
+      throw std::invalid_argument("工具包含不支持的字段；允许的字段为 " + json(allowed).dump());
 }
 std::string Text(const json& args, const char* key, size_t max, const std::string& fallback = "") {
   if (!args.contains(key)) return fallback;
@@ -35,19 +35,19 @@ std::string Text(const json& args, const char* key, size_t max, const std::strin
 std::string Choice(const json& args, const char* key, std::initializer_list<const char*> values, const char* fallback = "") {
   auto value = Text(args, key, 64, fallback);
   if (std::none_of(values.begin(), values.end(), [&](const char* option) { return value == option; }))
-    throw std::invalid_argument("工具参数不在支持范围内");
+    throw std::invalid_argument(std::string(key) + " 必须为 " + json(values).dump() + " 中的一项");
   return value;
 }
 int64_t Number(const json& args, const char* key, int64_t min, int64_t max, int64_t fallback = -1) {
   if (!args.contains(key)) {
     if (fallback >= min && fallback <= max) return fallback;
-    throw std::invalid_argument("缺少操作所需的数字参数");
+    throw std::invalid_argument(std::string("缺少数字参数 ") + key);
   }
-  if (!args[key].is_number_integer()) throw std::invalid_argument("工具数字参数必须是整数");
+  if (!args[key].is_number_integer()) throw std::invalid_argument(std::string(key) + " 必须是整数");
   if (args[key].is_number_unsigned() && args[key].get<uint64_t>() > static_cast<uint64_t>(INT64_MAX))
     throw std::invalid_argument("工具数字参数超出范围");
   auto value = args[key].get<int64_t>();
-  if (value < min || value > max) throw std::invalid_argument("工具数字参数超出范围");
+  if (value < min || value > max) throw std::invalid_argument(std::string(key) + " 必须在 " + std::to_string(min) + " 到 " + std::to_string(max) + " 之间");
   return value;
 }
 std::string Plain(const json& item, const char* key, size_t max = 1000) {
@@ -356,8 +356,10 @@ json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies, con
       return {{"ok", true}, {"url", url}, {"browser", "system_default"}, {"notice", "已交给系统默认浏览器打开；网页加载状态未检测"}};
     }
     return Fail("未知工具");
+  } catch (const json::parse_error&) {
+    return {{"ok", false}, {"code", "invalid_arguments"}, {"error", "工具参数不是有效的 JSON，请按照工具定义重新构造对象"}};
   } catch (const std::invalid_argument& error) {
-    return Fail(error.what());
+    return {{"ok", false}, {"code", "invalid_arguments"}, {"error", error.what()}};
   } catch (const std::exception&) {
     // Network/library errors can contain request headers; never forward them.
     return Fail("工具执行失败，请检查网络和登录状态后重试");

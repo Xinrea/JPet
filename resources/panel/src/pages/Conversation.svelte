@@ -12,14 +12,16 @@
   let error = "";
   let saveError = "";
   let search = "";
-  let order = "recent";
+  let order = "oldest";
   let timer;
   let controller;
   let destroyed = false;
-  const states = { pending: "回复中", completed: "已完成", interrupted: "已打断", failed: "回复失败" };
+  const states = { pending: "进行中", completed: "已完成", interrupted: "已打断", failed: "失败" };
+  const tools = { view_desktop: "查看桌面", get_game_profile: "查询属性", get_game_clothes: "查询服装", get_task_catalog: "查询任务目录", get_current_task: "查询当前任务", get_task_queue: "查询任务队列", get_task_history: "查询任务历史", get_game_achievements: "查询成就", get_game_statistics: "查询统计", get_game_rank: "查询排行榜", game_action: "游戏操作", jpet_settings: "JPet 设置", web_search: "网页搜索", bilibili_search: "B站搜索", open_url: "打开网页" };
+  const format = value => JSON.stringify(value || {}, null, 2);
 
   $: visible = records.filter((item) =>
-    `${item.user}\n${item.assistant}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
+    `${item.text || ""}\n${item.name || ""}\n${tools[item.name] || ""}\n${format(item.arguments)}\n${format(item.result)}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
   ).sort((a, b) => order === "recent" ? b.id - a.id : a.id - b.id);
 
   function dateLabel(timestamp) {
@@ -63,15 +65,15 @@
 <section class="conversation-page" aria-label="AI 对话">
   <div class="history-summary game-card">
     <span class="summary-icon"><UiIcon name="chat" size={26} /></span>
-    <div class="summary-copy"><h2>和轴伊的聊天时光</h2><p>对话文字保存在本机，最多保留最近 {limit} 轮。</p></div>
+    <div class="summary-copy"><h2>和轴伊的聊天时光</h2><p>对话文字保存在本机，包含工具调用，最多保留最近 {limit} 条消息。</p></div>
     <div class="summary-actions">
-      <span class="record-count"><strong>{records.length}</strong> 轮对话</span>
+      <span class="record-count"><strong>{records.length}</strong> 条消息</span>
       <button class="voice-settings-button" aria-haspopup="dialog" on:click={() => voiceSettingsOpen = true}><UiIcon name="settings" size={17} />语音对话设置</button>
     </div>
   </div>
 
   <div class="history-tools">
-    <label class="history-search"><span class="sr-only">搜索用户发言或轴伊回复</span><input type="search" bind:value={search} placeholder="搜索对话内容…" /></label>
+    <label class="history-search"><span class="sr-only">搜索消息或工具调用</span><input type="search" bind:value={search} placeholder="搜索消息、工具或参数…" /></label>
     <label><span class="sr-only">对话排序</span><select bind:value={order}><option value="recent">最新在前</option><option value="oldest">最早在前</option></select></label>
     <button class="refresh-button" on:click={refresh} disabled={refreshing}>刷新</button>
   </div>
@@ -82,17 +84,34 @@
   {:else if error && records.length === 0}
     <div class="history-empty game-card"><UiIcon name="chat" size={36} /><h2>暂时无法读取记录</h2><p>点击重新加载，再试一次。</p></div>
   {:else if records.length === 0}
-    <div class="history-empty game-card"><UiIcon name="chat" size={36} /><h2>还没有对话记录</h2><p><button on:click={() => voiceSettingsOpen = true}>配置语音对话</button>后，按 Option（Mac）或 Ctrl（Windows）开启麦克风，和轴伊聊聊吧；再按一次关闭。</p><small>从本次更新后开始记录，语音转写仅供参考。</small></div>
+    <div class="history-empty game-card"><UiIcon name="chat" size={36} /><h2>还没有对话记录</h2><p><button on:click={() => voiceSettingsOpen = true}>配置语音对话</button>后，使用 Option（Mac）或 Ctrl（Windows）和轴伊聊聊吧。可在语音设置中选择开关或按住方式。</p><small>从本次更新后开始记录，语音转写仅供参考。</small></div>
   {:else if visible.length === 0}
     <div class="history-empty game-card"><UiIcon name="chat" size={36} /><h2>没有找到相关对话</h2><p>试试其他关键词，或<button on:click={() => search = ""}>清空搜索</button>。</p></div>
   {:else}
-    <p class="result-count">显示 {visible.length} 轮对话 · 语音转写仅供参考</p>
+    <p class="result-count">显示 {visible.length} 条消息 · 语音转写仅供参考</p>
     <div class="history-list">
       {#each visible as item (item.id)}
-        <article class="conversation-card game-card">
-          <header><time datetime={new Date(item.created_at * 1000).toISOString()}>{dateLabel(item.created_at)}</time><span class="turn-state" class:pending={item.state === "pending"} class:failed={item.state === "failed"}>{states[item.state] || "已完成"}</span></header>
-          <div class="message user-message"><span class="message-avatar"><UiIcon name="user" size={18} /></span><div class="message-content"><h3>你</h3><p class:placeholder={!item.user}>{item.user || (item.state === "pending" ? "正在等待语音转写…" : "未获取到语音转写")}</p></div></div>
-          <div class="message assistant-message"><span class="message-avatar"><UiIcon name="spark" size={18} /></span><div class="message-content"><h3>轴伊 <span>AI</span></h3><p class:placeholder={!item.assistant}>{item.assistant || (item.state === "pending" ? "正在思考或执行工具…" : item.state === "failed" ? "本次回复失败，请重新说话。" : item.state === "interrupted" ? "本次回复已打断。" : "本次没有文字回复。")}</p></div></div>
+        <article class="message-row" class:user-row={item.role === "user"} class:tool-row={item.role === "tool"} aria-label={item.role === "user" ? "你的消息" : item.role === "tool" ? "工具调用" : "轴伊的消息"}>
+          <span class="message-avatar"><UiIcon name={item.role === "user" ? "user" : item.role === "tool" ? "settings" : "spark"} size={18} /></span>
+          <div class="message-content">
+            <header>
+              <strong>{item.role === "user" ? "你" : item.role === "tool" ? tools[item.name] || "工具调用" : "轴伊"}</strong>
+              <time datetime={new Date(item.created_at * 1000).toISOString()}>{dateLabel(item.created_at)}</time>
+              {#if item.role !== "user" || item.state === "pending" || item.state === "failed"}<span class="message-state" class:pending={item.state === "pending"} class:failed={item.state === "failed"}>{states[item.state] || "已完成"}</span>{/if}
+            </header>
+            <div class="message-bubble">
+              {#if item.role === "tool"}
+                <div class="tool-name">{item.name}</div>
+                {#if item.result?.error}<p class="tool-error">{item.result.error}</p>
+                {:else if item.state === "pending"}<p class="placeholder">正在执行…</p>
+                {:else if item.state === "interrupted"}<p class="placeholder">已打断，未完成的操作可能已经生效。</p>
+                {:else}<p>{item.result?.notice || (item.state === "failed" ? "工具执行失败" : "执行完成")}</p>{/if}
+                <details class="tool-details"><summary>调用参数与结果</summary><div class="tool-detail-label">参数</div><pre>{format(item.arguments)}</pre>{#if item.result}<div class="tool-detail-label">结果</div><pre>{format(item.result)}</pre>{/if}</details>
+              {:else}
+                <p class:placeholder={!item.text}>{item.text || (item.role === "user" ? item.state === "pending" ? "正在等待语音转写…" : "未获取到语音转写" : item.state === "pending" ? "正在回复…" : item.state === "failed" ? "本次回复失败。" : "本次回复已打断。")}</p>
+              {/if}
+            </div>
+          </div>
         </article>
       {/each}
     </div>
@@ -129,20 +148,28 @@
   .history-empty p { max-width: 420px; font-size: 12px; line-height: 1.9; color: var(--muted); }
   .history-empty small { font-size: 11px; color: var(--muted); }
   .result-count { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
-  .history-list { display: flex; flex-direction: column; gap: 16px; }
-  .conversation-card { overflow: hidden; }
-  .conversation-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #edf0e6; background: #fcfdf9; font-size: 11px; color: var(--muted); }
-  .turn-state { padding: 3px 8px; border-radius: 6px; background: #edf3e5; color: #7e9569; }
-  .turn-state.pending { background: #fff2d8; color: #aa8138; }
-  .turn-state.failed { background: #fff0f4; color: #be5573; }
-  .message { display: flex; align-items: flex-start; gap: 12px; margin: 18px; }
-  .message-avatar { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; color: #ae8974; background: #f7efe9; border-radius: 10px; }
-  .assistant-message .message-avatar { color: var(--green-ink); background: #ecf6dd; }
+  .history-list { display: flex; flex-direction: column; gap: 22px; padding: 20px; border: 1px solid #e7ecde; border-radius: 14px; background: #fff; }
+  .message-row { display: flex; align-items: flex-start; gap: 12px; }
+  .message-avatar { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; color: var(--green-ink); background: #ecf6dd; border-radius: 10px; }
+  .user-row .message-avatar { color: #ae8974; background: #f7efe9; }
+  .tool-row .message-avatar { color: #8e7eaa; background: #f1edf7; }
   .message-content { flex: 1; min-width: 0; }
-  .message-content h3 { font-size: 12px; font-weight: 800; margin: 3px 0 8px; }
-  .message-content h3 span { margin-left: 4px; font-size: 9px; color: var(--green-ink); }
-  .message-content p { font-size: 13px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
-  .assistant-message .message-content p { padding: 12px 14px; border: 1px solid #e8eddc; border-radius: 10px; background: #f8fbf2; }
-  .message-content p.placeholder { color: var(--muted); font-size: 12px; }
-  @media (max-width: 560px) { .history-summary { flex-wrap: wrap; padding: 16px; gap: 10px; } .summary-icon { width: 40px; height: 40px; } .summary-actions { width: 100%; justify-content: space-between; gap: 10px; } .record-count strong { font-size: 20px; } .history-tools { flex-wrap: wrap; gap: 8px; } .history-search { flex-basis: 100%; } .history-tools > label:not(.history-search) { flex: 1; } select { width: 100%; } .message { margin: 16px 12px; gap: 9px; } .conversation-card header { padding: 12px; } }
+  .message-content header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-height: 32px; margin-bottom: 6px; }
+  .message-content header strong { font-size: 12px; font-weight: 800; }
+  time { color: var(--muted); font-size: 10px; }
+  .message-state { padding: 3px 7px; border-radius: 6px; background: #edf3e5; color: #7e9569; font-size: 10px; }
+  .message-state.pending { background: #fff2d8; color: #aa8138; }
+  .message-state.failed { background: #fff0f4; color: #be5573; }
+  .message-bubble { padding: 12px 14px; border: 1px solid #e8eddc; border-radius: 0 12px 12px; background: #f8fbf2; }
+  .user-row .message-bubble { background: #faf7f4; border-color: #efe6df; }
+  .tool-row .message-bubble { background: #faf8fd; border-color: #e9e2f2; }
+  .message-bubble p { font-size: 13px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+  .message-bubble p.placeholder { color: var(--muted); font-size: 12px; }
+  .tool-name { font-size: 11px; color: #8e7eaa; margin-bottom: 6px; overflow-wrap: anywhere; }
+  .tool-error { color: #be5573; }
+  .tool-details { margin-top: 10px; font-size: 11px; }
+  .tool-details summary { cursor: pointer; color: #8e7eaa; }
+  .tool-detail-label { margin-top: 10px; color: var(--muted); }
+  pre { margin-top: 5px; padding: 10px; max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #fff; border: 1px solid #eee8f5; border-radius: 8px; user-select: text; }
+  @media (max-width: 560px) { .history-summary { flex-wrap: wrap; padding: 16px; gap: 10px; } .summary-icon { width: 40px; height: 40px; } .summary-actions { width: 100%; justify-content: space-between; gap: 10px; } .record-count strong { font-size: 20px; } .history-tools { flex-wrap: wrap; gap: 8px; } .history-search { flex-basis: 100%; } .history-tools > label:not(.history-search) { flex: 1; } select { width: 100%; } .history-list { padding: 14px 10px; } .message-row { gap: 8px; } }
 </style>

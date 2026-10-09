@@ -87,16 +87,20 @@ VoiceChat::VoiceChat() : platform_(Voice::MakePlatform()),
 }
 
 void VoiceChat::SetState(const std::string& state, const std::string& message) {
+  const bool holdMode = DataManager::GetInstance()->GetConfig<std::string>("voice", "input_mode", "toggle") == "hold";
   std::string text = message;
   if (text.empty()) {
     if (state == "listening") text = "正在听…";
     else if (state == "connecting") text = "正在连接千问…";
     else if (state == "thinking") text = "千问正在思考…";
     else if (state == "speaking") text = "千问正在回复…";
-    else text = std::string("按 ") + Shortcut + " 开启麦克风";
+    else text = std::string(holdMode ? "按住 " : "按 ") + Shortcut + " 开启麦克风";
   }
   const bool microphoneOn = session_.Recording();
-  if (microphoneOn && state != "error") text += std::string(" 麦克风已开启，再按 ") + Shortcut + " 关闭";
+  if (microphoneOn && state != "error") {
+    if (holdMode) text += std::string(" 松开 ") + Shortcut + " 后回复";
+    else text += std::string(" 麦克风已开启，再按 ") + Shortcut + " 关闭";
+  }
   {
     std::lock_guard<std::mutex> lock(statusMutex_);
     if (status_["state"] != state || status_["message"] != text) {
@@ -112,10 +116,12 @@ void VoiceChat::SetState(const std::string& state, const std::string& message) {
 }
 
 nlohmann::json VoiceChat::Status() {
+  const auto inputMode = DataManager::GetInstance()->GetConfig<std::string>("voice", "input_mode", "toggle");
   std::lock_guard<std::mutex> lock(statusMutex_);
   auto status = status_;
   status["model"] = Voice::Model;
   status["shortcut"] = Shortcut;
+  status["input_mode"] = inputMode;
   status["available_tools"] = nlohmann::json::array();
   for (const auto& definition : Voice::ToolDefinitions()) status["available_tools"].push_back(definition["function"]["name"]);
   return status;
@@ -129,7 +135,7 @@ void VoiceChat::Begin() {
   const bool server = data->GetConfig<std::string>("voice", "provider", "custom") == "jpet";
   if (!server && (!Voice::ValidWorkspace(workspace) || !data->GetConfig<bool>("voice", "has_api_key", false))) {
     SetState("error", "请先在对话 → 语音对话设置中填写 API Key 和业务空间 ID");
-    waitForRelease_ = true;
+    shortcut_.BlockUntilRelease();
     return;
   }
   if (!connected_) {
@@ -137,7 +143,7 @@ void VoiceChat::Begin() {
     const auto key = server ? PowerLiveAccount::Instance().CachedAccessToken(error) : Voice::LoadApiKey(LAppPal::WStringToString(LAppDefine::documentPath), error);
     if (!error.empty() || key.empty()) {
       SetState("error", error.empty() ? "未找到 API Key，请在语音对话设置中重新保存" : error);
-      waitForRelease_ = true;
+      shortcut_.BlockUntilRelease();
       return;
     }
     session_.Reset();
@@ -153,7 +159,7 @@ void VoiceChat::Begin() {
   capturedBytes_ = sentBytes_ = sentChunks_ = 0;
   capturedEnergy_ = 0;
   capturedPeak_ = 0;
-  session_.BeginInput();
+  session_.BeginInput(data->GetConfig<std::string>("voice", "input_mode", "toggle") == "hold");
   platform_->StartCapture();
   microphoneEnabled_ = true;
   lastActivity_ = Clock::now();
@@ -206,8 +212,12 @@ void VoiceChat::Drain() {
         else if (type == "response.done")
           LAppPal::PrintLog("[Voice] Receive type=response.done status=%s",
               DiagnosticCode(message.at("response"), "status").c_str());
-        else if (type == "error")
-          LAppPal::PrintLog("[Voice] Server error code=%s", DiagnosticCode(message.at("error"), "code").c_str());
+        else if (type == "error") {
+          const auto& detail = message.at("error");
+          LAppPal::PrintLog("[Voice] Server error code=%s type=%s category=%s request=%s",
+              DiagnosticCode(detail, "code").c_str(), DiagnosticCode(detail, "type").c_str(),
+              Voice::ServerErrorCategory(detail).c_str(), DiagnosticCode(detail, "event_id").c_str());
+        }
         session_.Receive(message);
         lastActivity_ = Clock::now();
       }
@@ -235,7 +245,7 @@ void VoiceChat::Fail(const std::string& error) {
   const auto message = error;
   LAppPal::PrintLog(LogLevel::Error, "[Voice] Failure: %s", message.c_str());
   Close(true);
-  waitForRelease_ = rawHeld_;
+  shortcut_.BlockUntilRelease();
   SetState("error", message);
 }
 
@@ -244,24 +254,20 @@ void VoiceChat::Tick(GLFWwindow* window) {
   window_ = window;
   const auto now = Clock::now();
   const bool held = platform_->ShortcutHeld();
-  const bool pressed = held && !rawHeld_;
-  rawHeld_ = held;
   if (resetRequested_.exchange(false)) {
     Close();
-    waitForRelease_ = held;
+    shortcut_.BlockUntilRelease(held);
     SetState("idle");
   }
-  if (!held) waitForRelease_ = false;
-  // Only the up-to-down edge toggles capture. Holding or releasing the key
-  // leaves the microphone in its current state.
-  if (pressed && !waitForRelease_) {
-    if (microphoneEnabled_) End();
-    else Begin();
-  }
+  const bool holdMode = DataManager::GetInstance()->GetConfig<std::string>("voice", "input_mode", "toggle") == "hold";
+  const auto action = shortcut_.Update(held, holdMode, microphoneEnabled_);
+  if (action == Voice::ShortcutControl::Action::Begin) Begin();
+  else if (action == Voice::ShortcutControl::Action::End) End();
   Drain();
   Voice::DrainSettingsTools();
   if (tools_) for (const auto& result : tools_->Poll()) {
-    LAppPal::PrintLog("[Voice] Tool completed ok=%d", result.value.value("ok", false));
+    LAppPal::PrintLog("[Voice] Tool completed ok=%d code=%s output_bytes=%zu",
+        result.value.value("ok", false), DiagnosticCode(result.value, "code").c_str(), result.value.dump().size());
     {
       std::lock_guard<std::mutex> lock(statusMutex_);
       nlohmann::json visible = {{"ok", result.value.value("ok", false)}};

@@ -4,6 +4,7 @@
 #include "VoiceSession.hpp"
 #include "VoiceHistory.hpp"
 #include "VoiceTools.hpp"
+#include "VoiceShortcut.hpp"
 #include <atomic>
 #include <chrono>
 #include <mutex>
@@ -37,9 +38,8 @@ class VoiceChat {
   nlohmann::json status_ = {{"state", "idle"}, {"message", ""}, {"reply", ""}, {"microphone_on", false}};
   GLFWwindow* window_ = nullptr;
   bool connected_ = false;
-  bool rawHeld_ = false;
+  Voice::ShortcutControl shortcut_;
   bool microphoneEnabled_ = false;
-  bool waitForRelease_ = false;
   bool failurePending_ = false;
   size_t capturedBytes_ = 0;
   size_t sentBytes_ = 0;

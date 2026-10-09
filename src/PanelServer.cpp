@@ -569,11 +569,17 @@ void PanelServer::doServe() {
       const auto payload = nlohmann::json::parse(req.body);
       const auto workspace = Voice::Trim(payload.value("workspace_id", DataManager::GetInstance()->GetVoiceSettings().at("workspace_id").get<std::string>()));
       const auto provider = payload.value("provider", std::string{});
+      const auto inputMode = payload.value("input_mode", std::string{});
+      if (payload.contains("input_mode") && inputMode.empty()) {
+        res.status = 400;
+        res.set_content(R"({"error":"请选择开关或按住的快捷键方式"})", "application/json");
+        return;
+      }
       std::string key, error;
       const bool clear = payload.value("clear_api_key", false);
       const bool updateKey = clear || payload.contains("api_key");
       if (!clear && updateKey) key = Voice::Trim(payload.at("api_key").get<std::string>());
-      if (!DataManager::GetInstance()->UpdateVoiceSettings(workspace, updateKey ? &key : nullptr, error, provider)) {
+      if (!DataManager::GetInstance()->UpdateVoiceSettings(workspace, updateKey ? &key : nullptr, error, provider, inputMode)) {
         res.status = 400;
         res.set_content(nlohmann::json{{"error", error}}.dump(), "application/json");
         return;

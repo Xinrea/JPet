@@ -52,7 +52,8 @@ class DataManager {
   void SaveVoiceHistory(const nlohmann::json& history);
   bool UpdateVoiceSettings(const std::string& workspace,
                            const std::string* apiKey, std::string& error,
-                           const std::string& provider = "");
+                           const std::string& provider = "",
+                           const std::string& inputMode = "");
 
   void GetDisplay(float* scale, bool* green, bool* rateLimit);
   void UpdateDisplay(float scale, bool green, bool rateLimit);

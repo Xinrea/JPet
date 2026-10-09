@@ -6,6 +6,8 @@
 
   // Voice credentials are write-only; the API never returns the saved key.
   let voiceProvider = "custom";
+  let voiceInputMode = "toggle";
+  const voiceInputModes = [{ value: "toggle", name: "开关 · 全双工" }, { value: "hold", name: "按住 · 半双工" }];
   const voiceProviders = [{ value: "custom", name: "自定义千问服务" }, { value: "jpet", name: "JPet Server · PowerLive 账号" }];
   let powerlive = null, powerliveTimer = null, powerliveBusy = false, powerliveError = "", powerliveRefreshing = false;
   async function refreshPowerlive() {
@@ -44,6 +46,7 @@
       const settings = await response.json();
       if (voiceDisposed) return;
       voiceProvider = settings.provider || "custom";
+      voiceInputMode = settings.input_mode || "toggle";
       voiceWorkspace = settings.workspace_id || "";
       voiceHasKey = settings.has_api_key;
       await refreshVoiceStatus();
@@ -55,7 +58,7 @@
   }
   async function saveVoiceSettings(clearKey = false) {
     voiceSaving = true; voiceError = ""; voiceMessage = "";
-    const payload = { workspace_id: voiceWorkspace.trim(), provider: voiceProvider };
+    const payload = { workspace_id: voiceWorkspace.trim(), provider: voiceProvider, input_mode: voiceInputMode };
     if (clearKey) payload.clear_api_key = true;
     else if (voiceApiKey.trim()) payload.api_key = voiceApiKey.trim();
     try {
@@ -66,6 +69,7 @@
       if (!response.ok) throw new Error(settings.error || "保存语音设置失败");
       if (voiceDisposed) return;
       voiceProvider = settings.provider;
+      voiceInputMode = settings.input_mode || "toggle";
       voiceWorkspace = settings.workspace_id;
       voiceHasKey = settings.has_api_key;
       voiceApiKey = "";
@@ -92,8 +96,9 @@
 </script>
 
 <div class="voice-settings">
-    <SettingCard title="语音对话" description="按一次开启麦克风，再按一次关闭" icon="mic">
-      <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong><p>按 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 开启或关闭麦克风；开启后可连续对话，说话时可打断回复。</p></div></div>
+    <SettingCard title="语音对话" description="选择快捷键的使用方式" icon="mic">
+      <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong><p>{#if voiceInputMode === "hold"}按住 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 打断回复并录音，松开后停止录音、播放回复。{:else}按 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 开启或关闭麦克风；开启后可连续对话，说话时可打断回复。{/if}</p></div></div>
+      <div class="setting-field"><label for="voice-input-mode">Option / Ctrl 使用方式</label><Select id="voice-input-mode" items={voiceInputModes} bind:value={voiceInputMode} disabled={voiceLoading || voiceSaving} /></div>
       <div class="setting-field"><label for="voice-provider">AI 服务方式</label><Select id="voice-provider" items={voiceProviders} bind:value={voiceProvider} disabled={voiceLoading || voiceSaving} /></div>
       {#if voiceProvider === "custom"}
       <div class="setting-field"><label for="voice-api-key">百炼 API Key<span>{voiceHasKey ? "已保存" : "待设置"}</span></label><Input id="voice-api-key" type="password" bind:value={voiceApiKey} placeholder={voiceHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
@@ -115,7 +120,7 @@
         {/if}
         {#if powerliveError || powerlive?.error}<p class="feedback error" role="alert">{powerliveError || powerlive.error}</p>{/if}
       {/if}
-      <div class="setting-actions"><Button size="sm" on:click={() => saveVoiceSettings()} disabled={voiceLoading || voiceSaving || (voiceProvider === "custom" && (!voiceWorkspace.trim() || (!voiceHasKey && !voiceApiKey.trim())))}>{voiceSaving ? "保存中…" : "保存语音设置"}</Button>{#if voiceProvider === "custom" && voiceHasKey}<Button size="sm" color="alternative" on:click={() => saveVoiceSettings(true)} disabled={voiceLoading || voiceSaving}>移除 Key</Button>{/if}</div>
+      <div class="setting-actions"><Button size="sm" on:click={() => saveVoiceSettings()} disabled={voiceLoading || voiceSaving}>{voiceSaving ? "保存中…" : "保存语音设置"}</Button>{#if voiceProvider === "custom" && voiceHasKey}<Button size="sm" color="alternative" on:click={() => saveVoiceSettings(true)} disabled={voiceLoading || voiceSaving}>移除 Key</Button>{/if}</div>
       {#if voiceError}<p class="feedback error" role="alert">{voiceError}</p>{/if}
       {#if voiceMessage}<p class="feedback success" role="status">{voiceMessage}</p>{/if}
     </SettingCard>

@@ -63,8 +63,17 @@ def main(gui=False, app=APP):
                 raise RuntimeError("Panel server did not start")
             assert code == 200 and config["has_api_key"] is False and "api_key" not in config
             assert config["provider"] == "custom"
+            assert config["input_mode"] == "toggle"
+            # Mode can be saved before credentials are configured.
+            assert request(port, "/api/config/voice", {"input_mode": "hold"})[1]["input_mode"] == "hold"
             assert request(port, "/api/config/voice", {"provider": "jpet"})[0] == 200
             assert request(port, "/api/config/voice")[1]["provider"] == "jpet"
+            assert request(port, "/api/config/voice")[1]["input_mode"] == "hold"
+            for invalid_mode in ["", "invalid", None, 123, False]:
+                assert request(port, "/api/config/voice", {"input_mode": invalid_mode})[0] == 400
+            assert request(port, "/api/config/voice")[1]["input_mode"] == "hold"
+            assert request(port, "/api/config/voice", {"input_mode": "toggle"})[1]["input_mode"] == "toggle"
+            assert request(port, "/api/config/voice", {"input_mode": "hold"})[0] == 200
             assert request(port, "/api/config/voice", {"provider": "invalid"})[0] == 400
             assert request(port, "/api/config/voice", {"provider": "custom"})[0] == 200
             account = request(port, "/api/powerlive")[1]
@@ -81,6 +90,7 @@ def main(gui=False, app=APP):
             assert request(port, "/api/powerlive/logout", {})[0] == 200
             voice = request(port, "/api/voice")[1]
             assert voice["microphone_on"] is False
+            assert voice["input_mode"] == "hold"
             assert voice["model"] == "qwen3.8-omni-flash-realtime"
             assert set(voice["available_tools"]) == {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "get_game_rank", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"}
             code, history = request(port, "/api/voice/history")
@@ -94,6 +104,7 @@ def main(gui=False, app=APP):
             assert request(port, "/api/config/voice", {"workspace_id": "ws-123"}, "text/plain")[0] == 403
             assert request(port, "/api/config/voice")[1]["workspace_id"] == "ws-123"
             contents = Path(profile, "jpet.toml").read_text()
+            assert re.search(r'^\s*input_mode\s*=\s*[\"\']hold[\"\']', contents, re.MULTILINE)
             assert "workspace_id" in contents and not re.search(r"^\s*api_key\s*=", contents, re.MULTILINE)
             output, errors = process.communicate(timeout=10)
             if process.returncode:

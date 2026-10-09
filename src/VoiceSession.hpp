@@ -21,19 +21,22 @@ std::string ConnectionUrl(const std::string& workspace);
 std::string EncodeBase64(const std::string& bytes);
 std::string DecodeBase64(const std::string& encoded);
 std::string FriendlyError(const std::string& code);
+std::string ServerErrorCategory(const nlohmann::json& error);
 
 struct ToolCall {
   std::string id, name, arguments;
 };
 
 struct ConversationEvent {
-  enum class Type { Started, UserTranscript, AssistantTranscript, InputFailed, Completed, Interrupted, Failed };
+  enum class Type { Started, UserTranscript, AssistantTranscript, InputFailed, ToolStarted, ToolCompleted, Completed, Interrupted, Failed };
   Type type;
   uint64_t turn;
   std::string text;
+  std::string id;
+  nlohmann::json data = nlohmann::json::object();
 };
 
-// Toggleable microphone, server-VAD protocol, independent of devices and credentials. The same
+// Gated microphone, server-VAD protocol, independent of devices and credentials. The same
 // state machine is used by both native backends and deterministic tests.
 class Session {
  public:
@@ -50,7 +53,7 @@ class Session {
   };
   explicit Session(Callbacks callbacks, nlohmann::json tools = nlohmann::json::array());
   void Reset(bool failed = false);
-  void BeginInput();
+  void BeginInput(bool halfDuplex = false);
   void AppendInput(const std::string& pcm);
   void EndInput();
   void Receive(const nlohmann::json& event);
@@ -58,15 +61,15 @@ class Session {
   bool Ready() const { return ready_; }
   bool Recording() const { return inputOpen_; }
   bool WaitingForReply() const {
-    return !speechActive_ && (awaitingResponse_ || responseActive_ || !pendingTools_.empty());
+    return !speechActive_ && (awaitingResponse_ || responseActive_ || continuationDeferred_ || !pendingTools_.empty());
   }
   bool Busy() const {
-    return inputOpen_ || speechActive_ || awaitingResponse_ || responseActive_ ||
+    return inputOpen_ || speechActive_ || awaitingResponse_ || responseActive_ || continuationDeferred_ ||
         !pendingTools_.empty() || !bufferedInput_.empty();
   }
 
  private:
-  void Send(nlohmann::json event);
+  std::string Send(nlohmann::json event);
   void FlushInput();
   void StartTurn();
   void Status(const std::string& state, const std::string& message = "");
@@ -74,21 +77,31 @@ class Session {
   void RetireResponse(const std::string& id);
   void CollectTool(const nlohmann::json& item);
   void ContinueResponse();
-  void Record(ConversationEvent::Type type, const std::string& text = "", uint64_t turn = 0);
+  void Record(ConversationEvent::Type type, const std::string& text = "", uint64_t turn = 0,
+      const std::string& id = "", const nlohmann::json& data = nlohmann::json::object());
+  void UpdateTranscript(const nlohmann::json& event);
   void FinishTurn(ConversationEvent::Type type);
   Callbacks callbacks_;
   uint64_t eventId_ = 0;
   bool ready_ = false;
   bool inputOpen_ = false;
+  bool halfDuplex_ = false;
+  std::string bufferedReply_;
   bool speechActive_ = false;
   bool awaitingResponse_ = false;
   bool responseActive_ = false;
   bool acceptReply_ = false;
+  bool continuationDeferred_ = false;
+  size_t continuationRetries_ = 0;
+  std::string continuationEventId_;
+  std::set<std::string> interruptedRequests_;
   size_t inputBytes_ = 0;
   std::string bufferedInput_;
   std::string responseId_;
   std::string reply_;
   std::string replyPrefix_;
+  std::string responseText_, responseTranscript_;
+  bool hasAudioTranscript_ = false;
   uint64_t turnId_ = 0;
   bool turnActive_ = false;
   std::string speechItem_;

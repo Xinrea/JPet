@@ -1,6 +1,8 @@
 #include "VoiceSession.hpp"
 #include "VoiceEventQueue.hpp"
+#include "VoiceShortcut.hpp"
 #include "VoiceHistory.hpp"
+#include "voice_history_helpers.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -84,7 +86,7 @@ int main() {
     Check(setup["turn_detection"]["type"] == "semantic_vad" && setup["turn_detection"]["silence_duration_ms"] == Voice::InputSilenceMs && setup["audio"]["input"]["format"]["sample_rate"] == 16000 &&
         setup["audio"]["output"]["format"]["sample_rate"] == 24000, "server semantic VAD and PCM protocol");
     Check(setup["input_audio_transcription"]["model"] == "qwen3-asr-flash-realtime", "user speech transcription is enabled");
-    Check(first.history.Snapshot()["list"].empty(), "upload alone does not create a history entry");
+    Check(TurnSnapshot(first.history).empty(), "upload alone does not create a history entry");
     std::string uploaded;
     for (const auto& event : first.sent) if (event["type"] == "input_audio_buffer.append") uploaded += Voice::DecodeBase64(event["audio"]);
     Check(uploaded == std::string(6400, '\x12') + std::string(Voice::InputTailBytes, '\0'), "all first-turn samples are uploaded in order");
@@ -98,10 +100,75 @@ int main() {
     tap.session.AppendInput(std::string(640, '\0'));
     tap.session.EndInput();
     Check(tap.Count("response.create") == 0 && tap.Count("input_audio_buffer.clear") == 0, "short audio is left to server VAD without clearing its buffer");
-    Check(tap.history.Snapshot()["list"].empty(), "accidental taps do not create history");
+    Check(TurnSnapshot(tap.history).empty(), "accidental taps do not create history");
+
+    using Action = Voice::ShortcutControl::Action;
+    Voice::ShortcutControl toggleKey, holdKey;
+    Check(toggleKey.Update(true, false, false) == Action::Begin &&
+        toggleKey.Update(true, false, true) == Action::None &&
+        toggleKey.Update(false, false, true) == Action::None &&
+        toggleKey.Update(true, false, true) == Action::End,
+        "toggle starts on press, ignores holding/release, and stops on the next press");
+    Check(holdKey.Update(true, true, false) == Action::Begin &&
+        holdKey.Update(true, true, true) == Action::None &&
+        holdKey.Update(false, true, true) == Action::End &&
+        holdKey.Update(false, true, false) == Action::None,
+        "hold starts once on press and stops once on release");
+    holdKey.BlockUntilRelease(true);
+    Check(holdKey.Update(true, true, false) == Action::None &&
+        holdKey.Update(false, true, false) == Action::None &&
+        holdKey.Update(true, true, false) == Action::Begin,
+        "settings reset while held requires release before starting again");
+    holdKey.BlockUntilRelease();
+    Check(holdKey.Update(true, true, false) == Action::None &&
+        holdKey.Update(false, true, false) == Action::None &&
+        holdKey.Update(true, false, false) == Action::Begin,
+        "capture failure does not repeatedly restart while held and recovery can switch modes");
+
+    Fixture hold;
+    hold.Connect(); hold.Turn("prior-input"); hold.Reply("prior-reply");
+    const auto audio = [](const std::string& id, const std::string& pcm) {
+      return json{{"type", "response.audio.delta"}, {"response_id", id}, {"delta", Voice::EncodeBase64(pcm)}};
+    };
+    hold.session.Receive(audio("prior-reply", "old!"));
+    Check(hold.playing, "previous reply is playing before push-to-talk");
+    hold.session.BeginInput(true);
+    Check(!hold.playing && hold.session.Recording(), "hold press immediately interrupts playback without waiting for speech");
+    hold.session.Receive(audio("prior-reply", "late"));
+    Check(hold.played == "old!", "late audio from the interrupted reply is discarded");
+    hold.played.clear();
+    hold.session.AppendInput("pcm!"); hold.Speech("held-input"); hold.Reply("held-reply");
+    hold.session.Receive(audio("held-reply", "one!"));
+    hold.session.Receive(audio("held-reply", "two!"));
+    hold.session.Receive({{"type", "response.done"}, {"response", {{"id", "held-reply"}, {"status", "completed"}}}});
+    Check(!hold.playing && hold.played.empty() && hold.session.Recording(), "even a completed reply stays silent until release");
+    hold.session.EndInput();
+    Check(hold.playing && hold.played == "one!two!" && !hold.session.Recording(), "release stops recording and plays buffered audio in order");
+    const auto holdUploads = hold.Count("input_audio_buffer.append");
+    hold.session.AppendInput("echo");
+    Check(hold.Count("input_audio_buffer.append") == holdUploads && hold.Count("response.cancel") == 0 && hold.Count("response.create") == 0,
+        "reply playback cannot upload microphone audio in hold mode and VAD still owns replies");
+    hold.session.BeginInput(true);
+    hold.Speech("pause-input"); hold.Reply("pause-reply");
+    hold.session.Receive(audio("pause-reply", "drop"));
+    hold.Speech("resumed-input"); hold.Reply("resumed-reply");
+    hold.session.Receive(audio("resumed-reply", "keep"));
+    hold.session.EndInput();
+    Check(hold.played == "one!two!keep", "resuming speech while held discards the reply from the earlier pause");
+    hold.session.Receive(audio("resumed-reply", "tail"));
+    Check(hold.played == "one!two!keeptail", "remaining response audio streams normally after release");
+    hold.session.BeginInput(true);
+    hold.Speech("reset-input"); hold.Reply("reset-reply");
+    hold.session.Receive(audio("reset-reply", "lost"));
+    hold.session.Reset(); hold.session.EndInput();
+    Check(hold.played == "one!two!keeptail" && !hold.playing, "connection reset clears buffered half-duplex output");
+
+    Fixture emptyHold;
+    emptyHold.Connect(); emptyHold.session.BeginInput(true); emptyHold.session.EndInput();
+    Check(emptyHold.Count("input_audio_buffer.append") == 0 && TurnSnapshot(emptyHold.history).empty(), "empty hold does not force a reply or create a turn");
 
     first.Speech(); first.Reply();
-    Check(first.history.Snapshot()["list"].size() == 1, "server commit starts one history turn");
+    Check(TurnSnapshot(first.history).size() == 1, "server commit starts one history turn");
 
     Fixture buffered;
     buffered.session.BeginInput(); buffered.session.AppendInput(std::string(6400, '\1')); buffered.session.EndInput();
@@ -132,6 +199,13 @@ int main() {
     continuous.session.AppendInput(std::string(3200, '\1'));
     Check(!continuous.session.Recording() && continuous.Count("input_audio_buffer.append") == stoppedChunks,
         "explicit microphone off stops capture uploads");
+    Fixture parallelText;
+    parallelText.Connect(); parallelText.Turn(); parallelText.Reply();
+    parallelText.session.Receive({{"type", "response.text.delta"}, {"response_id", "r1"}, {"delta", "同一段回复"}});
+    parallelText.session.Receive({{"type", "response.audio_transcript.delta"}, {"response_id", "r1"}, {"delta", "同一段回复"}});
+    parallelText.session.Receive({{"type", "response.text.done"}, {"response_id", "r1"}, {"text", "同一段回复"}});
+    Check(parallelText.transcript == "同一段回复" && parallelText.history.Snapshot()["list"].size() == 2,
+        "text and audio transcript streams cannot duplicate a reply or its message");
 
     Fixture interrupt;
     interrupt.Connect(); interrupt.Turn(); interrupt.Reply();
@@ -146,7 +220,7 @@ int main() {
     Check(interrupt.playing && interrupt.Count("response.cancel") == 0 && interrupt.Count("response.create") == 0 &&
         interrupt.Count("input_audio_buffer.commit") == 0 && interrupt.Count("input_audio_buffer.clear") == 0,
         "silent press and release do not affect the reply or force a new turn");
-    Check(interrupt.history.Snapshot()["list"].size() == 1 && interrupt.history.Snapshot()["list"][0]["state"] == "pending",
+    Check(TurnSnapshot(interrupt.history).size() == 1 && TurnSnapshot(interrupt.history)[0]["state"] == "pending",
         "silent key press does not interrupt history");
     interrupt.session.BeginInput(); interrupt.session.AppendInput(std::string(6400, '\2'));
     interrupt.session.Receive({{"type", "input_audio_buffer.speech_started"}, {"item_id", "u2"}});
@@ -162,16 +236,16 @@ int main() {
     interrupt.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r2"}, {"transcript", "你好"}});
     Check(interrupt.transcript == "你好", "complete response transcript is visible");
     interrupt.session.Receive({{"type", "response.done"}, {"response", {{"id", "r2"}, {"status", "completed"}}}});
-    Check(interrupt.session.Recording() && interrupt.history.Snapshot()["list"][0]["state"] == "completed", "server can complete a turn while the microphone is on");
+    Check(interrupt.session.Recording() && TurnSnapshot(interrupt.history)[0]["state"] == "completed", "server can complete a turn while the microphone is on");
     interrupt.Speech("u3"); interrupt.Reply("r3", "i3"); interrupt.session.EndInput();
-    Check(interrupt.history.Snapshot()["list"].size() == 3 && interrupt.Count("response.create") == 0,
+    Check(TurnSnapshot(interrupt.history).size() == 3 && interrupt.Count("response.create") == 0,
         "multiple server turns can share one key hold");
 
     Fixture conversation;
     conversation.Connect(); conversation.Turn(); conversation.Reply();
     conversation.session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", "u1"}});
     conversation.session.Receive({{"type", "response.audio_transcript.delta"}, {"response_id", "r1"}, {"delta", "第一轮回复"}});
-    Check(conversation.history.Snapshot()["list"][0]["assistant"] == "第一轮回复", "streaming reply is visible in history");
+    Check(TurnSnapshot(conversation.history)[0]["assistant"] == "第一轮回复", "streaming reply is visible in history");
     conversation.session.BeginInput();
     conversation.session.AppendInput(std::string(6400, '\0')); conversation.session.EndInput();
     conversation.Speech("u2");
@@ -184,7 +258,7 @@ int main() {
     conversation.session.Receive({{"type", "response.audio_transcript.delta"}, {"response_id", "r1"}, {"delta", "过期回复"}});
     conversation.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r2"}, {"transcript", "第二轮回复"}});
     conversation.session.Receive({{"type", "response.done"}, {"response", {{"id", "r2"}, {"status", "completed"}}}});
-    auto history = conversation.history.Snapshot()["list"];
+    auto history = TurnSnapshot(conversation.history);
     Check(history.size() == 2 && history[0]["user"] == "第二轮问题" && history[0]["assistant"] == "第二轮回复" &&
         history[0]["state"] == "completed", "latest round contains the correct question and answer");
     Check(history[1]["user"] == "第一轮问题" && history[1]["assistant"] == "第一轮回复" &&
@@ -192,7 +266,7 @@ int main() {
 
     conversation.session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", "u2"}});
     conversation.session.Receive({{"type", "input_audio_buffer.speech_stopped"}, {"item_id", "u2"}});
-    Check(conversation.history.Snapshot()["list"].size() == 2 && !conversation.session.Busy(),
+    Check(TurnSnapshot(conversation.history).size() == 2 && !conversation.session.Busy(),
         "duplicate server input events after ASR cannot create ghost turns or keep the session busy");
 
     conversation.Turn("u3"); conversation.Reply("r3", "i3");
@@ -201,7 +275,7 @@ int main() {
         {"error", {{"message", "private upstream data"}}}});
     conversation.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r3"}, {"transcript", "部分回复"}});
     conversation.session.Reset(true);
-    history = conversation.history.Snapshot()["list"];
+    history = TurnSnapshot(conversation.history);
     Check(history[0]["state"] == "failed" && history[0]["assistant"] == "部分回复" && history[0]["user"] == "" &&
         history.dump().find("private upstream data") == std::string::npos, "failed rounds keep partial text without raw server errors");
 
@@ -214,18 +288,49 @@ int main() {
     persisted.Apply({Event::Type::Completed, 1, ""});
     persisted.Apply({Event::Type::Started, 2, ""});
     Voice::History restored(json::parse(saved.dump()));
-    history = restored.Snapshot()["list"];
+    history = TurnSnapshot(restored);
     Check(history[0]["state"] == "interrupted" && history[1]["user"] == "重启前的问题" &&
         history[1]["assistant"] == "重启前的回复", "restart restores text and finalizes unfinished rounds");
     restored.Apply({Event::Type::Started, 1, ""});
-    Check(restored.Snapshot()["list"][0]["id"] == 3, "IDs remain unique across restarts and session counters");
+    Check(TurnSnapshot(restored)[0]["id"] == 3, "IDs remain unique across restarts and session counters");
     for (uint64_t turn = 3; turn < 205; ++turn) persisted.Apply({Event::Type::Started, turn, ""});
-    Check(persisted.Snapshot()["list"].size() == Voice::History::Limit && saved.size() == Voice::History::Limit,
+    Check(TurnSnapshot(persisted).size() == Voice::History::Limit && saved.size() == Voice::History::Limit,
         "both memory and persisted history are capped");
     persisted.Apply({Event::Type::UserTranscript, 1, "已淘汰的旧轮次"});
-    Check(persisted.Snapshot()["list"].dump().find("已淘汰的旧轮次") == std::string::npos, "evicted turns cannot reappear");
+    Check(TurnSnapshot(persisted).dump().find("已淘汰的旧轮次") == std::string::npos, "evicted turns cannot reappear");
     Voice::History malformed(json::array({nullptr, "invalid", json{{"id", 1}}}));
-    Check(malformed.Snapshot()["list"].empty(), "malformed saved history is ignored");
+    Check(TurnSnapshot(malformed).empty(), "malformed saved history is ignored");
+    Voice::History migrated(json::array({json{{"id", 8}, {"created_at", 123}, {"user", "旧问题"}, {"assistant", "旧回复"}, {"state", "completed"}},
+        json{{"id", 9}, {"created_at", 124}, {"user", "未完成的问题"}, {"assistant", "部分回复"}, {"state", "pending"}}}));
+    auto flat = migrated.Snapshot()["list"];
+    Check(flat.size() == 4 && flat[0]["role"] == "user" && flat[1]["role"] == "assistant" && flat[1]["text"] == "旧回复" && flat[3]["state"] == "interrupted",
+        "legacy pairs migrate into chronological independent messages");
+    json messageSave;
+    Voice::History timeline(json::array(), [&](const json& data) { messageSave = data; });
+    timeline.Apply({Event::Type::Started, 1, ""});
+    timeline.Apply({Event::Type::AssistantTranscript, 1, "我先看看。", "response-1"});
+    timeline.Apply({Event::Type::ToolStarted, 1, "jpet_settings", "call-1", {{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 40}, {"api_key", "private-key"}}}, {"credentials", "private-key"}}});
+    timeline.Apply({Event::Type::ToolCompleted, 1, "", "call-1", {{"ok", true}, {"settings", {{"audio", {{"volume", 40}, {"token", "private-key"}}}}}, {"audio", "raw-audio"}, {"image", "raw-image"}, {"raw", "private-raw"}}});
+    timeline.Apply({Event::Type::AssistantTranscript, 1, "音量已经调整好了。", "response-2"});
+    timeline.Apply({Event::Type::Completed, 1, ""});
+    timeline.Apply({Event::Type::UserTranscript, 1, "音量调到四十"});
+    flat = timeline.Snapshot()["list"];
+    Check(flat.size() == 4 && flat[0]["text"] == "音量调到四十" && flat[1]["text"] == "我先看看。" && flat[2]["role"] == "tool" && flat[3]["text"] == "音量已经调整好了。",
+        "late ASR fills the original user message and tool continuations are separate ordered messages");
+    Check(flat[2]["arguments"]["settings"] == json{{"volume", 40}} && flat[2]["result"]["settings"]["audio"] == json{{"volume", 40}} &&
+        messageSave.dump().find("private-") == std::string::npos && messageSave.dump().find("raw-audio") == std::string::npos && messageSave.dump().find("raw-image") == std::string::npos,
+        "only allowlisted tool summaries are persisted");
+    Voice::History messageRestore(json::parse(messageSave.dump()));
+    Check(messageRestore.Snapshot()["list"] == flat, "flat message history restores without changing ordering or summaries");
+    messageRestore.Apply({Event::Type::Started, 1, ""});
+    Check(messageRestore.Snapshot()["list"].back()["id"] > flat.back()["id"], "new message IDs remain unique after restart");
+    auto huge = json::object();
+    for (const auto* field : {"action", "section", "query", "question", "target", "url"}) huge[field] = std::string(1500, 'x');
+    messageRestore.Apply({Event::Type::ToolStarted, 1, "web_search", "huge", huge});
+    messageRestore.Apply({Event::Type::ToolCompleted, 1, "", "huge", huge});
+    const auto compact = messageRestore.Snapshot()["list"].back();
+    Check(compact["arguments"].dump().size() <= 4096 && compact["result"].dump().size() <= 4096,
+        "invalid fields and saved summaries are bounded by total bytes, not just per-field size");
     bool rejectSave = true;
     Voice::History unavailable(json::array(), [&](const json&) { if (rejectSave) throw std::runtime_error("disk failure"); });
     unavailable.Apply({Event::Type::Started, 1, ""});
@@ -243,7 +348,10 @@ int main() {
     Fixture failed;
     failed.Connect(); failed.Turn(); failed.Reply();
     failed.session.Receive({{"type", "response.done"}, {"response", {{"status", "failed"}}}});
-    Check(failed.state == "error", "failed response remains an error");
+    Check(failed.state == "idle" && failed.session.Ready(), "failed response keeps the connection ready for another turn");
+    failed.Turn("after-failure"); failed.Reply("after-failure-response");
+    failed.session.Receive({{"type", "response.done"}, {"response", {{"id", "after-failure-response"}, {"status", "completed"}}}});
+    Check(failed.session.Ready() && !failed.session.WaitingForReply(), "another VAD turn can finish after a failed response");
     failed.session.Receive({{"type", "error"}, {"error", {{"code", "invalid_api_key"}}}});
     Check(!failed.session.Ready() && !failed.session.Busy() && failed.state == "error" && failed.error.find("认证失败") != std::string::npos, "authentication error resets the session");
 
