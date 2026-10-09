@@ -84,11 +84,11 @@ std::string FriendlyError(const std::string& code) {
   std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
   if (lower.find("auth") != std::string::npos || lower.find("api_key") != std::string::npos ||
       lower.find("permission") != std::string::npos || lower == "401" || lower == "403")
-    return "千问认证失败，请检查北京地域的 API Key、业务空间 ID 和模型权限";
+    return "语音服务认证失败，请检查北京地域的 API Key、业务空间 ID 和模型权限";
   if (lower.find("rate") != std::string::npos || lower.find("quota") != std::string::npos || lower == "429")
-    return "千问额度不足或请求过于频繁，请稍后再试";
-  if (lower.find("balance") != std::string::npos) return "千问账户余额不足，请检查百炼账户";
-  return "千问语音请求失败，请检查设置和网络后重试";
+    return "语音服务额度不足或请求过于频繁，请稍后再试";
+  if (lower.find("balance") != std::string::npos) return "百炼账户余额不足，请检查百炼账户";
+  return "语音请求失败，请检查设置和网络后重试";
 }
 
 std::string ServerErrorCategory(const nlohmann::json& error) {
@@ -443,7 +443,7 @@ void Session::Receive(const nlohmann::json& event) {
     CollectTool(event.at("item"));
   } else if (type == "response.audio.delta" && acceptReply_) {
     auto pcm = DecodeBase64(event.at("delta").get<std::string>());
-    if (pcm.size() % 2) throw std::invalid_argument("千问返回了无效的 PCM 音频");
+    if (pcm.size() % 2) throw std::invalid_argument("语音服务返回了无效的 PCM 音频");
     if (!pcm.empty()) {
       if (halfDuplex_ && inputOpen_) {
         // A pause can trigger semantic VAD before release. Hold the current

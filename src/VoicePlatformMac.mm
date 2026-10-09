@@ -126,8 +126,8 @@ struct MacState : std::enable_shared_from_this<MacState> {
           state->queue->Network(generation, Event::Type::Error, state->cloudService
               ? (status == 401 || status == 403 ? "PowerLive 登录已失效，请在设置中重新登录" : status == 429 ? "今日 AI 额度不足，北京时间零点重置；可以切换自定义服务继续使用" : status == 409 ? "此账号已有语音连接，请先结束其他设备的对话" : "JPet AI 服务连接已断开，请稍后重试")
               : auth
-              ? "千问认证失败，请检查北京地域的 API Key、业务空间 ID 和模型权限"
-              : "千问语音连接已断开，请检查网络和业务空间设置后重试");
+              ? "语音服务认证失败，请检查北京地域的 API Key、业务空间 ID 和模型权限"
+              : "语音连接已断开，请检查网络和业务空间设置后重试");
           return;
         }
         if (message.type == NSURLSessionWebSocketMessageTypeString && message.string) {
@@ -253,7 +253,7 @@ class MacPlatform final : public Platform {
       if (error) {
         events->Network(generation, Event::Type::Diagnostic,
             "[Voice] WebSocket send failed code=" + std::to_string(error.code));
-        events->Network(generation, Event::Type::Error, "千问语音发送失败，请检查网络后重试");
+        events->Network(generation, Event::Type::Error, "语音发送失败，请检查网络后重试");
       }
     }];
   }
@@ -297,7 +297,7 @@ class MacPlatform final : public Platform {
       if (!state_->outputEngine.isRunning) {
         NSError* error = nil;
         if (![state_->outputEngine startAndReturnError:&error]) {
-          state_->queue->Push(Event::Type::Error, "无法播放千问回复，请检查系统声音输出");
+          state_->queue->Push(Event::Type::Error, "无法播放轴伊的回复，请检查系统声音输出");
           return;
         }
       }
@@ -327,7 +327,7 @@ class MacPlatform final : public Platform {
           }];
       if (!state_->player.isPlaying) [state_->player play];
     } @catch (NSException*) {
-      state_->queue->Push(Event::Type::Error, "无法播放千问回复，请检查系统声音输出");
+      state_->queue->Push(Event::Type::Error, "无法播放轴伊的回复，请检查系统声音输出");
     }
   }
 

@@ -91,9 +91,9 @@ void VoiceChat::SetState(const std::string& state, const std::string& message) {
   std::string text = message;
   if (text.empty()) {
     if (state == "listening") text = "正在听…";
-    else if (state == "connecting") text = "正在连接千问…";
-    else if (state == "thinking") text = "千问正在思考…";
-    else if (state == "speaking") text = "千问正在回复…";
+    else if (state == "connecting") text = "正在呼唤轴伊…";
+    else if (state == "thinking") text = "轴伊正在思考…";
+    else if (state == "speaking") text = "轴伊正在回复…";
     else text = std::string(holdMode ? "按住 " : "按 ") + Shortcut + " 开启麦克风";
   }
   const bool microphoneOn = session_.Recording();
@@ -223,7 +223,7 @@ void VoiceChat::Drain() {
       }
     } catch (const std::exception&) {
       // Never expose a server payload or a credential in logs/error messages.
-      Fail("千问返回了无法处理的语音数据，请重新说话");
+      Fail("轴伊没能听清这段语音，请重新说话");
       break;
     }
     if (failurePending_) { Fail(error_); break; }
@@ -294,9 +294,9 @@ void VoiceChat::Tick(GLFWwindow* window) {
     lastActivity_ = Clock::now();
   }
   if (connected_ && !session_.Ready() && now - connectedAt_ > std::chrono::seconds(15))
-    Fail("连接千问超时，请检查网络、API Key 和业务空间 ID");
+    Fail("呼唤轴伊超时，请检查网络和语音服务设置");
   else if (connected_ && session_.WaitingForReply() && now - lastActivity_ > std::chrono::seconds(45))
-    Fail("千问回复超时，请按快捷键重新开启麦克风");
+    Fail("轴伊回复超时，请按快捷键重新开启麦克风");
   else if (connected_ && !session_.Busy() && !platform_->IsPlaying() && now - lastActivity_ > std::chrono::minutes(2)) {
     Close();
     SetState("idle");

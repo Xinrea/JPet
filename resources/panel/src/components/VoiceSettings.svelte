@@ -142,7 +142,7 @@
       {#if voiceMessage}<p class="feedback success" role="status">{voiceMessage}</p>{/if}
     </SettingCard>
     <SettingCard title="对话与工具状态" description="查看最近的回复和执行结果" icon="spark">
-      <p class="setting-help">可调整声音、显示、桌面互动、通知、轮盘和装扮，查看桌面、查询游戏数据、安排或取消任务、升级属性、搜索网页和 B 站，以及用默认浏览器打开网页。B 站搜索使用当前登录账号；查看桌面时会截图并发送给千问，Mac 首次使用需允许录屏权限。</p>
+      <p class="setting-help">可调整声音、显示、桌面互动、通知、轮盘和装扮，查看桌面、查询游戏数据、安排或取消任务、升级属性、搜索网页和 B 站，以及用默认浏览器打开网页。B 站搜索使用当前登录账号；查看桌面时会截图并发送给当前语音服务，Mac 首次使用需允许录屏权限。</p>
       {#if voiceStatus?.message}<p class="feedback" class:error={voiceStatus.state === "error"} aria-live="polite">{voiceStatus.message}</p>{/if}
       {#if voiceStatus?.reply}<p class="voice-reply">{voiceStatus.reply}</p>{/if}
       {#if voiceStatus?.last_tool}

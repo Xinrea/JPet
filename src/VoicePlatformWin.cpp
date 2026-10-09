@@ -72,13 +72,13 @@ void Receive(const std::shared_ptr<WinState>& state, uint64_t generation,
   components.dwHostNameLength = components.dwUrlPathLength = components.dwExtraInfoLength = static_cast<DWORD>(-1);
   // WinHTTP cracks HTTPS URLs; the WebSocket upgrade is requested below.
   const std::wstring https = L"https" + address.substr(3);
-  if (!WinHttpCrackUrl(https.c_str(), 0, 0, &components)) { fail("千问语音地址无效，请检查业务空间 ID"); return; }
+  if (!WinHttpCrackUrl(https.c_str(), 0, 0, &components)) { fail("语音服务地址无效，请检查业务空间 ID"); return; }
   const std::wstring host(components.lpszHostName, components.dwHostNameLength);
   const std::wstring path = std::wstring(components.lpszUrlPath, components.dwUrlPathLength) +
       std::wstring(components.lpszExtraInfo, components.dwExtraInfoLength);
   HttpHandle session{WinHttpOpen(L"JPet voice", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
       WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)};
-  if (!session.value) { fail("无法初始化千问语音连接"); return; }
+  if (!session.value) { fail("无法初始化语音连接"); return; }
   WinHttpSetTimeouts(session.value, 15000, 15000, 15000, 15000);
   HttpHandle connection{WinHttpConnect(session.value, host.c_str(), components.nPort, 0)};
   HttpHandle request{connection.value ? WinHttpOpenRequest(connection.value, L"GET", path.c_str(),
@@ -90,7 +90,7 @@ void Receive(const std::shared_ptr<WinState>& state, uint64_t generation,
       !WinHttpAddRequestHeaders(request.value, authorization.c_str(), static_cast<DWORD>(-1), WINHTTP_ADDREQ_FLAG_ADD) ||
       !WinHttpSendRequest(request.value, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
       !WinHttpReceiveResponse(request.value, nullptr)) {
-    fail("千问语音连接失败，请检查网络和北京地域的业务空间设置"); return;
+    fail("语音连接失败，请检查网络和语音服务设置"); return;
   }
   DWORD status = 0, length = sizeof(status);
   WinHttpQueryHeaders(request.value, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
@@ -98,12 +98,12 @@ void Receive(const std::shared_ptr<WinState>& state, uint64_t generation,
   if (status != 101) {
     fail(url.find("/v1/ai/realtime") != std::string::npos
         ? (status == 401 || status == 403 ? "PowerLive 登录已失效，请在设置中重新登录" : status == 429 ? "今日 AI 额度不足，北京时间零点重置；可以切换自定义服务继续使用" : status == 409 ? "此账号已有语音连接，请先结束其他设备的对话" : "JPet AI 服务暂时不可用，请稍后重试")
-        : status == 401 || status == 403 ? "千问认证失败，请检查 API Key、业务空间 ID 和模型权限" :
-        status == 429 ? "千问请求过于频繁或额度不足，请稍后重试" : "千问语音连接失败，请检查业务空间设置");
+        : status == 401 || status == 403 ? "语音服务认证失败，请检查 API Key、业务空间 ID 和模型权限" :
+        status == 429 ? "语音服务请求过于频繁或额度不足，请稍后重试" : "语音连接失败，请检查业务空间设置");
     return;
   }
   HttpHandle socket{WinHttpWebSocketCompleteUpgrade(request.value, 0)};
-  if (!socket.value) { fail("无法建立千问语音 WebSocket 连接"); return; }
+  if (!socket.value) { fail("无法建立语音 WebSocket 连接"); return; }
   {
     std::lock_guard<std::mutex> lock(state->networkMutex);
     if (state->stopping || state->queue->connection != generation) return;
@@ -121,10 +121,10 @@ void Receive(const std::shared_ptr<WinState>& state, uint64_t generation,
     WINHTTP_WEB_SOCKET_BUFFER_TYPE type;
     const auto result = WinHttpWebSocketReceive(active, buffer.data(), static_cast<DWORD>(buffer.size()), &bytes, &type);
     if (result != NO_ERROR || type == WINHTTP_WEB_SOCKET_CLOSE_BUFFER_TYPE) {
-      fail("千问语音连接已断开，请按 Ctrl 重新开启麦克风"); break;
+      fail("语音连接已断开，请按 Ctrl 重新开启麦克风"); break;
     }
     if (type == WINHTTP_WEB_SOCKET_UTF8_FRAGMENT_BUFFER_TYPE || type == WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE) {
-      if (message.size() + bytes > 4 * 1024 * 1024) { fail("千问返回的语音消息过大"); break; }
+      if (message.size() + bytes > 4 * 1024 * 1024) { fail("语音服务返回的消息过大"); break; }
       message.append(buffer.data(), bytes);
       if (type == WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE) {
         state->queue->Network(generation, Event::Type::Message, std::move(message));
@@ -259,7 +259,7 @@ class WinPlatform final : public Platform {
         lock.unlock();
         if (WinHttpWebSocketSend(socket, WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE,
               message.data(), static_cast<DWORD>(message.size())) != NO_ERROR) {
-          state->queue->Network(generation, Event::Type::Error, "千问语音发送失败，请检查网络后重试");
+          state->queue->Network(generation, Event::Type::Error, "语音发送失败，请检查网络后重试");
           break;
         }
       }
@@ -384,7 +384,7 @@ class WinPlatform final : public Platform {
       format.nBlockAlign = 2;
       format.nAvgBytesPerSec = 48000;
       if (waveOutOpen(&state_->output, WAVE_MAPPER, &format, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR) {
-        state_->queue->Push(Event::Type::Error, "无法播放千问回复，请检查声音输出设备"); return;
+        state_->queue->Push(Event::Type::Error, "无法播放轴伊的回复，请检查声音输出设备"); return;
       }
     }
     for (auto it = state_->outputBuffers.begin(); it != state_->outputBuffers.end();) {
@@ -400,11 +400,11 @@ class WinPlatform final : public Platform {
     buffer->header.lpData = buffer->bytes.data();
     buffer->header.dwBufferLength = static_cast<DWORD>(pcm.size());
     if (waveOutPrepareHeader(state_->output, &buffer->header, sizeof(WAVEHDR)) != MMSYSERR_NOERROR) {
-      state_->queue->Push(Event::Type::Error, "无法准备千问回复音频"); return;
+      state_->queue->Push(Event::Type::Error, "无法准备轴伊的回复音频"); return;
     }
     if (waveOutWrite(state_->output, &buffer->header, sizeof(WAVEHDR)) != MMSYSERR_NOERROR) {
       waveOutUnprepareHeader(state_->output, &buffer->header, sizeof(WAVEHDR));
-      state_->queue->Push(Event::Type::Error, "无法播放千问回复，请检查声音输出设备"); return;
+      state_->queue->Push(Event::Type::Error, "无法播放轴伊的回复，请检查声音输出设备"); return;
     }
     state_->outputBuffers.push_back(std::move(buffer));
   }

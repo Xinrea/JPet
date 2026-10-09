@@ -121,7 +121,7 @@ export class AiAccount extends DurableObject<Env> {
       });
       if (!response.ok) {
         this.quota.settle(id, response.status >= 300 && response.status < 500 ? 0 : null);
-        return failure("千问服务暂时不可用，请稍后重试", "jpet_upstream_error", 502);
+        return failure("AI 服务暂时不可用，请稍后重试", "jpet_upstream_error", 502);
       }
       const result: any = await response.json(), used = totalTokens(result.usage);
       this.quota.settle(id, used);
@@ -371,7 +371,7 @@ export class AiAccount extends DurableObject<Env> {
         const code = p.error?.code;
         const kind = providerErrorKind(p.error);
         console.warn(JSON.stringify({ component: "jpet-ai", stage: "provider-error", provider_code: typeof code === "string" && /^[a-zA-Z0-9_.-]{1,96}$/.test(code) ? code : "unknown", kind, elapsed_ms: Date.now() - connectedAt }));
-        if (kind === "fatal") { finish("千问语音服务返回错误，请稍后重试", "jpet_upstream_error"); return; }
+        if (kind === "fatal") { finish("语音服务返回错误，请稍后重试", "jpet_upstream_error"); return; }
         // Client errors reject one request and keep the provider session open.
         const requestId = p.error?.event_id;
         if (continuation && pending.includes(continuation.request) && (!requestId || requestId === continuation.eventId)) {
