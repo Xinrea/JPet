@@ -86,6 +86,12 @@ int main() {
     }) Check(run("jpet_settings", request)["ok"] == true, "daily settings and local notification/shortcut actions accepted");
     Check(run("jpet_settings", {{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "website"}, {"target", " HTTPS://example.com/a%2Fb?sig=x%2Fy "}})["ok"] == true &&
       last["target"] == "https://example.com/a%2Fb?sig=x%2Fy", "website shortcuts use the URL validator without rewriting query strings");
+    Check(run("jpet_settings", {{"action", "update"}, {"settings", {{"volume", 10}}}})["ok"] == true && last["section"] == "audio" &&
+      run("jpet_settings", {{"action", "update"}, {"settings", {{"tail", true}}}})["ok"] == true && last["section"] == "appearance",
+      "update infers an omitted section from its unique field names");
+    const auto mixed = run("jpet_settings", {{"action", "update"}, {"settings", {{"volume", 10}, {"tail", true}}}});
+    Check(mixed["code"] == "invalid_arguments" && mixed["error"].get<std::string>().find("section") != std::string::npos,
+      "fields from several sections ask for separate calls");
     const int beforeBadSettings = settingsCalls;
     for (const auto& request : {
       json{{"action", "get"}, {"section", "voice"}}, json{{"action", "get"}, {"section", "account"}},
