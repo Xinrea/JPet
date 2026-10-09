@@ -259,6 +259,13 @@ void VoiceChat::Tick(GLFWwindow* window) {
     shortcut_.BlockUntilRelease(held);
     SetState("idle");
   }
+  if (historyClearRequested_.exchange(false)) {
+    // Messages from the old session may have arrived before Close().
+    history_.Clear();
+    std::lock_guard<std::mutex> lock(statusMutex_);
+    status_["reply"] = "";
+    status_.erase("last_tool");
+  }
   const bool holdMode = DataManager::GetInstance()->GetConfig<std::string>("voice", "input_mode", "toggle") == "hold";
   const auto action = shortcut_.Update(held, holdMode, microphoneEnabled_);
   if (action == Voice::ShortcutControl::Action::Begin) Begin();

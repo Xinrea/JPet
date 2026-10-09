@@ -443,6 +443,31 @@ int main() {
     slot.Created("r2"); slot.Done(json::array(), "completed", "r2");
     Check(!slot.session.Busy() && slot.session.Ready(), "slot recovery completes normally");
 
+    SessionFixture pendingSlot;
+    pendingSlot.Arguments(); pendingSlot.Done(); pendingSlot.session.CompleteTool("c1", {{"ok", true}});
+    pendingSlot.session.Receive({{"type", "error"}, {"error", {{"type", "invalid_request_error"}, {"message", "Conversation already has a pending response request"}}}});
+    Check(pendingSlot.session.Ready() && pendingSlot.session.WaitingForReply() && pendingSlot.state != "error",
+        "Qwen 3.8 pending-response refusal without event_id waits for the occupied slot");
+    pendingSlot.Done(json::array(), "completed", "remote-pending");
+    Check(pendingSlot.Count("response.create") == 2 && pendingSlot.Count("conversation.item.create") == 1, "pending-response refusal retries speech once");
+
+    SessionFixture providerFirst;
+    providerFirst.Arguments(); providerFirst.Done(); providerFirst.session.CompleteTool("c1", {{"ok", true}});
+    providerFirst.Created("r2");
+    providerFirst.session.Receive({{"type", "error"}, {"error", {{"type", "invalid_request_error"}, {"message", "Conversation already has an active response"}}}});
+    providerFirst.Done(json::array(), "completed", "r2");
+    Check(providerFirst.session.Ready() && !providerFirst.session.Busy() && providerFirst.Count("response.create") == 1 && providerFirst.state != "error",
+        "a reply the provider started first completes the tool turn without a retry");
+
+    SessionFixture rejected;
+    rejected.Arguments(); rejected.Done(); rejected.session.CompleteTool("c1", {{"ok", true}});
+    rejected.session.Receive({{"type", "error"}, {"error", {{"type", "invalid_request_error"}, {"code", "invalid_value"}, {"message", "Invalid value"}}}});
+    Check(rejected.session.Ready() && !rejected.session.Busy() && rejected.state != "error", "client errors fail one turn but keep the connection");
+    SessionFixture unsafe;
+    unsafe.Arguments(); unsafe.Done(); unsafe.session.CompleteTool("c1", {{"ok", true}});
+    unsafe.session.Receive({{"type", "error"}, {"error", {{"type", "invalid_request_error"}, {"code", "data_inspection_failed"}}}});
+    Check(!unsafe.session.Ready() && unsafe.state == "error", "content safety rejection starts a new session");
+
     SessionFixture superseded;
     superseded.Arguments(); superseded.Done(); superseded.session.CompleteTool("c1", {{"ok", true}});
     std::string staleRequest;

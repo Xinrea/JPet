@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, createEventDispatcher } from "svelte";
   import { Input, Button, Select } from "flowbite-svelte";
   import SettingCard from "./SettingCard.svelte";
   import UiIcon from "./UiIcon.svelte";
@@ -82,6 +82,23 @@
     }
   }
 
+  const dispatch = createEventDispatcher();
+  let historyConfirm = false, historyClearing = false, historyError = "", historyMessage = "";
+  async function clearHistory() {
+    historyClearing = true; historyError = ""; historyMessage = "";
+    try {
+      const response = await fetch("/api/voice/history", { method: "DELETE" });
+      const result = await response.json().catch(() => ({}));
+      dispatch("historycleared");
+      if (!response.ok) throw new Error(result.error || "清空对话记录失败");
+      if (!voiceDisposed) historyMessage = "对话记录已清空";
+    } catch (error) {
+      if (!voiceDisposed) historyError = error.message;
+    } finally {
+      if (!voiceDisposed) { historyClearing = false; historyConfirm = false; }
+    }
+  }
+
   onMount(() => {
     loadVoiceSettings();
     refreshPowerlive();
@@ -135,6 +152,19 @@
           {#each (voiceStatus.last_tool.sources || voiceStatus.last_tool.results || []) as source}{#if source.url}<p><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title || source.url}</a></p>{/if}{/each}
         </div>
       {/if}
+    </SettingCard>
+    <SettingCard title="对话记录" description="管理保存在本机的聊天内容" icon="chat">
+      <p class="setting-help">清空后，本机保存的对话文字和工具调用摘要将被删除，且无法恢复。当前语音会话也会断开，下次对话时轴伊不会记得之前的内容。</p>
+      <div class="setting-actions">
+        {#if historyConfirm}
+          <Button size="sm" color="red" on:click={clearHistory} disabled={historyClearing}>{historyClearing ? "清空中…" : "确认清空"}</Button>
+          <Button size="sm" color="alternative" on:click={() => historyConfirm = false} disabled={historyClearing}>取消</Button>
+        {:else}
+          <Button size="sm" color="alternative" on:click={() => { historyConfirm = true; historyMessage = ""; historyError = ""; }}>清空对话记录</Button>
+        {/if}
+      </div>
+      {#if historyError}<p class="feedback error" role="alert">{historyError}</p>{/if}
+      {#if historyMessage}<p class="feedback success" role="status">{historyMessage}</p>{/if}
     </SettingCard>
 </div>
 

@@ -599,6 +599,15 @@ void PanelServer::doServe() {
     res.set_header("Cache-Control", "no-store");
     res.set_content(VoiceChat::GetInstance()->History().dump(), "application/json");
   });
+  server->Delete("/api/voice/history", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, false)) return;
+    if (!VoiceChat::GetInstance()->ClearHistory()) {
+      res.status = 500;
+      res.set_content(R"({"error":"对话记录已清空，但暂时无法保存，重启后可能恢复。"})", "application/json");
+      return;
+    }
+    res.set_content(R"({"success":true})", "application/json");
+  });
   server->Post("/api/config/audio",
                [](const httplib::Request &req, httplib::Response &res) {
                  LAppPal::PrintLog("POST /api/config/audio");

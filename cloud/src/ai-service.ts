@@ -6,6 +6,15 @@ const failure = (error: string, code = "jpet_bad_request", status = 400) => aiJs
 const quotaError = () => failure("今日 AI token 额度不足，请在北京时间零点重置后重试", "jpet_quota_exceeded", 429);
 interface Secrets { QWEN_WORKSPACE_ID?: string; QWEN_API_KEY?: string }
 class RealtimeProtocolError extends Error { constructor(readonly code: string) { super(code); } }
+// Qwen keeps the connection after invalid_request_error. Rejected content,
+// credentials and quota still end the session; nothing here is logged verbatim.
+export function providerErrorKind(error: any): "busy" | "rejected" | "fatal" {
+  const detail = ["code", "type", "message"].map(key => typeof error?.[key] === "string" ? error[key] : "").join(" ").toLowerCase();
+  if (/another response is in progress|cannot create response while .*in progress|already has (?:a pending response request|an active response)|user is speaking/.test(detail)) return "busy";
+  if (error?.type !== "invalid_request_error") return "fatal";
+  if (/data[_ -]?inspection|inappropriate content|data may contain|auth|api[_ -]?key|permission|arrearage|balance|quota|rate[_ -]?limit|throttl|access[_ -]?denied|model[_ -]?not[_ -]?found/.test(detail)) return "fatal";
+  return "rejected";
+}
 
 // Reject compressed image bombs by inspecting the JPEG header before forwarding.
 export function validImage(url: unknown): boolean {
@@ -144,7 +153,8 @@ export class AiAccount extends DurableObject<Env> {
     } finally { clearTimeout(handshakeTimer); }
     const [client, server] = Object.values(new WebSocketPair());
     upstream.accept(); server.accept();
-    let closed = false, updated = false, context = 0, audioBytes = 0, forwardedAudioBytes = 0, uncertain = false, speechActive = false, continuationReady = false;
+    let closed = false, updated = false, context = 0, audioBytes = 0, forwardedAudioBytes = 0, uncertain = false, speechActive = false, continuationReady = false, continuationRetry = false;
+    let continuation: { request: { budget: number; interrupted: boolean }; eventId: string } | undefined;
     const pending = new Array<{ budget: number; interrupted: boolean }>();
     const committed = new Set<string>(), callOwners = new Map<string, string>();
     let continuationSilence: ReturnType<typeof setTimeout> | undefined;
@@ -181,7 +191,9 @@ export class AiAccount extends DurableObject<Env> {
     };
     const generate = () => {
       if (!authorizeResponse()) return;
-      send(upstream, { event_id: crypto.randomUUID(), type: "response.create", response: { modalities: ["text", "audio"] } });
+      const eventId = crypto.randomUUID();
+      continuation = { request: pending[pending.length - 1], eventId };
+      send(upstream, { event_id: eventId, type: "response.create", response: { modalities: ["text", "audio"] } });
       // The provider's VAD pipeline can defer a tool continuation until the
       // next audio frame, even if the user has switched the microphone off.
       // Supply at most one second of zero PCM, stopping as soon as generation
@@ -248,9 +260,10 @@ export class AiAccount extends DurableObject<Env> {
         if (!updated) throw new RealtimeProtocolError("unexpected_response_create");
         // A tool continuation can cross speech_started in transit. The new VAD
         // turn owns generation then; discard the stale continuation once.
-        if (!continuationReady) { trace("continuation-ignored", { speech_active: speechActive }); return; }
+        if (!continuationReady && !continuationRetry) { trace("continuation-ignored", { speech_active: speechActive }); return; }
         if (calls.size || pending.length || responses.size) throw new RealtimeProtocolError("unexpected_response_create");
-        continuationReady = false; generate(); trace("continuation-forwarded");
+        const retry = continuationRetry;
+        continuationReady = continuationRetry = false; generate(); trace("continuation-forwarded", { retry });
       } else throw new RealtimeProtocolError("unsupported_client_event");
     }));
     upstream.addEventListener("message", event => enqueue("upstream-message", () => {
@@ -260,7 +273,7 @@ export class AiAccount extends DurableObject<Env> {
         stopContinuationSilence();
         // The native client closes interrupted tools with cancellation outputs.
         // Keep issued IDs valid once, without requiring their old continuation.
-        speechActive = true; audioBytes = 0; continuationReady = false;
+        speechActive = true; audioBytes = 0; continuationReady = continuationRetry = false;
         for (const request of pending) request.interrupted = true;
         for (const call of calls) retiredCalls.add(call);
         calls.clear(); for (const responseId of responses.keys()) interrupted.add(responseId);
@@ -273,6 +286,9 @@ export class AiAccount extends DurableObject<Env> {
         if (responses.has(responseId) || completed.has(responseId)) {
           trace("response-created-duplicate", { completed: completed.has(responseId) }); return;
         }
+        // After a refused continuation, the reply occupying the slot may have
+        // had no reservation of its own. Admit it instead of dropping the session.
+        if (!pending.length && continuationRetry && !authorizeResponse()) return;
         const request = pending.shift();
         if (!request) throw new RealtimeProtocolError("unexpected_response_created");
         stopContinuationSilence();
@@ -297,6 +313,11 @@ export class AiAccount extends DurableObject<Env> {
               calls.add(item.call_id); seenCalls.add(item.call_id); callOwners.set(item.call_id, responseId);
             }
           }
+        }
+        if (!responses.has(responseId) && continuationRetry && typeof responseId === "string" && responseId) {
+          // The occupying reply may complete without announcing response.created.
+          if (!pending.length && !authorizeResponse()) return;
+          responses.set(responseId, pending.shift()!.budget);
         }
         if (!responses.has(responseId)) throw new RealtimeProtocolError("unknown_response_done");
         let usage = totalTokens(p.response?.usage);
@@ -331,8 +352,18 @@ export class AiAccount extends DurableObject<Env> {
       server.send(event.data);
       if (p.type === "error") {
         const code = p.error?.code;
-        console.warn(JSON.stringify({ component: "jpet-ai", stage: "provider-error", provider_code: typeof code === "string" && /^[a-zA-Z0-9_.-]{1,96}$/.test(code) ? code : "unknown", elapsed_ms: Date.now() - connectedAt }));
-        finish("千问语音服务返回错误，请稍后重试", "jpet_upstream_error");
+        const kind = providerErrorKind(p.error);
+        console.warn(JSON.stringify({ component: "jpet-ai", stage: "provider-error", provider_code: typeof code === "string" && /^[a-zA-Z0-9_.-]{1,96}$/.test(code) ? code : "unknown", kind, elapsed_ms: Date.now() - connectedAt }));
+        if (kind === "fatal") { finish("千问语音服务返回错误，请稍后重试", "jpet_upstream_error"); return; }
+        // Client errors reject one request and keep the provider session open.
+        const requestId = p.error?.event_id;
+        if (continuation && pending.includes(continuation.request) && (!requestId || requestId === continuation.eventId)) {
+          pending.splice(pending.indexOf(continuation.request), 1);
+          if (kind === "busy") continuationRetry = true;
+          uncertain = !!pending.length || !!responses.size || speechActive;
+          trace("continuation-refused", { kind });
+        }
+        continuation = undefined;
       }
     }));
     server.addEventListener("close", () => enqueue("client-close", () => finish()));

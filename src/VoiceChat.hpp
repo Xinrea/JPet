@@ -17,6 +17,10 @@ class VoiceChat {
   void ConfigurationChanged() { resetRequested_ = true; }
   nlohmann::json Status();
   nlohmann::json History() { return history_.Snapshot(); }
+  bool ClearHistory() {
+    historyClearRequested_ = resetRequested_ = true;
+    return history_.Clear();
+  }
   bool IsBusy() const;
 
  private:
@@ -33,6 +37,7 @@ class VoiceChat {
   Voice::History history_;
   Voice::Session session_;
   std::atomic<bool> resetRequested_{false};
+  std::atomic<bool> historyClearRequested_{false};
   std::atomic<bool> busy_{false};
   std::mutex statusMutex_;
   nlohmann::json status_ = {{"state", "idle"}, {"message", ""}, {"reply", ""}, {"microphone_on", false}};

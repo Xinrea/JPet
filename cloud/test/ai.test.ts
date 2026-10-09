@@ -4,7 +4,7 @@ import { describe, expect, it, beforeAll } from "vitest";
 import { SignJWT, generateKeyPair, createLocalJWKSet, exportJWK } from "jose";
 import { identity, ISSUER } from "../src/ai-auth";
 import { DAILY_TOKENS, REQUEST_RESERVE, TokenQuota, quotaDay, quotaReset, totalTokens } from "../src/ai-quota";
-import { validImage } from "../src/ai-service";
+import { providerErrorKind, validImage } from "../src/ai-service";
 import worker from "../src/index";
 
 describe("PowerLive AI authorization", () => {
@@ -259,6 +259,66 @@ describe("AI forwarding and admission", () => {
         expect(audioAfterCreate).toBe(mode === "stall" ? 5 : 1);
         if (mode !== "stall") expect(instance.quota.view().used).toBe(100);
       } finally { if (deadline !== undefined) clearTimeout(deadline); client?.close(1000); provider.close(1000); globalThis.fetch = original; }
+    });
+  });
+  it("classifies provider errors without closing on recoverable client errors", () => {
+    expect(providerErrorKind({ type: "invalid_request_error", message: "Conversation already has a pending response request" })).toBe("busy");
+    expect(providerErrorKind({ type: "invalid_request_error", code: "invalid_value", message: "Failed to generate" })).toBe("rejected");
+    expect(providerErrorKind({ type: "invalid_request_error", code: "data_inspection_failed" })).toBe("fatal");
+    expect(providerErrorKind({ type: "server_error", message: "internal" })).toBe("fatal");
+    expect(providerErrorKind({ code: "COMMON_ERROR" })).toBe("fatal");
+  });
+  it.each([false, true])("retries a tool continuation refused while the provider slot is busy (provider reply announced: %s)", async announced => {
+    const stub = env.AI_ACCOUNTS.getByName(crypto.randomUUID());
+    await runInDurableObject(stub, async instance => {
+      const original = globalThis.fetch;
+      const [provider, upstream] = Object.values(new WebSocketPair()); provider.accept();
+      let manualRequests = 0;
+      const emit = (p: unknown) => provider.send(JSON.stringify(p));
+      const reply = (id: string, output: unknown[] = []) => {
+        emit({ type: "response.created", response: { id } });
+        emit({ type: "response.done", response: { id, status: "completed", output, usage: { total_tokens: 50, output_tokens: 10 } } });
+      };
+      provider.addEventListener("message", event => {
+        const p = JSON.parse(event.data as string);
+        if (p.type === "session.update") emit({ type: "session.updated" });
+        if (p.type === "input_audio_buffer.append" && manualRequests === 0) {
+          emit({ type: "input_audio_buffer.committed", item_id: "input-1" });
+          reply("tool-request", [{ type: "function_call", call_id: "tool-1", name: "open_url", arguments: "{}" }]);
+        }
+        if (p.type === "response.create" && ++manualRequests === 1) {
+          emit({ type: "error", error: { type: "invalid_request_error", message: "Conversation already has a pending response request" } });
+          // The reply occupying the slot completes later, with or without a prior reservation.
+          if (announced) reply("provider-pending");
+          else setTimeout(() => emit({ type: "response.done", response: { id: "unannounced", status: "completed", usage: { total_tokens: 10 } } }), 0);
+        } else if (p.type === "response.create") reply("tool-answer");
+      });
+      globalThis.fetch = (async () => new Response(null, { status: 101, webSocket: upstream })) as typeof fetch;
+      let client: WebSocket | undefined;
+      try {
+        const response = await instance.fetch(new Request("https://jpet.test/v1/ai/realtime", { headers: { Upgrade: "websocket", "X-JPet-Expires": String(Date.now() + 300000) } }));
+        client = response.webSocket!; client.accept();
+        const send = (p: unknown) => client!.send(JSON.stringify(p));
+        const closed = new Promise<string>(resolve => client!.addEventListener("close", () => resolve("closed")));
+        const answered = new Promise<string>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("Retry did not reach the provider")), 3000);
+          client!.addEventListener("message", event => {
+            const p = JSON.parse(event.data as string);
+            if (p.type === "error" && p.error.code?.startsWith("jpet_")) { clearTimeout(timer); reject(new Error(p.error.code)); }
+            if (p.type === "session.updated") send({ type: "input_audio_buffer.append", audio: btoa("\x01".repeat(3200)) });
+            if (p.type === "response.done" && p.response.id === "tool-request") {
+              send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: "tool-1", output: '{"ok":true}' } });
+              send({ type: "response.create" });
+            }
+            // The desktop retries once the occupied slot reports completion.
+            if (p.type === "response.done" && (p.response.id === "provider-pending" || p.response.id === "unannounced")) send({ type: "response.create" });
+            if (p.type === "response.done" && p.response.id === "tool-answer") { clearTimeout(timer); resolve("answered"); }
+          });
+          send({ type: "session.update", session: { instructions: "test", tools: [], audio: { input: { format: { type: "pcm", sample_rate: 16000 } } } } });
+        });
+        expect(await Promise.race([answered, closed])).toBe("answered");
+        expect(manualRequests).toBe(2);
+      } finally { client?.close(1000); provider.close(1000); globalThis.fetch = original; }
     });
   });
   it("accepts a new spoken turn after more than a minute of microphone-on silence", async () => {

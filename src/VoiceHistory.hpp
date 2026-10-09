@@ -86,6 +86,15 @@ class History {
     TrimEntries(); SaveEntries();
   }
 
+  // IDs keep increasing so panels never confuse new messages with cleared ones;
+  // events from a turn in progress are dropped after clearing.
+  bool Clear() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    entries_ = json::array(); turns_.clear(); keys_.clear();
+    SaveEntries();
+    return !saveFailed_;
+  }
+
   json Snapshot() {
     std::lock_guard<std::mutex> lock(mutex_);
     return {{"list", entries_}, {"limit", Limit}, {"error", saveFailed_ ? "对话记录暂时无法保存，重启后可能丢失。" : ""}};

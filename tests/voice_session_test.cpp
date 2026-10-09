@@ -338,6 +338,17 @@ int main() {
     rejectSave = false;
     unavailable.Apply({Event::Type::Completed, 1, ""});
     Check(unavailable.Snapshot()["error"] == "", "successful save clears the storage error");
+    json clearedSave = json::array({1});
+    Voice::History clearing(json::parse(messageSave.dump()), [&](const json& data) { clearedSave = data; });
+    clearing.Apply({Event::Type::Started, 7, ""});
+    Check(clearing.Clear() && clearing.Snapshot()["list"].empty() && clearedSave.empty(), "clearing removes memory and persisted history");
+    clearing.Apply({Event::Type::UserTranscript, 7, "清空前开始的问题"});
+    Check(clearing.Snapshot()["list"].empty(), "events from a turn started before clearing are dropped");
+    clearing.Apply({Event::Type::Started, 8, ""});
+    Check(clearing.Snapshot()["list"].size() == 1 && clearing.Snapshot()["list"][0]["id"].get<uint64_t>() > flat.back()["id"].get<uint64_t>() + 1,
+        "IDs keep increasing after clearing");
+    rejectSave = true;
+    Check(!unavailable.Clear() && unavailable.Snapshot()["list"].empty(), "clearing reports storage failures");
 
     Fixture early;
     early.Connect(); early.Turn();

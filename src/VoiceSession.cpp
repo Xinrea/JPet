@@ -99,9 +99,13 @@ std::string ServerErrorCategory(const nlohmann::json& error) {
   // Project only the classification, never upstream messages or credentials.
   if (detail.find("auth") != std::string::npos || detail.find("api_key") != std::string::npos || detail.find("permission") != std::string::npos) return "authentication";
   if (detail.find("another response is in progress") != std::string::npos ||
+      detail.find("already has a pending response request") != std::string::npos ||
+      detail.find("already has an active response") != std::string::npos ||
       detail.find("response_active") != std::string::npos || detail.find("response_slot_busy") != std::string::npos ||
       (detail.find("cannot create response") != std::string::npos && detail.find("in progress") != std::string::npos)) return "response_slot_busy";
   if (detail.find("user is speaking") != std::string::npos || detail.find("input_busy") != std::string::npos) return "input_busy";
+  if (detail.find("data_inspection_failed") != std::string::npos || detail.find("inappropriate content") != std::string::npos ||
+      detail.find("data may contain") != std::string::npos) return "content_safety";
   if (detail.find("function_call") != std::string::npos || detail.find("call_id") != std::string::npos || detail.find("function call") != std::string::npos) return "tool_output_rejected";
   return "other";
 }
@@ -500,13 +504,35 @@ void Session::Receive(const nlohmann::json& event) {
     const auto category = ServerErrorCategory(error);
     const auto request = error.value("event_id", std::string{});
     if (category != "authentication" && interruptedRequests_.erase(request)) return;
-    if (ready_ && (category == "response_slot_busy" || category == "input_busy") &&
+    const bool busy = category == "response_slot_busy" || category == "input_busy";
+    if (ready_ && busy && responseActive_ && !continuationEventId_.empty() &&
+        (request.empty() || request == continuationEventId_)) {
+      // The provider started its own reply first; it carries the tool result.
+      continuationEventId_.clear();
+      return;
+    }
+    if (ready_ && busy &&
         awaitingResponse_ && !responseActive_ && !continuationEventId_.empty() &&
         (request.empty() || request == continuationEventId_) && ++continuationRetries_ <= 3) {
       continuationDeferred_ = true;
       awaitingResponse_ = false;
       acceptReply_ = false;
       Status("thinking", "正在等待语音服务完成当前回复…");
+      return;
+    }
+    if (category == "content_safety") {
+      // Rejected content stays in the remote context; only a new session recovers.
+      Reset(true);
+      Status("error", "这次内容未通过语音服务的安全检查，请换个说法再试");
+      return;
+    }
+    // Client errors reject one request; the provider keeps the connection open.
+    // Credential, quota and balance codes keep their specific fatal messages.
+    if (ready_ && error.value("type", std::string{}) == "invalid_request_error" && category != "authentication" &&
+        FriendlyError(code) == FriendlyError("")) {
+      FinishTurn(ConversationEvent::Type::Failed);
+      Interrupt();
+      Status(inputOpen_ ? "listening" : "idle", "本次请求被语音服务拒绝，可以继续说话或重新开启麦克风");
       return;
     }
     const auto message = FriendlyError(code);

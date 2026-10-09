@@ -119,7 +119,7 @@
 </section>
 
 <Modal title="语音对话设置" bind:open={voiceSettingsOpen} size="md">
-  {#if voiceSettingsOpen}<VoiceSettings />{/if}
+  {#if voiceSettingsOpen}<VoiceSettings on:historycleared={() => { records = []; refresh(); }} />{/if}
 </Modal>
 
 <style>
