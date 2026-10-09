@@ -6,6 +6,13 @@ const failure = (error: string, code = "jpet_bad_request", status = 400) => aiJs
 const quotaError = () => failure("今日 AI token 额度不足，请在北京时间零点重置后重试", "jpet_quota_exceeded", 429);
 interface Secrets { QWEN_WORKSPACE_ID?: string; QWEN_API_KEY?: string }
 class RealtimeProtocolError extends Error { constructor(readonly code: string) { super(code); } }
+// Context after a reply: its measured input plus its own output. total_tokens alone
+// cannot be split, so callers keep their estimate when this returns null.
+export function measuredContext(usage: any): number | null {
+  const input = usage?.input_tokens ?? usage?.prompt_tokens, output = usage?.output_tokens ?? usage?.completion_tokens;
+  if (!Number.isSafeInteger(input) || input < 0 || !Number.isSafeInteger(output) || output < 0) return null;
+  return input + output;
+}
 // Qwen keeps the connection after invalid_request_error. Rejected content,
 // credentials and quota still end the session; nothing here is logged verbatim.
 export function providerErrorKind(error: any): "busy" | "rejected" | "fatal" {
@@ -61,9 +68,10 @@ export class AiAccount extends DurableObject<Env> {
     const limit = Number(env.AI_DAILY_TOKEN_LIMIT);
     this.quota = new TokenQuota(ctx.storage, Number.isSafeInteger(limit) && limit > 0 ? limit : DAILY_TOKENS);
   }
+  private enabled(): boolean { return String(this.env.AI_ENABLED) !== "false"; }
   private configured(): boolean {
     const { QWEN_API_KEY: key, QWEN_WORKSPACE_ID: workspace } = this.env as Env & Secrets;
-    return !!key && /^[\x21-\x7e]{1,512}$/.test(key) && !!workspace && /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(workspace);
+    return this.enabled() && !!key && /^[\x21-\x7e]{1,512}$/.test(key) && !!workspace && /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(workspace);
   }
   private async schedule(): Promise<void> {
     const due = this.quota.nextExpiry();
@@ -80,6 +88,7 @@ export class AiAccount extends DurableObject<Env> {
     if (path === "/v1/ai/me" && request.method === "GET") {
       await this.schedule(); return aiJson({ quota: this.quota.view(), service_ready: this.configured() });
     }
+    if (!this.enabled()) return failure("JPet AI 服务暂时下线，可以在语音设置中切换为自定义千问服务", "jpet_unavailable", 503);
     if (!this.configured()) return failure("JPet AI 服务尚未配置，请联系管理员", "jpet_unavailable", 503);
     if (path === "/v1/ai/realtime" && request.method === "GET") return this.realtime(request);
     if (request.method === "POST" && ["/v1/ai/vision", "/v1/ai/search"].includes(path)) return this.tool(request, path.endsWith("vision"));
@@ -160,7 +169,7 @@ export class AiAccount extends DurableObject<Env> {
     let continuationSilence: ReturnType<typeof setTimeout> | undefined;
     let silenceGeneration = 0;
     const stopContinuationSilence = () => { ++silenceGeneration; if (continuationSilence !== undefined) clearTimeout(continuationSilence); continuationSilence = undefined; };
-    const responses = new Map<string, number>(), completed = new Set<string>(), calls = new Set<string>(), retiredCalls = new Set<string>(), seenCalls = new Set<string>(), interrupted = new Set<string>();
+    const responses = new Map<string, { budget: number; context: number }>(), completed = new Set<string>(), calls = new Set<string>(), retiredCalls = new Set<string>(), seenCalls = new Set<string>(), interrupted = new Set<string>();
     let queued = Promise.resolve();
     const send = (ws: WebSocket, event: any) => ws.send(JSON.stringify(event));
     const trace = (stage: string, detail: Record<string, string | number | boolean> = {}) => {
@@ -292,7 +301,7 @@ export class AiAccount extends DurableObject<Env> {
         const request = pending.shift();
         if (!request) throw new RealtimeProtocolError("unexpected_response_created");
         stopContinuationSilence();
-        responses.set(responseId, request.budget);
+        responses.set(responseId, { budget: request.budget, context });
         if (request.interrupted) interrupted.add(responseId);
         trace("response-created", { interrupted: request.interrupted });
       } else if (p.type === "response.output_item.done" && p.item?.type === "function_call") {
@@ -317,7 +326,7 @@ export class AiAccount extends DurableObject<Env> {
         if (!responses.has(responseId) && continuationRetry && typeof responseId === "string" && responseId) {
           // The occupying reply may complete without announcing response.created.
           if (!pending.length && !authorizeResponse()) return;
-          responses.set(responseId, pending.shift()!.budget);
+          responses.set(responseId, { budget: pending.shift()!.budget, context });
         }
         if (!responses.has(responseId)) throw new RealtimeProtocolError("unknown_response_done");
         let usage = totalTokens(p.response?.usage);
@@ -325,19 +334,27 @@ export class AiAccount extends DurableObject<Env> {
           if (!aborted) throw new RealtimeProtocolError("missing_response_usage");
           // Aborted replies may omit metering. Bill their own admission budget
           // once, keeping the other response/next-turn reservations intact.
-          usage = responses.get(responseId)!;
+          usage = responses.get(responseId)!.budget;
           console.warn(JSON.stringify({ component: "jpet-ai", stage: "response-usage", failure: "aborted_usage_missing", status: p.response.status, estimated_tokens: usage }));
         }
         if (aborted || interrupted.has(responseId)) {
           for (const call of calls) if (callOwners.get(call) === responseId) { calls.delete(call); retiredCalls.add(call); }
         }
         continuationReady = !aborted && !interrupted.has(responseId) && calls.size > 0;
+        const started = responses.get(responseId)!.context;
         responses.delete(responseId); completed.add(responseId);
         if (completed.size > 100 || !this.quota.consume(id, usage)) { finish("今日 AI token 额度已用完", "jpet_quota_exceeded"); return; }
-        const output = p.response.usage?.output_tokens;
-        context += (Number.isSafeInteger(output) && output >= 0 ? output : aborted ? 0 : usage) * 4 + 128;
+        const measured = aborted ? null : measuredContext(p.response.usage);
+        const estimated = context;
+        if (measured !== null) {
+          // The provider measured the context at generation; keep only input admitted since then.
+          context = measured + Math.max(0, context - started);
+        } else {
+          const output = p.response.usage?.output_tokens;
+          context += (Number.isSafeInteger(output) && output >= 0 ? output : aborted ? 0 : usage) * 4 + 128;
+        }
         uncertain = !!pending.length || !!responses.size || speechActive;
-        trace("response-done", { continuation_ready: continuationReady, aborted, usage });
+        trace("response-done", { continuation_ready: continuationReady, aborted, usage, context, estimated_context: estimated, measured: measured !== null });
       }
       if (p.type === "input_audio_buffer.committed") {
         if (typeof p.item_id === "string" && p.item_id) {

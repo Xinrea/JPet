@@ -4,7 +4,7 @@ import { describe, expect, it, beforeAll } from "vitest";
 import { SignJWT, generateKeyPair, createLocalJWKSet, exportJWK } from "jose";
 import { identity, ISSUER } from "../src/ai-auth";
 import { DAILY_TOKENS, REQUEST_RESERVE, TokenQuota, quotaDay, quotaReset, totalTokens } from "../src/ai-quota";
-import { providerErrorKind, validImage } from "../src/ai-service";
+import { measuredContext, providerErrorKind, validImage } from "../src/ai-service";
 import worker from "../src/index";
 
 describe("PowerLive AI authorization", () => {
@@ -259,6 +259,71 @@ describe("AI forwarding and admission", () => {
         expect(audioAfterCreate).toBe(mode === "stall" ? 5 : 1);
         if (mode !== "stall") expect(instance.quota.view().used).toBe(100);
       } finally { if (deadline !== undefined) clearTimeout(deadline); client?.close(1000); provider.close(1000); globalThis.fetch = original; }
+    });
+  });
+  it.each([[3000, "completed"], [30000, "jpet_quota_exceeded"]])("replaces the context estimate with measured usage (input %i)", async (input, outcome) => {
+    expect(measuredContext({ input_tokens: 5, output_tokens: 2 })).toBe(7);
+    expect(measuredContext({ total_tokens: 7 })).toBeNull();
+    const stub = env.AI_ACCOUNTS.getByName(crypto.randomUUID());
+    await runInDurableObject(stub, async instance => {
+      const original = globalThis.fetch;
+      const [provider, upstream] = Object.values(new WebSocketPair()); provider.accept();
+      let turn = 0;
+      const emit = (p: unknown) => provider.send(JSON.stringify(p));
+      provider.addEventListener("message", event => {
+        const p = JSON.parse(event.data as string);
+        if (p.type === "session.update") emit({ type: "session.updated" });
+        if (p.type === "input_audio_buffer.append") {
+          const id = `reply-${++turn}`;
+          emit({ type: "input_audio_buffer.committed", item_id: `input-${turn}` });
+          emit({ type: "response.created", response: { id } });
+          emit({ type: "response.done", response: { id, status: "completed", output: [], usage: { input_tokens: input, output_tokens: 1000, total_tokens: input + 1000 } } });
+        }
+      });
+      globalThis.fetch = (async () => new Response(null, { status: 101, webSocket: upstream })) as typeof fetch;
+      let client: WebSocket | undefined;
+      try {
+        const response = await instance.fetch(new Request("https://jpet.test/v1/ai/realtime", { headers: { Upgrade: "websocket", "X-JPet-Expires": String(Date.now() + 300000) } }));
+        client = response.webSocket!; client.accept();
+        const send = (p: unknown) => client!.send(JSON.stringify(p));
+        const result = await new Promise<string>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("Turns did not finish")), 3000);
+          client!.addEventListener("message", event => {
+            const p = JSON.parse(event.data as string);
+            if (p.type === "error") { clearTimeout(timer); resolve(p.error.code); }
+            if (p.type === "session.updated" || p.type === "response.done") {
+              if (turn === 5) { clearTimeout(timer); resolve("completed"); }
+              else send({ type: "input_audio_buffer.append", audio: btoa("\x01".repeat(3200)) });
+            }
+          });
+          // Near the 16 KB handshake limit: the byte estimate alone leaves room for only two replies.
+          send({ type: "session.update", session: { instructions: "x".repeat(15000), tools: [], audio: { input: { format: { type: "pcm", sample_rate: 16000 } } } } });
+        });
+        expect(result).toBe(outcome);
+        if (outcome === "completed") expect(turn).toBe(5); else expect(turn).toBe(1);
+      } finally { client?.close(1000); provider.close(1000); globalThis.fetch = original; }
+    });
+  });
+  it("takes every AI endpoint offline when AI_ENABLED is false", async () => {
+    const stub = env.AI_ACCOUNTS.getByName(crypto.randomUUID());
+    await runInDurableObject(stub, async instance => {
+      const self = instance as unknown as { env: Env };
+      const previous = self.env;
+      self.env = { ...previous, AI_ENABLED: "false" } as Env;
+      try {
+        const me = await (await instance.fetch(new Request("https://jpet.test/v1/ai/me"))).json() as { service_ready: boolean };
+        expect(me.service_ready).toBe(false);
+        for (const request of [
+          new Request("https://jpet.test/v1/ai/realtime", { headers: { Upgrade: "websocket", "X-JPet-Expires": String(Date.now() + 300000) } }),
+          new Request("https://jpet.test/v1/ai/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }),
+          new Request("https://jpet.test/v1/ai/vision", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }),
+        ]) {
+          const response = await instance.fetch(request);
+          expect(response.status).toBe(503);
+          expect(await response.json()).toMatchObject({ code: "jpet_unavailable" });
+        }
+        expect(instance.quota.view().reserved).toBe(0);
+      } finally { self.env = previous; }
     });
   });
   it("classifies provider errors without closing on recoverable client errors", () => {

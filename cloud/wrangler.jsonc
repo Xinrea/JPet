@@ -7,7 +7,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "routes": [{ "pattern": "s.jpet.powerlive.io", "custom_domain": true }],
-  "vars": { "AI_DAILY_TOKEN_LIMIT": 2000000 },
+  "vars": { "AI_DAILY_TOKEN_LIMIT": 2000000, "AI_ENABLED": "false" },
   "durable_objects": {
     "bindings": [{ "name": "PLAYERS", "class_name": "Player" }, { "name": "AI_ACCOUNTS", "class_name": "AiAccount" }]
   },
