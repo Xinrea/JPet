@@ -34,11 +34,11 @@ class VoiceChat {
   std::atomic<bool> resetRequested_{false};
   std::atomic<bool> busy_{false};
   std::mutex statusMutex_;
-  nlohmann::json status_ = {{"state", "idle"}, {"message", ""}, {"reply", ""}};
+  nlohmann::json status_ = {{"state", "idle"}, {"message", ""}, {"reply", ""}, {"microphone_on", false}};
   GLFWwindow* window_ = nullptr;
   bool connected_ = false;
   bool rawHeld_ = false;
-  bool turnStarted_ = false;
+  bool microphoneEnabled_ = false;
   bool waitForRelease_ = false;
   bool failurePending_ = false;
   size_t capturedBytes_ = 0;
@@ -49,5 +49,5 @@ class VoiceChat {
   std::string error_;
   std::string indicator_;
   bool indicatorError_ = false;
-  Clock::time_point keyPressedAt_, connectedAt_, lastActivity_, stateChangedAt_;
+  Clock::time_point connectedAt_, lastActivity_, stateChangedAt_;
 };

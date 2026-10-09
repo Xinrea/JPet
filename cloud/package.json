@@ -18,5 +18,8 @@
     "vitest": "4.1.11",
     "wrangler": "4.147.0",
     "ws": "8.21.0"
+  },
+  "dependencies": {
+    "jose": "6.2.12"
   }
 }

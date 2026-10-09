@@ -112,6 +112,27 @@ int main() {
     Check(queued == std::string(6400, '\1') + std::string(Voice::InputTailBytes, '\0') +
         std::string(6400, '\2') + std::string(Voice::InputTailBytes, '\0'), "repeated presses during connection preserve all samples");
 
+    Fixture continuous;
+    continuous.Connect(); continuous.session.BeginInput();
+    for (int i = 0; i < 650; ++i) continuous.session.AppendInput(std::string(3200, '\0'));
+    Check(continuous.Count("input_audio_buffer.append") == 650 && continuous.session.Recording(),
+        "microphone stays on and uploads beyond one minute without another key press");
+    Check(!continuous.session.WaitingForReply(), "quiet open microphone is not a stalled reply");
+    for (int i = 1; i <= 3; ++i) {
+      continuous.Speech("continuous-user-" + std::to_string(i));
+      Check(continuous.session.WaitingForReply(), "reply timeout also applies with microphone open");
+      const auto id = "continuous-reply-" + std::to_string(i);
+      continuous.Reply(id, "continuous-item-" + std::to_string(i));
+      continuous.session.Receive({{"type", "response.done"}, {"response", {{"id", id}, {"status", "completed"}}}});
+      Check(continuous.session.Recording() && !continuous.session.WaitingForReply() && continuous.state == "listening",
+          "completed reply returns to listening while microphone stays open");
+    }
+    continuous.session.EndInput();
+    const auto stoppedChunks = continuous.Count("input_audio_buffer.append");
+    continuous.session.AppendInput(std::string(3200, '\1'));
+    Check(!continuous.session.Recording() && continuous.Count("input_audio_buffer.append") == stoppedChunks,
+        "explicit microphone off stops capture uploads");
+
     Fixture interrupt;
     interrupt.Connect(); interrupt.Turn(); interrupt.Reply();
     interrupt.session.Receive({{"type", "response.audio.delta"}, {"delta", Voice::EncodeBase64(std::string(4800, '\0'))}});
@@ -141,7 +162,7 @@ int main() {
     interrupt.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r2"}, {"transcript", "你好"}});
     Check(interrupt.transcript == "你好", "complete response transcript is visible");
     interrupt.session.Receive({{"type", "response.done"}, {"response", {{"id", "r2"}, {"status", "completed"}}}});
-    Check(interrupt.session.Recording() && interrupt.history.Snapshot()["list"][0]["state"] == "completed", "server can complete a turn while the key is held");
+    Check(interrupt.session.Recording() && interrupt.history.Snapshot()["list"][0]["state"] == "completed", "server can complete a turn while the microphone is on");
     interrupt.Speech("u3"); interrupt.Reply("r3", "i3"); interrupt.session.EndInput();
     Check(interrupt.history.Snapshot()["list"].size() == 3 && interrupt.Count("response.create") == 0,
         "multiple server turns can share one key hold");

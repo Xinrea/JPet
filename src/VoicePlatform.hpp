@@ -39,4 +39,6 @@ std::unique_ptr<Platform> MakePlatform();
 bool SaveApiKey(const std::string& profile, const std::string& key,
                 std::string& error);
 std::string LoadApiKey(const std::string& profile, std::string& error);
+bool SavePowerLiveRefreshToken(const std::string& profile, const std::string& token, std::string& error);
+std::string LoadPowerLiveRefreshToken(const std::string& profile, std::string& error);
 }  // namespace Voice

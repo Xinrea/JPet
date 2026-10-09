@@ -1,7 +1,10 @@
 <script>
   import { onMount, onDestroy } from "svelte";
+  import { Modal } from "flowbite-svelte";
+  import VoiceSettings from "../components/VoiceSettings.svelte";
   import UiIcon from "../components/UiIcon.svelte";
 
+  let voiceSettingsOpen = false;
   let records = [];
   let limit = 200;
   let loading = true;
@@ -57,11 +60,14 @@
   });
 </script>
 
-<section class="conversation-page" aria-label="AI 对话记录">
+<section class="conversation-page" aria-label="AI 对话">
   <div class="history-summary game-card">
     <span class="summary-icon"><UiIcon name="chat" size={26} /></span>
     <div class="summary-copy"><h2>和轴伊的聊天时光</h2><p>对话文字保存在本机，最多保留最近 {limit} 轮。</p></div>
-    <span class="record-count"><strong>{records.length}</strong> 轮对话</span>
+    <div class="summary-actions">
+      <span class="record-count"><strong>{records.length}</strong> 轮对话</span>
+      <button class="voice-settings-button" aria-haspopup="dialog" on:click={() => voiceSettingsOpen = true}><UiIcon name="settings" size={17} />语音对话设置</button>
+    </div>
   </div>
 
   <div class="history-tools">
@@ -76,7 +82,7 @@
   {:else if error && records.length === 0}
     <div class="history-empty game-card"><UiIcon name="chat" size={36} /><h2>暂时无法读取记录</h2><p>点击重新加载，再试一次。</p></div>
   {:else if records.length === 0}
-    <div class="history-empty game-card"><UiIcon name="chat" size={36} /><h2>还没有对话记录</h2><p>在「设置 → 声音」中配置语音对话后，按住 Option（Mac）或 Ctrl（Windows）和轴伊聊聊吧。</p><small>从本次更新后开始记录，语音转写仅供参考。</small></div>
+    <div class="history-empty game-card"><UiIcon name="chat" size={36} /><h2>还没有对话记录</h2><p><button on:click={() => voiceSettingsOpen = true}>配置语音对话</button>后，按 Option（Mac）或 Ctrl（Windows）开启麦克风，和轴伊聊聊吧；再按一次关闭。</p><small>从本次更新后开始记录，语音转写仅供参考。</small></div>
   {:else if visible.length === 0}
     <div class="history-empty game-card"><UiIcon name="chat" size={36} /><h2>没有找到相关对话</h2><p>试试其他关键词，或<button on:click={() => search = ""}>清空搜索</button>。</p></div>
   {:else}
@@ -93,12 +99,19 @@
   {/if}
 </section>
 
+<Modal title="语音对话设置" bind:open={voiceSettingsOpen} size="md">
+  {#if voiceSettingsOpen}<VoiceSettings />{/if}
+</Modal>
+
 <style>
   .history-summary { display: flex; align-items: center; gap: 14px; padding: 20px; margin-bottom: 20px; }
   .summary-icon { display: grid; place-items: center; flex-shrink: 0; width: 48px; height: 48px; color: var(--green-ink); background: var(--green-soft); border-radius: 14px; }
   .summary-copy { flex: 1; min-width: 0; }
   .summary-copy h2 { font-size: 16px; font-weight: 800; }
   .summary-copy p { margin-top: 6px; font-size: 12px; color: var(--muted); line-height: 1.8; }
+  .summary-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+  .voice-settings-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 9px 14px; border: 1px solid #dce3d1; border-radius: 9px; background: var(--green-soft); color: var(--green-ink); font-size: 12px; font-weight: 800; }
+  .voice-settings-button:hover { background: #e6f0d6; }
   .record-count { flex-shrink: 0; font-size: 11px; color: var(--muted); }
   .record-count strong { font-size: 26px; color: var(--green-ink); font-variant-numeric: tabular-nums; }
   .history-tools { display: flex; gap: 10px; margin-bottom: 16px; }
@@ -131,5 +144,5 @@
   .message-content p { font-size: 13px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
   .assistant-message .message-content p { padding: 12px 14px; border: 1px solid #e8eddc; border-radius: 10px; background: #f8fbf2; }
   .message-content p.placeholder { color: var(--muted); font-size: 12px; }
-  @media (max-width: 560px) { .history-summary { flex-wrap: wrap; padding: 16px; gap: 10px; } .summary-icon { width: 40px; height: 40px; } .record-count { width: 100%; padding-left: 50px; } .record-count strong { font-size: 20px; } .history-tools { flex-wrap: wrap; gap: 8px; } .history-search { flex-basis: 100%; } .history-tools > label:not(.history-search) { flex: 1; } select { width: 100%; } .message { margin: 16px 12px; gap: 9px; } .conversation-card header { padding: 12px; } }
+  @media (max-width: 560px) { .history-summary { flex-wrap: wrap; padding: 16px; gap: 10px; } .summary-icon { width: 40px; height: 40px; } .summary-actions { width: 100%; justify-content: space-between; gap: 10px; } .record-count strong { font-size: 20px; } .history-tools { flex-wrap: wrap; gap: 8px; } .history-search { flex-basis: 100%; } .history-tools > label:not(.history-search) { flex: 1; } select { width: 100%; } .message { margin: 16px 12px; gap: 9px; } .conversation-card header { padding: 12px; } }
 </style>

@@ -23,8 +23,8 @@ void Report(const char* name, const json& result) {
   if (ok && result.contains("sources")) std::cout << "source_count=" << result["sources"].size() << '\n';
   if (!ok) { ++failures; std::cout << result.value("error", std::string("unexpected service response")) << '\n'; }
 }
-bool CheckRealtime(const std::string& workspace, const std::string& key, const std::string& pcm = {}) {
-  NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@(Voice::ConnectionUrl(workspace).c_str())]];
+bool CheckRealtime(const std::string& workspace, const std::string& key, const std::string& pcm = {}, bool localProbe = false) {
+  NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@(localProbe ? "ws://127.0.0.1:8791/realtime" : Voice::ConnectionUrl(workspace).c_str())]];
   [request setValue:@(("Bearer " + key).c_str()) forHTTPHeaderField:@"Authorization"];
   NSURLSession* connection = [NSURLSession sessionWithConfiguration:NSURLSessionConfiguration.ephemeralSessionConfiguration];
   NSURLSessionWebSocketTask* socket = [connection webSocketTaskWithRequest:request];
@@ -60,6 +60,7 @@ bool CheckRealtime(const std::string& workspace, const std::string& key, const s
     const auto event = json::parse(received.UTF8String, nullptr, false);
     if (!event.is_object()) break;
     const auto type = event.value("type", std::string{});
+    if (localProbe && type.find(".delta") == std::string::npos) std::cout << "event=" << type << std::endl;
     if (type == "error") { std::cout << "realtime service rejected request\n"; break; }
     const bool finished = type == "response.done" && toolCalls && !session.Busy();
     session.Receive(event);
@@ -81,6 +82,15 @@ bool CheckRealtime(const std::string& workspace, const std::string& key, const s
 int main(int argc, char** argv) {
   @autoreleasepool {
     try {
+      // Local preview proxy supplies its own server credential. This path uses
+      // synthetic audio and fixtures only; it never opens a profile or keychain.
+      if (argc == 3 && std::string(argv[1]) == "--realtime-local-probe") {
+        std::ifstream file(argv[2], std::ios::binary);
+        const std::string pcm((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        if (pcm.size() < 3200 || pcm.size() % 2 || pcm.size() > 320000) return 2;
+        Report("native protocol via local preview", {{"ok", CheckRealtime("", "", pcm, true)}});
+        return failures ? 1 : 0;
+      }
       const bool realtimeCall = argc == 4 && std::string(argv[2]) == "--realtime-call";
       const bool realtimeConfig = argc == 3 && std::string(argv[2]) == "--realtime-config-only";
       if (argc != 2 && !(argc == 3 && std::string(argv[2]) == "--bilibili-only") && !realtimeCall && !realtimeConfig) {

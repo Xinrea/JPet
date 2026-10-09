@@ -40,3 +40,4 @@ build/
 build-scripts/Output
 
 .env
+.wrangler/

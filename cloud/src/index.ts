@@ -1,3 +1,5 @@
+import { routeAI } from "./ai-auth";
+export { AiAccount } from "./ai-service";
 import { DurableObject } from "cloudflare:workers";
 import { advance, command, createGame, GameError, LEASE_MS, migrateGame, number, recordTouches, resumeGame, snapshot, updateBuffs, type Command, type GameState } from "./game";
 
@@ -258,6 +260,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
+      if (url.pathname.startsWith("/v1/ai/")) return routeAI(request, env);
       if (request.method === "GET" && url.pathname === "/health") return json({ ok: true, protocol: 1 });
       if (request.method === "GET" && url.pathname === "/v1/socket") {
         const uid = url.searchParams.get("uid");

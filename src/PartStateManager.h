@@ -61,4 +61,6 @@ class PartStateManager {
   void ApplyState();
   map<string, bool> GetStatus();
   void Toggle(const string &key, bool enable);
+  // Absolute appearance updates on the render thread, excluding outfit unlocks.
+  bool SetAppearance(const map<string, bool>& parts, int mouth = 0);
 };

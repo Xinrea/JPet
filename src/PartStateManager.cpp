@@ -120,10 +120,27 @@ void PartStateManager::Toggle(const std::string& key, bool enable) {
   return;
 }
 
+bool PartStateManager::SetAppearance(const map<string, bool>& parts, int mouth) {
+  if (!model || mouth < 0 || mouth > 6) return false;
+  for (const auto& [key, _] : parts)
+    if (param_map_.find(key) == param_map_.end() || LAppPal::StartWith(key, "ParamCloth") || LAppPal::StartWith(key, "ParamMouth")) return false;
+  auto* current = LAppLive2DManager::GetInstance()->GetModel(0);
+  if (!current) return false;
+  // A previous additive toggle must not overwrite this absolute setting later.
+  current->StopMotionsForAppearance();
+  model->LoadParameters();
+  for (const auto& [key, enabled] : parts) model->SetParameterValue(param_map_.at(key).id, enabled ? 30.0f : 0.0f);
+  if (mouth) for (int i = 1; i <= 6; ++i)
+    model->SetParameterValue(param_map_.at("ParamMouth" + std::to_string(i)).id, i == mouth ? 30.0f : 0.0f);
+  model->SaveParameters();
+  SnapshotState();
+  return true;
+}
+
 map<string, bool> PartStateManager::GetStatus() {
   map<string, bool> ret;
   for (const auto& [_, entry] : param_map_) {
-    ret[entry.key] = (entry.getValue(model) > 0);
+    ret[entry.key] = (model ? entry.getValue(model) : DataManager::GetInstance()->GetWithDefault(prefix_ + entry.key, entry.value)) > 0;
   }
   return ret;
 }

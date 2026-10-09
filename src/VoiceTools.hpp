@@ -16,8 +16,10 @@ struct ToolDependencies {
   std::function<std::string(const nlohmann::json&)> command;
   std::function<nlohmann::json(const nlohmann::json&)> desktop, web, bilibili;
   std::function<bool(const std::string&, std::string&)> openUrl;
+  std::function<nlohmann::json(const nlohmann::json&, const std::function<bool()>&)> settings;
 };
-nlohmann::json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies);
+nlohmann::json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies,
+    const std::function<bool()>& cancelled = {});
 nlohmann::json GameView(const nlohmann::json& snapshot, const nlohmann::json& profile,
     const nlohmann::json& tasks, const nlohmann::json& achievements,
     const nlohmann::json& connection, const nlohmann::json& identity, const std::string& section);
@@ -46,4 +48,8 @@ class ToolExecutor {
   std::thread worker_;
 };
 ToolDependencies MakeToolDependencies();
+// Pump settings on the render thread; cancellation/shutdown releases waiting workers.
+void DrainSettingsTools();
+void CancelSettingsTools();
+void StopSettingsTools();
 } // namespace Voice

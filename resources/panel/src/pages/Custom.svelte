@@ -9,6 +9,8 @@
   import imgClothes1 from "../assets/c1.png";
   import imgClothes2 from "../assets/c2.png";
   import imgClothes3 from "../assets/c3.png";
+  import { onDestroy } from "svelte";
+  import { sse } from "../sse.js";
   const clothesImages = [imgClothes1, imgClothes2, imgClothes3];
 
   export let current = 0;
@@ -91,6 +93,10 @@
   }
 
   updatePartStatus();
+  const unsubscribe = sse.subscribe((event) => {
+    if (event?.data === "SETTINGS_UPDATE") updatePartStatus();
+  });
+  onDestroy(unsubscribe);
 </script>
 
 <div class="dress-layout">

@@ -7,10 +7,11 @@
   "workers_dev": false,
   "preview_urls": false,
   "routes": [{ "pattern": "s.jpet.powerlive.io", "custom_domain": true }],
+  "vars": { "AI_DAILY_TOKEN_LIMIT": 2000000 },
   "durable_objects": {
-    "bindings": [{ "name": "PLAYERS", "class_name": "Player" }]
+    "bindings": [{ "name": "PLAYERS", "class_name": "Player" }, { "name": "AI_ACCOUNTS", "class_name": "AiAccount" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Player"] }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Player"] }, { "tag": "v2", "new_sqlite_classes": ["AiAccount"] }],
   "d1_databases": [{
     "binding": "RANK",
     "database_name": "jpet-rank",

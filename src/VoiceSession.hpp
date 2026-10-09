@@ -33,7 +33,7 @@ struct ConversationEvent {
   std::string text;
 };
 
-// Microphone-gated, server-VAD protocol, independent of devices and credentials. The same
+// Toggleable microphone, server-VAD protocol, independent of devices and credentials. The same
 // state machine is used by both native backends and deterministic tests.
 class Session {
  public:
@@ -57,6 +57,9 @@ class Session {
   void CompleteTool(const std::string& callId, const nlohmann::json& result);
   bool Ready() const { return ready_; }
   bool Recording() const { return inputOpen_; }
+  bool WaitingForReply() const {
+    return !speechActive_ && (awaitingResponse_ || responseActive_ || !pendingTools_.empty());
+  }
   bool Busy() const {
     return inputOpen_ || speechActive_ || awaitingResponse_ || responseActive_ ||
         !pendingTools_.empty() || !bufferedInput_.empty();

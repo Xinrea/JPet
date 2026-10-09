@@ -1,3 +1,4 @@
+#include "PowerLiveAccount.hpp"
 #include "PanelServer.hpp"
 #include "BuffManager.hpp"
 #include "CloudGame.hpp"
@@ -299,6 +300,55 @@ nlohmann::json PanelServer::getTaskStatus() {
 }
 
 void PanelServer::doServe() {
+  int port = 8053;
+  // A smoke test can run beside the user's app with an isolated profile/port.
+  if (std::getenv("JPET_SMOKE_TEST")) {
+    if (const auto* testPort = std::getenv("JPET_SMOKE_PORT")) {
+      char* end = nullptr;
+      const auto parsed = std::strtol(testPort, &end, 10);
+      if (*testPort && !*end && parsed > 0 && parsed <= 65535) port = static_cast<int>(parsed);
+    }
+  }
+  PowerLiveAccount::Instance().Configure(LAppPal::WStringToString(LAppDefine::documentPath), CloudGame::ServiceUrl(), port);
+  const auto localRequest = [port](const httplib::Request& req, httplib::Response& res, bool post) {
+    const auto authority = "127.0.0.1:" + std::to_string(port), localhost = "localhost:" + std::to_string(port);
+    const auto host = req.get_header_value("Host"), origin = req.get_header_value("Origin");
+    if ((host != authority && host != localhost) || (!origin.empty() && origin != "http://" + authority && origin != "http://" + localhost) ||
+        (post && (req.get_header_value("Content-Type").find("application/json") != 0 || req.body.size() > 2048))) {
+      res.status = 403; res.set_content(R"({"error":"请求来源无效"})", "application/json"); return false;
+    }
+    res.set_header("Cache-Control", "no-store"); return true;
+  };
+  server->Get("/api/powerlive", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, false)) return;
+    res.set_content(PowerLiveAccount::Instance().Status().dump(), "application/json");
+  });
+  server->Post("/api/powerlive/login", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, true)) return;
+    std::string error;
+    const bool ok = PowerLiveAccount::Instance().Login(error);
+    res.status = ok ? 202 : 400;
+    res.set_content(nlohmann::json{{"success", ok}, {"error", error}}.dump(), "application/json");
+  });
+  server->Post("/api/powerlive/logout", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, true)) return;
+    std::string error;
+    const bool ok = PowerLiveAccount::Instance().Logout(error);
+    if (ok) VoiceChat::GetInstance()->ConfigurationChanged();
+    res.status = ok ? 200 : 400;
+    res.set_content(nlohmann::json{{"success", ok}, {"error", error}}.dump(), "application/json");
+  });
+  server->Get("/oauth/callback", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, false)) return;
+    std::string error;
+    const bool ok = PowerLiveAccount::Instance().Callback(req.get_param_value("state"), req.get_param_value("code"), req.get_param_value("error"), error);
+    if (ok) VoiceChat::GetInstance()->ConfigurationChanged();
+    res.status = ok ? 200 : 400;
+    res.set_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'");
+    res.set_header("Referrer-Policy", "no-referrer");
+    res.set_content(ok ? "<!doctype html><meta charset=utf-8><title>JPet</title><p>PowerLive 登录成功，可以关闭此页面并返回 JPet。</p>" :
+      "<!doctype html><meta charset=utf-8><title>JPet</title><p>登录未完成或请求已失效，请返回 JPet 设置重新登录。</p>", "text/html; charset=utf-8");
+  });
   server->set_base_dir("resources/panel/dist");
   server->Post("/api/log", [](const httplib::Request &req,
                               httplib::Response &res) {
@@ -507,7 +557,8 @@ void PanelServer::doServe() {
     res.set_header("Cache-Control", "no-store");
     res.set_content(DataManager::GetInstance()->GetVoiceSettings().dump(), "application/json");
   });
-  server->Post("/api/config/voice", [](const httplib::Request& req, httplib::Response& res) {
+  server->Post("/api/config/voice", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, true)) return;
     res.set_header("Cache-Control", "no-store");
     if (req.body.size() > 2048 || req.get_header_value("Content-Type").find("application/json") != 0) {
       res.status = 400;
@@ -516,12 +567,13 @@ void PanelServer::doServe() {
     }
     try {
       const auto payload = nlohmann::json::parse(req.body);
-      const auto workspace = Voice::Trim(payload.at("workspace_id").get<std::string>());
+      const auto workspace = Voice::Trim(payload.value("workspace_id", DataManager::GetInstance()->GetVoiceSettings().at("workspace_id").get<std::string>()));
+      const auto provider = payload.value("provider", std::string{});
       std::string key, error;
       const bool clear = payload.value("clear_api_key", false);
       const bool updateKey = clear || payload.contains("api_key");
       if (!clear && updateKey) key = Voice::Trim(payload.at("api_key").get<std::string>());
-      if (!DataManager::GetInstance()->UpdateVoiceSettings(workspace, updateKey ? &key : nullptr, error)) {
+      if (!DataManager::GetInstance()->UpdateVoiceSettings(workspace, updateKey ? &key : nullptr, error, provider)) {
         res.status = 400;
         res.set_content(nlohmann::json{{"error", error}}.dump(), "application/json");
         return;
@@ -988,15 +1040,6 @@ void PanelServer::doServe() {
   });
 
   initSSE();
-  int port = 8053;
-  // A smoke test can run beside the user's app with an isolated profile/port.
-  if (std::getenv("JPET_SMOKE_TEST")) {
-    if (const auto* testPort = std::getenv("JPET_SMOKE_PORT")) {
-      char* end = nullptr;
-      const auto parsed = std::strtol(testPort, &end, 10);
-      if (*testPort && !*end && parsed > 0 && parsed <= 65535) port = static_cast<int>(parsed);
-    }
-  }
   if (!_stopping) server->listen("127.0.0.1", port);
   LAppPal::PrintLog(LogLevel::Info, "[PanelServer]Worker exit");
 }

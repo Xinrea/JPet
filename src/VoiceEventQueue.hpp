@@ -23,7 +23,7 @@ struct EventQueue {
     // A stalled render loop must not accumulate unbounded audio/network data.
     if (bytes + data.size() > 8 * 1024 * 1024) {
       events.clear();
-      data = "语音处理暂时跟不上，请重新按住快捷键说话";
+      data = "语音处理暂时跟不上，请按快捷键重新开启麦克风";
       type = Event::Type::Error;
       bytes = 0;
     }

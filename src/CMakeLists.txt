@@ -19,6 +19,8 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/PowerLiveAccount.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/PowerLiveAccount.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSession.cpp
@@ -26,6 +28,7 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceHistory.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTools.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTools.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSettingsQueue.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolsRuntime.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolsNetwork.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolsNetwork.hpp

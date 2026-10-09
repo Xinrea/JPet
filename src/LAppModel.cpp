@@ -595,6 +595,11 @@ void LAppModel::StartMotion(ACubismMotion* motion) {
   _motionManager->StartMotionPriority(motion, true, PriorityForce);
 }
 
+void LAppModel::StopMotionsForAppearance() {
+  _motionManager->StopAllMotions();
+  LAppDelegate::GetInstance()->InMotion = false;
+}
+
 void LAppModel::SetRandomExpression() {
   if (_expressions.GetSize() == 0) {
     return;

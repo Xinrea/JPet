@@ -31,59 +31,6 @@
   let _mute = false;
   let _touch_audio = false;
   let _idle_audio = false;
-  // Voice credentials are write-only; the API never returns the saved key.
-  let voiceApiKey = "", voiceWorkspace = "", voiceHasKey = false;
-  let voiceLoading = true, voiceSaving = false, voiceError = "", voiceMessage = "";
-  let voiceStatus = null, voiceTimer = null, voiceDisposed = false, voiceRefreshing = false;
-  async function refreshVoiceStatus() {
-    if (voiceDisposed || voiceRefreshing || document.hidden) return;
-    voiceRefreshing = true;
-    try {
-      const response = await fetch("/api/voice", { cache: "no-store" });
-      if (!response.ok) return;
-      const status = await response.json();
-      if (!voiceDisposed) voiceStatus = status;
-    } catch (_) { /* The next refresh retries a temporarily unavailable panel. */ }
-    finally { voiceRefreshing = false; }
-  }
-  async function loadVoiceSettings() {
-    try {
-      const response = await fetch("/api/config/voice", { cache: "no-store" });
-      if (!response.ok) throw new Error("无法读取语音设置");
-      const settings = await response.json();
-      if (voiceDisposed) return;
-      voiceWorkspace = settings.workspace_id || "";
-      voiceHasKey = settings.has_api_key;
-      await refreshVoiceStatus();
-    } catch (error) {
-      if (!voiceDisposed) voiceError = error.message;
-    } finally {
-      if (!voiceDisposed) voiceLoading = false;
-    }
-  }
-  async function saveVoiceSettings(clearKey = false) {
-    voiceSaving = true; voiceError = ""; voiceMessage = "";
-    const payload = { workspace_id: voiceWorkspace.trim() };
-    if (clearKey) payload.clear_api_key = true;
-    else if (voiceApiKey.trim()) payload.api_key = voiceApiKey.trim();
-    try {
-      const response = await fetch("/api/config/voice", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-      });
-      const settings = await response.json();
-      if (!response.ok) throw new Error(settings.error || "保存语音设置失败");
-      if (voiceDisposed) return;
-      voiceWorkspace = settings.workspace_id;
-      voiceHasKey = settings.has_api_key;
-      voiceApiKey = "";
-      voiceMessage = clearKey ? "API Key 已移除" : "语音设置已保存";
-      await refreshVoiceStatus();
-    } catch (error) {
-      if (!voiceDisposed) voiceError = error.message;
-    } finally {
-      if (!voiceDisposed) voiceSaving = false;
-    }
-  }
   // display
   let _green = false;
   let _limit = false;
@@ -108,9 +55,7 @@
     { value: 2, name: "网站" },
     { value: 3, name: "设置面板" },
   ];
-  function init() {
-    loadVoiceSettings();
-    voiceTimer = setInterval(refreshVoiceStatus, 800);
+  function loadLocalSettings() {
     // get from server
     fetch("/api/config/audio")
       .then((res) => res.json())
@@ -147,13 +92,18 @@
         _track = data.track;
         _dropfile = data.dropfile;
       });
+  }
+  let settingsUnsubscribe;
+  function init() {
+    loadLocalSettings();
     account_initial_timer = setTimeout(() => loadAccount(), 1000);
     account_refresh_timer = setInterval(() => loadAccount(), 10 * 1000);
-    sse.subscribe((e) => {
+    settingsUnsubscribe = sse.subscribe((e) => {
       if (!e) {
         return;
       }
       console.log("SSE:", e);
+      if (e.data === "SETTINGS_UPDATE") loadLocalSettings();
       if (e.data == "NOTIFY_UPDATE") {
         fetch("/api/config/notify")
           .then((res) => res.json())
@@ -401,8 +351,7 @@
   }
   init();
   onDestroy(() => {
-    voiceDisposed = true;
-    if (voiceTimer) clearInterval(voiceTimer);
+    settingsUnsubscribe?.();
     stopQrPolling();
     if (account_refresh_timer) clearInterval(account_refresh_timer);
     if (account_initial_timer) clearTimeout(account_initial_timer);
@@ -469,27 +418,7 @@
       <div class="setting-field"><label for="volume">音量<span>{_volume}%</span></label><div class="volume-control"><input aria-label="音量滑块" type="range" min="0" max="100" step="1" bind:value={_volume} on:change={updateAudio} /><Input id="volume" bind:value={_volume} on:change={updateAudio} type="number" min={0} max={100} step={1} /></div></div>
     </SettingCard>
 
-    <SettingCard title="语音对话" description="按住开启麦克风，松开关闭" icon="mic">
-      <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong><p>按住 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 说话；由模型服务端判断语音结束和是否打断回复。</p></div></div>
-      <div class="setting-field"><label for="voice-api-key">百炼 API Key<span>{voiceHasKey ? "已保存" : "待设置"}</span></label><Input id="voice-api-key" type="password" bind:value={voiceApiKey} placeholder={voiceHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
-      <div class="setting-field"><label for="voice-workspace">业务空间 ID</label><Input id="voice-workspace" bind:value={voiceWorkspace} placeholder="填写 API Key 所属的业务空间 ID" autocomplete="off" spellcheck="false" maxlength={63} disabled={voiceLoading || voiceSaving} /></div>
-      <p class="setting-help">使用北京地域的 API Key 和业务空间。API Key 保存在本机系统凭据存储中。</p>
-      <div class="setting-actions"><Button size="sm" on:click={() => saveVoiceSettings()} disabled={voiceLoading || voiceSaving || !voiceWorkspace.trim() || (!voiceHasKey && !voiceApiKey.trim())}>{voiceSaving ? "保存中…" : "保存语音设置"}</Button>{#if voiceHasKey}<Button size="sm" color="alternative" on:click={() => saveVoiceSettings(true)} disabled={voiceLoading || voiceSaving}>移除 Key</Button>{/if}</div>
-      {#if voiceError}<p class="feedback error" role="alert">{voiceError}</p>{/if}
-      {#if voiceMessage}<p class="feedback success" role="status">{voiceMessage}</p>{/if}
-    </SettingCard>
-    <div class="full-width"><SettingCard title="对话与工具状态" description="查看最近的回复和执行结果" icon="spark">
-      <p class="setting-help">可查看桌面、查询游戏数据、安排或取消任务、升级属性、搜索网页和 B 站，以及用默认浏览器打开网页。B 站搜索使用当前登录账号；查看桌面时会截图并发送给千问，Mac 首次使用需允许录屏权限。</p>
-      {#if voiceStatus?.message}<p class="feedback" class:error={voiceStatus.state === "error"} aria-live="polite">{voiceStatus.message}</p>{/if}
-      {#if voiceStatus?.reply}<p class="voice-reply">{voiceStatus.reply}</p>{/if}
-      {#if voiceStatus?.last_tool}
-        <div class="voice-tool"><strong>{voiceStatus.last_tool.label} · {voiceStatus.last_tool.ok ? "完成" : "失败"}</strong>
-          {#if voiceStatus.last_tool.error}<p class="feedback error">{voiceStatus.last_tool.error}</p>{/if}
-          {#if voiceStatus.last_tool.url}<p><a href={voiceStatus.last_tool.url} target="_blank" rel="noopener noreferrer">{voiceStatus.last_tool.url}</a></p>{/if}
-          {#each (voiceStatus.last_tool.sources || voiceStatus.last_tool.results || []) as source}{#if source.url}<p><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title || source.url}</a></p>{/if}{/each}
-        </div>
-      {/if}
-    </SettingCard></div>
+
   </div>
 
   <div class="settings-grid" class:section-hidden={category !== "notify"}>

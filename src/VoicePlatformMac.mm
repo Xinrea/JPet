@@ -102,6 +102,7 @@ struct MacState : std::enable_shared_from_this<MacState> {
   NSTextField* __strong label = nil;
   uint64_t captureRequest = 0;
   bool captureWanted = false;
+  bool cloudService = false;
   bool tapInstalled = false;
   std::mutex playbackMutex;
   uint64_t playbackGeneration = 0;
@@ -120,7 +121,11 @@ struct MacState : std::enable_shared_from_this<MacState> {
               " close_code=" + std::to_string(task.closeCode));
           NSString* description = error.localizedDescription.lowercaseString;
           const bool auth = [description containsString:@"401"] || [description containsString:@"403"];
-          state->queue->Network(generation, Event::Type::Error, auth
+          const auto response = [task.response isKindOfClass:NSHTTPURLResponse.class] ? (NSHTTPURLResponse*)task.response : nil;
+          const auto status = response.statusCode;
+          state->queue->Network(generation, Event::Type::Error, state->cloudService
+              ? (status == 401 || status == 403 ? "PowerLive 登录已失效，请在设置中重新登录" : status == 429 ? "今日 AI 额度不足，北京时间零点重置；可以切换自定义服务继续使用" : status == 409 ? "此账号已有语音连接，请先结束其他设备的对话" : "JPet AI 服务连接已断开，请稍后重试")
+              : auth
               ? "千问认证失败，请检查北京地域的 API Key、业务空间 ID 和模型权限"
               : "千问语音连接已断开，请检查网络和业务空间设置后重试");
           return;
@@ -218,6 +223,7 @@ class MacPlatform final : public Platform {
 
   void Connect(const std::string& url, const std::string& key) override {
     Disconnect();
+    state_->cloudService = url.find("/v1/ai/realtime") != std::string::npos;
     const auto generation = ++state_->queue->connection;
     NSURLSessionConfiguration* config = NSURLSessionConfiguration.ephemeralSessionConfiguration;
     config.timeoutIntervalForRequest = 15;
@@ -383,9 +389,9 @@ class MacPlatform final : public Platform {
   std::shared_ptr<MacState> state_ = std::make_shared<MacState>();
 };
 
-NSMutableDictionary* KeyQuery(const std::string& profile) {
+NSMutableDictionary* KeyQuery(const std::string& profile, NSString* service = @"cn.vjoi.jpet.qwen") {
   return [@{(__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
-      (__bridge id)kSecAttrService: @"cn.vjoi.jpet.qwen",
+      (__bridge id)kSecAttrService: service,
       (__bridge id)kSecAttrAccount: Text(profile)} mutableCopy];
 }
 }  // namespace
@@ -423,6 +429,41 @@ std::string LoadApiKey(const std::string& profile, std::string& error) {
     const auto status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
     if (status == errSecItemNotFound) return {};
     if (status != errSecSuccess) { error = "无法读取 API Key，请允许 JPet 访问系统钥匙串"; return {}; }
+    NSData* data = CFBridgingRelease(result);
+    return std::string(static_cast<const char*>(data.bytes), data.length);
+  }
+}
+bool SavePowerLiveRefreshToken(const std::string& profile, const std::string& key, std::string& error) {
+  @autoreleasepool {
+    NSMutableDictionary* query = KeyQuery(profile, @"cn.vjoi.jpet.powerlive");
+    OSStatus result;
+    if (key.empty()) {
+      result = SecItemDelete((__bridge CFDictionaryRef)query);
+      if (result == errSecItemNotFound) result = errSecSuccess;
+    } else {
+      NSData* data = [NSData dataWithBytes:key.data() length:key.size()];
+      NSDictionary* update = @{(__bridge id)kSecValueData: data};
+      result = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)update);
+      if (result == errSecItemNotFound) {
+        query[(__bridge id)kSecValueData] = data;
+        query[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
+        result = SecItemAdd((__bridge CFDictionaryRef)query, nullptr);
+      }
+    }
+    if (result != errSecSuccess) error = "无法保存 PowerLive 登录信息，请允许 JPet 访问系统钥匙串";
+    return result == errSecSuccess;
+  }
+}
+
+std::string LoadPowerLiveRefreshToken(const std::string& profile, std::string& error) {
+  @autoreleasepool {
+    NSMutableDictionary* query = KeyQuery(profile, @"cn.vjoi.jpet.powerlive");
+    query[(__bridge id)kSecReturnData] = @YES;
+    query[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
+    CFTypeRef result = nullptr;
+    const auto status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+    if (status == errSecItemNotFound) return {};
+    if (status != errSecSuccess) { error = "无法读取 PowerLive 登录信息，请允许 JPet 访问系统钥匙串"; return {}; }
     NSData* data = CFBridgingRelease(result);
     return std::string(static_cast<const char*>(data.bytes), data.length);
   }

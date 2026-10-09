@@ -1,5 +1,6 @@
 #include "VoiceTools.hpp"
 #include "VoiceHistory.hpp"
+#include "VoiceSettingsQueue.hpp"
 #include <chrono>
 #include <atomic>
 #include <future>
@@ -48,7 +49,7 @@ struct SessionFixture {
 int main() {
   try {
     const auto definitions = Voice::ToolDefinitions();
-    Check(definitions.size() == 6, "six tool families registered");
+    Check(definitions.size() == 7, "seven tool families registered");
     for (const auto& definition : definitions) Check(definition["type"] == "function" &&
       definition["function"]["parameters"]["additionalProperties"] == false, "nested Qwen schema with closed arguments");
     int mutations = 0, queries = 0, external = 0, opens = 0;
@@ -63,6 +64,113 @@ int main() {
       [&](const std::string& url, std::string&) { ++opens; openedUrl = url; return true; }
     };
     const auto run = [&](const char* name, json args) { return Voice::ExecuteTool(Call(name, args), dependencies); };
+    int settingsCalls = 0;
+    dependencies.settings = [&](const json& request, const std::function<bool()>&) { ++settingsCalls; last = request; return json{{"ok", true}, {"settings", {{"audio", {{"volume", 30}}}}}}; };
+    Check(run("jpet_settings", json::object())["ok"] == true && last == json{{"action", "get"}, {"section", "all"}}, "settings defaults to reading whitelisted values");
+    for (const auto* section : {"audio", "display", "interaction", "notifications", "shortcuts", "clothes", "appearance"})
+      Check(run("jpet_settings", {{"action", "get"}, {"section", section}})["ok"] == true && last["section"] == section, "each settings section can be read");
+    for (const auto& request : {
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 30}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 0}, {"mute", true}, {"idle_audio", false}, {"touch_audio", false}}}},
+      json{{"action", "update"}, {"section", "display"}, {"settings", {{"scale", 1.25}, {"green", true}, {"limit", true}}}},
+      json{{"action", "update"}, {"section", "display"}, {"settings", {{"scale", 0}}}},
+      json{{"action", "update"}, {"section", "interaction"}, {"settings", {{"track", false}, {"dropfile", false}}}},
+      json{{"action", "update"}, {"section", "notifications"}, {"settings", {{"dynamic", false}, {"live", true}, {"update", false}}}},
+      json{{"action", "update"}, {"section", "appearance"}, {"settings", {{"long_hair", true}, {"glasses", true}, {"mouth", 6}}}},
+      json{{"action", "add_watch"}, {"uid", "123456"}}, json{{"action", "remove_watch"}, {"uid", "123456"}},
+      json{{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "disabled"}},
+      json{{"action", "set_shortcut"}, {"direction", "right"}, {"shortcut_type", "settings"}},
+      json{{"action", "set_shortcut"}, {"direction", "down"}, {"shortcut_type", "application"}, {"target", "/Applications/JPet.app"}},
+      json{{"action", "set_shortcut"}, {"direction", "left"}, {"shortcut_type", "folder"}, {"target", "C:\\Users\\Test"}}
+    }) Check(run("jpet_settings", request)["ok"] == true, "daily settings and local notification/shortcut actions accepted");
+    Check(run("jpet_settings", {{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "website"}, {"target", " HTTPS://example.com/a%2Fb?sig=x%2Fy "}})["ok"] == true &&
+      last["target"] == "https://example.com/a%2Fb?sig=x%2Fy", "website shortcuts use the URL validator without rewriting query strings");
+    const int beforeBadSettings = settingsCalls;
+    for (const auto& request : {
+      json{{"action", "get"}, {"section", "voice"}}, json{{"action", "get"}, {"section", "account"}},
+      json{{"action", "get"}, {"api_key", "secret"}}, json{{"action", "logout"}},
+      json{{"action", "update"}, {"section", "all"}, {"settings", {{"mute", true}}}},
+      json{{"action", "update"}, {"section", "audio"}}, json{{"action", "update"}, {"section", "audio"}, {"settings", json::object()}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", -1}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 101}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 20.5}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"mute", "false"}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"mute", 1}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 20}, {"provider", "jpet"}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 20}, {"scale", 2}}}},
+      json{{"action", "update"}, {"section", "display"}, {"settings", {{"scale", 3.1}}}},
+      json{{"action", "update"}, {"section", "display"}, {"settings", {{"scale", -0.1}}}},
+      json{{"action", "update"}, {"section", "display"}, {"settings", {{"scale", nullptr}}}},
+      json{{"action", "update"}, {"section", "notifications"}, {"settings", {{"cookies", "secret"}}}},
+      json{{"action", "update"}, {"section", "appearance"}, {"settings", {{"glasses", "true"}}}},
+      json{{"action", "update"}, {"section", "appearance"}, {"settings", {{"mouth", 0}}}},
+      json{{"action", "update"}, {"section", "appearance"}, {"settings", {{"mouth", 7}}}},
+      json{{"action", "update"}, {"section", "appearance"}, {"settings", {{"mouth", 1.5}}}},
+      json{{"action", "update"}, {"section", "appearance"}, {"settings", {{"ParamCloth2", true}}}},
+      json{{"action", "add_watch"}, {"uid", "0"}}, json{{"action", "add_watch"}, {"uid", "123x"}},
+      json{{"action", "remove_watch"}, {"uid", 123}}, json{{"action", "add_watch"}, {"uid", "123\n"}, {"section", "all"}},
+      json{{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "website"}, {"target", "javascript:alert(1)"}},
+      json{{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "website"}, {"target", "https://user:password@example.com"}},
+      json{{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "application"}, {"target", "ls"}},
+      json{{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "folder"}},
+      json{{"action", "set_shortcut"}, {"direction", "diagonal"}, {"shortcut_type", "settings"}},
+      json{{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "disabled"}, {"target", "ignored"}},
+      json{{"action", "change_clothes"}, {"clothes_id", 3}}, json{{"action", "change_clothes"}, {"clothes_id", 1}, {"unlock", true}}
+    }) Check(run("jpet_settings", request)["ok"] == false, "invalid and excluded settings rejected before dispatch");
+    Check(settingsCalls == beforeBadSettings && mutations == 0, "invalid settings never reach the runtime or cloud command");
+    Check(run("jpet_settings", {{"action", "change_clothes"}, {"clothes_id", 1}})["ok"] == true && mutations == 1, "settings clothing changes use the existing cloud command");
+    dependencies.command = [&](const json& command) { ++mutations; Check(command == json{{"type", "clothes"}, {"id", 2}}, "clothing settings only submit an existing outfit ID"); return std::string("服装尚未解锁"); };
+    const auto beforeLockedClothes = queries;
+    Check(run("jpet_settings", {{"action", "change_clothes"}, {"clothes_id", 2}})["error"] == "服装尚未解锁" && queries == beforeLockedClothes, "locked clothing cannot claim success or bypass server conditions");
+    dependencies.command = [&](const json& command) { ++mutations; last = command; return std::string{}; };
+    dependencies.settings = [](const json&, const std::function<bool()>&) { return json{{"ok", false}, {"error", "轮盘入口的本机路径不存在或无法访问"}}; };
+    Check(run("jpet_settings", {{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "folder"}, {"target", "/missing"}})["ok"] == false, "runtime settings failures remain failures");
+    dependencies.settings = {};
+    Check(run("jpet_settings", json::object())["ok"] == false, "missing settings adapter does not claim success");
+
+    {
+      Voice::SettingsQueue settingsQueue;
+      const auto mainThread = std::this_thread::get_id();
+      std::thread::id applyingThread;
+      auto applied = std::async(std::launch::async, [&] { return settingsQueue.Invoke([&] { applyingThread = std::this_thread::get_id(); return json{{"ok", true}}; }); });
+      auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+      while (applied.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready && std::chrono::steady_clock::now() < deadline) settingsQueue.Drain();
+      settingsQueue.Cancel(true);
+      Check(applied.get()["ok"] == true && applyingThread == mainThread, "settings are applied by the pumping main thread, not the tool worker");
+      settingsQueue.Start();
+      int appliedAfterCancel = 0;
+      auto cancelled = std::async(std::launch::async, [&] { return settingsQueue.Invoke([&] { ++appliedAfterCancel; return json{{"ok", true}}; }); });
+      deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+      while (cancelled.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready && std::chrono::steady_clock::now() < deadline) settingsQueue.Cancel();
+      settingsQueue.Cancel(true);
+      Check(cancelled.get()["ok"] == false, "interruption releases a pending settings worker with failure");
+      settingsQueue.Drain();
+      Check(appliedAfterCancel == 0 && settingsQueue.Invoke([&] { ++appliedAfterCancel; return json{{"ok", true}}; })["ok"] == false, "cancelled settings cannot run later and shutdown rejects new requests");
+      settingsQueue.Start();
+      std::promise<void> dispatchStarted, releaseDispatch, dispatchFinished;
+      auto started = dispatchStarted.get_future();
+      auto release = releaseDispatch.get_future();
+      auto finished = dispatchFinished.get_future();
+      auto settingsDependencies = dependencies;
+      settingsDependencies.settings = [&](const json&, const std::function<bool()>& cancelled) {
+        dispatchStarted.set_value();
+        release.wait(); // Simulate cancellation before the runtime queues its work.
+        auto result = settingsQueue.Invoke([&] { ++appliedAfterCancel; return json{{"ok", true}}; }, cancelled);
+        dispatchFinished.set_value();
+        return result;
+      };
+      Voice::ToolExecutor settingsExecutor(settingsDependencies);
+      settingsExecutor.Submit({Call("jpet_settings", {{"action", "update"}, {"section", "audio"}, {"settings", {{"mute", true}}}})});
+      const bool entered = started.wait_for(std::chrono::seconds(2)) == std::future_status::ready;
+      settingsExecutor.Cancel();
+      settingsQueue.Cancel();
+      releaseDispatch.set_value();
+      deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+      while (finished.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready && std::chrono::steady_clock::now() < deadline) settingsQueue.Drain();
+      settingsQueue.Cancel(true);
+      Check(entered && finished.wait_for(std::chrono::seconds(1)) == std::future_status::ready && appliedAfterCancel == 0,
+        "settings queued after interruption still check the original tool generation before mutating");
+    }
     for (const auto& url : {"https://www.bilibili.com/", "http://127.0.0.1:8080/path?q=test#part", "https://[::1]:8443/", "https://example.com/中文?q=%E4%B8%AD#片段"}) {
       const auto result = run("open_url", {{"url", url}});
       Check(result["ok"] == true && result["url"] == url && openedUrl == url && result["browser"] == "system_default", "valid web URL reaches default browser unchanged");
@@ -160,8 +268,12 @@ int main() {
     Check(first.calls.size() == 1 && first.session.Busy() && first.state == "tool", "three duplicate delivery forms execute once");
     Check(first.history.Snapshot()["list"][0]["state"] == "pending", "tool invocation does not finish the history turn");
     first.session.BeginInput();
+    const auto openMicChunks = first.Count("input_audio_buffer.append");
     first.session.CompleteTool("c1", {{"ok", true}});
+    Check(first.Count("input_audio_buffer.append") == openMicChunks, "open microphone needs no synthetic continuation audio");
     Check(first.Count("conversation.item.create") == 1 && first.Count("response.create") == 1, "tool output precedes one continuation");
+    Check(first.sent.back()["response"]["modalities"] == json::array({"text", "audio"}),
+        "tool continuation explicitly requests a spoken reply as in the provider example");
     first.session.CompleteTool("c1", {{"ok", true}});
     Check(first.Count("response.create") == 1, "duplicate tool completion ignored");
     first.Created("r2");
@@ -177,6 +289,17 @@ int main() {
     Check(multiple.Count("response.create") == 0 && multiple.session.Busy(), "all tool results required before continuation");
     multiple.session.CompleteTool("c1", {{"ok", true}});
     Check(multiple.Count("response.create") == 1, "one continuation for multiple calls");
+    std::string continuationSilence;
+    bool afterCreate = false;
+    for (const auto& event : multiple.sent) {
+      if (event["type"] == "response.create") afterCreate = true;
+      if (afterCreate && event["type"] == "input_audio_buffer.append") continuationSilence += Voice::DecodeBase64(event["audio"]);
+    }
+    Check(!multiple.session.Recording() && continuationSilence == std::string(Voice::InputBytesPerSecond, '\0'),
+        "closed microphone supplies one second of zero PCM after tool continuation without reopening capture");
+    const auto completedChunks = multiple.Count("input_audio_buffer.append");
+    multiple.session.CompleteTool("c1", {{"ok", true}});
+    Check(multiple.Count("input_audio_buffer.append") == completedChunks, "duplicate tool completion cannot add more silence");
     multiple.Created("r2"); multiple.Arguments("c3", "r2"); multiple.Done(json::array(), "completed", "r2");
     Check(multiple.calls.size() == 3, "subsequent tool round supported");
     multiple.session.CompleteTool("c3", {{"ok", true}});

@@ -62,9 +62,27 @@ def main(gui=False, app=APP):
             else:
                 raise RuntimeError("Panel server did not start")
             assert code == 200 and config["has_api_key"] is False and "api_key" not in config
+            assert config["provider"] == "custom"
+            assert request(port, "/api/config/voice", {"provider": "jpet"})[0] == 200
+            assert request(port, "/api/config/voice")[1]["provider"] == "jpet"
+            assert request(port, "/api/config/voice", {"provider": "invalid"})[0] == 400
+            assert request(port, "/api/config/voice", {"provider": "custom"})[0] == 200
+            account = request(port, "/api/powerlive")[1]
+            assert account["logged_in"] is False and account["user"] is None
+            assert not {"access_token", "refresh_token", "id_token"} & account.keys()
+            for route in ["/api/powerlive/login", "/api/powerlive/logout"]:
+                assert request(port, route, {}, "text/plain")[0] == 403
+                forged = urllib.request.Request(f"http://127.0.0.1:{port}" + route, data=b"{}", headers={"Content-Type": "application/json", "Origin": "https://evil.example"})
+                try:
+                    urllib.request.urlopen(forged)
+                    raise AssertionError("Cross-origin account mutation accepted")
+                except urllib.error.HTTPError as rejected:
+                    assert rejected.code == 403
+            assert request(port, "/api/powerlive/logout", {})[0] == 200
             voice = request(port, "/api/voice")[1]
+            assert voice["microphone_on"] is False
             assert voice["model"] == "qwen3.8-omni-flash-realtime"
-            assert set(voice["available_tools"]) == {"view_desktop", "get_game_state", "game_action", "web_search", "bilibili_search", "open_url"}
+            assert set(voice["available_tools"]) == {"view_desktop", "get_game_state", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"}
             code, history = request(port, "/api/voice/history")
             assert code == 200 and history == {"list": [], "limit": 200, "error": ""}
             # These requests never create a credential in the real keychain.
@@ -73,7 +91,7 @@ def main(gui=False, app=APP):
             for invalid in [{"workspace_id": "evil.example"}, {"workspace_id": 123},
                             {"workspace_id": "ws-123", "api_key": "sk-x\r\nInjected: yes"}]:
                 assert request(port, "/api/config/voice", invalid)[0] == 400
-            assert request(port, "/api/config/voice", {"workspace_id": "ws-123"}, "text/plain")[0] == 400
+            assert request(port, "/api/config/voice", {"workspace_id": "ws-123"}, "text/plain")[0] == 403
             assert request(port, "/api/config/voice")[1]["workspace_id"] == "ws-123"
             contents = Path(profile, "jpet.toml").read_text()
             assert "workspace_id" in contents and not re.search(r"^\s*api_key\s*=", contents, re.MULTILINE)

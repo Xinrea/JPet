@@ -96,7 +96,9 @@ void Receive(const std::shared_ptr<WinState>& state, uint64_t generation,
   WinHttpQueryHeaders(request.value, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
       WINHTTP_HEADER_NAME_BY_INDEX, &status, &length, WINHTTP_NO_HEADER_INDEX);
   if (status != 101) {
-    fail(status == 401 || status == 403 ? "千问认证失败，请检查 API Key、业务空间 ID 和模型权限" :
+    fail(url.find("/v1/ai/realtime") != std::string::npos
+        ? (status == 401 || status == 403 ? "PowerLive 登录已失效，请在设置中重新登录" : status == 429 ? "今日 AI 额度不足，北京时间零点重置；可以切换自定义服务继续使用" : status == 409 ? "此账号已有语音连接，请先结束其他设备的对话" : "JPet AI 服务暂时不可用，请稍后重试")
+        : status == 401 || status == 403 ? "千问认证失败，请检查 API Key、业务空间 ID 和模型权限" :
         status == 429 ? "千问请求过于频繁或额度不足，请稍后重试" : "千问语音连接失败，请检查业务空间设置");
     return;
   }
@@ -119,7 +121,7 @@ void Receive(const std::shared_ptr<WinState>& state, uint64_t generation,
     WINHTTP_WEB_SOCKET_BUFFER_TYPE type;
     const auto result = WinHttpWebSocketReceive(active, buffer.data(), static_cast<DWORD>(buffer.size()), &bytes, &type);
     if (result != NO_ERROR || type == WINHTTP_WEB_SOCKET_CLOSE_BUFFER_TYPE) {
-      fail("千问语音连接已断开，请重新按住 Ctrl 说话"); break;
+      fail("千问语音连接已断开，请按 Ctrl 重新开启麦克风"); break;
     }
     if (type == WINHTTP_WEB_SOCKET_UTF8_FRAGMENT_BUFFER_TYPE || type == WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE) {
       if (message.size() + bytes > 4 * 1024 * 1024) { fail("千问返回的语音消息过大"); break; }
@@ -496,6 +498,33 @@ std::string LoadApiKey(const std::string& profile, std::string& error) {
   PCREDENTIALW credential = nullptr;
   if (!CredReadW(CredentialTarget(profile).c_str(), CRED_TYPE_GENERIC, 0, &credential)) {
     if (GetLastError() != ERROR_NOT_FOUND) error = "无法读取 API Key，请检查 Windows 凭据管理器";
+    return {};
+  }
+  const std::string key(reinterpret_cast<const char*>(credential->CredentialBlob), credential->CredentialBlobSize);
+  CredFree(credential);
+  return key;
+}
+bool SavePowerLiveRefreshToken(const std::string& profile, const std::string& key, std::string& error) {
+  auto target = (L"JPet/PowerLive/" + Wide(profile));
+  if (key.empty()) {
+    if (CredDeleteW(target.c_str(), CRED_TYPE_GENERIC, 0) || GetLastError() == ERROR_NOT_FOUND) return true;
+  } else {
+    CREDENTIALW credential{};
+    credential.Type = CRED_TYPE_GENERIC;
+    credential.TargetName = target.data();
+    credential.CredentialBlobSize = static_cast<DWORD>(key.size());
+    credential.CredentialBlob = reinterpret_cast<LPBYTE>(const_cast<char*>(key.data()));
+    credential.Persist = CRED_PERSIST_LOCAL_MACHINE;
+    if (CredWriteW(&credential, 0)) return true;
+  }
+  error = "无法保存 PowerLive 登录信息，请检查 Windows 凭据管理器";
+  return false;
+}
+
+std::string LoadPowerLiveRefreshToken(const std::string& profile, std::string& error) {
+  PCREDENTIALW credential = nullptr;
+  if (!CredReadW((L"JPet/PowerLive/" + Wide(profile)).c_str(), CRED_TYPE_GENERIC, 0, &credential)) {
+    if (GetLastError() != ERROR_NOT_FOUND) error = "无法读取 PowerLive 登录信息，请检查 Windows 凭据管理器";
     return {};
   }
   const std::string key(reinterpret_cast<const char*>(credential->CredentialBlob), credential->CredentialBlobSize);

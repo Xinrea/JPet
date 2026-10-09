@@ -84,6 +84,7 @@ class LAppModel : public Csm::CubismUserModel {
       bool IsIdle = false);
 
   void StartMotion(ACubismMotion* motion);
+  void StopMotionsForAppearance();
 
   /**
    * @brief   ランダムに選ばれたモーションの再生を開始する。
