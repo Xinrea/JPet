@@ -53,7 +53,7 @@ macOS 发布包采用 ad-hoc 签名，未进行 Apple Developer ID 签名和公�
 
 在「对话 → 语音对话设置」选择 AI 服务：使用自己的北京地域百炼 API Key / 业务空间，或登录 PowerLive 账号使用 JPet Server。
 JPet Server 每个账号每日提供 2,000,000 token，语音、桌面识别和网页搜索共用，按北京时间零点重置。
-Mac 按 **Option**、Windows 按 **Ctrl** 开启麦克风，再按一次关闭；开启后可连续多轮对话，说话可打断回复。
+Mac 按 **Option**、Windows 按 **Ctrl** 开启麦克风，再按一次关闭；开启后可连续多轮对话，说话可打断回复。也可以在语音设置中改为按住说话、松开回复。
 首次使用需允许麦克风权限，查看桌面还需要录屏权限。
 
 API Key 保存在 macOS 钥匙串或 Windows 凭据管理器，不上传到 JPet 云端。

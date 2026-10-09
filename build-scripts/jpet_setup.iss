@@ -3,7 +3,7 @@
 
 #define MyAppName "JPet"
 #ifndef MyAppVersion
-#define MyAppVersion "3.0.1-beta.3"
+#define MyAppVersion "3.0.1"
 #endif
 #define MyAppPublisher "Xinrea"
 #define MyAppURL "https://pet.vjoi.cn/"
