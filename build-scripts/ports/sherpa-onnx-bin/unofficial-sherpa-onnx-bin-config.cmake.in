@@ -1,0 +1,10 @@
+get_filename_component(_sherpa_prefix "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+if(NOT TARGET unofficial::sherpa-onnx-bin::headers)
+  add_library(unofficial::sherpa-onnx-bin::headers INTERFACE IMPORTED)
+  set_target_properties(unofficial::sherpa-onnx-bin::headers PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${_sherpa_prefix}/include/onnxruntime;${_sherpa_prefix}/include")
+endif()
+# Shared libraries to ship with the application; JPet loads them at run time.
+set(SHERPA_ONNX_BIN_RUNTIMES "@runtimes@")
+set(SHERPA_ONNX_BIN_ONNXRUNTIME "${_sherpa_prefix}/@destination@/@ort_runtime@")
+unset(_sherpa_prefix)

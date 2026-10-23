@@ -1,13 +1,14 @@
 #pragma once
 
 #include "VoicePlatform.hpp"
+#include <algorithm>
 #include <atomic>
 #include <mutex>
 #include <utility>
 
 namespace Voice {
 struct EventQueue {
-  std::atomic<uint64_t> connection{0};
+  std::atomic<uint64_t> connections[Channels]{};
   std::atomic<uint64_t> capture{0};
   std::atomic<bool> capturing{false};
   std::mutex mutex;
@@ -19,21 +20,22 @@ struct EventQueue {
     PushLocked(type, std::move(data));
   }
 
-  void PushLocked(Event::Type type, std::string data) {
+  void PushLocked(Event::Type type, std::string data, int channel = LocalChannel) {
     // A stalled render loop must not accumulate unbounded audio/network data.
     if (bytes + data.size() > 8 * 1024 * 1024) {
       events.clear();
       data = "语音处理暂时跟不上，请按快捷键重新开启麦克风";
       type = Event::Type::Error;
       bytes = 0;
+      channel = LocalChannel;
     }
     bytes += data.size();
-    events.push_back({type, std::move(data)});
+    events.push_back({type, std::move(data), channel});
   }
 
-  void Network(uint64_t generation, Event::Type type, std::string data) {
+  void Network(int channel, uint64_t generation, Event::Type type, std::string data) {
     std::lock_guard<std::mutex> lock(mutex);
-    if (connection == generation) PushLocked(type, std::move(data));
+    if (connections[channel] == generation) PushLocked(type, std::move(data), channel);
   }
 
   void Captured(uint64_t generation, Event::Type type, std::string data) {
@@ -51,10 +53,13 @@ struct EventQueue {
     return result;
   }
 
-  void Clear() {
+  // Drops queued events of one closed channel.
+  void Clear(int channel) {
     std::lock_guard<std::mutex> lock(mutex);
-    events.clear();
+    events.erase(std::remove_if(events.begin(), events.end(),
+        [&](const Event& event) { return event.channel == channel; }), events.end());
     bytes = 0;
+    for (const auto& event : events) bytes += event.data.size();
   }
 };
 }  // namespace Voice

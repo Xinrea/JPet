@@ -93,8 +93,11 @@ NSString* Text(const std::string& value) {
 
 struct MacState : std::enable_shared_from_this<MacState> {
   std::shared_ptr<EventQueue> queue = std::make_shared<EventQueue>();
-  NSURLSession* __strong network = nil;
-  NSURLSessionWebSocketTask* __strong socket = nil;
+  struct Channel {
+    NSURLSession* __strong network = nil;
+    NSURLSessionWebSocketTask* __strong socket = nil;
+  };
+  Channel channels[Channels];
   AVAudioEngine* __strong inputEngine = nil;
   AVAudioEngine* __strong outputEngine = nil;
   AVAudioPlayerNode* __strong player = nil;
@@ -102,39 +105,37 @@ struct MacState : std::enable_shared_from_this<MacState> {
   NSTextField* __strong label = nil;
   uint64_t captureRequest = 0;
   bool captureWanted = false;
-  bool cloudService = false;
   bool tapInstalled = false;
   std::mutex playbackMutex;
   uint64_t playbackGeneration = 0;
   uint64_t scheduledFrames = 0;
   uint64_t completedFrames = 0;
 
-  void Receive(NSURLSessionWebSocketTask* task, uint64_t generation) {
+  void Receive(NSURLSessionWebSocketTask* task, int channel, uint64_t generation) {
     std::weak_ptr<MacState> weak = shared_from_this();
     [task receiveMessageWithCompletionHandler:^(NSURLSessionWebSocketMessage* message, NSError* error) {
       @autoreleasepool {
         const auto state = weak.lock();
-        if (!state || state->queue->connection != generation) return;
+        if (!state || state->queue->connections[channel] != generation) return;
         if (error) {
-          state->queue->Network(generation, Event::Type::Diagnostic,
-              "[Voice] WebSocket receive failed code=" + std::to_string(error.code) +
-              " close_code=" + std::to_string(task.closeCode));
+          state->queue->Network(channel, generation, Event::Type::Diagnostic,
+              "[Voice] WebSocket receive failed channel=" + std::to_string(channel) + " code=" +
+              std::to_string(error.code) + " close_code=" + std::to_string(task.closeCode));
           NSString* description = error.localizedDescription.lowercaseString;
           const bool auth = [description containsString:@"401"] || [description containsString:@"403"];
-          const auto response = [task.response isKindOfClass:NSHTTPURLResponse.class] ? (NSHTTPURLResponse*)task.response : nil;
-          const auto status = response.statusCode;
-          state->queue->Network(generation, Event::Type::Error, state->cloudService
-              ? (status == 401 || status == 403 ? "PowerLive 登录已失效，请在设置中重新登录" : status == 429 ? "今日 AI 额度不足，北京时间零点重置；可以切换自定义服务继续使用" : status == 409 ? "此账号已有语音连接，请先结束其他设备的对话" : "JPet AI 服务连接已断开，请稍后重试")
-              : auth
+          state->queue->Network(channel, generation, Event::Type::Error, auth
               ? "语音服务认证失败，请检查北京地域的 API Key、业务空间 ID 和模型权限"
               : "语音连接已断开，请检查网络和业务空间设置后重试");
           return;
         }
         if (message.type == NSURLSessionWebSocketMessageTypeString && message.string) {
           const char* utf8 = message.string.UTF8String;
-          if (utf8) state->queue->Network(generation, Event::Type::Message, utf8);
+          if (utf8) state->queue->Network(channel, generation, Event::Type::Message, utf8);
+        } else if (message.type == NSURLSessionWebSocketMessageTypeData && message.data) {
+          state->queue->Network(channel, generation, Event::Type::Binary,
+              std::string(static_cast<const char*>(message.data.bytes), message.data.length));
         }
-        state->Receive(task, generation);
+        state->Receive(task, channel, generation);
       }
     }];
   }
@@ -210,7 +211,7 @@ class MacPlatform final : public Platform {
  public:
   ~MacPlatform() override {
     StopCapture();
-    Disconnect();
+    DisconnectAll();
     StopPlayback();
     [state_->outputEngine stop];
     [state_->indicator orderOut:nil];
@@ -221,39 +222,40 @@ class MacPlatform final : public Platform {
     return ([NSEvent modifierFlags] & NSEventModifierFlagOption) != 0;
   }
 
-  void Connect(const std::string& url, const std::string& key) override {
-    Disconnect();
-    state_->cloudService = url.find("/v1/ai/realtime") != std::string::npos;
-    const auto generation = ++state_->queue->connection;
+  void Connect(int channel, const std::string& url, const std::string& key) override {
+    Disconnect(channel);
+    auto& target = state_->channels[channel];
+    const auto generation = ++state_->queue->connections[channel];
     NSURLSessionConfiguration* config = NSURLSessionConfiguration.ephemeralSessionConfiguration;
     config.timeoutIntervalForRequest = 15;
-    state_->network = [NSURLSession sessionWithConfiguration:config];
+    target.network = [NSURLSession sessionWithConfiguration:config];
     NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:Text(url)]];
     [request setValue:Text("Bearer " + key) forHTTPHeaderField:@"Authorization"];
-    state_->socket = [state_->network webSocketTaskWithRequest:request];
-    state_->socket.maximumMessageSize = 4 * 1024 * 1024;
-    [state_->socket resume];
-    state_->Receive(state_->socket, generation);
+    target.socket = [target.network webSocketTaskWithRequest:request];
+    target.socket.maximumMessageSize = 4 * 1024 * 1024;
+    [target.socket resume];
+    state_->Receive(target.socket, channel, generation);
   }
 
-  void Disconnect() override {
-    ++state_->queue->connection;
-    [state_->socket cancelWithCloseCode:NSURLSessionWebSocketCloseCodeNormalClosure reason:nil];
-    [state_->network invalidateAndCancel];
-    state_->socket = nil;
-    state_->network = nil;
-    state_->queue->Clear();
+  void Disconnect(int channel) override {
+    auto& target = state_->channels[channel];
+    ++state_->queue->connections[channel];
+    [target.socket cancelWithCloseCode:NSURLSessionWebSocketCloseCodeNormalClosure reason:nil];
+    [target.network invalidateAndCancel];
+    target.socket = nil;
+    target.network = nil;
+    state_->queue->Clear(channel);
   }
 
-  void Send(const std::string& message) override {
-    const auto generation = state_->queue->connection.load();
+  void Send(int channel, const std::string& message) override {
+    const auto generation = state_->queue->connections[channel].load();
     const auto events = state_->queue;
     NSURLSessionWebSocketMessage* payload = [[NSURLSessionWebSocketMessage alloc] initWithString:Text(message)];
-    [state_->socket sendMessage:payload completionHandler:^(NSError* error) {
+    [state_->channels[channel].socket sendMessage:payload completionHandler:^(NSError* error) {
       if (error) {
-        events->Network(generation, Event::Type::Diagnostic,
-            "[Voice] WebSocket send failed code=" + std::to_string(error.code));
-        events->Network(generation, Event::Type::Error, "语音发送失败，请检查网络后重试");
+        events->Network(channel, generation, Event::Type::Diagnostic,
+            "[Voice] WebSocket send failed channel=" + std::to_string(channel) + " code=" + std::to_string(error.code));
+        events->Network(channel, generation, Event::Type::Error, "语音发送失败，请检查网络后重试");
       }
     }];
   }
@@ -334,6 +336,11 @@ class MacPlatform final : public Platform {
   bool IsPlaying() const override {
     std::lock_guard<std::mutex> lock(state_->playbackMutex);
     return state_->scheduledFrames > state_->completedFrames;
+  }
+
+  uint64_t PlayedSamples() const override {
+    std::lock_guard<std::mutex> lock(state_->playbackMutex);
+    return state_->completedFrames;
   }
 
   void StopPlayback() override {
@@ -433,9 +440,9 @@ std::string LoadApiKey(const std::string& profile, std::string& error) {
     return std::string(static_cast<const char*>(data.bytes), data.length);
   }
 }
-bool SavePowerLiveRefreshToken(const std::string& profile, const std::string& key, std::string& error) {
+bool SaveChatApiKey(const std::string& profile, const std::string& key, std::string& error) {
   @autoreleasepool {
-    NSMutableDictionary* query = KeyQuery(profile, @"cn.vjoi.jpet.powerlive");
+    NSMutableDictionary* query = KeyQuery(profile, @"cn.vjoi.jpet.chat");
     OSStatus result;
     if (key.empty()) {
       result = SecItemDelete((__bridge CFDictionaryRef)query);
@@ -450,22 +457,23 @@ bool SavePowerLiveRefreshToken(const std::string& profile, const std::string& ke
         result = SecItemAdd((__bridge CFDictionaryRef)query, nullptr);
       }
     }
-    if (result != errSecSuccess) error = "无法保存 PowerLive 登录信息，请允许 JPet 访问系统钥匙串";
+    if (result != errSecSuccess) error = "无法保存大模型 API Key，请允许 JPet 访问系统钥匙串";
     return result == errSecSuccess;
   }
 }
 
-std::string LoadPowerLiveRefreshToken(const std::string& profile, std::string& error) {
+std::string LoadChatApiKey(const std::string& profile, std::string& error) {
   @autoreleasepool {
-    NSMutableDictionary* query = KeyQuery(profile, @"cn.vjoi.jpet.powerlive");
+    NSMutableDictionary* query = KeyQuery(profile, @"cn.vjoi.jpet.chat");
     query[(__bridge id)kSecReturnData] = @YES;
     query[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
     CFTypeRef result = nullptr;
     const auto status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
     if (status == errSecItemNotFound) return {};
-    if (status != errSecSuccess) { error = "无法读取 PowerLive 登录信息，请允许 JPet 访问系统钥匙串"; return {}; }
+    if (status != errSecSuccess) { error = "无法读取大模型 API Key，请允许 JPet 访问系统钥匙串"; return {}; }
     NSData* data = CFBridgingRelease(result);
     return std::string(static_cast<const char*>(data.bytes), data.length);
   }
 }
+
 }  // namespace Voice

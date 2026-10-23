@@ -1,40 +1,79 @@
 # 语音对话
 
-在「对话 → 语音对话设置」选择 AI 服务方式，然后保存。
+轴伊的语音对话由三部分组成，结构参考 [Pipecat](https://github.com/pipecat-ai/pipecat)：
 
-- **自定义千问服务**：填写北京地域的百炼 API Key 和对应业务空间 ID。沿用当前配置，Key 保存在 macOS 钥匙串或 Windows 凭据管理器中，不上传到 JPet 云端。
-- **JPet Server**：点击「使用 PowerLive 登录」，在系统浏览器中使用 PowerLive 账号完成登录。客户端无需配置千问 Key。每个账号每日共用 **2,000,000 token**，语音、桌面识别和网页搜索均计入额度，按**北京时间每日 00:00**重置。面板显示已用、可用及请求中预留额度；管理员可调整额度。
+- **听**：本机判断说话轮次（Silero VAD + Smart Turn），本机识别语音（SenseVoice），语音不离开电脑。
+- **想**：大模型生成回复并调用工具，默认使用百炼，也可以填写任意 OpenAI 兼容接口。
+- **说**：百炼 CosyVoice 按句合成，边生成边播放。
 
-PowerLive 登录采用 PKCE，刷新凭据单独保存在系统凭据存储中；面板和配置文件不保存登录令牌。退出 PowerLive 会结束当前语音连接，切换服务会在下一次对话中生效。B 站游戏账号与 PowerLive AI 账号分别用于原有功能。
+```
+麦克风 16 kHz ──▶ AEC3（Windows）──▶ Silero VAD ──▶ Smart Turn v3 ──┐
+                                                                     │ 轮次结束
+                                                SenseVoice（本机） ◀─┘
+                                                        │ 用户文字
+     工具执行 ◀──── tool_calls ◀──── 大模型流式输出 ◀────┘
+        │ 结果                             │ 文字，按句切分
+        └──────▶ 再次请求大模型            ▼
+                               CosyVoice（每句一个任务）──▶ 24 kHz PCM ──▶ 扬声器
+```
 
-JPet Server 会先预留额度，再按模型返回的实际 token 用量结算；已发出但中断、无法确认用量的请求按预留额度记账。一个账号同时允许一条语音连接，最长 10 分钟，登录到期或北京时间零点时关闭；对话上下文达到预算上限时需重新开始。额度不足时可以切换到自定义服务。云端只持久化额度数据，不保存音频、截图或对话内容。云端配置见 [部署说明](../cloud/README.md)。
+## 设置
 
-- Mac 使用 Option，Windows 使用 Ctrl，均可在语音对话设置中选择使用方式：
-  - **开关 · 全双工**（默认）：按一次开启麦克风，再按一次关闭；松开按键不会停止录音。开启后可连续对话，回复时直接说话即可打断；单纯开关麦克风不会取消回复。
-  - **按住 · 半双工**：按下立即打断正在播放的回复和待处理工具，按住录音，松开停止录音并播放回复。录音期间到达的回复音频暂存，继续说话会丢弃上一段暂存回复，避免边录音边播放。
-- 宠物窗口不需要获得焦点。录音、等待和回复状态显示在宠物附近；麦克风开启时持续显示开关提示。
-- 保存使用方式后会关闭当前语音连接；如果保存时按键仍按住，需要松开再按下。无需配置 API Key 即可保存快捷键方式。
-- 首次在 Mac 使用时需要允许麦克风权限；授权后可开始说话。
-- 同一连接保留对话上下文；麦克风关闭且空闲两分钟后断开，下次开启建立新会话。
-- 麦克风可持续开启，不再一分钟自动停止；仍受服务的会话时长和额度限制。回复音量跟随音频设置。
+在「对话 → 语音对话设置」中：
 
-- 自定义千问服务可在语音对话设置中选择语音模型和轴伊的音色：`qwen3.8-omni-flash-realtime`（默认）、`qwen3.5-omni-plus-realtime`、`qwen3.5-omni-flash-realtime`。
-  音色列表随模型变化，只提供普通话、方言和粤语音色，默认为 `Tina`（甜甜）；切换模型时若原音色不受支持，会改回 `Tina`。
-  业务空间需开通所选模型；保存后关闭当前连接，下一次对话生效。JPet Server 固定使用 `qwen3.8-omni-flash-realtime` 和 `Tina`。
-  兼容关系参见[音色列表](https://help.aliyun.com/zh/model-studio/omni-voice-list)。
+1. **下载本机语音识别模型**（约 237 MB，只需一次）。下载后语音只在本机识别。
+2. 填写北京地域的**百炼 API Key 和业务空间 ID**。用于语音合成、网页搜索、查看桌面，以及未填写接口地址时的大模型。
+3. **大模型**：默认 `qwen-plus`，可选或填写其他模型名。填写「大模型接口地址」后改用该 OpenAI 兼容接口（如 DeepSeek、本机 Ollama），
+   并需填写该接口的 API Key；地址必须是 HTTPS，本机地址可用 HTTP，不能包含账号信息。
+4. **语音合成**：CosyVoice v3 Flash（默认）或 v3 Plus，以及轴伊的音色（默认龙安欢）。业务空间需开通所选模型。
 
-默认使用 `qwen3.8-omni-flash-realtime` 的 WebSocket `semantic_vad` 模式。
-输入为 16 kHz、单声道、16 bit PCM；输出为 24 kHz PCM。
-Mac 使用系统默认输入设备，并显式选择第 1 路输入作为麦克风，避免多输入声卡的离散声道
-在默认声道映射下变成静音，也避免混入其他输入和回环声音。
-客户端只发送 `input_audio_buffer.append` 音频流，不因按键发送 `response.cancel`、
-`input_audio_buffer.clear`、`input_audio_buffer.commit` 或 `response.create`。
-千问通过语义 VAD 判断有效语音、结束时机和自动提交，两种服务都由千问自动触发回复；JPet Server 在转发音频前检查并预留额度，不另外请求同一轮回复。麦克风开启期间可完成多轮对话。
-按住模式在按下时立即停止本地播放，并忽略已打断回复的后续音频；服务端收到新的语音后由 VAD 取消生成。按住期间只暂存当前有效回复的 PCM，最多 120 秒；松开后才交给播放器，重置或打断会清空暂存。此模式不需要服务端协议变更。
-关闭麦克风后追加 1 秒静音 PCM（VAD 静音阈值为 800 毫秒），使服务端在麦克风关闭后仍能检测句尾。
-收到服务端 `input_audio_buffer.speech_started` 时停止本地旧播放、取消旧工具并保留已收到的文字，
-收到 `input_audio_buffer.committed` 时建立对话记录。单纯按键或上传静音不会新建记录。
-同一连接继续保留对话上下文；工具结果回传后发送 `response.create` 续答。若此时麦克风已关闭，客户端追加 1 秒纯静音 PCM 推动模型续答；云端也为未继续上传音频的客户端提供最多 1 秒的静音补帧，收到真实音频或回复建立事件即停止。补帧不采集麦克风，不重新执行工具。
+两个 API Key 都只写不读，保存在 macOS 钥匙串或 Windows 凭据管理器中，不上传到 JPet 云端。保存设置后，下一次对话生效。
+
+## 使用
+
+- Mac 使用 Option，Windows 使用 Ctrl，可选使用方式：
+  - **开关 · 全双工**（默认）：按一次开启麦克风，再按一次关闭。开启期间由本机判断每句话何时说完，可连续多轮对话。
+  - **按住 · 半双工**：按下立即打断回复并开始录音，松开即发送。
+  - 本机轮次检测模型无法加载时，开关模式退化为「按一下开始、再按一下发送」。
+- 轴伊说话时检测到的语音先视为「试探」：本机每 0.5 秒识别一次已说内容，识别出至少 2 个字且与正在播放的回复不同时才打断，
+  避免外放的回声把轴伊自己打断；整句只是回复的回声时直接丢弃。
+- 打断时停止播放、取消大模型请求、重连合成服务并取消未完成的工具；上下文只保留已经播出的句子（当前句按播放比例截取）。
+- 宠物窗口不需要获得焦点；录音、思考、执行工具和回复状态显示在宠物附近。首次在 Mac 使用需要允许麦克风权限。
+- 同一连接保留对话上下文（最近 40 条消息）；麦克风关闭且空闲两分钟后断开，并释放识别模型占用的内存。
+
+## 本机识别与轮次检测
+
+| 模型 | 用途 | 来源与许可 |
+| --- | --- | --- |
+| `silero_vad.onnx` | 语音活动检测：置信度 0.7，开始 0.2 s，停止 0.2 s | 随安装包，Silero VAD v5，MIT |
+| `smart-turn-v3.2-cpu.onnx` | 判断一句话是否说完：最近 8 s，概率 > 0.5 视为说完，静音满 3 s 强制结束 | 随安装包，Pipecat Smart Turn，BSD-2-Clause |
+| SenseVoice-Small int8 | 语音识别：普通话、粤语、英、日、韩，带标点与数字规整 | 按需下载，sherpa-onnx 导出（2025-09-09） |
+
+- 模型下载到资料目录的 `models/sensevoice-int8-2025-09-09/`，逐个文件校验大小与 SHA-256，校验通过后写入 `verified` 标记。
+  目前依次尝试 Hugging Face 与 hf-mirror.com；正式发布应改为 JPet 自己的 CDN。
+- 三个模型共用随 JPet 分发的 sherpa-onnx 1.13.8 与 ONNX Runtime 1.28.2（均在运行时加载，最低 macOS 11）。
+- 识别在独立线程中进行；识别器在第一轮识别时加载（约 1 秒），加载后峰值内存约 560 MB。
+
+Apple M2 Max 上的识别实测（`voice_speech_probe`，识别使用 2 个线程）：
+
+| 项目 | 结果 |
+| --- | --- |
+| 模型加载 | 约 1.0 s |
+| 2 秒左右的指令 | 平均 51 ms，最长 85 ms（RTF 0.026） |
+| 5–7 秒的真实录音（模型自带样例） | 100–150 ms |
+| 15 条 JPet 指令 × Tingting（自然音色） | CER 3.4%，错误主要是「轴伊」→「周一」、「升」→「深」 |
+| 同上 × 5 种系统音色 | CER 15.6%；Eddy、Grandpa、Sandy 等机械音色 19–24%，偏悲观 |
+| 加白噪声 15 dB / 5 dB | CER 19.5% / 34.9% |
+
+合成语音不能代表真人录音，结果只用于比较趋势；真实准确率还需要用真人录音验证。
+
+## 大模型与合成
+
+- 默认请求 `https://{业务空间}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions`（流式，`enable_thinking=false`）。
+  系统提示要求回复适合朗读、不用 Markdown，一般不超过三句话；单条回复最多 1024 token。
+- 回复按中英文句末标点切句；第一句在 6 个字以上的逗号处即可切出，以缩短首句等待。链接和 Markdown 符号不朗读。
+- CosyVoice 不支持取消任务，音频帧也不带任务标识，因此每句使用一个任务（`run-task` → `continue-task` → `finish-task`），
+  在同一连接上顺序执行，并据此记录每句的音频区间，用于计算打断时已播出的文字。合成速度快于播放，后续句子的任务开销被播放时间掩盖。
 
 ## 对话记录
 
@@ -79,83 +118,61 @@ Mac 使用系统默认输入设备，并显式选择第 1 路输入作为麦克�
 
 游戏操作复用现有云端命令、幂等重放和费用校验，只有云端确认成功才报告成功，随后只返回受影响的状态：任务操作返回当前任务和队列，扩容返回队列，属性/升星返回属性与价格，换装返回服装。状态读取失败不会把已成功的操作改报为失败，模型应单独查询而非重试操作。
 查询不再提供完整状态入口；任务目录、历史、成就和排行榜默认每页5项，最多10项。任务目录、历史和成就使用next_offset继续查询，排行榜使用offset/limit分页。离线状态标记为缓存。
-日常设置使用字段白名单和类型/范围校验，不读取或修改B站/PowerLive登录、Cookie、AI服务、API Key、业务空间或云端连接配置。轮盘程序/文件夹只能配置已存在的本机绝对路径，网页入口仅接受HTTP/HTTPS；配置不会自动启动程序或打开网页。窗口相关设置在主线程应用并保存，面板通过SSE同步更新；打断或退出会取消尚未应用的设置。
+日常设置使用字段白名单和类型/范围校验，不读取或修改B站登录、Cookie、API Key、业务空间、大模型或云端连接配置。轮盘程序/文件夹只能配置已存在的本机绝对路径，网页入口仅接受HTTP/HTTPS；配置不会自动启动程序或打开网页。窗口相关设置在主线程应用并保存，面板通过SSE同步更新；打断或退出会取消尚未应用的设置。
 
-工具在独立线程顺序执行；每轮最多16次调用。重复的服务端函数事件只执行一次。
-函数参数事件只暂存调用，必须等到 `response.done` 确认回复成功完成才执行。
-取消、未完成或失败回复中的工具草稿直接丢弃，不为未成立的调用发送 `function_call_output`。
+工具在独立线程顺序执行；每轮最多16次调用，同一条回复最多连续请求大模型8轮。
+大模型的回复流结束后才执行其中的 `tool_calls`；取消或失败的回复不执行。所有调用的结果回传后再请求一次大模型续答，
+续答前说的话与续答分别显示在对话记录中。
 工具参数错误会返回 `invalid_arguments` 和合法字段/范围提示，模型可以修正参数并继续调用；错误不会关闭录音。
-工具续答区分“已发送请求、等待创建”和“服务端已开始生成”；回复槽占用时等待实际完成事件，最多重试续答三次，
-不重复执行工具或回传结果。新语音取消旧续答，带旧请求ID的迟到拒绝不会关闭当前对话。
-单次 `response.done` 失败结束本轮，保持连接及麦克风状态，下一轮仍可正常对话；认证或连接错误仍会关闭连接。
-服务端检测到新语音时会取消排队中的工具，并关闭已经成功完成回复、进入执行阶段的旧函数调用，丢弃旧结果；已经发出的云端操作可能生效，
-应查询实际状态，不能自动重复执行。关闭应用会等待工具线程结束后才销毁游戏数据。
+用户打断时取消排队中的工具，并为每个未完成的调用写入「已打断」结果，保证上下文中的调用都有结果；
+已经发出的云端操作可能生效，应查询实际状态，不能自动重复执行。关闭应用会等待工具线程结束后才销毁游戏数据。
 
 查看桌面时，截图只在内存中压缩和传输，不保存到磁盘或日志。Mac首次使用需允许JPet录屏，
 授权后重启应用再试。macOS 14及以后使用ScreenCaptureKit，11–13使用旧系统截图接口；
 Windows使用GDI捕获。图片最长边不超过1920像素，JPEG不超过512KB。
-截图发送到已配置的北京业务空间，通过 `qwen-vl-plus` 读取后，将观察文本交给语音模型。
+截图发送到已配置的北京业务空间，通过 `qwen-vl-plus` 读取后，将观察文本交给大模型。
 网页搜索使用同一API Key调用 `qwen-plus`；该业务空间还需允许访问这两个模型。
-[千问实时接口](https://help.aliyun.com/zh/model-studio/client-events)的自定义工具与内置联网搜索不能同时启用，
-因此这里使用独立的[联网搜索请求](https://help.aliyun.com/zh/model-studio/web-search)。
+搜索使用独立的[联网搜索请求](https://help.aliyun.com/zh/model-studio/web-search)，与对话所用的大模型无关。
 视觉请求格式参见[图像理解文档](https://help.aliyun.com/zh/model-studio/vision)。
 
-B站Cookie仅用于发往 `api.bilibili.com` 的HTTPS请求，不交给千问、不写入日志，也不跟随重定向。
+B站Cookie仅用于发往 `api.bilibili.com` 的HTTPS请求，不交给大模型、不写入日志，也不跟随重定向。
 搜索服务限流、Cookie过期、录屏权限或模型权限不足时，工具返回可读错误，不能编造搜索或画面结果。
 截图与搜索中的文字按外部数据处理，不作为额外操作指令。
 
-## 验证
-
-启用 `JPET_BUILD_VOICE_TESTS=ON` 后运行 `ctest -R "voice_|powerlive_account"`，覆盖PCM声道转换、语音会话、
-工具参数与云端操作映射、重复事件/多工具续接/服务端打断、搜索解析和合成图片JPEG编码。
-`python3 tests/voice_panel_smoke_test.py` 使用临时资料目录测试原生启动、设置持久化与工具目录。
-
-macOS可额外启用 `JPET_BUILD_VOICE_NETWORK_PROBE=ON`，手动运行
-`build/macos-arm64/tests/voice_tools_network_probe "JPet资料目录"`。
-这是显式运行的联网检查，不加入自动测试：只读打开游戏数据库，复用当前登录账号搜索，
-验证实时工具配置、联网搜索和合成图片的视觉请求，不修改游戏数据、不获取实际桌面截图、不打印凭据。
-若系统钥匙串不能在无交互情况下读取API Key，则跳过千问检查。
-可加 `--bilibili-only` 检查全部B站搜索分类；加 `--realtime-call 合成语音.pcm` 检查语音输入、
-实际函数调用、工具结果回传和语音续答，PCM需为16kHz单声道s16le，游戏结果使用测试夹具，不执行真实游戏操作。
-当前千问 WebSocket 文档未提供按播放时长截断消息的事件，已生成但未播放的内容仍可能保留在上下文中。
-
-接口说明：[调用指南](https://help.aliyun.com/zh/model-studio/realtime)、
-[客户端事件](https://help.aliyun.com/zh/model-studio/client-events)。
-
-协议回归检查不需要 API Key 或音频设备：
-
-```sh
-cmake -S . -B build/macos-arm64 -DJPET_BUILD_VOICE_TESTS=ON
-cmake --build build/macos-arm64
-ctest --test-dir build/macos-arm64 -R 'voice_(session|audio_mac)' --output-on-failure
-```
-
-macOS 原生设置接口检查：`python3 tests/voice_panel_smoke_test.py`。
-该检查使用临时数据目录和独立端口，验证启动、退出、配置保存和参数校验，不写入 API Key。
-
-语音诊断记录在用户数据目录的 `jpet.log`，以 `[Voice]` 为前缀：
-记录采集格式与选中声道、每次采集的音频字节数/时长/RMS/峰值、关闭麦克风时的上传队列字节数和包数，
-以及会话配置、服务端语音开始/结束与提交确认、回复完成状态、错误码、错误类型/分类、关联请求ID和工具结果字节数。
-`rms=0 peak=0` 表示采集到的是静音；`Upload queued` 表示本地已交给发送层，
-需结合服务端 `input_audio_buffer.committed` 判断提交是否成功。
-日志不保存 API Key、音频内容或对话文本。Mac 数据目录默认为
-`~/Library/Application Support/JPet/`。
-
-全双工协议检查参考了 [qwen-audio-agent 的回复生命周期](https://github.com/QwenAudio/qwen-audio-agent/blob/main/server/src/voice/response-lifecycle.mjs)、
-[回复槽管理](https://github.com/QwenAudio/qwen-audio-agent/blob/main/server/src/voice/realtime-response-slot.mjs)和
-[千问服务适配](https://github.com/QwenAudio/qwen-audio-agent/blob/main/server/src/voice/providers/dashscope.mjs)。
 ## 回声消除（Windows）
 
 Windows 录音和播放使用 WASAPI 共享模式，打开默认设备；由系统音频引擎在设备格式与 16 kHz（录音）/24 kHz（播放）
-单声道 16 bit PCM 之间转换。麦克风经过 WebRTC AudioProcessing（AEC3 回声消除、中等强度降噪、高通滤波）后再上传；
+单声道 16 bit PCM 之间转换。麦克风经过 WebRTC AudioProcessing（AEC3 回声消除、中等强度降噪、高通滤波）后再交给轮次检测和识别；
 AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量），没有回复时写入静音，保证参考流连续。
 麦克风开启期间播放流保持运行；麦克风关闭且回复播完 3 秒后释放播放设备，避免音频流阻止系统睡眠。
-只消除轴伊自己的声音，其他程序播放的音乐、视频不在参考信号内。
+只消除轴伊自己的声音，其他程序播放的音乐、视频不在参考信号内。Mac 暂无回声消除，外放时只能依靠上面的回声文字比对。
 
 - 设置环境变量 `JPET_VOICE_AEC=0` 后启动可关闭回声处理，用于对比原始录音。
 - `jpet.log` 中 `[Voice] Capture wasapi ...` 记录录音延迟和 AEC 开关；麦克风开启时每 5 秒输出
   `[Voice] AEC ... reduction=…dB`，即处理前后麦克风电平差（包含降噪的作用）。
-- `voice_echo_test` 使用合成的远端/近端信号检查回声衰减、单讲与双讲时近端语音保留，以及无参考信号时的对照。
 - 依赖 `webrtc-audio-processing` 2.1，由 [`build-scripts/ports`](../build-scripts/ports) 中的 vcpkg overlay port 构建为静态库；
   它要求 abseil 不低于 20240722 且仍提供 `absl::Nullable`，因此 `vcpkg.json` 将 abseil 固定为 20250127.1。
-- Mac 端暂未接入，仍使用 AVAudioEngine 录音和播放。
+
+## 验证
+
+启用 `JPET_BUILD_VOICE_TESTS=ON` 后运行 `ctest -R voice_`，不需要 API Key、模型下载或音频设备：
+
+| 测试 | 内容 |
+| --- | --- |
+| `voice_common` | 凭据与业务空间校验、Base64、快捷键状态、对话记录、事件队列 |
+| `voice_cascade` | 切句、SSE 解析、一轮完整对话、按句合成、回声与真实打断、只保留已播出文字、工具续答、按住说话 |
+| `voice_turn` | VAD 状态机、Whisper 特征、Silero 与 Smart Turn 实际模型（Mac 用系统语音合成测试音频） |
+| `voice_models` | 模型下载：镜像回退、哈希校验失败、取消与重新下载 |
+| `voice_echo` | AEC3 回声衰减、单讲与双讲时近端语音保留，以及无参考信号时的对照 |
+| `voice_tools` | 工具参数、云端操作映射、搜索解析、取消 |
+
+`python3 tests/voice_panel_smoke_test.py` 使用临时资料目录测试原生启动、设置接口、持久化与参数校验，不写入 API Key。
+`build/macos-arm64/tests/voice_speech_probe <模型目录> [test_wavs 目录]` 在本机测量识别延迟与字错率。
+
+macOS 可额外启用 `JPET_BUILD_VOICE_NETWORK_PROBE=ON`，手动运行
+`build/macos-arm64/tests/voice_tools_network_probe "JPet资料目录"`：只读打开游戏数据库，验证 B 站搜索、
+联网搜索和合成图片的视觉请求，不修改游戏数据、不获取实际桌面截图、不打印凭据；加 `--bilibili-only` 只检查 B 站搜索。
+
+语音诊断记录在用户数据目录的 `jpet.log`，以 `[Voice]` 为前缀：采集时长、RMS 与峰值，轮次结束时的 Smart Turn 概率，
+识别模型加载耗时，回声丢弃与打断，合成任务失败码，工具调用名称与结果大小。日志不保存 API Key、音频内容或对话文本。
+Mac 数据目录默认为 `~/Library/Application Support/JPet/`。

@@ -1,7 +1,10 @@
 #pragma once
 
+#include "VoiceCascade.hpp"
+#include "VoiceModels.hpp"
+#include "VoiceSpeech.hpp"
 #include "VoicePlatform.hpp"
-#include "VoiceSession.hpp"
+#include "VoiceCommon.hpp"
 #include "VoiceHistory.hpp"
 #include "VoiceTools.hpp"
 #include "VoiceShortcut.hpp"
@@ -22,6 +25,9 @@ class VoiceChat {
     return history_.Clear();
   }
   bool IsBusy() const;
+  // Local speech recognition model: download, cancel or remove it.
+  bool SpeechModelAction(const std::string& action, std::string& error);
+  nlohmann::json SpeechModelStatus() { return ModelStore().Status(); }
 
  private:
   using Clock = std::chrono::steady_clock;
@@ -32,10 +38,25 @@ class VoiceChat {
   void Close(bool failed = false);
   void Fail(const std::string& error);
   void SetState(const std::string& state, const std::string& message = "");
+  bool Recording() const { return pipeline_ && pipeline_->Recording(); }
+  bool StartPipeline(const std::string& workspace, const std::string& key);
+  void PlayReply(const std::string& pcm);
+  void SubmitTools(const std::vector<Voice::ToolCall>& calls);
+  Voice::SpeechModelStore& ModelStore();
   std::unique_ptr<Voice::Platform> platform_;
   std::unique_ptr<Voice::ToolExecutor> tools_;
   Voice::History history_;
-  Voice::Session session_;
+  std::unique_ptr<Voice::Pipeline> pipeline_;
+  // Local turn-detection models, loaded once and shared by successive pipelines.
+  std::unique_ptr<Voice::SileroVad> vad_;
+  std::unique_ptr<Voice::SmartTurn> smartTurn_;
+  std::string turnModelError_;
+  std::once_flag modelStoreOnce_;
+  std::unique_ptr<Voice::SpeechModelStore> modelStore_;
+  // Loaded on the pipeline's recognition worker on first use (about a second).
+  std::mutex recognizerMutex_;
+  std::unique_ptr<Voice::LocalRecognizer> localRecognizer_;
+  std::string recognizerError_;
   std::atomic<bool> resetRequested_{false};
   std::atomic<bool> historyClearRequested_{false};
   std::atomic<bool> busy_{false};
@@ -45,14 +66,10 @@ class VoiceChat {
   bool connected_ = false;
   Voice::ShortcutControl shortcut_;
   bool microphoneEnabled_ = false;
-  bool failurePending_ = false;
   size_t capturedBytes_ = 0;
-  size_t sentBytes_ = 0;
-  size_t sentChunks_ = 0;
   double capturedEnergy_ = 0;
   int capturedPeak_ = 0;
-  std::string error_;
   std::string indicator_;
   bool indicatorError_ = false;
-  Clock::time_point connectedAt_, lastActivity_, stateChangedAt_;
+  Clock::time_point lastActivity_, stateChangedAt_;
 };

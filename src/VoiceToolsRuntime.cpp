@@ -1,4 +1,3 @@
-#include "PowerLiveAccount.hpp"
 #include "VoiceTools.hpp"
 #include "VoiceToolsNetwork.hpp"
 #include "VoicePlatform.hpp"
@@ -159,17 +158,13 @@ json ReadGame(const json& query) {
     {{"uid", data->GetWithDefault("uid", std::string{})}, {"name", data->GetWithDefault("uname", std::string{})}}, section, query.value("offset", size_t{0}), query.value("limit", size_t{5}));
 }
 
-struct AICredentials { std::string workspace, key, service, error; };
+struct AICredentials { std::string workspace, key, error; };
 AICredentials Credentials() {
   auto* data = DataManager::GetInstance();
   AICredentials result;
-  if (data->GetConfig<std::string>("voice", "provider", "custom") == "jpet") {
-    result.service = CloudGame::ServiceUrl(); result.key = PowerLiveAccount::Instance().AccessToken(result.error);
-  } else {
-    result.workspace = data->GetConfig<std::string>("voice", "workspace_id", "");
-    result.key = LoadApiKey(LAppPal::WStringToString(LAppDefine::documentPath), result.error);
-    if (result.error.empty() && (!ValidWorkspace(result.workspace) || !ValidApiKey(result.key))) result.error = "请在语音设置中保存有效的 API Key 和业务空间 ID";
-  }
+  result.workspace = data->GetConfig<std::string>("voice", "workspace_id", "");
+  result.key = LoadApiKey(LAppPal::WStringToString(LAppDefine::documentPath), result.error);
+  if (result.error.empty() && (!ValidWorkspace(result.workspace) || !ValidApiKey(result.key))) result.error = "请在语音设置中保存有效的 API Key 和业务空间 ID";
   return result;
 }
 json ReadDesktop(const json& query) {
@@ -178,12 +173,12 @@ json ReadDesktop(const json& query) {
   DesktopImage image;
   std::string error;
   if (!CaptureDesktop(query.at("display").get<int>(), image, error)) return Fail(error);
-  return DescribeDesktop(query, image, credentials.workspace, credentials.key, credentials.service);
+  return DescribeDesktop(query, image, credentials.workspace, credentials.key);
 }
 json ReadWeb(const json& query) {
   const auto credentials = Credentials();
   if (!credentials.error.empty()) return Fail(credentials.error);
-  return SearchWeb(query, credentials.workspace, credentials.key, credentials.service);
+  return SearchWeb(query, credentials.workspace, credentials.key);
 }
 json ReadBilibili(const json& query) {
   auto* data = DataManager::GetInstance();

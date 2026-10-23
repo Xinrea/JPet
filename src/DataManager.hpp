@@ -26,6 +26,8 @@ class DataManager {
   void PostProcess(const std::string& key, int value);
 
   void initNotifySection();
+  // The [voice] table, created when missing; callers hold gameMutex.
+  toml::table& VoiceTable();
 
  public:
   ~DataManager() { Save(); };
@@ -50,12 +52,9 @@ class DataManager {
   nlohmann::json GetVoiceSettings();
   nlohmann::json LoadVoiceHistory();
   void SaveVoiceHistory(const nlohmann::json& history);
-  bool UpdateVoiceSettings(const std::string& workspace,
-                           const std::string* apiKey, std::string& error,
-                           const std::string& provider = "",
-                           const std::string& inputMode = "",
-                           const std::string& model = "",
-                           const std::string& voice = "");
+  // Applies the optional fields of a settings payload, including write-only
+  // API keys, after validating all of them.
+  bool UpdateVoiceSettings(const nlohmann::json& payload, std::string& error);
 
   void GetDisplay(float* scale, bool* green, bool* rateLimit);
   void UpdateDisplay(float scale, bool green, bool rateLimit);

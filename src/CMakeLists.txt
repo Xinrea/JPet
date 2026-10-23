@@ -19,12 +19,24 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/PowerLiveAccount.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/PowerLiveAccount.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSession.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSession.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceCommon.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceCommon.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceCascade.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceCascade.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceLlm.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceLlm.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceText.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceText.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTurn.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTurn.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceOnnx.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceOnnx.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSpeech.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSpeech.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceModels.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceModels.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceHistory.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTools.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceTools.hpp

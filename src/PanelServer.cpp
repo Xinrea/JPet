@@ -1,4 +1,3 @@
-#include "PowerLiveAccount.hpp"
 #include "PanelServer.hpp"
 #include "BuffManager.hpp"
 #include "CloudGame.hpp"
@@ -309,46 +308,15 @@ void PanelServer::doServe() {
       if (*testPort && !*end && parsed > 0 && parsed <= 65535) port = static_cast<int>(parsed);
     }
   }
-  PowerLiveAccount::Instance().Configure(LAppPal::WStringToString(LAppDefine::documentPath), CloudGame::ServiceUrl(), port);
-  const auto localRequest = [port](const httplib::Request& req, httplib::Response& res, bool post) {
+  const auto localRequest = [port](const httplib::Request& req, httplib::Response& res, bool post, size_t limit = 2048) {
     const auto authority = "127.0.0.1:" + std::to_string(port), localhost = "localhost:" + std::to_string(port);
     const auto host = req.get_header_value("Host"), origin = req.get_header_value("Origin");
     if ((host != authority && host != localhost) || (!origin.empty() && origin != "http://" + authority && origin != "http://" + localhost) ||
-        (post && (req.get_header_value("Content-Type").find("application/json") != 0 || req.body.size() > 2048))) {
+        (post && (req.get_header_value("Content-Type").find("application/json") != 0 || req.body.size() > limit))) {
       res.status = 403; res.set_content(R"({"error":"请求来源无效"})", "application/json"); return false;
     }
     res.set_header("Cache-Control", "no-store"); return true;
   };
-  server->Get("/api/powerlive", [localRequest](const httplib::Request& req, httplib::Response& res) {
-    if (!localRequest(req, res, false)) return;
-    res.set_content(PowerLiveAccount::Instance().Status().dump(), "application/json");
-  });
-  server->Post("/api/powerlive/login", [localRequest](const httplib::Request& req, httplib::Response& res) {
-    if (!localRequest(req, res, true)) return;
-    std::string error;
-    const bool ok = PowerLiveAccount::Instance().Login(error);
-    res.status = ok ? 202 : 400;
-    res.set_content(nlohmann::json{{"success", ok}, {"error", error}}.dump(), "application/json");
-  });
-  server->Post("/api/powerlive/logout", [localRequest](const httplib::Request& req, httplib::Response& res) {
-    if (!localRequest(req, res, true)) return;
-    std::string error;
-    const bool ok = PowerLiveAccount::Instance().Logout(error);
-    if (ok) VoiceChat::GetInstance()->ConfigurationChanged();
-    res.status = ok ? 200 : 400;
-    res.set_content(nlohmann::json{{"success", ok}, {"error", error}}.dump(), "application/json");
-  });
-  server->Get("/oauth/callback", [localRequest](const httplib::Request& req, httplib::Response& res) {
-    if (!localRequest(req, res, false)) return;
-    std::string error;
-    const bool ok = PowerLiveAccount::Instance().Callback(req.get_param_value("state"), req.get_param_value("code"), req.get_param_value("error"), error);
-    if (ok) VoiceChat::GetInstance()->ConfigurationChanged();
-    res.status = ok ? 200 : 400;
-    res.set_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'");
-    res.set_header("Referrer-Policy", "no-referrer");
-    res.set_content(ok ? "<!doctype html><meta charset=utf-8><title>JPet</title><p>PowerLive 登录成功，可以关闭此页面并返回 JPet。</p>" :
-      "<!doctype html><meta charset=utf-8><title>JPet</title><p>登录未完成或请求已失效，请返回 JPet 设置重新登录。</p>", "text/html; charset=utf-8");
-  });
   server->set_base_dir("resources/panel/dist");
   server->Post("/api/log", [](const httplib::Request &req,
                               httplib::Response &res) {
@@ -558,30 +526,17 @@ void PanelServer::doServe() {
     res.set_content(DataManager::GetInstance()->GetVoiceSettings().dump(), "application/json");
   });
   server->Post("/api/config/voice", [localRequest](const httplib::Request& req, httplib::Response& res) {
-    if (!localRequest(req, res, true)) return;
+    if (!localRequest(req, res, true, 4096)) return;
     res.set_header("Cache-Control", "no-store");
-    if (req.body.size() > 2048 || req.get_header_value("Content-Type").find("application/json") != 0) {
+    if (req.body.size() > 4096 || req.get_header_value("Content-Type").find("application/json") != 0) {
       res.status = 400;
       res.set_content(R"({"error":"语音设置格式不正确"})", "application/json");
       return;
     }
     try {
       const auto payload = nlohmann::json::parse(req.body);
-      const auto workspace = Voice::Trim(payload.value("workspace_id", DataManager::GetInstance()->GetVoiceSettings().at("workspace_id").get<std::string>()));
-      const auto provider = payload.value("provider", std::string{});
-      const auto inputMode = payload.value("input_mode", std::string{});
-      const auto model = payload.value("model", std::string{});
-      const auto voice = payload.value("voice", std::string{});
-      if (payload.contains("input_mode") && inputMode.empty()) {
-        res.status = 400;
-        res.set_content(R"({"error":"请选择开关或按住的快捷键方式"})", "application/json");
-        return;
-      }
-      std::string key, error;
-      const bool clear = payload.value("clear_api_key", false);
-      const bool updateKey = clear || payload.contains("api_key");
-      if (!clear && updateKey) key = Voice::Trim(payload.at("api_key").get<std::string>());
-      if (!DataManager::GetInstance()->UpdateVoiceSettings(workspace, updateKey ? &key : nullptr, error, provider, inputMode, model, voice)) {
+      std::string error;
+      if (!DataManager::GetInstance()->UpdateVoiceSettings(payload, error)) {
         res.status = 400;
         res.set_content(nlohmann::json{{"error", error}}.dump(), "application/json");
         return;
@@ -596,6 +551,18 @@ void PanelServer::doServe() {
   server->Get("/api/voice", [](const httplib::Request&, httplib::Response& res) {
     res.set_header("Cache-Control", "no-store");
     res.set_content(VoiceChat::GetInstance()->Status().dump(), "application/json");
+  });
+  server->Post("/api/voice/speech-model", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, true)) return;
+    const auto payload = nlohmann::json::parse(req.body, nullptr, false);
+    std::string error;
+    if (!payload.is_object() || !payload.contains("action") || !payload["action"].is_string() ||
+        !VoiceChat::GetInstance()->SpeechModelAction(payload["action"].get<std::string>(), error)) {
+      res.status = 400;
+      res.set_content(nlohmann::json{{"error", error.empty() ? "模型操作格式不正确" : error}}.dump(), "application/json");
+      return;
+    }
+    res.set_content(VoiceChat::GetInstance()->SpeechModelStatus().dump(), "application/json");
   });
   server->Get("/api/voice/history", [](const httplib::Request&, httplib::Response& res) {
     res.set_header("Cache-Control", "no-store");

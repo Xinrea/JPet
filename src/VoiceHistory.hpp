@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VoiceSession.hpp"
+#include "VoiceCommon.hpp"
 #include <algorithm>
 #include <chrono>
 #include <mutex>

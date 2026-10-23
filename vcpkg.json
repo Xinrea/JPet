@@ -23,7 +23,11 @@
     "cryptopp",
     "croncpp",
     "neargye-semver",
-    "webrtc-audio-processing"
+    "webrtc-audio-processing",
+    {
+      "name": "sherpa-onnx-bin",
+      "platform": "(windows & x64) | (osx & arm64)"
+    }
   ],
   "overrides": [
     {

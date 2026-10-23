@@ -5,7 +5,8 @@
 #include "LAppLive2DManager.hpp"
 #include "PanelServer.hpp"
 #include "VoicePlatform.hpp"
-#include "VoiceSession.hpp"
+#include "VoiceCascade.hpp"
+#include "VoiceCommon.hpp"
 
 #include <filesystem>
 
@@ -126,18 +127,26 @@ void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
 
 nlohmann::json DataManager::GetVoiceSettings() {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  // Fall back to defaults if the saved model or voice is no longer offered.
-  auto model = GetConfig<std::string>("voice", "model", Voice::DefaultModel);
-  if (!Voice::ValidModel(model)) model = Voice::DefaultModel;
-  auto voice = GetConfig<std::string>("voice", "voice", Voice::DefaultVoice);
-  if (!Voice::ValidVoice(model, voice)) voice = Voice::DefaultVoice;
+  // Fall back to defaults when a saved value is no longer valid or offered.
+  auto chatModel = GetConfig<std::string>("voice", "chat_model", Voice::DefaultChatModel);
+  if (!Voice::ValidChatModel(chatModel)) chatModel = Voice::DefaultChatModel;
+  auto chatUrl = GetConfig<std::string>("voice", "chat_base_url", "");
+  if (!chatUrl.empty() && !Voice::ValidChatBaseUrl(chatUrl)) chatUrl.clear();
+  auto ttsModel = GetConfig<std::string>("voice", "tts_model", Voice::DefaultTtsModel);
+  auto ttsVoice = GetConfig<std::string>("voice", "tts_voice", Voice::DefaultTtsVoice);
+  if (!Voice::ValidTtsVoice(ttsModel, ttsVoice)) {
+    if (!Voice::ValidTtsVoice(ttsModel, Voice::DefaultTtsVoice)) ttsModel = Voice::DefaultTtsModel;
+    ttsVoice = Voice::DefaultTtsVoice;
+  }
+  auto inputMode = GetConfig<std::string>("voice", "input_mode", "toggle");
+  if (inputMode != "hold") inputMode = "toggle";
   return {{"workspace_id", GetConfig<std::string>("voice", "workspace_id", "")},
           {"has_api_key", GetConfig<bool>("voice", "has_api_key", false)},
-          {"model", model},
-          {"voice", voice},
-          {"models", Voice::ModelCatalog()},
-          {"provider", GetConfig<std::string>("voice", "provider", "custom")},
-          {"input_mode", GetConfig<std::string>("voice", "input_mode", "toggle")}};
+          {"input_mode", inputMode},
+          {"chat_model", chatModel}, {"chat_base_url", chatUrl},
+          {"has_chat_api_key", GetConfig<bool>("voice", "has_chat_api_key", false)},
+          {"tts_model", ttsModel}, {"tts_voice", ttsVoice},
+          {"catalog", Voice::CascadeCatalog()}};
 }
 
 nlohmann::json DataManager::LoadVoiceHistory() {
@@ -150,49 +159,74 @@ void DataManager::SaveVoiceHistory(const nlohmann::json& history) {
   gameData->UpdateBatch({}, {{"voice.history", history.dump()}});
 }
 
-bool DataManager::UpdateVoiceSettings(const std::string& workspace,
-                                      const std::string* apiKey, std::string& error,
-                                      const std::string& provider, const std::string& inputMode,
-                                      const std::string& model, const std::string& voice) {
-  if (!provider.empty() && provider != "custom" && provider != "jpet") {
-    error = "请选择有效的 AI 服务方式";
-    return false;
-  }
-  if (!inputMode.empty() && inputMode != "toggle" && inputMode != "hold") {
-    error = "请选择开关或按住的快捷键方式";
-    return false;
-  }
-  if (!model.empty() && !Voice::ValidModel(model)) {
-    error = "请选择有效的语音模型";
-    return false;
-  }
+bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string& error) {
+  if (!payload.is_object()) { error = "语音设置格式不正确"; return false; }
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
   const auto current = GetVoiceSettings();
-  const auto nextModel = model.empty() ? current.at("model").get<std::string>() : model;
-  auto nextVoice = voice.empty() ? current.at("voice").get<std::string>() : voice;
-  if (!Voice::ValidVoice(nextModel, nextVoice)) {
-    if (!voice.empty()) {
-      error = "所选音色不支持当前语音模型";
-      return false;
-    }
-    nextVoice = Voice::DefaultVoice;
-  }
-  if (!workspace.empty() && !Voice::ValidWorkspace(workspace)) {
+  // Every field is optional; a missing field keeps the saved value.
+  const auto text = [&](const char* key, std::string& value) {
+    if (!payload.contains(key)) { value = current.value(key, std::string{}); return true; }
+    if (!payload[key].is_string()) return false;
+    value = Voice::Trim(payload[key].get<std::string>());
+    return true;
+  };
+  std::string workspace, inputMode, chatModel, chatUrl, ttsModel, ttsVoice;
+  if (!text("workspace_id", workspace) || (!workspace.empty() && !Voice::ValidWorkspace(workspace))) {
     error = "业务空间 ID 应为 1～63 位字母、数字或连字符，且不能以连字符开头或结尾";
     return false;
   }
-  if (apiKey && !apiKey->empty() && !Voice::ValidApiKey(*apiKey)) {
-    error = "API Key 格式不正确，请检查是否包含空格";
+  if (!text("input_mode", inputMode) || (inputMode != "toggle" && inputMode != "hold")) {
+    error = "请选择开关或按住的快捷键方式";
     return false;
   }
-  if (apiKey && !Voice::SaveApiKey(LAppPal::WStringToString(LAppDefine::documentPath), *apiKey, error)) return false;
-  const bool hasKey = apiKey ? !apiKey->empty() : GetConfig<bool>("voice", "has_api_key", false);
-  data.insert_or_assign("voice", toml::table{{"workspace_id", workspace}, {"has_api_key", hasKey},
-    {"provider", provider.empty() ? GetConfig<std::string>("voice", "provider", "custom") : provider},
-    {"input_mode", inputMode.empty() ? GetConfig<std::string>("voice", "input_mode", "toggle") : inputMode},
-    {"model", nextModel}, {"voice", nextVoice}});
+  if (!text("chat_model", chatModel) || !Voice::ValidChatModel(chatModel)) { error = "请填写有效的大模型名称"; return false; }
+  if (!text("chat_base_url", chatUrl) || (!chatUrl.empty() && !Voice::ValidChatBaseUrl(chatUrl))) {
+    error = "大模型接口地址需以 https:// 开头（本机地址可用 http://），且不能包含账号信息";
+    return false;
+  }
+  const bool voiceGiven = payload.contains("tts_voice");
+  if (!text("tts_model", ttsModel) || !text("tts_voice", ttsVoice)) { error = "语音合成设置格式不正确"; return false; }
+  if (!Voice::ValidTtsVoice(ttsModel, ttsVoice)) {
+    // Switching models keeps the voice when offered, else the default voice.
+    if (voiceGiven || !Voice::ValidTtsVoice(ttsModel, Voice::DefaultTtsVoice)) { error = "请选择有效的语音合成音色"; return false; }
+    ttsVoice = Voice::DefaultTtsVoice;
+  }
+  // Keys are write-only: a new value replaces the saved one, "clear_*" removes it.
+  const auto secret = [&](const char* key, const char* clear, std::string& value, bool& update) {
+    update = payload.value(clear, false) || payload.contains(key);
+    if (!update || payload.value(clear, false)) return true;
+    if (!payload[key].is_string()) return false;
+    value = Voice::Trim(payload[key].get<std::string>());
+    return value.empty() || Voice::ValidApiKey(value);
+  };
+  std::string apiKey, chatKey;
+  bool updateKey = false, updateChatKey = false;
+  if (!secret("api_key", "clear_api_key", apiKey, updateKey)) { error = "API Key 格式不正确，请检查是否包含空格"; return false; }
+  if (!secret("chat_api_key", "clear_chat_api_key", chatKey, updateChatKey)) {
+    error = "大模型 API Key 格式不正确，请检查是否包含空格";
+    return false;
+  }
+  const auto profile = LAppPal::WStringToString(LAppDefine::documentPath);
+  if (updateKey && !Voice::SaveApiKey(profile, apiKey, error)) return false;
+  if (updateChatKey && !Voice::SaveChatApiKey(profile, chatKey, error)) return false;
+  auto& table = VoiceTable();
+  // Settings of the removed Omni engine and JPet Server provider.
+  for (const auto* legacy : {"provider", "model", "voice", "engine", "stt"}) table.erase(legacy);
+  table.insert_or_assign("workspace_id", workspace);
+  table.insert_or_assign("input_mode", inputMode);
+  table.insert_or_assign("chat_model", chatModel);
+  table.insert_or_assign("chat_base_url", chatUrl);
+  table.insert_or_assign("tts_model", ttsModel);
+  table.insert_or_assign("tts_voice", ttsVoice);
+  if (updateKey) table.insert_or_assign("has_api_key", !apiKey.empty());
+  if (updateChatKey) table.insert_or_assign("has_chat_api_key", !chatKey.empty());
   Save();
   return true;
+}
+
+toml::table& DataManager::VoiceTable() {
+  if (!data["voice"].is_table()) data.insert_or_assign("voice", toml::table{});
+  return *data["voice"].as_table();
 }
 
 void DataManager::UpdateDisplay(float scale, bool green, bool rateLimit) {

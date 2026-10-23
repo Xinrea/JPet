@@ -1,6 +1,4 @@
 #include "VoiceTools.hpp"
-#include "VoiceHistory.hpp"
-#include "voice_history_helpers.hpp"
 #include "VoiceSettingsQueue.hpp"
 #include <chrono>
 #include <atomic>
@@ -12,39 +10,6 @@ namespace {
 using nlohmann::json;
 void Check(bool condition, const char* label) { if (!condition) throw std::runtime_error(label); }
 Voice::ToolCall Call(const char* name, json args) { return {"c1", name, args.dump()}; }
-struct SessionFixture {
-  std::vector<json> sent;
-  std::vector<Voice::ToolCall> calls;
-  std::string state;
-  size_t interruptions = 0;
-  Voice::History history;
-  Voice::Session session{{
-    [this](const json& value) { sent.push_back(value); }, [](const std::string&) {}, [] { return false; }, [] {},
-    [this](const std::string& value, const std::string&) { state = value; }, [](const std::string&) {},
-    [this](const std::vector<Voice::ToolCall>& value) { calls.insert(calls.end(), value.begin(), value.end()); },
-    [this](const Voice::ConversationEvent& event) { history.Apply(event); },
-    [this] { ++interruptions; }
-  }, Voice::ToolDefinitions()};
-  SessionFixture() {
-    session.Receive({{"type", "session.created"}});
-    session.Receive({{"type", "session.updated"}});
-    session.BeginInput(); session.AppendInput(std::string(6400, '\0')); session.EndInput();
-    session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", "u1"}});
-    Created("r1");
-  }
-  void Created(const char* id) { session.Receive({{"type", "response.created"}, {"response", {{"id", id}}}}); }
-  json Item(const char* id = "c1") {
-    return {{"type", "function_call"}, {"call_id", id}, {"name", "get_game_profile"}, {"arguments", "{}"}};
-  }
-  void Arguments(const char* id = "c1", const char* response = "r1") {
-    auto event = Item(id); event["type"] = "response.function_call_arguments.done"; event["response_id"] = response;
-    session.Receive(event);
-  }
-  void Done(json output = json::array(), const char* status = "completed", const char* id = "r1") {
-    session.Receive({{"type", "response.done"}, {"response", {{"id", id}, {"status", status}, {"output", output}}}});
-  }
-  size_t Count(const char* type) { size_t count = 0; for (const auto& value : sent) if (value["type"] == type) ++count; return count; }
-};
 }
 
 int main() {
@@ -340,165 +305,10 @@ int main() {
     Check(web["sources"][0]["url"] == "https://example.com/page" && web["summary"] == "结论[ref_1]", "web search retains citations and sources");
     Check(!Voice::WebSearchResults({{"output", {{"choices", {{{"message", {{"content", "没有来源"}}}}}}}}}, 5)["ok"].get<bool>(), "uncited generation is not represented as successful search");
 
-    SessionFixture first;
-    Check(first.sent.front()["session"].dump().size() < 16000, "session instructions and fifteen tools fit the relay handshake limit");
-    Check(first.sent.front()["session"]["tools"] == definitions && !first.sent.front()["session"].contains("enable_search"), "custom tools configured without conflicting built-in search");
-    first.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r1"}, {"transcript", "我先查询一下。"}});
-    first.Arguments();
-    first.session.Receive({{"type", "response.output_item.done"}, {"response_id", "r1"}, {"item", first.Item()}});
-    Check(first.calls.empty(), "tool waits for complete response before execution");
-    first.Done(json::array({first.Item()}));
-    Check(first.calls.size() == 1 && first.session.Busy() && first.state == "tool", "three duplicate delivery forms execute once");
-    Check(TurnSnapshot(first.history)[0]["state"] == "pending", "tool invocation does not finish the history turn");
-    first.session.BeginInput();
-    const auto openMicChunks = first.Count("input_audio_buffer.append");
-    first.session.CompleteTool("c1", {{"ok", true}});
-    Check(first.Count("input_audio_buffer.append") == openMicChunks, "open microphone needs no synthetic continuation audio");
-    Check(first.Count("conversation.item.create") == 1 && first.Count("response.create") == 1, "tool output precedes one continuation");
-    Check(first.sent.back()["response"]["modalities"] == json::array({"text", "audio"}),
-        "tool continuation explicitly requests a spoken reply as in the provider example");
-    first.session.CompleteTool("c1", {{"ok", true}});
-    Check(first.Count("response.create") == 1, "duplicate tool completion ignored");
-    first.Created("r2");
-    first.session.Receive({{"type", "response.audio_transcript.delta"}, {"response_id", "r2"}, {"delta", "结果是"}});
-    first.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r2"}, {"transcript", "结果是 100 经验。"}});
-    first.Done(json::array(), "completed", "r2");
-    const auto firstHistory = TurnSnapshot(first.history);
-    Check(firstHistory.size() == 1 && firstHistory[0]["state"] == "completed" &&
-        firstHistory[0]["assistant"] == "我先查询一下。\n\n结果是 100 经验。", "tool continuations retain all reply text in one history round");
-    SessionFixture multiple;
-    multiple.Arguments("c1"); multiple.Arguments("c2"); multiple.Done();
-    multiple.session.CompleteTool("c2", {{"ok", false}, {"error", "失败"}});
-    Check(multiple.Count("response.create") == 0 && multiple.session.Busy(), "all tool results required before continuation");
-    multiple.session.CompleteTool("c1", {{"ok", true}});
-    Check(multiple.Count("response.create") == 1, "one continuation for multiple calls");
-    std::string continuationSilence;
-    bool afterCreate = false;
-    for (const auto& event : multiple.sent) {
-      if (event["type"] == "response.create") afterCreate = true;
-      if (afterCreate && event["type"] == "input_audio_buffer.append") continuationSilence += Voice::DecodeBase64(event["audio"]);
-    }
-    Check(!multiple.session.Recording() && continuationSilence == std::string(Voice::InputBytesPerSecond, '\0'),
-        "closed microphone supplies one second of zero PCM after tool continuation without reopening capture");
-    const auto completedChunks = multiple.Count("input_audio_buffer.append");
-    multiple.session.CompleteTool("c1", {{"ok", true}});
-    Check(multiple.Count("input_audio_buffer.append") == completedChunks, "duplicate tool completion cannot add more silence");
-    multiple.Created("r2"); multiple.Arguments("c3", "r2"); multiple.Done(json::array(), "completed", "r2");
-    Check(multiple.calls.size() == 3, "subsequent tool round supported");
-    multiple.session.CompleteTool("c3", {{"ok", true}});
-    multiple.Arguments("old-delayed", "r1");
-    multiple.Created("r1");
-    multiple.Created("r3");
-    multiple.Done(json::array(), "completed", "r3");
-    Check(multiple.calls.size() == 3, "retired response cannot issue delayed calls or steal next response ID");
-    SessionFixture cancelled;
-    cancelled.Arguments(); cancelled.Done(json::array(), "cancelled");
-    Check(cancelled.calls.empty() && cancelled.Count("conversation.item.create") == 0, "cancelled draft cannot invoke mutation or send an invalid output");
-    // Replay the 22:06:16 log sequence: a draft in a cancelled response, then
-    // another VAD turn. No orphan function output may be sent to the provider.
-    cancelled.session.Receive({{"type", "input_audio_buffer.speech_started"}, {"item_id", "u2"}});
-    cancelled.session.Receive({{"type", "input_audio_buffer.committed"}, {"item_id", "u2"}});
-    cancelled.Created("r2"); cancelled.Arguments("valid-after-cancel", "r2"); cancelled.Done(json::array(), "completed", "r2");
-    cancelled.session.CompleteTool("valid-after-cancel", {{"ok", true}});
-    Check(cancelled.calls.size() == 1 && cancelled.Count("conversation.item.create") == 1 && cancelled.Count("response.create") == 1,
-        "a cancelled draft does not poison the next tool turn");
-    for (const auto* outcome : {"cancelled", "incomplete", "failed"}) {
-      SessionFixture aborted;
-      aborted.Arguments(); aborted.Done(json::array({aborted.Item()}), outcome);
-      Check(aborted.calls.empty() && aborted.Count("conversation.item.create") == 0 && aborted.session.Ready() && !aborted.session.Busy(),
-          "aborted final output is discarded without closing the connection or leaving pending drafts");
-    }
-    SessionFixture draftInterrupt;
-    draftInterrupt.Arguments();
-    draftInterrupt.session.Receive({{"type", "input_audio_buffer.speech_started"}, {"item_id", "u2"}});
-    draftInterrupt.Done(json::array({draftInterrupt.Item()}), "cancelled");
-    Check(draftInterrupt.Count("conversation.item.create") == 0 && draftInterrupt.calls.empty(), "speech before response completion drops drafts without returning a cancellation output");
-
-    SessionFixture badArguments;
-    auto invalid = badArguments.Item(); invalid["name"] = "jpet_settings"; invalid["arguments"] = R"({"action":"update","section":"appearance","settings":{"volume":40}})";
-    badArguments.Done(json::array({invalid}));
-    const auto bad = ExecuteTool(badArguments.calls.back(), dependencies);
+    const auto bad = ExecuteTool({"c1", "jpet_settings", R"({"action":"update","section":"appearance","settings":{"volume":40}})"}, dependencies);
     Check(bad["ok"] == false && bad["code"] == "invalid_arguments" && bad["error"].get<std::string>().find("sweat") != std::string::npos,
         "parameter rejection returns actionable allowed fields rather than a generic network error");
-    badArguments.session.CompleteTool("c1", bad);
-    badArguments.Created("r2");
-    auto corrected = badArguments.Item("c2"); corrected["name"] = "jpet_settings"; corrected["arguments"] = R"({"action":"update","section":"appearance","settings":{"sweat":false}})";
-    badArguments.Done(json::array({corrected}), "completed", "r2");
-    badArguments.session.CompleteTool("c2", {{"ok", true}, {"settings", {{"appearance", {{"sweat", false}}}}}});
-    badArguments.Created("r3");
-    badArguments.session.Receive({{"type", "response.audio_transcript.done"}, {"response_id", "r3"}, {"transcript", "已经去掉汗了。"}});
-    badArguments.Done(json::array(), "completed", "r3");
-    Check(badArguments.Count("response.create") == 2 && badArguments.session.Ready() && !badArguments.session.Busy(), "a corrected tool call and spoken continuation finish after parameter error");
-    const auto messages = badArguments.history.Snapshot()["list"];
-    Check(messages.size() == 4 && messages[1]["role"] == "tool" && messages[1]["state"] == "failed" &&
-        messages[2]["role"] == "tool" && messages[2]["state"] == "completed" && messages[3]["text"] == "已经去掉汗了。",
-        "failed and corrected tool calls remain separate ordered messages");
     Check(ExecuteTool({"invalid-json", "jpet_settings", "{bad"}, dependencies)["code"] == "invalid_arguments", "invalid JSON is a tool parameter error");
-
-    SessionFixture slot;
-    slot.Arguments(); slot.Done(); slot.session.CompleteTool("c1", {{"ok", false}, {"error", "参数错误"}});
-    std::string continuationId;
-    for (const auto& event : slot.sent) if (event["type"] == "response.create") continuationId = event["event_id"];
-    slot.session.Receive({{"type", "error"}, {"error", {{"code", "invalid_request_error"}, {"message", "Another response is in progress"}, {"event_id", continuationId}}}});
-    Check(slot.session.Ready() && slot.session.WaitingForReply() && slot.Count("response.create") == 1, "response slot refusal waits without disconnecting or immediately retrying");
-    slot.Done(json::array(), "completed", "r1");
-    Check(slot.Count("response.create") == 1, "a duplicate old completion cannot release the occupied slot");
-    slot.Done(json::array(), "cancelled", "remote-slot");
-    Check(slot.Count("response.create") == 2 && slot.Count("conversation.item.create") == 1 && slot.calls.size() == 1,
-        "remote completion resumes speech without repeating tools or outputs");
-    slot.Created("r2"); slot.Done(json::array(), "completed", "r2");
-    Check(!slot.session.Busy() && slot.session.Ready(), "slot recovery completes normally");
-
-    SessionFixture pendingSlot;
-    pendingSlot.Arguments(); pendingSlot.Done(); pendingSlot.session.CompleteTool("c1", {{"ok", true}});
-    pendingSlot.session.Receive({{"type", "error"}, {"error", {{"type", "invalid_request_error"}, {"message", "Conversation already has a pending response request"}}}});
-    Check(pendingSlot.session.Ready() && pendingSlot.session.WaitingForReply() && pendingSlot.state != "error",
-        "Qwen 3.8 pending-response refusal without event_id waits for the occupied slot");
-    pendingSlot.Done(json::array(), "completed", "remote-pending");
-    Check(pendingSlot.Count("response.create") == 2 && pendingSlot.Count("conversation.item.create") == 1, "pending-response refusal retries speech once");
-
-    SessionFixture providerFirst;
-    providerFirst.Arguments(); providerFirst.Done(); providerFirst.session.CompleteTool("c1", {{"ok", true}});
-    providerFirst.Created("r2");
-    providerFirst.session.Receive({{"type", "error"}, {"error", {{"type", "invalid_request_error"}, {"message", "Conversation already has an active response"}}}});
-    providerFirst.Done(json::array(), "completed", "r2");
-    Check(providerFirst.session.Ready() && !providerFirst.session.Busy() && providerFirst.Count("response.create") == 1 && providerFirst.state != "error",
-        "a reply the provider started first completes the tool turn without a retry");
-
-    SessionFixture rejected;
-    rejected.Arguments(); rejected.Done(); rejected.session.CompleteTool("c1", {{"ok", true}});
-    rejected.session.Receive({{"type", "error"}, {"error", {{"type", "invalid_request_error"}, {"code", "invalid_value"}, {"message", "Invalid value"}}}});
-    Check(rejected.session.Ready() && !rejected.session.Busy() && rejected.state != "error", "client errors fail one turn but keep the connection");
-    SessionFixture unsafe;
-    unsafe.Arguments(); unsafe.Done(); unsafe.session.CompleteTool("c1", {{"ok", true}});
-    unsafe.session.Receive({{"type", "error"}, {"error", {{"type", "invalid_request_error"}, {"code", "data_inspection_failed"}}}});
-    Check(!unsafe.session.Ready() && unsafe.state == "error", "content safety rejection starts a new session");
-
-    SessionFixture superseded;
-    superseded.Arguments(); superseded.Done(); superseded.session.CompleteTool("c1", {{"ok", true}});
-    std::string staleRequest;
-    for (const auto& event : superseded.sent) if (event["type"] == "response.create") staleRequest = event["event_id"];
-    superseded.session.BeginInput();
-    superseded.session.Receive({{"type", "input_audio_buffer.speech_started"}, {"item_id", "u2"}});
-    superseded.session.Receive({{"type", "error"}, {"error", {{"message", "User is speaking"}, {"event_id", staleRequest}}}});
-    Check(superseded.session.Ready() && superseded.session.Recording(), "late rejection of an interrupted continuation cannot close the current microphone");
-    SessionFixture interrupted;
-    interrupted.Arguments(); interrupted.Done(); interrupted.session.BeginInput();
-    Check(interrupted.Count("conversation.item.create") == 0 && interrupted.interruptions == 0, "press does not cancel pending tools");
-    interrupted.session.Receive({{"type", "input_audio_buffer.speech_started"}, {"item_id", "u2"}});
-    Check(interrupted.interruptions == 1, "server speech event cancels the tool executor");
-    const auto sent = interrupted.sent.size();
-    interrupted.session.CompleteTool("c1", {{"ok", true}});
-    Check(interrupted.sent.size() == sent && interrupted.calls.size() == 1 && interrupted.Count("conversation.item.create") == 1, "interrupted call is closed and stale completion ignored");
-    SessionFixture stale;
-    stale.Arguments("old", "old-response"); stale.Done();
-    Check(stale.calls.empty(), "other response cannot enqueue tools");
-    SessionFixture fallback;
-    fallback.Done(json::array({fallback.Item()}));
-    Check(fallback.calls.size() == 1, "response.done output fallback works without argument event");
-    SessionFixture reset;
-    reset.Arguments(); reset.Done(); reset.session.Reset(); reset.session.CompleteTool("c1", {{"ok", true}});
-    Check(reset.Count("conversation.item.create") == 0 && !reset.session.Busy(), "reset invalidates tool results");
 
     std::promise<void> started, release;
     auto waiting = release.get_future().share();
@@ -518,7 +328,7 @@ int main() {
       results = executor.Poll(); std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     Check(executed == 2 && results.size() == 1 && results.front().call.id == "new", "cancellation drops queued work and stale in-flight result");
-    std::cout << "Voice tool dispatch, protocol, search parsing and cancellation tests passed\n";
+    std::cout << "Voice tool dispatch, search parsing and cancellation tests passed\n";
     return 0;
   } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

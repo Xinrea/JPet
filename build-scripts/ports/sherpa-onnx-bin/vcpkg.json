@@ -1,0 +1,8 @@
+{
+  "name": "sherpa-onnx-bin",
+  "version": "1.13.8",
+  "description": "Prebuilt sherpa-onnx C API with its ONNX Runtime 1.28.2 (CPU, no TTS), loaded by JPet at run time",
+  "homepage": "https://github.com/k2-fsa/sherpa-onnx",
+  "license": "Apache-2.0 AND MIT",
+  "supports": "(windows & x64) | (osx & arm64)"
+}

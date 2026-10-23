@@ -63,6 +63,7 @@ find_package(cryptopp CONFIG REQUIRED)
 find_package(croncpp CONFIG REQUIRED)
 find_package(semver CONFIG REQUIRED)
 find_package(unofficial-webrtc-audio-processing CONFIG REQUIRED)
+find_package(unofficial-sherpa-onnx-bin CONFIG REQUIRED)
 find_path(TOMLPLUSPLUS_INCLUDE_DIR toml++/toml.hpp REQUIRED)
 if(WIN32)
   find_package(unofficial-wintoast CONFIG REQUIRED)
@@ -235,6 +236,8 @@ target_link_libraries(${APP_NAME}
   semver::semver
   Threads::Threads
   OpenGL::GL
+  unofficial::sherpa-onnx-bin::headers
+  ${CMAKE_DL_LIBS}
 )
 
 # Specify include directories.
@@ -264,6 +267,19 @@ if(MSVC)
     debug -NODEFAULTLIB:libcmtd.lib optimized -NODEFAULTLIB:libcmt.lib)
 endif()
 
+# sherpa-onnx and ONNX Runtime are loaded at run time (src/VoiceOnnx.cpp,
+# src/VoiceSpeech.cpp); ship them with the app.
+if(APPLE)
+  add_custom_command(TARGET ${APP_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:${APP_NAME}>/Frameworks"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHERPA_ONNX_BIN_RUNTIMES} "$<TARGET_BUNDLE_CONTENT_DIR:${APP_NAME}>/Frameworks"
+    VERBATIM)
+else()
+  add_custom_command(TARGET ${APP_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHERPA_ONNX_BIN_RUNTIMES} "$<TARGET_FILE_DIR:${APP_NAME}>"
+    VERBATIM)
+endif()
+
 # Copy resource directory to build directory, except for panel
 
 if(APPLE)
@@ -275,7 +291,7 @@ if(NOT EXISTS "${RES_PATH}/panel/dist/index.html")
   message(FATAL_ERROR "Build the settings panel first: cd resources/panel && npm ci && npm run build")
 endif()
 
-foreach(DIRECTORY audios imgs circle-menu joi panel/dist updater)
+foreach(DIRECTORY audios imgs circle-menu joi models panel/dist updater)
   string(REPLACE "/" "_" DIRECTORY_TARGET "${DIRECTORY}")
   add_custom_target(${APP_NAME}_resource_${DIRECTORY_TARGET} ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory "${APP_RESOURCES}/${DIRECTORY}"
@@ -327,19 +343,13 @@ option(JPET_BUILD_UPDATE_TESTS "Build release selection and checksum tests" OFF)
 option(JPET_BUILD_VOICE_TESTS "Build voice conversation protocol tests" OFF)
 if(JPET_BUILD_VOICE_TESTS)
   enable_testing()
-  add_executable(powerlive_account_test tests/powerlive_account_test.cpp src/PowerLiveAccount.cpp)
-  set_target_properties(powerlive_account_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
-  target_include_directories(powerlive_account_test PRIVATE src)
-  target_compile_options(powerlive_account_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
-  target_link_libraries(powerlive_account_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads cpr::cpr OpenSSL::Crypto)
-  add_test(NAME powerlive_account COMMAND powerlive_account_test)
-  add_executable(voice_session_test tests/voice_session_test.cpp src/VoiceSession.cpp)
-  set_target_properties(voice_session_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
-  target_include_directories(voice_session_test PRIVATE src)
-  target_compile_options(voice_session_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
-  target_link_libraries(voice_session_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
-  add_test(NAME voice_session COMMAND voice_session_test)
-  add_executable(voice_tools_test tests/voice_tools_test.cpp src/VoiceTools.cpp src/VoiceSession.cpp)
+  add_executable(voice_common_test tests/voice_common_test.cpp src/VoiceCommon.cpp)
+  set_target_properties(voice_common_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_common_test PRIVATE src)
+  target_compile_options(voice_common_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_common_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
+  add_test(NAME voice_common COMMAND voice_common_test)
+  add_executable(voice_tools_test tests/voice_tools_test.cpp src/VoiceTools.cpp src/VoiceCommon.cpp)
   set_target_properties(voice_tools_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
   target_include_directories(voice_tools_test PRIVATE src)
   target_compile_options(voice_tools_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
@@ -351,6 +361,27 @@ if(JPET_BUILD_VOICE_TESTS)
   target_compile_options(voice_echo_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
   target_link_libraries(voice_echo_test PRIVATE unofficial::webrtc-audio-processing::webrtc-audio-processing)
   add_test(NAME voice_echo COMMAND voice_echo_test)
+  add_executable(voice_turn_test tests/voice_turn_test.cpp src/VoiceTurn.cpp src/VoiceOnnx.cpp)
+  set_target_properties(voice_turn_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_turn_test PRIVATE src)
+  target_compile_options(voice_turn_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_turn_test PRIVATE unofficial::sherpa-onnx-bin::headers ${CMAKE_DL_LIBS})
+  add_test(NAME voice_turn COMMAND voice_turn_test "${RES_PATH}/models")
+  set_tests_properties(voice_turn PROPERTIES ENVIRONMENT "JPET_ONNXRUNTIME_PATH=${SHERPA_ONNX_BIN_ONNXRUNTIME}")
+  add_executable(voice_cascade_test tests/voice_cascade_test.cpp src/VoiceCascade.cpp src/VoiceLlm.cpp
+    src/VoiceText.cpp src/VoiceTurn.cpp src/VoiceOnnx.cpp src/VoiceCommon.cpp)
+  set_target_properties(voice_cascade_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_cascade_test PRIVATE src)
+  target_compile_options(voice_cascade_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_cascade_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads cpr::cpr
+    unofficial::sherpa-onnx-bin::headers ${CMAKE_DL_LIBS})
+  add_test(NAME voice_cascade COMMAND voice_cascade_test)
+  add_executable(voice_models_test tests/voice_models_test.cpp src/VoiceModels.cpp)
+  set_target_properties(voice_models_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_models_test PRIVATE src)
+  target_compile_options(voice_models_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_models_test PRIVATE nlohmann_json::nlohmann_json cpr::cpr httplib::httplib OpenSSL::Crypto Threads::Threads)
+  add_test(NAME voice_models COMMAND voice_models_test)
   if(APPLE)
     add_executable(voice_audio_mac_test tests/voice_audio_mac_test.mm)
     set_target_properties(voice_audio_mac_test PROPERTIES
@@ -367,10 +398,15 @@ if(JPET_BUILD_VOICE_TESTS)
     target_compile_options(voice_desktop_mac_test PRIVATE -fobjc-arc)
     target_link_libraries(voice_desktop_mac_test PRIVATE "-framework AppKit" "-framework ImageIO" "-weak_framework ScreenCaptureKit" objc)
     add_test(NAME voice_desktop_mac COMMAND voice_desktop_mac_test)
+    # Opt-in benchmark: needs a downloaded SenseVoice model, so it is not a CTest test.
+    add_executable(voice_speech_probe tests/voice_speech_probe.cpp src/VoiceSpeech.cpp src/VoiceOnnx.cpp)
+    set_target_properties(voice_speech_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+    target_include_directories(voice_speech_probe PRIVATE src)
+    target_link_libraries(voice_speech_probe PRIVATE unofficial::sherpa-onnx-bin::headers ${CMAKE_DL_LIBS})
     option(JPET_BUILD_VOICE_NETWORK_PROBE "Build opt-in read-only voice tool integration probe (uses configured accounts)" OFF)
     if(JPET_BUILD_VOICE_NETWORK_PROBE)
       add_executable(voice_tools_network_probe tests/voice_tools_network_probe.mm src/VoiceToolsNetwork.cpp
-        src/VoiceTools.cpp src/VoiceSession.cpp src/VoiceDesktopMac.mm)
+        src/VoiceTools.cpp src/VoiceCommon.cpp src/VoiceDesktopMac.mm)
       set_target_properties(voice_tools_network_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests"
         OBJCXX_STANDARD 17 OBJCXX_STANDARD_REQUIRED ON)
       target_include_directories(voice_tools_network_probe PRIVATE src ${TOMLPLUSPLUS_INCLUDE_DIR})
