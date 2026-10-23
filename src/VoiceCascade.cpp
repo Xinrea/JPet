@@ -5,9 +5,6 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
-#include <cstdio>
-#include <cstring>
-#include <random>
 
 namespace Voice {
 namespace {
@@ -16,22 +13,11 @@ constexpr uint64_t MaxStreamSamples = InputRate * 55;  // Manual commits stay un
 constexpr size_t ContextMessages = 40;
 constexpr int MaxRounds = 8;
 
-std::string NewTaskId() {
-  static std::mt19937_64 random{std::random_device{}()};
-  const uint64_t a = random(), b = random();
-  char text[40];
-  std::snprintf(text, sizeof(text), "%08x-%04x-4%03x-%04x-%012llx", unsigned(a >> 32), unsigned((a >> 16) & 0xffff),
-      unsigned(a & 0xfff), unsigned(0x8000 | ((b >> 48) & 0x3fff)), static_cast<unsigned long long>(b & 0xffffffffffffULL));
-  return text;
-}
-
 std::string Trimmed(const std::string& text) {
   const auto first = text.find_first_not_of(" \t\r\n");
   if (first == std::string::npos) return {};
   return text.substr(first, text.find_last_not_of(" \t\r\n") - first + 1);
 }
-
-std::string Host(const std::string& workspace) { return "wss://" + workspace + ".cn-beijing.maas.aliyuncs.com"; }
 }  // namespace
 
 const nlohmann::json& CascadeCatalog() {
@@ -39,25 +25,7 @@ const nlohmann::json& CascadeCatalog() {
     {"chat_models", {
       {{"id", "qwen-plus"}, {"name", "通义千问 Plus（推荐）"}},
       {{"id", "qwen-flash"}, {"name", "通义千问 Flash · 更快"}},
-      {{"id", "qwen-max"}, {"name", "通义千问 Max · 更强"}}}},
-    // Companion and assistant voices from the CosyVoice voice list.
-    {"tts_models", {
-      {{"id", "cosyvoice-v3-flash"}, {"name", "CosyVoice v3 Flash（推荐）"}, {"voices", {
-        {{"id", "longanhuan"}, {"name", "龙安欢 · 元气活泼"}},
-        {{"id", "longanhuan_v3"}, {"name", "龙安欢 v3 · 元气活泼，支持方言"}},
-        {{"id", "longhua_v3"}, {"name", "龙华 · 元气甜美"}},
-        {{"id", "longanrou_v3"}, {"name", "龙安柔 · 温柔闺蜜"}},
-        {{"id", "longanqin_v3"}, {"name", "龙安亲 · 亲和活泼"}},
-        {{"id", "longanya_v3"}, {"name", "龙安雅 · 优雅"}},
-        {{"id", "longyingling_v3"}, {"name", "龙应聆 · 温暖共情"}},
-        {{"id", "longyingtao_v3"}, {"name", "龙应桃 · 温柔淡定"}},
-        {{"id", "longyingmu_v3"}, {"name", "龙应沐 · 优雅知性"}},
-        {{"id", "longanyang"}, {"name", "龙安洋 · 阳光男声"}},
-        {{"id", "longanzhi_v3"}, {"name", "龙安智 · 睿智成熟男声"}},
-        {{"id", "longyingxun_v3"}, {"name", "龙应询 · 青涩男声"}}}}},
-      {{"id", "cosyvoice-v3-plus"}, {"name", "CosyVoice v3 Plus · 更自然"}, {"voices", {
-        {{"id", "longanhuan"}, {"name", "龙安欢 · 元气活泼"}},
-        {{"id", "longanyang"}, {"name", "龙安洋 · 阳光男声"}}}}}}}};
+      {{"id", "qwen-max"}, {"name", "通义千问 Max · 更强"}}}}};
   return catalog;
 }
 
@@ -65,15 +33,6 @@ bool ValidChatModel(const std::string& model) {
   return !model.empty() && model.size() <= 128 && std::all_of(model.begin(), model.end(), [](unsigned char c) {
     return std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == ':' || c == '/';
   });
-}
-
-bool ValidTtsVoice(const std::string& model, const std::string& voice) {
-  for (const auto& entry : CascadeCatalog()["tts_models"]) {
-    if (entry["id"] != model) continue;
-    const auto& voices = entry["voices"];
-    return std::any_of(voices.begin(), voices.end(), [&](const auto& item) { return item["id"] == voice; });
-  }
-  return false;
 }
 
 
@@ -141,9 +100,9 @@ class Pipeline::LocalWorker {
 
 Pipeline::Pipeline(CascadeConfig config, Callbacks callbacks, nlohmann::json tools,
                    std::unique_ptr<TurnAnalyzer> analyzer, std::unique_ptr<ChatBackend> chat,
-                   Transcriber transcribe, bool threadedRecognition)
+                   std::unique_ptr<Synthesizer> synthesizer, Transcriber transcribe, bool threadedRecognition)
     : config_(std::move(config)), callbacks_(std::move(callbacks)), tools_(std::move(tools)),
-      analyzer_(std::move(analyzer)), chat_(std::move(chat)),
+      analyzer_(std::move(analyzer)), chat_(std::move(chat)), synthesizer_(std::move(synthesizer)),
       local_(std::make_unique<LocalWorker>(std::move(transcribe), threadedRecognition)) {}
 
 Pipeline::~Pipeline() = default;
@@ -168,7 +127,7 @@ bool Pipeline::BotBusy() const { return replyActive_ || (callbacks_.isPlaying &&
 bool Pipeline::WaitingForReply() const {
   const bool pendingInput = std::any_of(commits_.begin(), commits_.end(), [](const Commit& c) { return !c.tentative; });
   return listen_ != Listen::Active && (pendingInput || (replyActive_ &&
-      (chatActive_ || !pendingTools_.empty() || task_ != Task::None || !queued_.empty())));
+      (chatActive_ || !pendingTools_.empty() || synthesizing_ || !queued_.empty())));
 }
 
 bool Pipeline::Busy() const { return inputOpen_ || streaming_ || !commits_.empty() || replyActive_; }
@@ -300,7 +259,6 @@ void Pipeline::StartReply(const std::string& text) {
   Record(ConversationEvent::Type::UserTranscript, text);
   messages_.push_back({{"role", "user"}, {"content", text}});
   TrimContext();
-  EnsureSynthesis();
   if (callbacks_.transcript) callbacks_.transcript("");
   RequestChat();
 }
@@ -389,7 +347,7 @@ void Pipeline::TrimContext() {
   }
 }
 
-// ---- Synthesis (CosyVoice, one task per sentence) ---------------------------
+// ---- Synthesis (local, one sentence at a time) ---------------------------------
 
 void Pipeline::Speak(const std::string& sentence) {
   segments_.push_back({sentence, round_});
@@ -397,55 +355,15 @@ void Pipeline::Speak(const std::string& sentence) {
   StartSynthesis();
 }
 
-void Pipeline::EnsureSynthesis() {
-  if (synthesis_ != Link::Closed) return;
-  // Sends wait for the handshake in the platform layer; there is no session event.
-  synthesis_ = Link::Ready;
-  callbacks_.connect(SynthesisChannel, Host(config_.workspace) + "/api-ws/v1/inference", config_.apiKey);
-}
-
 void Pipeline::StartSynthesis() {
-  if (task_ != Task::None || queued_.empty()) return;
-  EnsureSynthesis();
+  if (synthesizing_ || queued_.empty()) return;
   taskSegment_ = queued_.front();
   queued_.pop_front();
-  taskId_ = NewTaskId();
-  task_ = Task::Starting;
-  carry_.clear();
-  callbacks_.send(SynthesisChannel, {
-    {"header", {{"action", "run-task"}, {"task_id", taskId_}, {"streaming", "duplex"}}},
-    {"payload", {{"task_group", "audio"}, {"task", "tts"}, {"function", "SpeechSynthesizer"}, {"model", config_.ttsModel},
-      {"parameters", {{"text_type", "PlainText"}, {"voice", config_.ttsVoice}, {"format", "pcm"},
-                      {"sample_rate", ReplySampleRate}, {"volume", 50}, {"rate", 1}, {"pitch", 1}}},
-      {"input", nlohmann::json::object()}}}});
+  synthesizing_ = true;
+  synthesizer_->Speak(++taskId_, segments_[taskSegment_].text);
 }
 
-void Pipeline::OnSynthesis(const nlohmann::json& event) {
-  if (!event.contains("header") || !event["header"].is_object()) return;
-  const auto& header = event["header"];
-  if (header.value("task_id", std::string{}) != taskId_ || task_ == Task::None) return;
-  const auto name = header.value("event", std::string{});
-  if (name == "task-started" && task_ == Task::Starting) {
-    task_ = Task::Running;
-    const auto continueTask = [&](const char* action, nlohmann::json input) {
-      callbacks_.send(SynthesisChannel, {{"header", {{"action", action}, {"task_id", taskId_}, {"streaming", "duplex"}}},
-                                         {"payload", {{"input", std::move(input)}}}});
-    };
-    continueTask("continue-task", {{"text", segments_[taskSegment_].text}});
-    continueTask("finish-task", nlohmann::json::object());
-  } else if (name == "task-finished" || name == "task-failed") {
-    if (name == "task-failed") Log("synthesis failed code=" + header.value("error_code", std::string{}));
-    task_ = Task::None;
-    StartSynthesis();
-  }
-}
-
-void Pipeline::OnAudio(const std::string& bytes) {
-  if (task_ == Task::None) return;
-  auto pcm = carry_ + bytes;
-  carry_.clear();
-  if (pcm.size() % 2) { carry_ = pcm.substr(pcm.size() - 1); pcm.pop_back(); }
-  if (pcm.empty()) return;
+void Pipeline::OnAudio(const std::string& pcm) {
   auto& segment = segments_[taskSegment_];
   if (!segment.started) { segment.started = true; segment.start = enqueued_; }
   segment.samples += pcm.size() / 2;
@@ -476,13 +394,8 @@ void Pipeline::Interrupt() {
   chat_->Cancel();
   chatActive_ = false;
   queued_.clear();
-  if (task_ != Task::None) {
-    // CosyVoice has no cancel and its audio frames carry no task id: reconnect.
-    callbacks_.disconnect(SynthesisChannel);
-    synthesis_ = Link::Closed;
-    task_ = Task::None;
-    EnsureSynthesis();
-  }
+  synthesizer_->Cancel();
+  synthesizing_ = false;
   if (!pendingTools_.empty()) {
     if (callbacks_.interruptTools) callbacks_.interruptTools();
     for (const auto& id : pendingTools_) {
@@ -527,8 +440,8 @@ void Pipeline::Reset(bool failed) {
   commits_.clear();
   queued_.clear();
   pendingTools_.clear();
-  task_ = Task::None;
-  synthesis_ = Link::Closed;
+  synthesizer_->Cancel();
+  synthesizing_ = false;
   if (analyzer_) analyzer_->Reset();
   local_->Reset();
   localAudio_.clear();
@@ -536,23 +449,6 @@ void Pipeline::Reset(bool failed) {
 }
 
 // ---- Event plumbing ------------------------------------------------------------
-
-void Pipeline::Receive(const Event& event) {
-  if (event.channel == SynthesisChannel && event.type == Event::Type::Binary) { OnAudio(event.data); return; }
-  if (event.channel != SynthesisChannel) return;
-  if (event.type == Event::Type::Error) {
-    Log("synthesis connection lost");
-    synthesis_ = Link::Closed;
-    if (task_ != Task::None) {
-      task_ = Task::None;
-      StartSynthesis();  // Reconnects and continues with the next sentence.
-    }
-    return;
-  }
-  if (event.type != Event::Type::Message) return;
-  const auto message = nlohmann::json::parse(event.data, nullptr, false);
-  if (message.is_object()) OnSynthesis(message);
-}
 
 bool Pipeline::Tick() {
   bool progressed = false;
@@ -582,9 +478,20 @@ bool Pipeline::Tick() {
     OnTranscript(Trimmed(result.text), tentative);
   }
   for (const auto& event : chat_->Poll()) { progressed = true; OnChat(event); }
+  for (auto& output : synthesizer_->Poll()) {
+    if (!synthesizing_ || output.id != taskId_) continue;
+    progressed = true;
+    if (!output.pcm.empty()) OnAudio(output.pcm);
+    if (!output.done) continue;
+    synthesizing_ = false;
+    if (output.error.empty()) continue;
+    Log("synthesis failed");
+    FinishReply(ConversationEvent::Type::Failed);
+    Status(inputOpen_ ? "listening" : "idle", output.error);
+  }
   StartSynthesis();
   if (replyActive_ && !chatActive_ && pendingTools_.empty() && roundDone_ && queued_.empty() &&
-      task_ == Task::None && !(callbacks_.isPlaying && callbacks_.isPlaying())) {
+      !synthesizing_ && !(callbacks_.isPlaying && callbacks_.isPlaying())) {
     FinishReply(ConversationEvent::Type::Completed);
     if (listen_ != Listen::Active) Status(inputOpen_ ? "listening" : "idle");
     progressed = true;

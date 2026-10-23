@@ -4,7 +4,7 @@
 
 - **听**：本机判断说话轮次（Silero VAD + Smart Turn），本机识别语音（SenseVoice），语音不离开电脑。
 - **想**：大模型生成回复并调用工具，默认使用百炼，也可以填写任意 OpenAI 兼容接口。
-- **说**：百炼 CosyVoice 按句合成，边生成边播放。
+- **说**：本机 Qwen3-TTS 用轴伊的声音按句合成，边生成边播放。
 
 ```
 麦克风 16 kHz ──▶ AEC3（Windows）──▶ Silero VAD ──▶ Smart Turn v3 ──┐
@@ -14,18 +14,17 @@
      工具执行 ◀──── tool_calls ◀──── 大模型流式输出 ◀────┘
         │ 结果                             │ 文字，按句切分
         └──────▶ 再次请求大模型            ▼
-                               CosyVoice（每句一个任务）──▶ 24 kHz PCM ──▶ 扬声器
+                          Qwen3-TTS（本机，每句一次）──▶ 24 kHz PCM ──▶ 扬声器
 ```
 
 ## 设置
 
 在「对话 → 语音对话设置」中：
 
-1. **下载本机语音识别模型**（约 237 MB，只需一次）。下载后语音只在本机识别。
-2. 填写北京地域的**百炼 API Key 和业务空间 ID**。用于语音合成、网页搜索、查看桌面，以及未填写接口地址时的大模型。
+1. **下载本机语音模型**（识别约 237 MB、合成约 1.28 GB，只需一次）。下载后语音识别和轴伊的声音合成都在本机进行。
+2. 填写北京地域的**百炼 API Key 和业务空间 ID**。用于网页搜索、查看桌面，以及未填写接口地址时的大模型。
 3. **大模型**：默认 `qwen-plus`，可选或填写其他模型名。填写「大模型接口地址」后改用该 OpenAI 兼容接口（如 DeepSeek、本机 Ollama），
    并需填写该接口的 API Key；地址必须是 HTTPS，本机地址可用 HTTP，不能包含账号信息。
-4. **语音合成**：CosyVoice v3 Flash（默认）或 v3 Plus，以及轴伊的音色（默认龙安欢）。业务空间需开通所选模型。
 
 两个 API Key 都只写不读，保存在 macOS 钥匙串或 Windows 凭据管理器中，不上传到 JPet 云端。保存设置后，下一次对话生效。
 
@@ -37,9 +36,9 @@
   - 本机轮次检测模型无法加载时，开关模式退化为「按一下开始、再按一下发送」。
 - 轴伊说话时检测到的语音先视为「试探」：本机每 0.5 秒识别一次已说内容，识别出至少 2 个字且与正在播放的回复不同时才打断，
   避免外放的回声把轴伊自己打断；整句只是回复的回声时直接丢弃。
-- 打断时停止播放、取消大模型请求、重连合成服务并取消未完成的工具；上下文只保留已经播出的句子（当前句按播放比例截取）。
+- 打断时停止播放、取消大模型请求和本机合成，并取消未完成的工具；上下文只保留已经播出的句子（当前句按播放比例截取）。
 - 宠物窗口不需要获得焦点；录音、思考、执行工具和回复状态显示在宠物附近。首次在 Mac 使用需要允许麦克风权限。
-- 同一连接保留对话上下文（最近 40 条消息）；麦克风关闭且空闲两分钟后断开，并释放识别模型占用的内存。
+- 同一连接保留对话上下文（最近 40 条消息）；麦克风关闭且空闲两分钟后断开，并释放识别和合成模型占用的内存。
 
 ## 本机识别与轮次检测
 
@@ -50,7 +49,7 @@
 | SenseVoice-Small int8 | 语音识别：普通话、粤语、英、日、韩，带标点与数字规整 | 按需下载，sherpa-onnx 导出（2025-09-09） |
 
 - 模型下载到资料目录的 `models/sensevoice-int8-2025-09-09/`，逐个文件校验大小与 SHA-256，校验通过后写入 `verified` 标记。
-  目前依次尝试 Hugging Face 与 hf-mirror.com；正式发布应改为 JPet 自己的 CDN。
+  目前依次尝试 Hugging Face 与 hf-mirror.com；正式发布应改为 JPet 自己的 CDN。识别与合成模型在设置中作为一组下载、取消和删除。
 - 三个模型共用随 JPet 分发的 sherpa-onnx 1.13.8 与 ONNX Runtime 1.28.2（均在运行时加载，最低 macOS 11）。
 - 识别在独立线程中进行；识别器在第一轮识别时加载（约 1 秒），加载后峰值内存约 560 MB。
 
@@ -67,13 +66,36 @@ Apple M2 Max 上的识别实测（`voice_speech_probe`，识别使用 2 个线�
 
 合成语音不能代表真人录音，结果只用于比较趋势；真实准确率还需要用真人录音验证。
 
+## 本机语音合成
+
+轴伊的声音由 [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) 12Hz 0.6B Base（Apache-2.0）在本机合成，
+通过 [qwentts.cpp](https://github.com/ServeurpersoCom/qwentts.cpp)（MIT，GGML）运行：
+
+| 项目 | 说明 |
+| --- | --- |
+| 模型 | `qwen-talker-0.6b-base-Q8_0.gguf`（947 MB）与 `qwen-tokenizer-12hz-Q8_0.gguf`（278 MB），来自 [Serveurperso/Qwen3-TTS-GGUF](https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF) 固定版本 `b7ee2e8`，下载到 `models/qwen3-tts-0.6b-base-q8_0/` 并校验 SHA-256 |
+| 音色 | 随安装包分发 `resources/models/joi-voice.json`：一段 8 秒轴伊录音提取的说话人向量和编码，加上该段文字，用于上下文克隆；不包含原始录音 |
+| 运行库 | `libqwen.dylib` / `qwen.dll` 与 GGML，在运行时加载；由 [`build-scripts/ports/qwentts`](../build-scripts/ports/qwentts) 固定版本构建 |
+| macOS | 单个 `libqwen.dylib`，GGML 静态链接，用 Metal 计算；需要 macOS 12 或更新版本 |
+| Windows | GGML 以模块形式随 `qwen.dll` 分发：有 Vulkan 驱动时用显卡，否则按 CPU 指令集选择 CPU 版本；构建机需安装 Vulkan SDK |
+
+- 开始对话时在独立线程加载模型（约 0.5 秒）并合成一句预热语音（约 1.4 秒，用于构建 GPU 管线），与用户说话同时进行。
+- 每句一次合成，流式输出；开头和结尾的静音被裁掉（分别保留 100 ms 与 200 ms），句内停顿保留。
+  每句最多生成「每字 0.4 秒 + 2 秒」的音频，防止采样失控。
+- 合成前把阿拉伯数字改写成中文读法（`1,250` → 一千二百五十、`30%` → 百分之三十、`2026年` → 二零二六年、`8:05` → 八点零五分），
+  模型自身没有文本规整。
+- 打断时取消当前句，取消在一帧（约 80 ms）内生效；被取消的句子不会再播出。
+- 合成失败（模型损坏、内存不足等）时结束本次回复并提示「轴伊的声音暂时无法合成」；运行库无法加载或系统版本过低时开始对话前即提示。
+
+Apple M2 Max（Metal）实测：每句开始出声约 0.2–0.4 秒，合成速度约为播放速度的 2.6 倍（RTF 0.38），
+对话期间进程内存增加约 2.6 GB。M2 Max 的 CPU 上 RTF 约 1.05，无法实时，因此 CPU 合成只能作为没有显卡时的退路。
+
 ## 大模型与合成
 
 - 默认请求 `https://{业务空间}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions`（流式，`enable_thinking=false`）。
   系统提示要求回复适合朗读、不用 Markdown，一般不超过三句话；单条回复最多 1024 token。
 - 回复按中英文句末标点切句；第一句在 6 个字以上的逗号处即可切出，以缩短首句等待。链接和 Markdown 符号不朗读。
-- CosyVoice 不支持取消任务，音频帧也不带任务标识，因此每句使用一个任务（`run-task` → `continue-task` → `finish-task`），
-  在同一连接上顺序执行，并据此记录每句的音频区间，用于计算打断时已播出的文字。合成速度快于播放，后续句子的任务开销被播放时间掩盖。
+- 句子按顺序逐句合成，并据此记录每句的音频区间，用于计算打断时已播出的文字。合成速度快于播放，后一句的合成被前一句的播放时间掩盖。
 
 ## 对话记录
 
@@ -160,19 +182,23 @@ AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量�
 | 测试 | 内容 |
 | --- | --- |
 | `voice_common` | 凭据与业务空间校验、Base64、快捷键状态、对话记录、事件队列 |
-| `voice_cascade` | 切句、SSE 解析、一轮完整对话、按句合成、回声与真实打断、只保留已播出文字、工具续答、按住说话 |
+| `voice_cascade` | 切句、数字读法、SSE 解析、一轮完整对话、按句合成、回声与真实打断、只保留已播出文字、合成失败、工具续答、按住说话 |
+| `voice_synthesis` | 静音裁剪、每句帧数上限、音色文件读写与随包音色的维度 |
 | `voice_turn` | VAD 状态机、Whisper 特征、Silero 与 Smart Turn 实际模型（Mac 用系统语音合成测试音频） |
-| `voice_models` | 模型下载：镜像回退、哈希校验失败、取消与重新下载 |
+| `voice_models` | 模型下载：镜像回退、哈希校验失败、取消与重新下载，识别与合成模型的合并状态 |
 | `voice_echo` | AEC3 回声衰减、单讲与双讲时近端语音保留，以及无参考信号时的对照 |
 | `voice_tools` | 工具参数、云端操作映射、搜索解析、取消 |
 
 `python3 tests/voice_panel_smoke_test.py` 使用临时资料目录测试原生启动、设置接口、持久化与参数校验，不写入 API Key。
 `build/macos-arm64/tests/voice_speech_probe <模型目录> [test_wavs 目录]` 在本机测量识别延迟与字错率。
+设置 `JPET_QWENTTS_PATH` 为 qwentts 运行库后，`voice_synthesis_probe <合成模型目录> resources/models/joi-voice.json [输出目录]`
+测量每句开始出声的时间与 RTF；`voice_synthesis_probe reference <合成模型目录> <24 kHz 单声道 wav> <文字> <来源说明> <输出.json>`
+从一段录音重新生成音色文件。
 
 macOS 可额外启用 `JPET_BUILD_VOICE_NETWORK_PROBE=ON`，手动运行
 `build/macos-arm64/tests/voice_tools_network_probe "JPet资料目录"`：只读打开游戏数据库，验证 B 站搜索、
 联网搜索和合成图片的视觉请求，不修改游戏数据、不获取实际桌面截图、不打印凭据；加 `--bilibili-only` 只检查 B 站搜索。
 
 语音诊断记录在用户数据目录的 `jpet.log`，以 `[Voice]` 为前缀：采集时长、RMS 与峰值，轮次结束时的 Smart Turn 概率，
-识别模型加载耗时，回声丢弃与打断，合成任务失败码，工具调用名称与结果大小。日志不保存 API Key、音频内容或对话文本。
+识别与合成模型加载耗时，每句合成开始出声的时间与总耗时，回声丢弃与打断，合成失败码，工具调用名称与结果大小。日志不保存 API Key、音频内容或对话文本。
 Mac 数据目录默认为 `~/Library/Application Support/JPet/`。

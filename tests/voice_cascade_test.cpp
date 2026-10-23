@@ -14,7 +14,6 @@
 namespace {
 using nlohmann::json;
 using Voice::ChatEvent;
-using Voice::Event;
 
 void Check(bool condition, const char* description) {
   if (!condition) throw std::runtime_error(description);
@@ -30,6 +29,15 @@ struct FakeChat final : Voice::ChatBackend {
   }
   void Cancel() override { ++cancels; pending.clear(); }
   std::vector<ChatEvent> Poll() override { auto events = std::move(pending); pending.clear(); return events; }
+};
+
+struct FakeSynthesizer final : Voice::Synthesizer {
+  std::vector<std::pair<uint64_t, std::string>> spoken;
+  std::vector<Output> pending;
+  int cancels = 0;
+  void Speak(uint64_t id, const std::string& text) override { spoken.emplace_back(id, text); }
+  void Cancel() override { ++cancels; pending.clear(); }
+  std::vector<Output> Poll() override { auto outputs = std::move(pending); pending.clear(); return outputs; }
 };
 
 std::string Tone(double seconds, double amplitude = 8000) {
@@ -49,12 +57,10 @@ float LoudVad(const float* frame) {
 
 struct Fixture {
   FakeChat* chat = nullptr;
-  std::vector<std::pair<int, std::string>> connects;
-  std::vector<int> disconnects;
-  std::vector<std::pair<int, json>> sent;
+  FakeSynthesizer* synth = nullptr;
   std::vector<Voice::ToolCall> tools;
   std::vector<Voice::ConversationEvent> history;
-  std::string played, state;
+  std::string played, state, message;
   bool playing = false;
   uint64_t heard = 0;
   int stops = 0;
@@ -67,20 +73,15 @@ struct Fixture {
   explicit Fixture(bool handsFree = true, bool threaded = false) {
     auto fake = std::make_unique<FakeChat>();
     chat = fake.get();
-    Voice::CascadeConfig config{"ws-1", "bailian-key", "https://chat.example/v1/chat/completions", "chat-key", "qwen-plus",
-                                true, "cosyvoice-v3-flash", "longanhuan"};
+    auto fakeSynth = std::make_unique<FakeSynthesizer>();
+    synth = fakeSynth.get();
+    Voice::CascadeConfig config{"https://chat.example/v1/chat/completions", "chat-key", "qwen-plus", true};
     Voice::Pipeline::Callbacks callbacks{
-      [this](int channel, const std::string& url, const std::string& key) {
-        Check(key == "bailian-key", "synthesis uses the Bailian key");
-        connects.emplace_back(channel, url);
-      },
-      [this](int channel) { disconnects.push_back(channel); },
-      [this](int channel, const json& message) { sent.emplace_back(channel, message); },
       [this](const std::string& pcm) { played += pcm; playing = true; },
       [this] { return playing; },
       [this] { return heard; },
       [this] { ++stops; playing = false; heard = 0; },
-      [this](const std::string& value, const std::string&) { state = value; },
+      [this](const std::string& value, const std::string& text) { state = value; message = text; },
       [](const std::string&) {},
       [this](const std::vector<Voice::ToolCall>& calls) { tools.insert(tools.end(), calls.begin(), calls.end()); },
       [this](const Voice::ConversationEvent& event) { history.push_back(event); },
@@ -90,15 +91,13 @@ struct Fixture {
     if (handsFree) analyzer = std::make_unique<Voice::TurnAnalyzer>(std::make_unique<Voice::TurnDetector>(
         LoudVad, [](const std::vector<int16_t>&) { return 0.9f; }), false);
     pipeline = std::make_unique<Voice::Pipeline>(config, callbacks, json::array({{{"type", "function"}, {"function", {{"name", "get_game_profile"}}}}}),
-        std::move(analyzer), std::move(fake), [this](const std::string& pcm) {
+        std::move(analyzer), std::move(fake), std::move(fakeSynth), [this](const std::string& pcm) {
           std::lock_guard<std::mutex> lock(mutex);
           transcribed.push_back(pcm.size());
           return next;
         }, threaded);
   }
   void Hear(const std::string& text) { std::lock_guard<std::mutex> lock(mutex); next = text; }
-  void Receive(int channel, const json& message) { pipeline->Receive({Event::Type::Message, message.dump(), channel}); pipeline->Tick(); }
-  void Audio(size_t samples) { pipeline->Receive({Event::Type::Binary, std::string(samples * 2, '\1'), Voice::SynthesisChannel}); }
   void Say(const std::string& pcm) {
     for (size_t offset = 0; offset < pcm.size(); offset += 640) { pipeline->AppendInput(pcm.substr(offset, 640)); pipeline->Tick(); }
   }
@@ -108,23 +107,12 @@ struct Fixture {
     Say(Tone(1.0));
     Say(Tone(0.4, 0));
   }
-  size_t Count(int channel, const std::string& action) const {
-    size_t count = 0;
-    for (const auto& [c, message] : sent)
-      if (c == channel && message.contains("header") && message["header"].value("action", std::string{}) == action) ++count;
-    return count;
-  }
-  json Last(int channel, const std::string& action) const {
-    for (auto it = sent.rbegin(); it != sent.rend(); ++it)
-      if (it->first == channel && it->second.contains("header") && it->second["header"]["action"] == action) return it->second;
-    return nullptr;
-  }
-  // Runs one synthesis task: started, audio, finished.
+  // Finishes the sentence being synthesised: its audio, then the end.
   void Synthesize(size_t samples) {
-    const auto task = Last(Voice::SynthesisChannel, "run-task")["header"]["task_id"];
-    Receive(Voice::SynthesisChannel, {{"header", {{"event", "task-started"}, {"task_id", task}}}});
-    Audio(samples);
-    Receive(Voice::SynthesisChannel, {{"header", {{"event", "task-finished"}, {"task_id", task}}}});
+    const auto id = synth->spoken.back().first;
+    synth->pending.push_back({id, std::string(samples * 2, '\1')});
+    synth->pending.push_back({id, {}, true});
+    pipeline->Tick();
   }
   void Stream(std::vector<std::string> deltas, std::vector<Voice::ToolCall> calls = {}) {
     for (auto& delta : deltas) chat->pending.push_back({ChatEvent::Type::Text, delta, {}, {}});
@@ -146,6 +134,12 @@ void Text() {
   Check(Voice::PrefixFraction("今天是晴天", 0.4) == "今天" && Voice::CodePoints("晴天ok") == 4, "UTF-8 aware prefixes");
   Check(Voice::LooksLikeEcho("今天是晴天", "好的，今天是个晴天。") && !Voice::LooksLikeEcho("等一下", "好的，今天是个晴天。"),
       "echo matches the reply text, not new speech");
+  Check(Voice::SpokenNumbers("你有1250点经验，排第12名，音量30%，进度2.5倍") == "你有一千二百五十点经验，排第十二名，音量百分之三十，进度二点五倍",
+        "numbers are written as they are read");
+  Check(Voice::SpokenNumbers("1,250,000人，100000，10050，105，0，007") == "一百二十五万人，十万，一万零五十，一百零五，零，零零七",
+        "groups of 万, inner zeros and digit strings");
+  Check(Voice::SpokenNumbers("2026年8:05和12:30、9:00，Qwen3") == "二零二六年八点零五分和十二点三十分、九点，Qwen三",
+        "years read digit by digit, clock times");
 }
 
 void Parser() {
@@ -172,7 +166,7 @@ void Parser() {
 void Conversation() {
   Fixture f;
   f.pipeline->BeginInput(false);
-  Check(f.connects.empty(), "opening the microphone connects nothing: recognition is local");
+  Check(f.synth->spoken.empty(), "opening the microphone starts nothing");
   f.Say(Tone(0.5, 0));
   Check(f.transcribed.empty(), "silence is not transcribed");
   f.Turn("今天天气怎么样");
@@ -182,18 +176,14 @@ void Conversation() {
   Check(body["stream"] == true && body["enable_thinking"] == false && body["tools"].size() == 1 &&
         body["messages"][0]["role"] == "system" && body["messages"][1] == json({{"role", "user"}, {"content", "今天天气怎么样"}}),
         "the chat request carries the prompt, tools and the user's words");
-  Check(f.connects.size() == 1 && f.connects[0].first == Voice::SynthesisChannel &&
-        f.connects[0].second == "wss://ws-1.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference", "synthesis connects with the reply");
 
   f.Stream({"好的，今天", "是晴天。明天", "可能下雨。"});
-  auto run = f.Last(Voice::SynthesisChannel, "run-task");
-  Check(run["payload"]["model"] == "cosyvoice-v3-flash" && run["payload"]["parameters"]["voice"] == "longanhuan" &&
-        run["payload"]["parameters"]["format"] == "pcm" && run["payload"]["parameters"]["sample_rate"] == 24000,
-        "sentences become CosyVoice tasks");
+  Check(f.synth->spoken.size() == 1 && f.synth->spoken[0].second == "好的，今天是晴天。",
+        "the first complete sentence is synthesised right away, alone");
   f.Synthesize(4800);
-  Check(f.Last(Voice::SynthesisChannel, "continue-task")["payload"]["input"]["text"] == "好的，今天是晴天。" &&
-        f.played.size() == 9600 && f.state == "speaking", "the first sentence plays as soon as it is synthesised");
-  Check(f.Count(Voice::SynthesisChannel, "run-task") == 2, "the next sentence starts after the previous task finishes");
+  Check(f.played.size() == 9600 && f.state == "speaking", "the first sentence plays as soon as it is synthesised");
+  Check(f.synth->spoken.size() == 2 && f.synth->spoken[1].second == "明天可能下雨。",
+        "the next sentence starts after the previous one finishes");
   f.Synthesize(2400);
   f.pipeline->Tick();
   Check(f.pipeline->WaitingForReply() == false && f.pipeline->Busy(), "the reply stays active while audio plays");
@@ -206,15 +196,19 @@ void Conversation() {
   f.Stream({"从前有一座山，山里有座庙。", "庙里有个老和尚。"});
   f.Synthesize(4800);
   f.heard = 2400;  // Half of the first sentence was heard.
-  const auto disconnects = f.disconnects.size();
+  const int cancels = f.synth->cancels;
   const int before = f.stops;
   f.Hear("从前有一座山");
   f.Say(Tone(0.8));
   Check(f.stops == before, "speech matching the reply is treated as echo and does not interrupt");
   f.Hear("等一下");
   f.Say(Tone(0.6));
-  Check(f.stops == before + 1 && f.chat->cancels > 0 && f.disconnects.size() == disconnects + 1 &&
-        f.disconnects.back() == Voice::SynthesisChannel, "a partial transcript that is not echo interrupts playback, chat and synthesis");
+  Check(f.stops == before + 1 && f.chat->cancels > 0 && f.synth->cancels == cancels + 1,
+        "a partial transcript that is not echo interrupts playback, chat and synthesis");
+  const auto played = f.played.size();
+  f.synth->pending.push_back({f.synth->spoken.back().first, std::string(960, '\1')});
+  f.pipeline->Tick();
+  Check(f.played.size() == played, "late audio of the interrupted sentence is not played");
   f.Say(Tone(0.4, 0));
   const auto& messages = f.chat->requests.back()["messages"];
   // The first segment "从前有一座山，" was half played: three of its seven characters.
@@ -239,6 +233,19 @@ void Conversation() {
   const auto& round = f.chat->requests.back()["messages"];
   Check(round[round.size() - 2]["tool_calls"][0]["id"] == "call_9" && round.back()["role"] == "tool" &&
         round.back()["tool_call_id"] == "call_9", "the follow-up request includes the call and its result");
+}
+
+void SynthesisFailure() {
+  Fixture f;
+  f.pipeline->BeginInput(false);
+  f.Turn("你好");
+  f.Stream({"你好呀。我是轴伊。"});
+  f.synth->pending.push_back({f.synth->spoken.back().first, {}, true, "轴伊的声音暂时无法合成，请稍后重试"});
+  f.pipeline->Tick();
+  Check(f.history.back().type == Voice::ConversationEvent::Type::Failed && f.synth->spoken.size() == 1 &&
+        f.state == "listening" && f.message == "轴伊的声音暂时无法合成，请稍后重试",
+        "a synthesis failure ends the reply with a readable message");
+  Check(!f.pipeline->WaitingForReply(), "a failed reply waits for nothing");
 }
 
 void WorkerThread() {
@@ -273,6 +280,7 @@ int main() {
     Text();
     Parser();
     Conversation();
+    SynthesisFailure();
     WorkerThread();
     PushToTalk();
     std::cout << "PASS voice cascade pipeline\n";

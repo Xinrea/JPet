@@ -88,6 +88,20 @@ int main() {
       store.Download();
       Check(Wait(store) == "ready", "a cancelled download can start again");
     }
+    {
+      using json = nlohmann::json;
+      const json ready = {{"state", "ready"}, {"received", 10}, {"total", 10}, {"error", ""}};
+      const json missing = {{"state", "missing"}, {"received", 0}, {"total", 30}, {"error", ""}};
+      const json failed = {{"state", "failed"}, {"received", 5}, {"total", 30}, {"error", "下载失败"}};
+      const json downloading = {{"state", "downloading"}, {"received", 7}, {"total", 30}, {"error", ""}};
+      const auto Combine = Voice::SpeechModelStore::Combine;
+      Check(Combine({ready, ready})["state"] == "ready", "both models ready");
+      Check(Combine({ready, missing}) == json({{"state", "missing"}, {"received", 10}, {"total", 40}, {"error", ""}}),
+            "a missing model makes the set missing and progress adds up");
+      Check(Combine({failed, missing}) == json({{"state", "failed"}, {"received", 5}, {"total", 60}, {"error", "下载失败"}}),
+            "a failure is reported with its message");
+      Check(Combine({failed, downloading})["state"] == "downloading", "a download in progress wins");
+    }
     server.stop();
     listener.join();
     std::filesystem::remove_all(directory);

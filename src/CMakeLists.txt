@@ -35,6 +35,8 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceOnnx.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSpeech.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSpeech.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSynthesis.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSynthesis.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceModels.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceModels.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceHistory.hpp

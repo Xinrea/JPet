@@ -63,9 +63,10 @@ def main(gui=False, app=APP):
                 raise RuntimeError("Panel server did not start")
             assert code == 200 and config["has_api_key"] is False and "api_key" not in config
             assert config["input_mode"] == "toggle" and config["chat_model"] == "qwen-plus" and config["chat_base_url"] == ""
-            assert config["tts_model"] == "cosyvoice-v3-flash" and config["tts_voice"] == "longanhuan"
-            assert {model["id"] for model in config["catalog"]["tts_models"]} == {"cosyvoice-v3-flash", "cosyvoice-v3-plus"}
-            assert not {"provider", "model", "voice", "engine", "cascade", "stt"} & config.keys()
+            assert {model["id"] for model in config["catalog"]["chat_models"]} == {"qwen-plus", "qwen-flash", "qwen-max"}
+            # Speech is synthesised on this machine in Joi's voice: no synthesis model or voice to choose.
+            assert not {"provider", "model", "voice", "engine", "cascade", "stt", "tts_model", "tts_voice"} & config.keys()
+            assert "tts_models" not in config["catalog"]
             # Mode can be saved before credentials are configured.
             assert request(port, "/api/config/voice", {"input_mode": "hold"})[1]["input_mode"] == "hold"
             for invalid_mode in ["", "invalid", None, 123, False]:
@@ -79,7 +80,8 @@ def main(gui=False, app=APP):
             voice = request(port, "/api/voice")[1]
             assert voice["microphone_on"] is False and voice["input_mode"] == "hold" and voice["model"] == "qwen-plus"
             assert set(voice["available_tools"]) == {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "get_game_rank", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"}
-            assert voice["speech_model"]["state"] == "missing" and voice["speech_model"]["total"] > 200_000_000
+            # Recognition (SenseVoice) and synthesis (Qwen3-TTS) download as one model set.
+            assert voice["speech_model"]["state"] == "missing" and voice["speech_model"]["total"] > 1_500_000_000
             code, history = request(port, "/api/voice/history")
             assert code == 200 and history == {"list": [], "limit": 200, "error": ""}
             # These requests never create a credential in the real keychain.
@@ -88,16 +90,14 @@ def main(gui=False, app=APP):
             for invalid in [{"workspace_id": "evil.example"}, {"workspace_id": 123},
                             {"workspace_id": "ws-123", "api_key": "sk-x\r\nInjected: yes"},
                             {"chat_api_key": "key with spaces"}, {"chat_base_url": "http://example.com/v1"},
-                            {"chat_base_url": "https://user:pw@example.com"}, {"chat_model": "bad model"},
-                            {"tts_model": "cosyvoice-v9"}, {"tts_model": "cosyvoice-v3-plus", "tts_voice": "longhua_v3"}]:
+                            {"chat_base_url": "https://user:pw@example.com"}, {"chat_model": "bad model"}]:
                 assert request(port, "/api/config/voice", invalid)[0] == 400, invalid
             assert request(port, "/api/config/voice", {"workspace_id": "ws-123"}, "text/plain")[0] == 403
+            # Fields of the removed CosyVoice synthesis are ignored, not errors.
             code, saved = request(port, "/api/config/voice", {"chat_model": "deepseek-chat", "chat_base_url": "https://api.deepseek.com/v1",
                                                               "tts_model": "cosyvoice-v3-plus", "tts_voice": "longanyang"})
             assert code == 200 and saved["chat_model"] == "deepseek-chat" and saved["chat_base_url"] == "https://api.deepseek.com/v1"
-            assert saved["tts_voice"] == "longanyang" and saved["has_chat_api_key"] is False and saved["workspace_id"] == "ws-123"
-            code, saved = request(port, "/api/config/voice", {"tts_model": "cosyvoice-v3-flash"})
-            assert code == 200 and saved["tts_voice"] == "longanyang", "a voice offered by the new model is kept"
+            assert "tts_voice" not in saved and saved["has_chat_api_key"] is False and saved["workspace_id"] == "ws-123"
             assert request(port, "/api/voice")[1]["model"] == "deepseek-chat"
             code, model = request(port, "/api/voice/speech-model", {"action": "cancel"})
             assert code == 200 and model["state"] == "missing"
@@ -105,7 +105,7 @@ def main(gui=False, app=APP):
             assert request(port, "/api/voice/speech-model", {"action": "download"}, "text/plain")[0] == 403
             contents = Path(profile, "jpet.toml").read_text()
             assert re.search(r'^\s*input_mode\s*=\s*[\"\']hold[\"\']', contents, re.MULTILINE)
-            assert re.search(r'^\s*tts_voice\s*=\s*[\"\']longanyang[\"\']', contents, re.MULTILINE)
+            assert not re.search(r'^\s*tts_(model|voice)\s*=', contents, re.MULTILINE)
             assert "workspace_id" in contents and not re.search(r"^\s*(api_key|chat_api_key|provider|engine)\s*=", contents, re.MULTILINE)
             output, errors = process.communicate(timeout=10)
             if process.returncode:

@@ -22,6 +22,10 @@ class SentenceSplitter {
 
 // Removes Markdown markup and links, which a voice should not read aloud.
 std::string Speakable(const std::string& text);
+// Writes Arabic numerals the way they are read in Chinese ("1,250" -> 一千二百五十,
+// "30%" -> 百分之三十, "2026年" -> 二零二六年, "8:05" -> 八点零五分), since the
+// synthesis model has no text normalization of its own.
+std::string SpokenNumbers(const std::string& text);
 // UTF-8 safe prefix holding `fraction` of the text's code points.
 std::string PrefixFraction(const std::string& text, double fraction);
 size_t CodePoints(const std::string& text);

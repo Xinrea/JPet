@@ -9,8 +9,9 @@
 #include <vector>
 
 namespace Voice {
-// Downloads the local SenseVoice recognition model on demand into the profile
-// directory, verifying each file's size and SHA-256 before it is used.
+// Downloads a local voice model (speech recognition or synthesis) on demand
+// into the profile directory, verifying each file's size and SHA-256 before it
+// is used.
 class SpeechModelStore {
  public:
   struct File { const char* name; uint64_t size; const char* sha256; };
@@ -25,8 +26,14 @@ class SpeechModelStore {
   // {state: missing|downloading|ready|failed, received, total, error}
   nlohmann::json Status() const;
 
+  // SenseVoice-Small for speech recognition.
   static const std::vector<File>& Files();
   static std::vector<std::string> DefaultMirrors();
+  // Qwen3-TTS 0.6B Base (talker, then codec) for speech synthesis.
+  static const std::vector<File>& SynthesisFiles();
+  static std::vector<std::string> SynthesisMirrors();
+  // One status for several stores that the settings present as one download.
+  static nlohmann::json Combine(const std::vector<nlohmann::json>& statuses);
 
  private:
   void Run(uint64_t generation);

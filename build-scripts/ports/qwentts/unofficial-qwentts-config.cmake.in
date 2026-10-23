@@ -1,0 +1,10 @@
+get_filename_component(_qwentts_prefix "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+if(NOT TARGET unofficial::qwentts::headers)
+  add_library(unofficial::qwentts::headers INTERFACE IMPORTED)
+  set_target_properties(unofficial::qwentts::headers PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${_qwentts_prefix}/include")
+endif()
+# Shared libraries to ship with the application; JPet loads them at run time.
+set(QWENTTS_RUNTIMES "@runtimes@")
+set(QWENTTS_LIBRARY "${_qwentts_prefix}/@destination@/@library@")
+unset(_qwentts_prefix)

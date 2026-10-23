@@ -1,0 +1,19 @@
+{
+  "name": "qwentts",
+  "version-date": "2026-10-16",
+  "description": "qwentts.cpp (Qwen3-TTS on GGML) built as a shared C library, loaded by JPet at run time",
+  "homepage": "https://github.com/ServeurpersoCom/qwentts.cpp",
+  "license": "MIT",
+  "supports": "(windows & x64) | (osx & arm64)",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    }
+  ],
+  "features": {
+    "vulkan": {
+      "description": "GGML Vulkan backend (Windows); needs the Vulkan SDK on the build machine"
+    }
+  }
+}

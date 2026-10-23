@@ -8,7 +8,7 @@
 struct GLFWwindow;
 
 namespace Voice {
-// WebSocket channels; speech synthesis is the only network stream today.
+// WebSocket channels. None is opened today: speech synthesis runs on this machine.
 constexpr int SynthesisChannel = 0, Channels = 1;
 constexpr int LocalChannel = -1;  // Microphone, playback and other local events.
 

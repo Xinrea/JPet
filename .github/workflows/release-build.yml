@@ -94,6 +94,21 @@ jobs:
       - name: Create binary cache directory
         shell: bash
         run: mkdir -p build/vcpkg-cache
+      - name: Install Vulkan SDK
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VULKAN_VERSION: 1.4.328.1
+          VULKAN_SHA256: a8675df6d538079c2a719a9373994948091db785b48f142e024254e76348d16c
+        run: |
+          # Speech synthesis (qwentts) uses GGML's Vulkan backend on Windows.
+          $installer = "$env:RUNNER_TEMP/VulkanSDK-Installer.exe"
+          curl.exe -fsSL -o $installer "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash -ne $env:VULKAN_SHA256) { throw "Vulkan SDK installer checksum mismatch" }
+          & $installer --accept-licenses --default-answer --confirm-command install
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\Bin"
       - name: Configure Windows
         if: runner.os == 'Windows'
         shell: pwsh

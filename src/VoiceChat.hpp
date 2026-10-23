@@ -25,9 +25,10 @@ class VoiceChat {
     return history_.Clear();
   }
   bool IsBusy() const;
-  // Local speech recognition model: download, cancel or remove it.
+  // Local speech recognition and synthesis models, managed as one download:
+  // download, cancel or remove them.
   bool SpeechModelAction(const std::string& action, std::string& error);
-  nlohmann::json SpeechModelStatus() { return ModelStore().Status(); }
+  nlohmann::json SpeechModelStatus();
 
  private:
   using Clock = std::chrono::steady_clock;
@@ -42,7 +43,7 @@ class VoiceChat {
   bool StartPipeline(const std::string& workspace, const std::string& key);
   void PlayReply(const std::string& pcm);
   void SubmitTools(const std::vector<Voice::ToolCall>& calls);
-  Voice::SpeechModelStore& ModelStore();
+  std::vector<Voice::SpeechModelStore*> ModelStores();  // Recognition, synthesis.
   std::unique_ptr<Voice::Platform> platform_;
   std::unique_ptr<Voice::ToolExecutor> tools_;
   Voice::History history_;
@@ -52,7 +53,7 @@ class VoiceChat {
   std::unique_ptr<Voice::SmartTurn> smartTurn_;
   std::string turnModelError_;
   std::once_flag modelStoreOnce_;
-  std::unique_ptr<Voice::SpeechModelStore> modelStore_;
+  std::unique_ptr<Voice::SpeechModelStore> recognitionModel_, synthesisModel_;
   // Loaded on the pipeline's recognition worker on first use (about a second).
   std::mutex recognizerMutex_;
   std::unique_ptr<Voice::LocalRecognizer> localRecognizer_;

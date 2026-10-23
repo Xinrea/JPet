@@ -41,7 +41,8 @@ fi
 echo "Building settings panel..."
 (cd "${ROOT_DIR}/resources/panel" && npm run build)
 
-if [[ ! -d "${VCPKG_INSTALLED_DIR}/arm64-osx/share/unofficial-webrtc-audio-processing" ]]; then
+if [[ ! -d "${VCPKG_INSTALLED_DIR}/arm64-osx/share/unofficial-webrtc-audio-processing" ||
+      ! -d "${VCPKG_INSTALLED_DIR}/arm64-osx/share/unofficial-qwentts" ]]; then
   echo "Installing C++ dependencies..."
   "${VCPKG_DIR}/vcpkg" install \
     --triplet arm64-osx \

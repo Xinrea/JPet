@@ -64,6 +64,7 @@ find_package(croncpp CONFIG REQUIRED)
 find_package(semver CONFIG REQUIRED)
 find_package(unofficial-webrtc-audio-processing CONFIG REQUIRED)
 find_package(unofficial-sherpa-onnx-bin CONFIG REQUIRED)
+find_package(unofficial-qwentts CONFIG REQUIRED)
 find_path(TOMLPLUSPLUS_INCLUDE_DIR toml++/toml.hpp REQUIRED)
 if(WIN32)
   find_package(unofficial-wintoast CONFIG REQUIRED)
@@ -237,6 +238,7 @@ target_link_libraries(${APP_NAME}
   Threads::Threads
   OpenGL::GL
   unofficial::sherpa-onnx-bin::headers
+  unofficial::qwentts::headers
   ${CMAKE_DL_LIBS}
 )
 
@@ -267,16 +269,17 @@ if(MSVC)
     debug -NODEFAULTLIB:libcmtd.lib optimized -NODEFAULTLIB:libcmt.lib)
 endif()
 
-# sherpa-onnx and ONNX Runtime are loaded at run time (src/VoiceOnnx.cpp,
-# src/VoiceSpeech.cpp); ship them with the app.
+# sherpa-onnx, ONNX Runtime and qwentts are loaded at run time (src/VoiceOnnx.cpp,
+# src/VoiceSpeech.cpp, src/VoiceSynthesis.cpp); ship them with the app.
 if(APPLE)
   add_custom_command(TARGET ${APP_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:${APP_NAME}>/Frameworks"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHERPA_ONNX_BIN_RUNTIMES} "$<TARGET_BUNDLE_CONTENT_DIR:${APP_NAME}>/Frameworks"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHERPA_ONNX_BIN_RUNTIMES} ${QWENTTS_RUNTIMES}
+      "$<TARGET_BUNDLE_CONTENT_DIR:${APP_NAME}>/Frameworks"
     VERBATIM)
 else()
   add_custom_command(TARGET ${APP_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHERPA_ONNX_BIN_RUNTIMES} "$<TARGET_FILE_DIR:${APP_NAME}>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHERPA_ONNX_BIN_RUNTIMES} ${QWENTTS_RUNTIMES} "$<TARGET_FILE_DIR:${APP_NAME}>"
     VERBATIM)
 endif()
 
@@ -374,8 +377,25 @@ if(JPET_BUILD_VOICE_TESTS)
   target_include_directories(voice_cascade_test PRIVATE src)
   target_compile_options(voice_cascade_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
   target_link_libraries(voice_cascade_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads cpr::cpr
-    unofficial::sherpa-onnx-bin::headers ${CMAKE_DL_LIBS})
+    unofficial::sherpa-onnx-bin::headers unofficial::qwentts::headers ${CMAKE_DL_LIBS})
   add_test(NAME voice_cascade COMMAND voice_cascade_test)
+  add_executable(voice_synthesis_test tests/voice_synthesis_test.cpp src/VoiceSynthesis.cpp src/VoiceOnnx.cpp
+    src/VoiceCommon.cpp src/VoiceText.cpp)
+  set_target_properties(voice_synthesis_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_synthesis_test PRIVATE src)
+  target_compile_options(voice_synthesis_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_synthesis_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads
+    unofficial::sherpa-onnx-bin::headers unofficial::qwentts::headers ${CMAKE_DL_LIBS})
+  add_test(NAME voice_synthesis COMMAND voice_synthesis_test "${RES_PATH}/models/joi-voice.json")
+  # Opt-in tool: needs the downloaded synthesis model, so it is not a CTest test.
+  # Run with JPET_QWENTTS_PATH set to the qwentts library (QWENTTS_LIBRARY).
+  add_executable(voice_synthesis_probe tests/voice_synthesis_probe.cpp src/VoiceSynthesis.cpp src/VoiceModels.cpp
+    src/VoiceOnnx.cpp src/VoiceCommon.cpp src/VoiceText.cpp)
+  set_target_properties(voice_synthesis_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_synthesis_probe PRIVATE src)
+  target_compile_options(voice_synthesis_probe PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_synthesis_probe PRIVATE nlohmann_json::nlohmann_json Threads::Threads cpr::cpr OpenSSL::Crypto
+    unofficial::sherpa-onnx-bin::headers unofficial::qwentts::headers ${CMAKE_DL_LIBS})
   add_executable(voice_models_test tests/voice_models_test.cpp src/VoiceModels.cpp)
   set_target_properties(voice_models_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
   target_include_directories(voice_models_test PRIVATE src)

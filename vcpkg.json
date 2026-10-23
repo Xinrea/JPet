@@ -27,6 +27,16 @@
     {
       "name": "sherpa-onnx-bin",
       "platform": "(windows & x64) | (osx & arm64)"
+    },
+    {
+      "name": "qwentts",
+      "features": [
+        {
+          "name": "vulkan",
+          "platform": "windows"
+        }
+      ],
+      "platform": "(windows & x64) | (osx & arm64)"
     }
   ],
   "overrides": [

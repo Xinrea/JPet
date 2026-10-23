@@ -58,6 +58,38 @@ std::vector<std::string> SpeechModelStore::DefaultMirrors() {
   return {"https://huggingface.co" + path, "https://hf-mirror.com" + path};
 }
 
+const std::vector<SpeechModelStore::File>& SpeechModelStore::SynthesisFiles() {
+  // qwentts.cpp GGUF conversions of Qwen3-TTS-12Hz-0.6B-Base, Q8_0.
+  static const std::vector<File> files = {
+    {"qwen-talker-0.6b-base-Q8_0.gguf", 992615488, "d54dbaf10591421fa764ed630d764efa717ae40cd959bd48c66d4eb1af226426"},
+    {"qwen-tokenizer-12hz-Q8_0.gguf", 291150624, "1883beeed99348fc35e23dd225e9082f93f6f8c109330a33d935baa8acdbfd94"},
+  };
+  return files;
+}
+
+std::vector<std::string> SpeechModelStore::SynthesisMirrors() {
+  // Pinned to the revision the bundled qwentts library reads.
+  const std::string path = "/Serveurperso/Qwen3-TTS-GGUF/resolve/b7ee2e8c7459c3bea99da23e3d178125a7d1713c/";
+  return {"https://huggingface.co" + path, "https://hf-mirror.com" + path};
+}
+
+nlohmann::json SpeechModelStore::Combine(const std::vector<nlohmann::json>& statuses) {
+  uint64_t received = 0, total = 0;
+  std::string state = "ready", error;
+  for (const auto& status : statuses) {
+    received += status.value("received", uint64_t{0});
+    total += status.value("total", uint64_t{0});
+    const auto part = status.value("state", std::string{});
+    if (part == "failed" && error.empty()) error = status.value("error", std::string{});
+    // Precedence: downloading, failed, missing, ready.
+    for (const auto* rank : {"downloading", "failed", "missing"}) {
+      if (state == rank) break;
+      if (part == rank) { state = rank; break; }
+    }
+  }
+  return {{"state", state}, {"received", received}, {"total", total}, {"error", error}};
+}
+
 SpeechModelStore::SpeechModelStore(std::string directory, std::vector<std::string> mirrors, std::vector<File> files)
     : directory_(std::move(directory)), mirrors_(std::move(mirrors)), files_(std::move(files)) {
   if (!Installed().empty()) state_ = "ready";
@@ -103,7 +135,7 @@ bool SpeechModelStore::Remove(std::string& error) {
   fs::remove_all(fs::u8path(directory_), code);
   std::lock_guard<std::mutex> lock(mutex_);
   state_ = "missing";
-  if (code) error = "无法删除本地识别模型，请稍后重试";
+  if (code) error = "无法删除本机语音模型，请稍后重试";
   return !code;
 }
 
@@ -163,10 +195,10 @@ void SpeechModelStore::Run(uint64_t generation) {
       received_ = done;
     }
     if (!live()) return;
-    if (!ok) { fail("本地识别模型下载失败，请检查网络后重试"); return; }
+    if (!ok) { fail("本机语音模型下载失败，请检查网络后重试"); return; }
     done += file.size;
   }
-  std::ofstream(root / Marker) << "sensevoice-int8-2025-09-09\n";
+  std::ofstream(root / Marker) << root.filename().u8string() << "\n";
   std::lock_guard<std::mutex> lock(mutex_);
   if (live()) state_ = "ready";
 }

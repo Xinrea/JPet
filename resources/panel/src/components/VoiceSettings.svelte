@@ -7,16 +7,12 @@
   // Credentials are write-only; the API never returns a saved key.
   let voiceInputMode = "toggle";
   const voiceInputModes = [{ value: "toggle", name: "开关 · 全双工" }, { value: "hold", name: "按住 · 半双工" }];
-  // Chat model (free text, optional OpenAI-compatible endpoint) and CosyVoice model and voice.
-  let chatModel = "", chatBaseUrl = "", chatApiKey = "", chatHasKey = false, ttsModel = "", ttsVoice = "", catalog = { chat_models: [], tts_models: [] };
-  $: ttsModelItems = catalog.tts_models.map(model => ({ value: model.id, name: model.name }));
-  $: ttsVoiceItems = (catalog.tts_models.find(model => model.id === ttsModel)?.voices || []).map(voice => ({ value: voice.id, name: voice.name }));
-  // Switching models keeps the voice when offered, otherwise the model's first (default) voice.
-  $: if (ttsVoiceItems.length && !ttsVoiceItems.some(item => item.value === ttsVoice)) ttsVoice = ttsVoiceItems[0].value;
+  // Chat model (free text, optional OpenAI-compatible endpoint).
+  let chatModel = "", chatBaseUrl = "", chatApiKey = "", chatHasKey = false, catalog = { chat_models: [] };
   let voiceApiKey = "", voiceWorkspace = "", voiceHasKey = false;
   let voiceLoading = true, voiceSaving = false, voiceError = "", voiceMessage = "";
   let voiceStatus = null, voiceTimer = null, voiceDisposed = false, voiceRefreshing = false;
-  // Local speech recognition model (SenseVoice), downloaded on demand.
+  // Local speech recognition (SenseVoice) and synthesis (Qwen3-TTS) models, downloaded on demand.
   let modelBusy = false, modelError = "";
   $: speechModel = voiceStatus?.speech_model;
   const megabytes = value => (Number(value || 0) / 1048576).toFixed(0);
@@ -46,7 +42,6 @@
     voiceHasKey = !!settings.has_api_key;
     catalog = settings.catalog || catalog;
     chatModel = settings.chat_model || ""; chatBaseUrl = settings.chat_base_url || ""; chatHasKey = !!settings.has_chat_api_key;
-    ttsModel = settings.tts_model || ""; ttsVoice = settings.tts_voice || "";
   }
   async function loadVoiceSettings() {
     try {
@@ -65,7 +60,7 @@
   async function saveVoiceSettings(clearKey = false, clearChatKey = false) {
     voiceSaving = true; voiceError = ""; voiceMessage = "";
     const payload = { workspace_id: voiceWorkspace.trim(), input_mode: voiceInputMode, chat_model: chatModel.trim(),
-      chat_base_url: chatBaseUrl.trim(), tts_model: ttsModel, tts_voice: ttsVoice };
+      chat_base_url: chatBaseUrl.trim() };
     if (clearKey) payload.clear_api_key = true;
     else if (voiceApiKey.trim()) payload.api_key = voiceApiKey.trim();
     if (clearChatKey) payload.clear_chat_api_key = true;
@@ -116,34 +111,32 @@
 </script>
 
 <div class="voice-settings">
-    <SettingCard title="语音对话" description="快捷键与本机语音识别" icon="mic">
+    <SettingCard title="语音对话" description="快捷键与本机语音模型" icon="mic">
       <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong><p>{#if voiceInputMode === "hold"}按住 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 打断回复并录音，松开后停止录音、播放回复。{:else}按 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 开启或关闭麦克风；开启后可连续对话，说话时可打断回复。{/if}</p></div></div>
       <div class="voice-tool">
-        {#if speechModel?.state === "ready"}<strong>本机语音识别已就绪</strong><p class="setting-help">语音只在本机识别（SenseVoice），不会上传。模型约占 240 MB 磁盘，对话时约占 560 MB 内存，空闲两分钟后释放。</p>
+        {#if speechModel?.state === "ready"}<strong>本机语音模型已就绪</strong><p class="setting-help">你的语音只在本机识别（SenseVoice），轴伊的声音在本机合成（Qwen3-TTS），都不会上传。模型约占 1.5 GB 磁盘，对话时约占 3 GB 内存，空闲两分钟后释放。</p>
           <Button size="xs" color="alternative" on:click={() => speechModelAction("remove")} disabled={modelBusy}>删除模型</Button>
-        {:else if speechModel?.state === "downloading"}<strong>正在下载语音识别模型 {megabytes(speechModel.received)} / {megabytes(speechModel.total)} MB</strong>
+        {:else if speechModel?.state === "downloading"}<strong>正在下载语音模型 {megabytes(speechModel.received)} / {megabytes(speechModel.total)} MB</strong>
           <Button size="xs" color="alternative" on:click={() => speechModelAction("cancel")} disabled={modelBusy}>取消</Button>
-        {:else}<strong>需要先下载本机语音识别模型</strong><p class="setting-help">约 237 MB，下载一次即可，语音只在本机识别。</p>
+        {:else}<strong>需要先下载本机语音模型</strong><p class="setting-help">语音识别与轴伊的声音合成共约 1.5 GB，下载一次即可，都在本机运行。</p>
           {#if speechModel?.error}<p class="feedback error">{speechModel.error}</p>{/if}
           <Button size="xs" on:click={() => speechModelAction("download")} disabled={modelBusy}>下载模型</Button>
         {/if}
         {#if modelError}<p class="feedback error" role="alert">{modelError}</p>{/if}
       </div>
     </SettingCard>
-    <SettingCard title="对话设置" description="快捷键方式、大模型和轴伊的声音" icon="settings">
+    <SettingCard title="对话设置" description="快捷键方式和大模型" icon="settings">
       <div class="setting-field"><label for="voice-input-mode">Option / Ctrl 使用方式</label><Select id="voice-input-mode" items={voiceInputModes} bind:value={voiceInputMode} disabled={voiceLoading || voiceSaving} /></div>
       <div class="setting-field"><label for="voice-api-key">百炼 API Key<span>{voiceHasKey ? "已保存" : "待设置"}</span></label><Input id="voice-api-key" type="password" bind:value={voiceApiKey} placeholder={voiceHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
       <div class="setting-field"><label for="voice-workspace">业务空间 ID</label><Input id="voice-workspace" bind:value={voiceWorkspace} placeholder="填写 API Key 所属的业务空间 ID" autocomplete="off" spellcheck="false" maxlength={63} disabled={voiceLoading || voiceSaving} /></div>
-      <p class="setting-help">北京地域的 API Key 和业务空间，用于语音合成、网页搜索、查看桌面，以及未填写接口地址时的大模型。API Key 保存在本机系统凭据存储中。</p>
+      <p class="setting-help">北京地域的 API Key 和业务空间，用于网页搜索、查看桌面，以及未填写接口地址时的大模型。API Key 保存在本机系统凭据存储中。</p>
       <div class="setting-field"><label for="chat-model">大模型</label><Input id="chat-model" list="chat-models" bind:value={chatModel} placeholder="qwen-plus" autocomplete="off" spellcheck="false" maxlength={128} disabled={voiceLoading || voiceSaving} />
         <datalist id="chat-models">{#each catalog.chat_models as model}<option value={model.id}>{model.name}</option>{/each}</datalist></div>
       <div class="setting-field"><label for="chat-base-url">大模型接口地址<span>可选</span></label><Input id="chat-base-url" bind:value={chatBaseUrl} placeholder="留空使用百炼；或填写 OpenAI 兼容的 Base URL" autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
       {#if chatBaseUrl.trim()}
       <div class="setting-field"><label for="chat-api-key">大模型 API Key<span>{chatHasKey ? "已保存" : "待设置"}</span></label><Input id="chat-api-key" type="password" bind:value={chatApiKey} placeholder={chatHasKey ? "已保存；输入新 Key 可替换" : "该接口的 API Key"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
       {/if}
-      <div class="setting-field"><label for="tts-model">语音合成</label><Select id="tts-model" items={ttsModelItems} bind:value={ttsModel} disabled={voiceLoading || voiceSaving} /></div>
-      <div class="setting-field"><label for="tts-voice">轴伊的音色</label><Select id="tts-voice" items={ttsVoiceItems} bind:value={ttsVoice} disabled={voiceLoading || voiceSaving} /></div>
-      <p class="setting-help">业务空间需开通所选的 CosyVoice 模型；保存后下一次对话生效。</p>
+      <p class="setting-help">保存后下一次对话生效。</p>
       <div class="setting-actions"><Button size="sm" on:click={() => saveVoiceSettings()} disabled={voiceLoading || voiceSaving}>{voiceSaving ? "保存中…" : "保存语音设置"}</Button>{#if voiceHasKey}<Button size="sm" color="alternative" on:click={() => saveVoiceSettings(true)} disabled={voiceLoading || voiceSaving}>移除 Key</Button>{/if}{#if chatHasKey}<Button size="sm" color="alternative" on:click={() => saveVoiceSettings(false, true)} disabled={voiceLoading || voiceSaving}>移除大模型 Key</Button>{/if}</div>
       {#if voiceError}<p class="feedback error" role="alert">{voiceError}</p>{/if}
       {#if voiceMessage}<p class="feedback success" role="status">{voiceMessage}</p>{/if}

@@ -62,25 +62,35 @@ void VoiceChat::SubmitTools(const std::vector<Voice::ToolCall>& calls) {
   lastActivity_ = Clock::now();
 }
 
-Voice::SpeechModelStore& VoiceChat::ModelStore() {
+std::vector<Voice::SpeechModelStore*> VoiceChat::ModelStores() {
   std::call_once(modelStoreOnce_, [this] {
-    modelStore_ = std::make_unique<Voice::SpeechModelStore>(
-        LAppPal::WStringToString(LAppDefine::documentPath) + "/models/sensevoice-int8-2025-09-09",
+    const auto models = LAppPal::WStringToString(LAppDefine::documentPath) + "/models/";
+    recognitionModel_ = std::make_unique<Voice::SpeechModelStore>(models + "sensevoice-int8-2025-09-09",
         Voice::SpeechModelStore::DefaultMirrors());
+    synthesisModel_ = std::make_unique<Voice::SpeechModelStore>(models + "qwen3-tts-0.6b-base-q8_0",
+        Voice::SpeechModelStore::SynthesisMirrors(), Voice::SpeechModelStore::SynthesisFiles());
   });
-  return *modelStore_;
+  return {recognitionModel_.get(), synthesisModel_.get()};
+}
+
+nlohmann::json VoiceChat::SpeechModelStatus() {
+  std::vector<nlohmann::json> statuses;
+  for (auto* store : ModelStores()) statuses.push_back(store->Status());
+  return Voice::SpeechModelStore::Combine(statuses);
 }
 
 bool VoiceChat::SpeechModelAction(const std::string& action, std::string& error) {
-  auto& store = ModelStore();
-  if (action == "download") store.Download();
-  else if (action == "cancel") store.Cancel();
+  const auto stores = ModelStores();
+  if (action == "download") for (auto* store : stores) store->Download();
+  else if (action == "cancel") for (auto* store : stores) store->Cancel();
   else if (action == "remove") {
     if (connected_) { error = "请先结束语音对话再删除模型"; return false; }
     std::lock_guard<std::mutex> lock(recognizerMutex_);
     localRecognizer_.reset();
     recognizerError_.clear();
-    return store.Remove(error);
+    bool removed = true;
+    for (auto* store : stores) removed = store->Remove(error) && removed;
+    return removed;
   } else { error = "未知的模型操作"; return false; }
   return true;
 }
@@ -88,15 +98,21 @@ bool VoiceChat::SpeechModelAction(const std::string& action, std::string& error)
 bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& key) {
   auto* data = DataManager::GetInstance();
   const auto settings = data->GetVoiceSettings();
-  const auto modelDirectory = ModelStore().Installed();
-  if (modelDirectory.empty()) {
-    SetState("error", "本机语音识别模型尚未下载，请在对话 → 语音对话设置中下载");
+  const auto stores = ModelStores();
+  const auto modelDirectory = stores[0]->Installed(), synthesisDirectory = stores[1]->Installed();
+  if (modelDirectory.empty() || synthesisDirectory.empty()) {
+    SetState("error", "本机语音模型尚未下载，请在对话 → 语音对话设置中下载");
+    return false;
+  }
+  std::string synthesisError;
+  Voice::VoiceReference voice;
+  if (!Voice::LocalSynthesisAvailable(synthesisError) || !Voice::LoadVoiceReference(
+          LAppPal::WStringToString(LAppDefine::execPath) + "resources/models/joi-voice.json", voice, synthesisError)) {
+    SetState("error", synthesisError);
     return false;
   }
   const auto profile = LAppPal::WStringToString(LAppDefine::documentPath);
   Voice::CascadeConfig config;
-  config.workspace = workspace;
-  config.apiKey = key;
   config.chatModel = settings.at("chat_model");
   const std::string baseUrl = settings.at("chat_base_url");
   config.bailianChat = baseUrl.empty();
@@ -110,8 +126,6 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
       return false;
     }
   }
-  config.ttsModel = settings.at("tts_model");
-  config.ttsVoice = settings.at("tts_voice");
 
   // Hands-free turns need the local models; without them the shortcut still
   // works as push-to-talk (press to speak, press or release to send).
@@ -131,10 +145,12 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
         [this](const float* frame) { return vad_->Probability(frame); },
         [this](const std::vector<int16_t>& audio) { return smartTurn_->Probability(audio); }));
   }
+  // The synthesis model starts loading now, while the user is still speaking.
+  const auto& files = Voice::SpeechModelStore::SynthesisFiles();
+  auto synthesizer = Voice::MakeLocalSynthesizer(
+      {synthesisDirectory + "/" + files[0].name, synthesisDirectory + "/" + files[1].name}, std::move(voice),
+      [](const std::string& line) { LAppPal::PrintLog("%s", line.c_str()); });
   Voice::Pipeline::Callbacks callbacks{
-    [this](int channel, const std::string& url, const std::string& apiKey) { platform_->Connect(channel, url, apiKey); },
-    [this](int channel) { platform_->Disconnect(channel); },
-    [this](int channel, const nlohmann::json& message) { platform_->Send(channel, message.dump()); },
     [this](const std::string& pcm) { PlayReply(pcm); },
     [this] { return platform_->IsPlaying(); },
     [this] { return platform_->PlayedSamples(); },
@@ -149,7 +165,8 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
     [this] { if (tools_) tools_->Cancel(); Voice::CancelSettingsTools(); },
     [](const std::string& line) { LAppPal::PrintLog("%s", line.c_str()); }};
   pipeline_ = std::make_unique<Voice::Pipeline>(std::move(config), std::move(callbacks), Voice::ToolDefinitions(),
-      std::move(analyzer), std::make_unique<Voice::ChatClient>(), [this, modelDirectory](const std::string& pcm) {
+      std::move(analyzer), std::make_unique<Voice::ChatClient>(), std::move(synthesizer),
+      [this, modelDirectory](const std::string& pcm) {
     std::lock_guard<std::mutex> lock(recognizerMutex_);
     if (!localRecognizer_ && recognizerError_.empty()) {
       const auto start = Clock::now();
@@ -159,9 +176,8 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
     }
     return localRecognizer_ ? localRecognizer_->Transcribe(pcm) : std::string{};
   });
-  LAppPal::PrintLog("[Voice] Connect chat_model=%s custom_chat=%d tts=%s hands_free=%d",
-      settings.at("chat_model").get<std::string>().c_str(), baseUrl.empty() ? 0 : 1,
-      settings.at("tts_model").get<std::string>().c_str(), pipeline_->HandsFree() ? 1 : 0);
+  LAppPal::PrintLog("[Voice] Connect chat_model=%s custom_chat=%d hands_free=%d",
+      settings.at("chat_model").get<std::string>().c_str(), baseUrl.empty() ? 0 : 1, pipeline_->HandsFree() ? 1 : 0);
   if (!pipeline_->HandsFree() && !turnModelError_.empty())
     SetState("connecting", turnModelError_ + "；快捷键改为按一下开始、再按一下发送");
   return true;
@@ -198,7 +214,7 @@ void VoiceChat::SetState(const std::string& state, const std::string& message) {
 
 nlohmann::json VoiceChat::Status() {
   const auto settings = DataManager::GetInstance()->GetVoiceSettings();
-  const auto speechModel = ModelStore().Status();
+  const auto speechModel = SpeechModelStatus();
   std::lock_guard<std::mutex> lock(statusMutex_);
   auto status = status_;
   status["model"] = settings.at("chat_model");
@@ -263,12 +279,7 @@ void VoiceChat::Drain() {
       LAppPal::PrintLog("%s", event.data.c_str());
       continue;
     }
-    // The pipeline recovers from its own synthesis connection.
-    if (event.channel != Voice::LocalChannel) {
-      if (pipeline_) pipeline_->Receive(event);
-      lastActivity_ = Clock::now();
-      continue;
-    }
+    if (event.channel != Voice::LocalChannel) continue;  // No network channel is opened.
     if (event.type == Voice::Event::Type::Error) { Fail(event.data); break; }
     if (event.type != Voice::Event::Type::Microphone || !pipeline_) continue;
     if (event.data.size() % 2) { Fail("轴伊没能听清这段语音，请重新说话"); break; }
@@ -290,9 +301,8 @@ void VoiceChat::Close(bool failed) {
   if (tools_) tools_->Cancel();
   Voice::CancelSettingsTools();
   platform_->StopCapture();
-  platform_->DisconnectAll();
   if (pipeline_) pipeline_->Reset(failed);
-  pipeline_.reset();  // Joins its recognition worker before the model can go.
+  pipeline_.reset();  // Joins its recognition and synthesis workers; the synthesis model goes with it.
   {
     // SenseVoice holds about half a gigabyte; reload it (about a second) next time.
     std::lock_guard<std::mutex> lock(recognizerMutex_);

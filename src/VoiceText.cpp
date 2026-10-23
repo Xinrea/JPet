@@ -31,6 +31,50 @@ bool Punctuation(const std::string& c) {
   return SentenceEnd(c) || Pause(c) || Is(c, {"．", ".", "“", "”", "\"", "‘", "’", "'", "（", "）", "(", ")",
       "《", "》", "—", "-", "~", "～", " ", "\t", "\r"});
 }
+
+constexpr const char* Digits[] = {"零", "一", "二", "三", "四", "五", "六", "七", "八", "九"};
+
+bool IsDigit(const std::string& text, size_t at) { return at < text.size() && text[at] >= '0' && text[at] <= '9'; }
+
+std::string DigitByDigit(const std::string& digits) {
+  std::string out;
+  for (const char d : digits) out += Digits[d - '0'];
+  return out;
+}
+
+// 1..9999 with 零 for inner gaps: 1050 -> 一千零五十.
+std::string Thousands(int n) {
+  constexpr const char* units[] = {"千", "百", "十", ""};
+  std::string out;
+  bool gap = false;
+  for (int i = 0, divisor = 1000; i < 4; ++i, divisor /= 10) {
+    const int d = n / divisor % 10;
+    if (d == 0) { gap = !out.empty(); continue; }
+    if (gap) { out += "零"; gap = false; }
+    out += Digits[d];
+    out += units[i];
+  }
+  return out;
+}
+
+// Up to twelve digits, grouped by 万 and 亿.
+std::string Cardinal(const std::string& digits) {
+  if (digits.size() > 12 || (digits.size() > 1 && digits[0] == '0')) return DigitByDigit(digits);
+  const uint64_t n = std::stoull(digits);
+  if (n == 0) return "零";
+  constexpr const char* groups[] = {"", "万", "亿"};
+  const int sections[] = {int(n % 10000), int(n / 10000 % 10000), int(n / 100000000)};
+  std::string out;
+  bool gap = false;
+  for (int i = 2; i >= 0; --i) {
+    if (sections[i] == 0) { gap = !out.empty(); continue; }
+    if (!out.empty() && (gap || sections[i] < 1000)) out += "零";
+    gap = false;
+    out += Thousands(sections[i]) + groups[i];
+  }
+  if (out.compare(0, 6, "一十") == 0) out.erase(0, 3);  // 12 -> 十二, 100000 -> 十万.
+  return out;
+}
 }  // namespace
 
 size_t CodePoints(const std::string& text) { return Split(text).size(); }
@@ -94,6 +138,46 @@ std::string Speakable(const std::string& text) {
   // A fragment of punctuation only has nothing to say.
   const auto characters = Split(out);
   if (std::all_of(characters.begin(), characters.end(), Punctuation)) return {};
+  return out;
+}
+
+std::string SpokenNumbers(const std::string& text) {
+  std::string out;
+  for (size_t i = 0; i < text.size();) {
+    if (!IsDigit(text, i)) { out += text[i++]; continue; }
+    size_t end = i;
+    while (IsDigit(text, end)) ++end;
+    std::string integer = text.substr(i, end - i);
+    const auto group = [&](char separator) {
+      return end < text.size() && text[end] == separator && IsDigit(text, end + 1) && IsDigit(text, end + 2);
+    };
+    // Clock time: "8:05".
+    if (integer.size() <= 2 && group(':') && !IsDigit(text, end + 3)) {
+      const char tens = text[end + 1], ones = text[end + 2];
+      out += Cardinal(integer) + "点";
+      if (tens != '0') out += Cardinal(std::string{tens, ones}) + "分";
+      else if (ones != '0') out += std::string("零") + Digits[ones - '0'] + "分";
+      i = end + 3;
+      continue;
+    }
+    // Thousands separators: "1,250" and "12,500,000".
+    if (integer.size() <= 3)
+      while (group(',') && IsDigit(text, end + 3) && !IsDigit(text, end + 4)) {
+        integer += text.substr(end + 1, 3);
+        end += 4;
+      }
+    std::string spoken = text.compare(end, 3, "年") == 0 && integer.size() == 4 ? DigitByDigit(integer) : Cardinal(integer);
+    if (end + 1 < text.size() && text[end] == '.' && IsDigit(text, end + 1)) {
+      size_t fraction = end + 1;
+      while (IsDigit(text, fraction)) ++fraction;
+      spoken += "点" + DigitByDigit(text.substr(end + 1, fraction - end - 1));
+      end = fraction;
+    }
+    if (text.compare(end, 1, "%") == 0) { spoken = "百分之" + spoken; end += 1; }
+    else if (text.compare(end, 3, "％") == 0) { spoken = "百分之" + spoken; end += 3; }
+    out += spoken;
+    i = end;
+  }
   return out;
 }
 

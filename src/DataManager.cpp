@@ -132,12 +132,6 @@ nlohmann::json DataManager::GetVoiceSettings() {
   if (!Voice::ValidChatModel(chatModel)) chatModel = Voice::DefaultChatModel;
   auto chatUrl = GetConfig<std::string>("voice", "chat_base_url", "");
   if (!chatUrl.empty() && !Voice::ValidChatBaseUrl(chatUrl)) chatUrl.clear();
-  auto ttsModel = GetConfig<std::string>("voice", "tts_model", Voice::DefaultTtsModel);
-  auto ttsVoice = GetConfig<std::string>("voice", "tts_voice", Voice::DefaultTtsVoice);
-  if (!Voice::ValidTtsVoice(ttsModel, ttsVoice)) {
-    if (!Voice::ValidTtsVoice(ttsModel, Voice::DefaultTtsVoice)) ttsModel = Voice::DefaultTtsModel;
-    ttsVoice = Voice::DefaultTtsVoice;
-  }
   auto inputMode = GetConfig<std::string>("voice", "input_mode", "toggle");
   if (inputMode != "hold") inputMode = "toggle";
   return {{"workspace_id", GetConfig<std::string>("voice", "workspace_id", "")},
@@ -145,7 +139,6 @@ nlohmann::json DataManager::GetVoiceSettings() {
           {"input_mode", inputMode},
           {"chat_model", chatModel}, {"chat_base_url", chatUrl},
           {"has_chat_api_key", GetConfig<bool>("voice", "has_chat_api_key", false)},
-          {"tts_model", ttsModel}, {"tts_voice", ttsVoice},
           {"catalog", Voice::CascadeCatalog()}};
 }
 
@@ -170,7 +163,7 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
     value = Voice::Trim(payload[key].get<std::string>());
     return true;
   };
-  std::string workspace, inputMode, chatModel, chatUrl, ttsModel, ttsVoice;
+  std::string workspace, inputMode, chatModel, chatUrl;
   if (!text("workspace_id", workspace) || (!workspace.empty() && !Voice::ValidWorkspace(workspace))) {
     error = "业务空间 ID 应为 1～63 位字母、数字或连字符，且不能以连字符开头或结尾";
     return false;
@@ -183,13 +176,6 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
   if (!text("chat_base_url", chatUrl) || (!chatUrl.empty() && !Voice::ValidChatBaseUrl(chatUrl))) {
     error = "大模型接口地址需以 https:// 开头（本机地址可用 http://），且不能包含账号信息";
     return false;
-  }
-  const bool voiceGiven = payload.contains("tts_voice");
-  if (!text("tts_model", ttsModel) || !text("tts_voice", ttsVoice)) { error = "语音合成设置格式不正确"; return false; }
-  if (!Voice::ValidTtsVoice(ttsModel, ttsVoice)) {
-    // Switching models keeps the voice when offered, else the default voice.
-    if (voiceGiven || !Voice::ValidTtsVoice(ttsModel, Voice::DefaultTtsVoice)) { error = "请选择有效的语音合成音色"; return false; }
-    ttsVoice = Voice::DefaultTtsVoice;
   }
   // Keys are write-only: a new value replaces the saved one, "clear_*" removes it.
   const auto secret = [&](const char* key, const char* clear, std::string& value, bool& update) {
@@ -210,14 +196,12 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
   if (updateKey && !Voice::SaveApiKey(profile, apiKey, error)) return false;
   if (updateChatKey && !Voice::SaveChatApiKey(profile, chatKey, error)) return false;
   auto& table = VoiceTable();
-  // Settings of the removed Omni engine and JPet Server provider.
-  for (const auto* legacy : {"provider", "model", "voice", "engine", "stt"}) table.erase(legacy);
+  // Settings of the removed Omni engine, JPet Server provider and CosyVoice synthesis.
+  for (const auto* legacy : {"provider", "model", "voice", "engine", "stt", "tts_model", "tts_voice"}) table.erase(legacy);
   table.insert_or_assign("workspace_id", workspace);
   table.insert_or_assign("input_mode", inputMode);
   table.insert_or_assign("chat_model", chatModel);
   table.insert_or_assign("chat_base_url", chatUrl);
-  table.insert_or_assign("tts_model", ttsModel);
-  table.insert_or_assign("tts_voice", ttsVoice);
   if (updateKey) table.insert_or_assign("has_api_key", !apiKey.empty());
   if (updateChatKey) table.insert_or_assign("has_chat_api_key", !chatKey.empty());
   Save();
