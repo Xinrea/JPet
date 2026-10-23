@@ -91,13 +91,8 @@ NSString* Text(const std::string& value) {
   return [[NSString alloc] initWithBytes:value.data() length:value.size() encoding:NSUTF8StringEncoding];
 }
 
-struct MacState : std::enable_shared_from_this<MacState> {
+struct MacState {
   std::shared_ptr<EventQueue> queue = std::make_shared<EventQueue>();
-  struct Channel {
-    NSURLSession* __strong network = nil;
-    NSURLSessionWebSocketTask* __strong socket = nil;
-  };
-  Channel channels[Channels];
   AVAudioEngine* __strong inputEngine = nil;
   AVAudioEngine* __strong outputEngine = nil;
   AVAudioPlayerNode* __strong player = nil;
@@ -110,35 +105,6 @@ struct MacState : std::enable_shared_from_this<MacState> {
   uint64_t playbackGeneration = 0;
   uint64_t scheduledFrames = 0;
   uint64_t completedFrames = 0;
-
-  void Receive(NSURLSessionWebSocketTask* task, int channel, uint64_t generation) {
-    std::weak_ptr<MacState> weak = shared_from_this();
-    [task receiveMessageWithCompletionHandler:^(NSURLSessionWebSocketMessage* message, NSError* error) {
-      @autoreleasepool {
-        const auto state = weak.lock();
-        if (!state || state->queue->connections[channel] != generation) return;
-        if (error) {
-          state->queue->Network(channel, generation, Event::Type::Diagnostic,
-              "[Voice] WebSocket receive failed channel=" + std::to_string(channel) + " code=" +
-              std::to_string(error.code) + " close_code=" + std::to_string(task.closeCode));
-          NSString* description = error.localizedDescription.lowercaseString;
-          const bool auth = [description containsString:@"401"] || [description containsString:@"403"];
-          state->queue->Network(channel, generation, Event::Type::Error, auth
-              ? "语音服务认证失败，请检查北京地域的 API Key、业务空间 ID 和模型权限"
-              : "语音连接已断开，请检查网络和业务空间设置后重试");
-          return;
-        }
-        if (message.type == NSURLSessionWebSocketMessageTypeString && message.string) {
-          const char* utf8 = message.string.UTF8String;
-          if (utf8) state->queue->Network(channel, generation, Event::Type::Message, utf8);
-        } else if (message.type == NSURLSessionWebSocketMessageTypeData && message.data) {
-          state->queue->Network(channel, generation, Event::Type::Binary,
-              std::string(static_cast<const char*>(message.data.bytes), message.data.length));
-        }
-        state->Receive(task, channel, generation);
-      }
-    }];
-  }
 
   void StartInputEngine() {
     if (!captureWanted || tapInstalled) return;
@@ -211,7 +177,6 @@ class MacPlatform final : public Platform {
  public:
   ~MacPlatform() override {
     StopCapture();
-    DisconnectAll();
     StopPlayback();
     [state_->outputEngine stop];
     [state_->indicator orderOut:nil];
@@ -220,44 +185,6 @@ class MacPlatform final : public Platform {
 
   bool ShortcutHeld() const override {
     return ([NSEvent modifierFlags] & NSEventModifierFlagOption) != 0;
-  }
-
-  void Connect(int channel, const std::string& url, const std::string& key) override {
-    Disconnect(channel);
-    auto& target = state_->channels[channel];
-    const auto generation = ++state_->queue->connections[channel];
-    NSURLSessionConfiguration* config = NSURLSessionConfiguration.ephemeralSessionConfiguration;
-    config.timeoutIntervalForRequest = 15;
-    target.network = [NSURLSession sessionWithConfiguration:config];
-    NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:Text(url)]];
-    [request setValue:Text("Bearer " + key) forHTTPHeaderField:@"Authorization"];
-    target.socket = [target.network webSocketTaskWithRequest:request];
-    target.socket.maximumMessageSize = 4 * 1024 * 1024;
-    [target.socket resume];
-    state_->Receive(target.socket, channel, generation);
-  }
-
-  void Disconnect(int channel) override {
-    auto& target = state_->channels[channel];
-    ++state_->queue->connections[channel];
-    [target.socket cancelWithCloseCode:NSURLSessionWebSocketCloseCodeNormalClosure reason:nil];
-    [target.network invalidateAndCancel];
-    target.socket = nil;
-    target.network = nil;
-    state_->queue->Clear(channel);
-  }
-
-  void Send(int channel, const std::string& message) override {
-    const auto generation = state_->queue->connections[channel].load();
-    const auto events = state_->queue;
-    NSURLSessionWebSocketMessage* payload = [[NSURLSessionWebSocketMessage alloc] initWithString:Text(message)];
-    [state_->channels[channel].socket sendMessage:payload completionHandler:^(NSError* error) {
-      if (error) {
-        events->Network(channel, generation, Event::Type::Diagnostic,
-            "[Voice] WebSocket send failed channel=" + std::to_string(channel) + " code=" + std::to_string(error.code));
-        events->Network(channel, generation, Event::Type::Error, "语音发送失败，请检查网络后重试");
-      }
-    }];
   }
 
   void StartCapture() override {

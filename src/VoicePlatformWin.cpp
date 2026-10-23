@@ -4,7 +4,6 @@
 #include "VoiceIndicatorStyle.hpp"
 
 #include <windows.h>
-#include <winhttp.h>
 #include <wincred.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
@@ -13,10 +12,8 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cmath>
-#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -32,11 +29,6 @@ std::wstring Wide(const std::string& value) {
   MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), out.data(), length);
   return out;
 }
-
-struct HttpHandle {
-  HINTERNET value = nullptr;
-  ~HttpHandle() { if (value) WinHttpCloseHandle(value); }
-};
 
 using Microsoft::WRL::ComPtr;
 using AudioClock = std::chrono::steady_clock;
@@ -83,18 +75,8 @@ std::string Hresult(HRESULT hr) {
   return text;
 }
 
-struct NetworkChannel {
-  std::atomic<bool> stopping{true};
-  std::mutex mutex;
-  std::condition_variable changed;
-  HINTERNET socket = nullptr;
-  std::deque<std::string> outgoing;
-  size_t outgoingBytes = 0;
-};
-
 struct WinState {
   std::shared_ptr<EventQueue> queue = std::make_shared<EventQueue>();
-  NetworkChannel channels[Channels];
   // Null when JPET_VOICE_AEC=0, for comparing raw microphone input.
   std::shared_ptr<EchoCanceller> echo;
   std::atomic<bool> captureStop{false}, captureRunning{false};
@@ -113,85 +95,6 @@ struct WinState {
   HFONT titleFont = nullptr;
   HFONT shortcutFont = nullptr;
 };
-
-void Receive(const std::shared_ptr<WinState>& state, int channel, uint64_t generation,
-             const std::string& url, const std::string& key) {
-  auto& net = state->channels[channel];
-  const auto fail = [&](const std::string& message) {
-    state->queue->Network(channel, generation, Event::Type::Error, message);
-  };
-  const std::wstring address = Wide(url);
-  URL_COMPONENTS components{};
-  components.dwStructSize = sizeof(components);
-  components.dwHostNameLength = components.dwUrlPathLength = components.dwExtraInfoLength = static_cast<DWORD>(-1);
-  // WinHTTP cracks HTTPS URLs; the WebSocket upgrade is requested below.
-  const std::wstring https = L"https" + address.substr(3);
-  if (!WinHttpCrackUrl(https.c_str(), 0, 0, &components)) { fail("语音服务地址无效，请检查业务空间 ID"); return; }
-  const std::wstring host(components.lpszHostName, components.dwHostNameLength);
-  const std::wstring path = std::wstring(components.lpszUrlPath, components.dwUrlPathLength) +
-      std::wstring(components.lpszExtraInfo, components.dwExtraInfoLength);
-  HttpHandle session{WinHttpOpen(L"JPet voice", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-      WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)};
-  if (!session.value) { fail("无法初始化语音连接"); return; }
-  WinHttpSetTimeouts(session.value, 15000, 15000, 15000, 15000);
-  HttpHandle connection{WinHttpConnect(session.value, host.c_str(), components.nPort, 0)};
-  HttpHandle request{connection.value ? WinHttpOpenRequest(connection.value, L"GET", path.c_str(),
-      nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE) : nullptr};
-  DWORD disable = WINHTTP_DISABLE_REDIRECTS;
-  if (request.value) WinHttpSetOption(request.value, WINHTTP_OPTION_DISABLE_FEATURE, &disable, sizeof(disable));
-  const std::wstring authorization = L"Authorization: Bearer " + Wide(key) + L"\r\n";
-  if (!request.value || !WinHttpSetOption(request.value, WINHTTP_OPTION_UPGRADE_TO_WEB_SOCKET, nullptr, 0) ||
-      !WinHttpAddRequestHeaders(request.value, authorization.c_str(), static_cast<DWORD>(-1), WINHTTP_ADDREQ_FLAG_ADD) ||
-      !WinHttpSendRequest(request.value, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
-      !WinHttpReceiveResponse(request.value, nullptr)) {
-    fail("语音连接失败，请检查网络和语音服务设置"); return;
-  }
-  DWORD status = 0, length = sizeof(status);
-  WinHttpQueryHeaders(request.value, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-      WINHTTP_HEADER_NAME_BY_INDEX, &status, &length, WINHTTP_NO_HEADER_INDEX);
-  if (status != 101) {
-    fail(status == 401 || status == 403 ? "语音服务认证失败，请检查 API Key、业务空间 ID 和模型权限" :
-        status == 429 ? "语音服务请求过于频繁或额度不足，请稍后重试" : "语音连接失败，请检查业务空间设置");
-    return;
-  }
-  HttpHandle socket{WinHttpWebSocketCompleteUpgrade(request.value, 0)};
-  if (!socket.value) { fail("无法建立语音 WebSocket 连接"); return; }
-  {
-    std::lock_guard<std::mutex> lock(net.mutex);
-    if (net.stopping || state->queue->connections[channel] != generation) return;
-    net.socket = socket.value;
-    socket.value = nullptr;  // Disconnect owns closing this handle.
-  }
-  net.changed.notify_all();
-  std::array<char, 16384> buffer;
-  std::string message, binary;
-  while (!net.stopping && state->queue->connections[channel] == generation) {
-    HINTERNET active;
-    { std::lock_guard<std::mutex> lock(net.mutex); active = net.socket; }
-    if (!active) break;
-    DWORD bytes = 0;
-    WINHTTP_WEB_SOCKET_BUFFER_TYPE type;
-    const auto result = WinHttpWebSocketReceive(active, buffer.data(), static_cast<DWORD>(buffer.size()), &bytes, &type);
-    if (result != NO_ERROR || type == WINHTTP_WEB_SOCKET_CLOSE_BUFFER_TYPE) {
-      fail("语音连接已断开，请按 Ctrl 重新开启麦克风"); break;
-    }
-    if (type == WINHTTP_WEB_SOCKET_UTF8_FRAGMENT_BUFFER_TYPE || type == WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE) {
-      if (message.size() + bytes > 4 * 1024 * 1024) { fail("语音服务返回的消息过大"); break; }
-      message.append(buffer.data(), bytes);
-      if (type == WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE) {
-        state->queue->Network(channel, generation, Event::Type::Message, std::move(message));
-        message.clear();
-      }
-    } else if (type == WINHTTP_WEB_SOCKET_BINARY_FRAGMENT_BUFFER_TYPE || type == WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE) {
-      if (binary.size() + bytes > 4 * 1024 * 1024) { fail("语音服务返回的消息过大"); break; }
-      binary.append(buffer.data(), bytes);
-      if (type == WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE) {
-        state->queue->Network(channel, generation, Event::Type::Binary, std::move(binary));
-        binary.clear();
-      }
-    }
-  }
-}
 
 LRESULT CALLBACK IndicatorProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
   if (message == WM_NCCREATE) {
@@ -295,76 +198,13 @@ class WinPlatform final : public Platform {
     if (!aec || std::strcmp(aec, "0") != 0) state_->echo = std::make_shared<EchoCanceller>();
   }
   ~WinPlatform() override {
-    StopCapture(); DisconnectAll(); StopPlayback(); StopRender();
+    StopCapture(); StopPlayback(); StopRender();
     if (state_->indicator) DestroyWindow(state_->indicator);
     if (state_->font) DeleteObject(state_->font);
     if (state_->titleFont) DeleteObject(state_->titleFont);
     if (state_->shortcutFont) DeleteObject(state_->shortcutFont);
   }
   bool ShortcutHeld() const override { return (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0; }
-
-  void Connect(int channel, const std::string& url, const std::string& key) override {
-    Disconnect(channel);
-    state_->channels[channel].stopping = false;
-    const auto generation = ++state_->queue->connections[channel];
-    const auto state = state_;
-    receiver_[channel] = std::thread([state, channel, generation, url, key] { Receive(state, channel, generation, url, key); });
-    sender_[channel] = std::thread([state, channel, generation] {
-      auto& net = state->channels[channel];
-      while (!net.stopping) {
-        std::unique_lock<std::mutex> lock(net.mutex);
-        net.changed.wait(lock, [&] { return net.stopping || (net.socket && !net.outgoing.empty()); });
-        if (net.stopping) break;
-        auto message = std::move(net.outgoing.front());
-        net.outgoing.pop_front();
-        net.outgoingBytes -= message.size();
-        const auto socket = net.socket;
-        lock.unlock();
-        if (WinHttpWebSocketSend(socket, WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE,
-              message.data(), static_cast<DWORD>(message.size())) != NO_ERROR) {
-          state->queue->Network(channel, generation, Event::Type::Error, "语音发送失败，请检查网络后重试");
-          break;
-        }
-      }
-    });
-  }
-
-  void Disconnect(int channel) override {
-    auto& net = state_->channels[channel];
-    ++state_->queue->connections[channel];
-    net.stopping = true;
-    HINTERNET socket;
-    {
-      std::lock_guard<std::mutex> lock(net.mutex);
-      socket = net.socket;
-      net.socket = nullptr;
-      net.outgoing.clear();
-      net.outgoingBytes = 0;
-    }
-    net.changed.notify_all();
-    if (socket) WinHttpCloseHandle(socket);
-    if (receiver_[channel].joinable()) {
-      // A pending synchronous DNS/TLS handshake cannot be canceled via a
-      // WebSocket handle yet. It owns shared state and has a 15-second timeout;
-      // let it finish off the UI thread. Its generation is already invalidated.
-      if (socket) receiver_[channel].join();
-      else receiver_[channel].detach();
-    }
-    if (sender_[channel].joinable()) sender_[channel].join();
-    state_->queue->Clear(channel);
-  }
-
-  void Send(int channel, const std::string& message) override {
-    auto& net = state_->channels[channel];
-    std::lock_guard<std::mutex> lock(net.mutex);
-    if (net.stopping) return;
-    if (net.outgoingBytes + message.size() > 4 * 1024 * 1024) {
-      state_->queue->Push(Event::Type::Error, "语音网络发送缓慢，请重新说话"); return;
-    }
-    net.outgoingBytes += message.size();
-    net.outgoing.push_back(message);
-    net.changed.notify_all();
-  }
 
   void StartCapture() override {
     if (microphone_.joinable()) {
@@ -605,7 +445,7 @@ class WinPlatform final : public Platform {
   }
 
   std::shared_ptr<WinState> state_ = std::make_shared<WinState>();
-  std::thread receiver_[Channels], sender_[Channels], microphone_, renderer_;
+  std::thread microphone_, renderer_;
   AudioClock::time_point lastAudio_{};
 };
 std::wstring CredentialTarget(const std::string& profile) { return L"JPet/Qwen/" + Wide(profile); }
