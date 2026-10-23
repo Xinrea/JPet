@@ -25,9 +25,67 @@ bool ValidApiKey(const std::string& value) {
       std::all_of(value.begin(), value.end(), [](unsigned char c) { return c >= 33 && c <= 126; });
 }
 
-std::string ConnectionUrl(const std::string& workspace) {
+std::string ConnectionUrl(const std::string& workspace, const std::string& model) {
   if (!ValidWorkspace(workspace)) throw std::invalid_argument("业务空间 ID 格式不正确");
-  return "wss://" + workspace + ".cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime?model=" + Model;
+  if (!ValidModel(model)) throw std::invalid_argument("语音模型不受支持");
+  return "wss://" + workspace + ".cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime?model=" + model;
+}
+
+const nlohmann::json& ModelCatalog() {
+  // Voice support follows the Bailian Qwen-Omni voice list. Only Mandarin, dialect
+  // and Cantonese voices are offered, since Joi answers in Chinese.
+  enum Series { V38 = 1, V35 = 2 };
+  struct VoiceOption { const char *id, *name; int series; };
+  static const VoiceOption voices[] = {
+    {"Tina", "甜甜 · 甜美温暖（默认）", V38 | V35}, {"Cici", "绵绵 · 软糯邻家", V38},
+    {"Liora Mira", "清欢 · 温柔", V38 | V35}, {"Serena", "苏瑶 · 温柔", V38 | V35},
+    {"Mia", "舒然 · 温柔治愈", V38 | V35}, {"Maia", "四月 · 知性温暖", V38 | V35},
+    {"Momo", "茉兔 · 俏皮搞怪", V38 | V35}, {"Sunnybobi", "知芝 · 大大咧咧", V35},
+    {"Cindy", "林欣宜 · 台湾腔俏皮", V38 | V35}, {"Qiao", "小乔妹 · 台湾腔甜美", V38 | V35},
+    {"Angel", "安琪 · 台普甜美", V38 | V35}, {"Katerina", "卡捷琳娜 · 成熟御姐", V38 | V35},
+    {"longanlingxin", "龙安灵心 · 温暖贴心", V38}, {"Theo Calm", "予安 · 沉稳舒缓", V38 | V35},
+    {"Raymond", "林川野 · 明亮少年", V38 | V35}, {"Zane", "泽恩 · 磁性男声", V38},
+    {"Evan", "江晨 · 大学生", V38 | V35}, {"Ethan", "晨煦 · 阳光男声", V35},
+    {"Harvey", "厚 · 低沉温和", V35}, {"Ryan", "甜茶 · 戏感男声", V38 | V35},
+    {"Wil", "伟伦 · 港台腔男声", V38 | V35}, {"Joyner", "阿逗 · 喜剧担当", V38 | V35},
+    {"Li Cassian", "李公公 · 古风角色", V38 | V35}, {"Gold", "金爷 · 说唱风格", V38 | V35},
+    {"Dylan", "晓东 · 北京话", V38 | V35}, {"Peter", "李彼得 · 天津话", V38 | V35},
+    {"Sunny", "晴儿 · 四川话", V38 | V35}, {"Eric", "程川 · 四川话", V38 | V35},
+    {"Marcus", "秦川 · 陕西话", V38 | V35}, {"Li", "老李 · 南京话", V38 | V35},
+    {"Joseph Chen", "阿樸伯 · 闽南语", V38 | V35}, {"Kiki", "阿清 · 粤语", V38 | V35},
+    {"Rocky", "阿强 · 粤语", V38 | V35},
+  };
+  static const nlohmann::json catalog = [] {
+    struct ModelOption { const char *id, *name; Series series; };
+    const ModelOption models[] = {
+      {DefaultModel, "Qwen3.8-Omni-Flash（推荐）", V38},
+      {"qwen3.5-omni-plus-realtime", "Qwen3.5-Omni-Plus", V35},
+      {"qwen3.5-omni-flash-realtime", "Qwen3.5-Omni-Flash", V35},
+    };
+    auto result = nlohmann::json::array();
+    for (const auto& model : models) {
+      auto list = nlohmann::json::array();
+      for (const auto& voice : voices)
+        if (voice.series & model.series) list.push_back({{"id", voice.id}, {"name", voice.name}});
+      result.push_back({{"id", model.id}, {"name", model.name}, {"voices", std::move(list)}});
+    }
+    return result;
+  }();
+  return catalog;
+}
+
+bool ValidModel(const std::string& model) {
+  const auto& catalog = ModelCatalog();
+  return std::any_of(catalog.begin(), catalog.end(), [&](const auto& entry) { return entry["id"] == model; });
+}
+
+bool ValidVoice(const std::string& model, const std::string& voice) {
+  for (const auto& entry : ModelCatalog()) {
+    if (entry["id"] != model) continue;
+    const auto& voices = entry["voices"];
+    return std::any_of(voices.begin(), voices.end(), [&](const auto& item) { return item["id"] == voice; });
+  }
+  return false;
 }
 
 std::string EncodeBase64(const std::string& bytes) {
@@ -379,7 +437,7 @@ void Session::Receive(const nlohmann::json& event) {
       {"audio", {
         {"input", {{"format", {{"type", "pcm"}, {"sample_rate", 16000},
           {"sample_format", "s16le"}, {"channels", 1}, {"packing", "interleaved"}, {"channel_layout", "mono"}}}}},
-        {"output", {{"voice", "Tina"}, {"format", {{"type", "pcm"}, {"sample_rate", 24000}}}}}
+        {"output", {{"voice", voice_}, {"format", {{"type", "pcm"}, {"sample_rate", 24000}}}}}
       }}, {"tools", tools_}
     }}});
   } else if (type == "session.updated") {

@@ -53,7 +53,9 @@ class DataManager {
   bool UpdateVoiceSettings(const std::string& workspace,
                            const std::string* apiKey, std::string& error,
                            const std::string& provider = "",
-                           const std::string& inputMode = "");
+                           const std::string& inputMode = "",
+                           const std::string& model = "",
+                           const std::string& voice = "");
 
   void GetDisplay(float* scale, bool* green, bool* rateLimit);
   void UpdateDisplay(float scale, bool green, bool rateLimit);

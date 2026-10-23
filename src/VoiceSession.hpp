@@ -9,7 +9,8 @@
 #include <vector>
 
 namespace Voice {
-constexpr const char* Model = "qwen3.8-omni-flash-realtime";
+constexpr const char* DefaultModel = "qwen3.8-omni-flash-realtime";
+constexpr const char* DefaultVoice = "Tina";
 constexpr size_t InputBytesPerSecond = 16000 * 2;
 constexpr int InputSilenceMs = 800;
 constexpr size_t InputTailBytes = InputBytesPerSecond;  // 1s of silence closes the gated stream for VAD.
@@ -17,7 +18,12 @@ constexpr size_t InputTailBytes = InputBytesPerSecond;  // 1s of silence closes 
 std::string Trim(const std::string& value);
 bool ValidWorkspace(const std::string& value);
 bool ValidApiKey(const std::string& value);
-std::string ConnectionUrl(const std::string& workspace);
+std::string ConnectionUrl(const std::string& workspace, const std::string& model = DefaultModel);
+// Selectable realtime models and the Chinese voices each supports:
+// [{id, name, voices: [{id, name}]}]. The first model is the default.
+const nlohmann::json& ModelCatalog();
+bool ValidModel(const std::string& model);
+bool ValidVoice(const std::string& model, const std::string& voice);
 std::string EncodeBase64(const std::string& bytes);
 std::string DecodeBase64(const std::string& encoded);
 std::string FriendlyError(const std::string& code);
@@ -53,6 +59,8 @@ class Session {
   };
   explicit Session(Callbacks callbacks, nlohmann::json tools = nlohmann::json::array());
   void Reset(bool failed = false);
+  // Output voice for the next session.update; set before connecting.
+  void SetVoice(const std::string& voice) { voice_ = voice; }
   void BeginInput(bool halfDuplex = false);
   void AppendInput(const std::string& pcm);
   void EndInput();
@@ -108,6 +116,7 @@ class Session {
   std::map<std::string, uint64_t> inputTurns_;
   std::set<std::string> committedInputs_;
   nlohmann::json tools_;
+  std::string voice_ = DefaultVoice;
   std::vector<ToolCall> toolCalls_;
   std::set<std::string> seenTools_, pendingTools_;
   std::set<std::string> retiredResponses_;

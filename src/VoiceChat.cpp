@@ -116,10 +116,12 @@ void VoiceChat::SetState(const std::string& state, const std::string& message) {
 }
 
 nlohmann::json VoiceChat::Status() {
-  const auto inputMode = DataManager::GetInstance()->GetConfig<std::string>("voice", "input_mode", "toggle");
+  const auto settings = DataManager::GetInstance()->GetVoiceSettings();
+  const auto inputMode = settings.at("input_mode").get<std::string>();
+  const auto model = settings.at("provider") == "jpet" ? std::string(Voice::DefaultModel) : settings.at("model").get<std::string>();
   std::lock_guard<std::mutex> lock(statusMutex_);
   auto status = status_;
-  status["model"] = Voice::Model;
+  status["model"] = model;
   status["shortcut"] = Shortcut;
   status["input_mode"] = inputMode;
   status["available_tools"] = nlohmann::json::array();
@@ -146,9 +148,13 @@ void VoiceChat::Begin() {
       shortcut_.BlockUntilRelease();
       return;
     }
+    // JPet Server pins its own model and voice; the selection applies to the custom service.
+    const auto settings = data->GetVoiceSettings();
+    const auto model = server ? std::string(Voice::DefaultModel) : settings.at("model").get<std::string>();
     session_.Reset();
-    LAppPal::PrintLog("[Voice] Connect model=%s", Voice::Model);
-    auto url = server ? CloudGame::ServiceUrl() + "/v1/ai/realtime" : Voice::ConnectionUrl(workspace);
+    session_.SetVoice(server ? std::string(Voice::DefaultVoice) : settings.at("voice").get<std::string>());
+    LAppPal::PrintLog("[Voice] Connect model=%s", model.c_str());
+    auto url = server ? CloudGame::ServiceUrl() + "/v1/ai/realtime" : Voice::ConnectionUrl(workspace, model);
     if (server && url.find("https:") == 0) url.replace(0, 5, "wss");
     else if (server && url.find("http:") == 0) url.replace(0, 4, "ws");
     platform_->Connect(url, key);

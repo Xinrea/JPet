@@ -7,6 +7,11 @@
   // Voice credentials are write-only; the API never returns the saved key.
   let voiceProvider = "custom";
   let voiceInputMode = "toggle";
+  let voiceModel = "", voiceVoice = "", voiceModels = [];
+  $: voiceModelItems = voiceModels.map(model => ({ value: model.id, name: model.name }));
+  $: voiceVoiceItems = (voiceModels.find(model => model.id === voiceModel)?.voices || []).map(voice => ({ value: voice.id, name: voice.name }));
+  // Switching models keeps the voice when supported, otherwise falls back to the model's first (default) voice.
+  $: if (voiceVoiceItems.length && !voiceVoiceItems.some(item => item.value === voiceVoice)) voiceVoice = voiceVoiceItems[0].value;
   const voiceInputModes = [{ value: "toggle", name: "开关 · 全双工" }, { value: "hold", name: "按住 · 半双工" }];
   const voiceProviders = [{ value: "custom", name: "自定义千问服务" }, { value: "jpet", name: "JPet Server · PowerLive 账号" }];
   let powerlive = null, powerliveTimer = null, powerliveBusy = false, powerliveError = "", powerliveRefreshing = false;
@@ -47,6 +52,9 @@
       if (voiceDisposed) return;
       voiceProvider = settings.provider || "custom";
       voiceInputMode = settings.input_mode || "toggle";
+      voiceModels = settings.models || [];
+      voiceModel = settings.model;
+      voiceVoice = settings.voice;
       voiceWorkspace = settings.workspace_id || "";
       voiceHasKey = settings.has_api_key;
       await refreshVoiceStatus();
@@ -59,6 +67,7 @@
   async function saveVoiceSettings(clearKey = false) {
     voiceSaving = true; voiceError = ""; voiceMessage = "";
     const payload = { workspace_id: voiceWorkspace.trim(), provider: voiceProvider, input_mode: voiceInputMode };
+    if (voiceModel) Object.assign(payload, { model: voiceModel, voice: voiceVoice });
     if (clearKey) payload.clear_api_key = true;
     else if (voiceApiKey.trim()) payload.api_key = voiceApiKey.trim();
     try {
@@ -70,6 +79,8 @@
       if (voiceDisposed) return;
       voiceProvider = settings.provider;
       voiceInputMode = settings.input_mode || "toggle";
+      voiceModel = settings.model;
+      voiceVoice = settings.voice;
       voiceWorkspace = settings.workspace_id;
       voiceHasKey = settings.has_api_key;
       voiceApiKey = "";
@@ -121,8 +132,11 @@
       <div class="setting-field"><label for="voice-api-key">百炼 API Key<span>{voiceHasKey ? "已保存" : "待设置"}</span></label><Input id="voice-api-key" type="password" bind:value={voiceApiKey} placeholder={voiceHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
       <div class="setting-field"><label for="voice-workspace">业务空间 ID</label><Input id="voice-workspace" bind:value={voiceWorkspace} placeholder="填写 API Key 所属的业务空间 ID" autocomplete="off" spellcheck="false" maxlength={63} disabled={voiceLoading || voiceSaving} /></div>
       <p class="setting-help">使用北京地域的 API Key 和业务空间。API Key 保存在本机系统凭据存储中。</p>
+      <div class="setting-field"><label for="voice-model">语音模型</label><Select id="voice-model" items={voiceModelItems} bind:value={voiceModel} disabled={voiceLoading || voiceSaving} /></div>
+      <div class="setting-field"><label for="voice-voice">轴伊的音色</label><Select id="voice-voice" items={voiceVoiceItems} bind:value={voiceVoice} disabled={voiceLoading || voiceSaving} /></div>
+      <p class="setting-help">可选音色随模型变化；业务空间需开通所选模型，保存后下一次对话生效。</p>
       {:else}
-        <p class="setting-help">使用 PowerLive 账号登录，共用 JPet Server 提供的千问服务。</p>
+        <p class="setting-help">使用 PowerLive 账号登录，共用 JPet Server 提供的千问服务，固定使用 Qwen3.8-Omni-Flash 和甜甜音色。</p>
         {#if powerlive?.logged_in}
           <p><strong>{powerlive.user?.name || powerlive.user?.email || "PowerLive 账号"}</strong>{#if powerlive.user?.email}<br/><span class="setting-help">{powerlive.user.email}</span>{/if}</p>
           {#if powerlive.quota}

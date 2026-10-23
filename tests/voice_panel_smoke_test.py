@@ -103,7 +103,17 @@ def main(gui=False, app=APP):
                 assert request(port, "/api/config/voice", invalid)[0] == 400
             assert request(port, "/api/config/voice", {"workspace_id": "ws-123"}, "text/plain")[0] == 403
             assert request(port, "/api/config/voice")[1]["workspace_id"] == "ws-123"
+            code, saved = request(port, "/api/config/voice", {"workspace_id": "ws-123", "model": "qwen3.5-omni-flash-realtime", "voice": "Ethan"})
+            assert code == 200 and saved["model"] == "qwen3.5-omni-flash-realtime" and saved["voice"] == "Ethan"
+            assert [model["id"] for model in saved["models"]][0] == "qwen3.8-omni-flash-realtime"
+            assert request(port, "/api/voice")[1]["model"] == "qwen3.5-omni-flash-realtime"
+            for invalid in [{"model": "qwen3.8-omni-flash-realtime", "voice": "Ethan"}, {"model": "evil&model=x"}, {"voice": "Cici"}]:
+                assert request(port, "/api/config/voice", {"workspace_id": "ws-123", **invalid})[0] == 400
+            code, saved = request(port, "/api/config/voice", {"workspace_id": "ws-123", "model": "qwen3.8-omni-flash-realtime"})
+            assert code == 200 and saved["voice"] == "Tina", "unsupported voice falls back when only the model changes"
+            assert request(port, "/api/config/voice", {"workspace_id": "ws-123", "voice": "Cici"})[1]["voice"] == "Cici"
             contents = Path(profile, "jpet.toml").read_text()
+            assert re.search(r'^\s*voice\s*=\s*[\"\']Cici[\"\']', contents, re.MULTILINE)
             assert re.search(r'^\s*input_mode\s*=\s*[\"\']hold[\"\']', contents, re.MULTILINE)
             assert "workspace_id" in contents and not re.search(r"^\s*api_key\s*=", contents, re.MULTILINE)
             output, errors = process.communicate(timeout=10)

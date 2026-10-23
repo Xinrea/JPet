@@ -18,7 +18,12 @@ JPet Server 会先预留额度，再按模型返回的实际 token 用量结算�
 - 同一连接保留对话上下文；麦克风关闭且空闲两分钟后断开，下次开启建立新会话。
 - 麦克风可持续开启，不再一分钟自动停止；仍受服务的会话时长和额度限制。回复音量跟随音频设置。
 
-当前使用 `qwen3.8-omni-flash-realtime` 的 WebSocket `semantic_vad` 模式。
+- 自定义千问服务可在语音对话设置中选择语音模型和轴伊的音色：`qwen3.8-omni-flash-realtime`（默认）、`qwen3.5-omni-plus-realtime`、`qwen3.5-omni-flash-realtime`。
+  音色列表随模型变化，只提供普通话、方言和粤语音色，默认为 `Tina`（甜甜）；切换模型时若原音色不受支持，会改回 `Tina`。
+  业务空间需开通所选模型；保存后关闭当前连接，下一次对话生效。JPet Server 固定使用 `qwen3.8-omni-flash-realtime` 和 `Tina`。
+  兼容关系参见[音色列表](https://help.aliyun.com/zh/model-studio/omni-voice-list)。
+
+默认使用 `qwen3.8-omni-flash-realtime` 的 WebSocket `semantic_vad` 模式。
 输入为 16 kHz、单声道、16 bit PCM；输出为 24 kHz PCM。
 Mac 使用系统默认输入设备，并显式选择第 1 路输入作为麦克风，避免多输入声卡的离散声道
 在默认声道映射下变成静音，也避免混入其他输入和回环声音。

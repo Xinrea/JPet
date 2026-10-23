@@ -63,6 +63,14 @@ int main() {
       Check(!Voice::ValidWorkspace(invalid), "workspace cannot replace the credential destination");
     Check(!Voice::ValidWorkspace(std::string(64, 'a')), "workspace fits one DNS label");
     Check(Voice::ConnectionUrl("ws-123") == "wss://ws-123.cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime?model=qwen3.8-omni-flash-realtime", "workspace endpoint");
+    Check(Voice::ConnectionUrl("ws-123", "qwen3.5-omni-plus-realtime") == "wss://ws-123.cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime?model=qwen3.5-omni-plus-realtime", "selected model endpoint");
+    bool rejected = false;
+    try { Voice::ConnectionUrl("ws-123", "qwen3.8-omni-flash-realtime&x=1"); } catch (const std::invalid_argument&) { rejected = true; }
+    Check(rejected && !Voice::ValidModel("") && Voice::ModelCatalog()[0]["id"] == Voice::DefaultModel, "only catalog models reach the endpoint");
+    Check(Voice::ValidVoice(Voice::DefaultModel, "Cici") && !Voice::ValidVoice("qwen3.5-omni-flash-realtime", "Cici") &&
+        Voice::ValidVoice("qwen3.5-omni-flash-realtime", "Ethan") && !Voice::ValidVoice(Voice::DefaultModel, "Ethan"), "voices follow model support");
+    for (const auto& model : Voice::ModelCatalog())
+      Check(Voice::ValidVoice(model["id"], Voice::DefaultVoice) && model["voices"][0]["id"] == Voice::DefaultVoice, "every model offers the default voice first");
     Check(Voice::Trim(" \n sk-test \r") == "sk-test" && !Voice::ValidApiKey("sk-test\r\nHeader: injected"), "credential header validation");
     for (size_t count = 0; count < 300; ++count) {
       std::string bytes;
@@ -86,6 +94,13 @@ int main() {
     Check(setup["turn_detection"]["type"] == "semantic_vad" && setup["turn_detection"]["silence_duration_ms"] == Voice::InputSilenceMs && setup["audio"]["input"]["format"]["sample_rate"] == 16000 &&
         setup["audio"]["output"]["format"]["sample_rate"] == 24000, "server semantic VAD and PCM protocol");
     Check(setup["input_audio_transcription"]["model"] == "qwen3-asr-flash-realtime", "user speech transcription is enabled");
+    Check(setup["audio"]["output"]["voice"] == Voice::DefaultVoice, "default output voice");
+    {
+      Fixture voiced;
+      voiced.session.SetVoice("Cici");
+      voiced.Connect();
+      Check(voiced.sent.front()["session"]["audio"]["output"]["voice"] == "Cici", "selected output voice");
+    }
     Check(TurnSnapshot(first.history).empty(), "upload alone does not create a history entry");
     std::string uploaded;
     for (const auto& event : first.sent) if (event["type"] == "input_audio_buffer.append") uploaded += Voice::DecodeBase64(event["audio"]);

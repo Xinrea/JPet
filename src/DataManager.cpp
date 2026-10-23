@@ -126,9 +126,16 @@ void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
 
 nlohmann::json DataManager::GetVoiceSettings() {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
+  // Fall back to defaults if the saved model or voice is no longer offered.
+  auto model = GetConfig<std::string>("voice", "model", Voice::DefaultModel);
+  if (!Voice::ValidModel(model)) model = Voice::DefaultModel;
+  auto voice = GetConfig<std::string>("voice", "voice", Voice::DefaultVoice);
+  if (!Voice::ValidVoice(model, voice)) voice = Voice::DefaultVoice;
   return {{"workspace_id", GetConfig<std::string>("voice", "workspace_id", "")},
           {"has_api_key", GetConfig<bool>("voice", "has_api_key", false)},
-          {"model", Voice::Model},
+          {"model", model},
+          {"voice", voice},
+          {"models", Voice::ModelCatalog()},
           {"provider", GetConfig<std::string>("voice", "provider", "custom")},
           {"input_mode", GetConfig<std::string>("voice", "input_mode", "toggle")}};
 }
@@ -145,7 +152,8 @@ void DataManager::SaveVoiceHistory(const nlohmann::json& history) {
 
 bool DataManager::UpdateVoiceSettings(const std::string& workspace,
                                       const std::string* apiKey, std::string& error,
-                                      const std::string& provider, const std::string& inputMode) {
+                                      const std::string& provider, const std::string& inputMode,
+                                      const std::string& model, const std::string& voice) {
   if (!provider.empty() && provider != "custom" && provider != "jpet") {
     error = "请选择有效的 AI 服务方式";
     return false;
@@ -154,7 +162,21 @@ bool DataManager::UpdateVoiceSettings(const std::string& workspace,
     error = "请选择开关或按住的快捷键方式";
     return false;
   }
+  if (!model.empty() && !Voice::ValidModel(model)) {
+    error = "请选择有效的语音模型";
+    return false;
+  }
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
+  const auto current = GetVoiceSettings();
+  const auto nextModel = model.empty() ? current.at("model").get<std::string>() : model;
+  auto nextVoice = voice.empty() ? current.at("voice").get<std::string>() : voice;
+  if (!Voice::ValidVoice(nextModel, nextVoice)) {
+    if (!voice.empty()) {
+      error = "所选音色不支持当前语音模型";
+      return false;
+    }
+    nextVoice = Voice::DefaultVoice;
+  }
   if (!workspace.empty() && !Voice::ValidWorkspace(workspace)) {
     error = "业务空间 ID 应为 1～63 位字母、数字或连字符，且不能以连字符开头或结尾";
     return false;
@@ -167,7 +189,8 @@ bool DataManager::UpdateVoiceSettings(const std::string& workspace,
   const bool hasKey = apiKey ? !apiKey->empty() : GetConfig<bool>("voice", "has_api_key", false);
   data.insert_or_assign("voice", toml::table{{"workspace_id", workspace}, {"has_api_key", hasKey},
     {"provider", provider.empty() ? GetConfig<std::string>("voice", "provider", "custom") : provider},
-    {"input_mode", inputMode.empty() ? GetConfig<std::string>("voice", "input_mode", "toggle") : inputMode}});
+    {"input_mode", inputMode.empty() ? GetConfig<std::string>("voice", "input_mode", "toggle") : inputMode},
+    {"model", nextModel}, {"voice", nextVoice}});
   Save();
   return true;
 }
