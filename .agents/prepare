@@ -67,6 +67,7 @@ echo "Installing C++ dependencies..."
 "${VCPKG_DIR}/vcpkg" install \
   --triplet arm64-osx \
   --x-install-root="${VCPKG_INSTALLED_DIR}" \
+  --overlay-ports="${ROOT_DIR}/build-scripts/ports" \
   --disable-metrics
 
 cat <<EOF

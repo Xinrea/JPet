@@ -84,5 +84,5 @@ if(APPLE)
 else()
   target_sources(${APP_NAME} PRIVATE
     main.cpp PlatformWin.cpp AudioManager.cpp WinToastEventHandler.cpp
-    GamePanel.cpp CookieWindow.cpp JPet.rc VoicePlatformWin.cpp VoiceDesktopWin.cpp CloudSocketWin.cpp)
+    GamePanel.cpp CookieWindow.cpp JPet.rc VoicePlatformWin.cpp VoiceEcho.cpp VoiceEcho.hpp VoiceDesktopWin.cpp CloudSocketWin.cpp)
 endif()

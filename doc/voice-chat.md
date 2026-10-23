@@ -144,4 +144,18 @@ macOS 原生设置接口检查：`python3 tests/voice_panel_smoke_test.py`。
 全双工协议检查参考了 [qwen-audio-agent 的回复生命周期](https://github.com/QwenAudio/qwen-audio-agent/blob/main/server/src/voice/response-lifecycle.mjs)、
 [回复槽管理](https://github.com/QwenAudio/qwen-audio-agent/blob/main/server/src/voice/realtime-response-slot.mjs)和
 [千问服务适配](https://github.com/QwenAudio/qwen-audio-agent/blob/main/server/src/voice/providers/dashscope.mjs)。
-本次只调整会话、工具与消息展示流程，未启用 AEC。
+## 回声消除（Windows）
+
+Windows 录音和播放使用 WASAPI 共享模式，打开默认设备；由系统音频引擎在设备格式与 16 kHz（录音）/24 kHz（播放）
+单声道 16 bit PCM 之间转换。麦克风经过 WebRTC AudioProcessing（AEC3 回声消除、中等强度降噪、高通滤波）后再上传；
+AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量），没有回复时写入静音，保证参考流连续。
+麦克风开启期间播放流保持运行；麦克风关闭且回复播完 3 秒后释放播放设备，避免音频流阻止系统睡眠。
+只消除轴伊自己的声音，其他程序播放的音乐、视频不在参考信号内。
+
+- 设置环境变量 `JPET_VOICE_AEC=0` 后启动可关闭回声处理，用于对比原始录音。
+- `jpet.log` 中 `[Voice] Capture wasapi ...` 记录录音延迟和 AEC 开关；麦克风开启时每 5 秒输出
+  `[Voice] AEC ... reduction=…dB`，即处理前后麦克风电平差（包含降噪的作用）。
+- `voice_echo_test` 使用合成的远端/近端信号检查回声衰减、单讲与双讲时近端语音保留，以及无参考信号时的对照。
+- 依赖 `webrtc-audio-processing` 2.1，由 [`build-scripts/ports`](../build-scripts/ports) 中的 vcpkg overlay port 构建为静态库；
+  它要求 abseil 不低于 20240722 且仍提供 `absl::Nullable`，因此 `vcpkg.json` 将 abseil 固定为 20250127.1。
+- Mac 端暂未接入，仍使用 AVAudioEngine 录音和播放。

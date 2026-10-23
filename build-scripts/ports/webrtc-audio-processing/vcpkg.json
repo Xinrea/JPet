@@ -1,0 +1,14 @@
+{
+  "name": "webrtc-audio-processing",
+  "version": "2.1",
+  "description": "WebRTC AudioProcessing module (AEC3, noise suppression, gain control) packaged by PulseAudio",
+  "homepage": "https://gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing",
+  "license": "BSD-3-Clause",
+  "dependencies": [
+    "abseil",
+    {
+      "name": "vcpkg-tool-meson",
+      "host": true
+    }
+  ]
+}

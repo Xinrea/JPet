@@ -6,7 +6,7 @@
 
 - 客户端：C++17、CMake 3.27+；Windows x64 使用 Visual Studio 2022，macOS ARM64 使用 Xcode Command Line Tools 和 Ninja。
 - 设置面板：Node.js 22+、npm、Svelte + Vite；源码位于 `resources/panel/`。
-- C++ 依赖：部分随 `thirdparty/` 提供，包括 GLFW、FMOD CORE 和 Cubism SDK；其余见 [`vcpkg.json`](../vcpkg.json)。RocksDB 子模块需通过 `git submodule update --init --recursive` 初始化。
+- C++ 依赖：部分随 `thirdparty/` 提供，包括 GLFW、FMOD CORE 和 Cubism SDK；其余见 [`vcpkg.json`](../vcpkg.json)。语音回声消除使用的 `webrtc-audio-processing` 由仓库内的 vcpkg overlay port（[`build-scripts/ports`](../build-scripts/ports)）提供，CMake 会自动加载；手动执行 `vcpkg install` 时需加 `--overlay-ports`。RocksDB 子模块需通过 `git submodule update --init --recursive` 初始化。
 - 云端服务：位于 `cloud/`，本地开发和部署见[云端游戏说明](cloud-game.md)。
 
 Windows 面板使用 WebView2；macOS 使用 WKWebView、GLFW/Cocoa 透明窗口、AVFoundation 音频和菜单栏状态项。
@@ -47,7 +47,8 @@ cd ../..
 
 ./build/vcpkg/bootstrap-vcpkg.sh -disableMetrics
 ./build/vcpkg/vcpkg install --triplet arm64-osx \
-  --x-install-root="$PWD/build/vcpkg_installed"
+  --x-install-root="$PWD/build/vcpkg_installed" \
+  --overlay-ports="$PWD/build-scripts/ports"
 
 cmake -S . -B build/macos-arm64 -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \

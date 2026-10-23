@@ -41,11 +41,12 @@ fi
 echo "Building settings panel..."
 (cd "${ROOT_DIR}/resources/panel" && npm run build)
 
-if [[ ! -d "${VCPKG_INSTALLED_DIR}/arm64-osx" ]]; then
+if [[ ! -d "${VCPKG_INSTALLED_DIR}/arm64-osx/share/unofficial-webrtc-audio-processing" ]]; then
   echo "Installing C++ dependencies..."
   "${VCPKG_DIR}/vcpkg" install \
     --triplet arm64-osx \
     --x-install-root="${VCPKG_INSTALLED_DIR}" \
+    --overlay-ports="${ROOT_DIR}/build-scripts/ports" \
     --disable-metrics
 fi
 

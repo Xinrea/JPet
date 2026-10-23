@@ -1,19 +1,26 @@
 #include "VoicePlatform.hpp"
+#include "VoiceEcho.hpp"
 #include "VoiceEventQueue.hpp"
 #include "VoiceIndicatorStyle.hpp"
 
 #include <windows.h>
 #include <winhttp.h>
 #include <wincred.h>
-#include <mmsystem.h>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <wrl/client.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <condition_variable>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <deque>
-#include <list>
 #include <thread>
 
 namespace Voice {
@@ -31,14 +38,50 @@ struct HttpHandle {
   ~HttpHandle() { if (value) WinHttpCloseHandle(value); }
 };
 
-struct InputBuffer {
-  WAVEHDR header{};
-  std::array<char, 640> bytes{};  // 20 ms, 16 kHz mono s16le.
+using Microsoft::WRL::ComPtr;
+using AudioClock = std::chrono::steady_clock;
+
+struct ComScope {
+  const bool owned = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+  ~ComScope() { if (owned) CoUninitialize(); }
 };
-struct OutputBuffer {
-  WAVEHDR header{};
-  std::string bytes;
-};
+
+// Opens the default endpoint in shared, event-driven mode. The audio engine
+// converts between the device mix format and 16-bit mono at `rate`, so neither
+// direction needs its own resampler.
+HRESULT OpenStream(EDataFlow flow, DWORD rate, REFERENCE_TIME duration, HANDLE event,
+                   ComPtr<IAudioClient>& client) {
+  ComPtr<IMMDeviceEnumerator> enumerator;
+  ComPtr<IMMDevice> device;
+  HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator));
+  if (SUCCEEDED(hr)) hr = enumerator->GetDefaultAudioEndpoint(flow, eConsole, &device);
+  if (SUCCEEDED(hr)) hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
+      reinterpret_cast<void**>(client.ReleaseAndGetAddressOf()));
+  WAVEFORMATEX format{};
+  format.wFormatTag = WAVE_FORMAT_PCM;
+  format.nChannels = 1;
+  format.nSamplesPerSec = rate;
+  format.wBitsPerSample = 16;
+  format.nBlockAlign = 2;
+  format.nAvgBytesPerSec = rate * 2;
+  if (SUCCEEDED(hr)) hr = client->Initialize(AUDCLNT_SHAREMODE_SHARED,
+      AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
+      duration, 0, &format, nullptr);
+  if (SUCCEEDED(hr)) hr = client->SetEventHandle(event);
+  return hr;
+}
+
+int LatencyMs(IAudioClient* client, REFERENCE_TIME buffer) {
+  REFERENCE_TIME latency = 0;
+  client->GetStreamLatency(&latency);
+  return static_cast<int>((latency + buffer) / 10000);
+}
+
+std::string Hresult(HRESULT hr) {
+  char text[16];
+  std::snprintf(text, sizeof(text), "0x%08lx", static_cast<unsigned long>(hr));
+  return text;
+}
 
 struct WinState {
   std::shared_ptr<EventQueue> queue = std::make_shared<EventQueue>();
@@ -48,11 +91,16 @@ struct WinState {
   HINTERNET socket = nullptr;
   std::deque<std::string> outgoing;
   size_t outgoingBytes = 0;
-  HWAVEIN input = nullptr;
-  HANDLE inputEvent = nullptr;
-  std::array<InputBuffer, 8> inputBuffers;
-  HWAVEOUT output = nullptr;
-  std::list<std::unique_ptr<OutputBuffer>> outputBuffers;
+  // Null when JPET_VOICE_AEC=0, for comparing raw microphone input.
+  std::shared_ptr<EchoCanceller> echo;
+  std::atomic<bool> captureStop{false}, captureRunning{false};
+  std::atomic<int> renderLatencyMs{0};
+  // Reply PCM (24 kHz mono) waiting for the render thread, guarded by renderMutex.
+  std::mutex renderMutex;
+  std::deque<int16_t> pending;
+  float volume = 1;
+  AudioClock::time_point audibleUntil{};
+  std::atomic<bool> renderStop{false}, renderFailed{false};
   HWND indicator = nullptr;
   bool indicatorError = false;
   std::wstring indicatorText;
@@ -231,9 +279,12 @@ LRESULT CALLBACK IndicatorProc(HWND window, UINT message, WPARAM wparam, LPARAM 
 
 class WinPlatform final : public Platform {
  public:
+  WinPlatform() {
+    const char* aec = std::getenv("JPET_VOICE_AEC");
+    if (!aec || std::strcmp(aec, "0") != 0) state_->echo = std::make_shared<EchoCanceller>();
+  }
   ~WinPlatform() override {
-    StopCapture(); Disconnect(); StopPlayback();
-    if (state_->output) waveOutClose(state_->output);
+    StopCapture(); Disconnect(); StopPlayback(); StopRender();
     if (state_->indicator) DestroyWindow(state_->indicator);
     if (state_->font) DeleteObject(state_->font);
     if (state_->titleFont) DeleteObject(state_->titleFont);
@@ -302,125 +353,71 @@ class WinPlatform final : public Platform {
   }
 
   void StartCapture() override {
-    if (state_->input) return;
-    WAVEFORMATEX format{};
-    format.wFormatTag = WAVE_FORMAT_PCM;
-    format.nChannels = 1;
-    format.nSamplesPerSec = 16000;
-    format.wBitsPerSample = 16;
-    format.nBlockAlign = 2;
-    format.nAvgBytesPerSec = 32000;
-    state_->inputEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    if (!state_->inputEvent || waveInOpen(&state_->input, WAVE_MAPPER, &format,
-          reinterpret_cast<DWORD_PTR>(state_->inputEvent), 0, CALLBACK_EVENT) != MMSYSERR_NOERROR) {
-      StopCapture();
-      state_->queue->Push(Event::Type::Error, "无法打开麦克风，请检查 Windows 麦克风权限和输入设备");
-      return;
+    if (microphone_.joinable()) {
+      if (state_->captureRunning) return;
+      microphone_.join();  // The previous stream ended on a device error.
     }
-    for (auto& buffer : state_->inputBuffers) {
-      buffer.header = {};
-      buffer.header.lpData = buffer.bytes.data();
-      buffer.header.dwBufferLength = static_cast<DWORD>(buffer.bytes.size());
-      if (waveInPrepareHeader(state_->input, &buffer.header, sizeof(WAVEHDR)) != MMSYSERR_NOERROR ||
-          waveInAddBuffer(state_->input, &buffer.header, sizeof(WAVEHDR)) != MMSYSERR_NOERROR) {
-        StopCapture(); state_->queue->Push(Event::Type::Error, "无法准备麦克风录音，请更换输入设备"); return;
-      }
-    }
+    // The speaker stream runs while the microphone is open so AEC3 always
+    // receives a continuous reference, silence included.
+    StartRender();
+    if (state_->echo) state_->echo->EndCapture();
+    state_->captureStop = false;
+    const auto generation = ++state_->queue->capture;
     state_->queue->capturing = true;
-    if (waveInStart(state_->input) != MMSYSERR_NOERROR) {
-      StopCapture(); state_->queue->Push(Event::Type::Error, "无法启动麦克风录音"); return;
-    }
+    state_->captureRunning = true;
     const auto state = state_;
-    microphone_ = std::thread([state] {
-      for (;;) {
-        WaitForSingleObject(state->inputEvent, 20);
-        for (auto& buffer : state->inputBuffers) {
-          if (!(buffer.header.dwFlags & WHDR_DONE)) continue;
-          if (buffer.header.dwBytesRecorded) state->queue->Push(Event::Type::Microphone,
-              std::string(buffer.bytes.data(), buffer.header.dwBytesRecorded));
-          buffer.header.dwBytesRecorded = 0;
-          if (state->queue->capturing && waveInAddBuffer(state->input, &buffer.header, sizeof(WAVEHDR)) != MMSYSERR_NOERROR) {
-            state->queue->capturing = false;
-            state->queue->Push(Event::Type::Error, "麦克风录音中断，请重新说话");
-          }
-        }
-        if (!state->queue->capturing) break;
-      }
+    microphone_ = std::thread([state, generation] {
+      CaptureLoop(state, generation);
+      state->captureRunning = false;
     });
   }
 
   void StopCapture() override {
+    if (!microphone_.joinable()) return;
+    // The worker drains the packets already captured before it exits, so the
+    // final words of this turn still reach the session.
+    state_->captureStop = true;
+    microphone_.join();
     state_->queue->capturing = false;
-    if (state_->input) waveInStop(state_->input);
-    if (state_->inputEvent) SetEvent(state_->inputEvent);
-    if (microphone_.joinable()) microphone_.join();
-    if (state_->input) {
-      // Reset after the worker exits so it cannot requeue a buffer after reset.
-      // Reset also returns the final partial recording buffer for this turn.
-      waveInReset(state_->input);
-      for (auto& buffer : state_->inputBuffers) {
-        if ((buffer.header.dwFlags & WHDR_DONE) && buffer.header.dwBytesRecorded) {
-          state_->queue->Push(Event::Type::Microphone,
-              std::string(buffer.bytes.data(), buffer.header.dwBytesRecorded));
-          buffer.header.dwBytesRecorded = 0;
-        }
-        if (buffer.header.dwFlags & WHDR_PREPARED) waveInUnprepareHeader(state_->input, &buffer.header, sizeof(WAVEHDR));
-      }
-      waveInClose(state_->input);
-      state_->input = nullptr;
-    }
-    if (state_->inputEvent) { CloseHandle(state_->inputEvent); state_->inputEvent = nullptr; }
+    lastAudio_ = AudioClock::now();
   }
 
-  std::vector<Event> Poll() override { return state_->queue->Poll(); }
+  std::vector<Event> Poll() override {
+    if (renderer_.joinable() && state_->renderFailed) {
+      StopRender();
+      StopPlayback();  // Replies queued after the failure would never play.
+    }
+    // Release the speaker stream once idle so it does not keep the device
+    // awake (an open stream can block system sleep).
+    if (renderer_.joinable() && !microphone_.joinable()) {
+      if (IsPlaying()) lastAudio_ = AudioClock::now();
+      else if (AudioClock::now() - lastAudio_ > std::chrono::seconds(3)) StopRender();
+    }
+    return state_->queue->Poll();
+  }
 
   void Play(const std::string& pcm, float volume) override {
-    if (!state_->output) {
-      WAVEFORMATEX format{};
-      format.wFormatTag = WAVE_FORMAT_PCM;
-      format.nChannels = 1;
-      format.nSamplesPerSec = 24000;
-      format.wBitsPerSample = 16;
-      format.nBlockAlign = 2;
-      format.nAvgBytesPerSec = 48000;
-      if (waveOutOpen(&state_->output, WAVE_MAPPER, &format, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR) {
-        state_->queue->Push(Event::Type::Error, "无法播放轴伊的回复，请检查声音输出设备"); return;
-      }
+    StartRender();
+    std::lock_guard<std::mutex> lock(state_->renderMutex);
+    state_->volume = std::clamp(volume, 0.0f, 1.0f);
+    for (size_t i = 0; i + 1 < pcm.size(); i += 2) {
+      int16_t sample;
+      std::memcpy(&sample, pcm.data() + i, sizeof(sample));
+      state_->pending.push_back(sample);
     }
-    for (auto it = state_->outputBuffers.begin(); it != state_->outputBuffers.end();) {
-      if ((*it)->header.dwFlags & WHDR_DONE) {
-        waveOutUnprepareHeader(state_->output, &(*it)->header, sizeof(WAVEHDR));
-        it = state_->outputBuffers.erase(it);
-      } else ++it;
-    }
-    const DWORD gain = static_cast<DWORD>(std::clamp(volume, 0.0f, 1.0f) * 65535);
-    waveOutSetVolume(state_->output, gain | (gain << 16));
-    auto buffer = std::make_unique<OutputBuffer>();
-    buffer->bytes = pcm;
-    buffer->header.lpData = buffer->bytes.data();
-    buffer->header.dwBufferLength = static_cast<DWORD>(pcm.size());
-    if (waveOutPrepareHeader(state_->output, &buffer->header, sizeof(WAVEHDR)) != MMSYSERR_NOERROR) {
-      state_->queue->Push(Event::Type::Error, "无法准备轴伊的回复音频"); return;
-    }
-    if (waveOutWrite(state_->output, &buffer->header, sizeof(WAVEHDR)) != MMSYSERR_NOERROR) {
-      waveOutUnprepareHeader(state_->output, &buffer->header, sizeof(WAVEHDR));
-      state_->queue->Push(Event::Type::Error, "无法播放轴伊的回复，请检查声音输出设备"); return;
-    }
-    state_->outputBuffers.push_back(std::move(buffer));
+    lastAudio_ = AudioClock::now();
   }
 
   bool IsPlaying() const override {
-    // Header completion also handles audio lengths that end between milliseconds.
-    return std::any_of(state_->outputBuffers.begin(), state_->outputBuffers.end(),
-        [](const auto& buffer) { return !(buffer->header.dwFlags & WHDR_DONE); });
+    std::lock_guard<std::mutex> lock(state_->renderMutex);
+    return !state_->pending.empty() || AudioClock::now() < state_->audibleUntil;
   }
 
   void StopPlayback() override {
-    if (state_->output) {
-      waveOutReset(state_->output);
-      for (const auto& buffer : state_->outputBuffers) waveOutUnprepareHeader(state_->output, &buffer->header, sizeof(WAVEHDR));
-    }
-    state_->outputBuffers.clear();
+    // At most one device buffer (40 ms) of the reply still plays after this.
+    std::lock_guard<std::mutex> lock(state_->renderMutex);
+    state_->pending.clear();
+    state_->audibleUntil = AudioClock::now();
   }
 
   void ShowIndicator(GLFWwindow* window, const std::string& text, bool error) override {
@@ -469,8 +466,129 @@ class WinPlatform final : public Platform {
   }
 
  private:
+  void StartRender() {
+    if (renderer_.joinable()) {
+      if (!state_->renderFailed) return;
+      StopRender();
+    }
+    state_->renderStop = false;
+    state_->renderFailed = false;
+    lastAudio_ = AudioClock::now();
+    const auto state = state_;
+    renderer_ = std::thread([state] { RenderLoop(state); });
+  }
+
+  void StopRender() {
+    if (!renderer_.joinable()) return;
+    state_->renderStop = true;
+    renderer_.join();
+  }
+
+  static void CaptureLoop(const std::shared_ptr<WinState>& state, uint64_t generation) {
+    ComScope com;
+    const auto fail = [&](const std::string& message, HRESULT hr) {
+      state->queue->Captured(generation, Event::Type::Diagnostic, "[Voice] Capture failed hr=" + Hresult(hr));
+      state->queue->Captured(generation, Event::Type::Error, message);
+    };
+    constexpr REFERENCE_TIME Buffer = 200000;  // 20 ms.
+    HANDLE event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    ComPtr<IAudioClient> client;
+    ComPtr<IAudioCaptureClient> capture;
+    HRESULT hr = event ? OpenStream(eCapture, EchoCanceller::CaptureRate, Buffer, event, client) : E_OUTOFMEMORY;
+    if (SUCCEEDED(hr)) hr = client->GetService(IID_PPV_ARGS(&capture));
+    if (SUCCEEDED(hr)) hr = client->Start();
+    if (FAILED(hr)) {
+      fail(hr == E_ACCESSDENIED ? "无法打开麦克风，请在 Windows 隐私设置中允许 JPet 使用麦克风"
+                                : "无法打开麦克风，请检查 Windows 麦克风权限和输入设备", hr);
+      if (event) CloseHandle(event);
+      return;
+    }
+    const int captureLatency = LatencyMs(client.Get(), Buffer);
+    if (state->echo) state->echo->SetStreamDelay(captureLatency + state->renderLatencyMs);
+    state->queue->Captured(generation, Event::Type::Diagnostic, "[Voice] Capture wasapi rate=16000 latency_ms=" +
+        std::to_string(captureLatency) + " aec=" + (state->echo ? "on" : "off"));
+    auto reported = AudioClock::now();
+    std::string chunk;
+    for (;;) {
+      const bool stopping = state->captureStop;
+      if (!stopping) WaitForSingleObject(event, 100);
+      chunk.clear();
+      UINT32 packet = 0;
+      while (SUCCEEDED(hr = capture->GetNextPacketSize(&packet)) && packet) {
+        BYTE* data = nullptr;
+        UINT32 frames = 0;
+        DWORD flags = 0;
+        if (FAILED(hr = capture->GetBuffer(&data, &frames, &flags, nullptr, nullptr))) break;
+        if (flags & AUDCLNT_BUFFERFLAGS_SILENT) chunk.append(frames * sizeof(int16_t), '\0');
+        else chunk.append(reinterpret_cast<const char*>(data), frames * sizeof(int16_t));
+        capture->ReleaseBuffer(frames);
+      }
+      if (FAILED(hr)) { fail("麦克风录音中断，请重新说话", hr); break; }
+      if (state->echo && !chunk.empty()) chunk = state->echo->Capture(chunk);
+      if (!chunk.empty()) state->queue->Captured(generation, Event::Type::Microphone, std::move(chunk));
+      if (state->echo && AudioClock::now() - reported > std::chrono::seconds(5)) {
+        reported = AudioClock::now();
+        state->queue->Captured(generation, Event::Type::Diagnostic, "[Voice] AEC " + state->echo->Summary());
+      }
+      if (stopping) break;
+    }
+    client->Stop();
+    CloseHandle(event);
+  }
+
+  static void RenderLoop(const std::shared_ptr<WinState>& state) {
+    ComScope com;
+    constexpr REFERENCE_TIME Buffer = 400000;  // 40 ms.
+    constexpr int Rate = EchoCanceller::RenderRate;
+    HANDLE event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    ComPtr<IAudioClient> client;
+    ComPtr<IAudioRenderClient> render;
+    UINT32 bufferFrames = 0;
+    HRESULT hr = event ? OpenStream(eRender, Rate, Buffer, event, client) : E_OUTOFMEMORY;
+    if (SUCCEEDED(hr)) hr = client->GetBufferSize(&bufferFrames);
+    if (SUCCEEDED(hr)) hr = client->GetService(IID_PPV_ARGS(&render));
+    if (SUCCEEDED(hr)) hr = client->Start();
+    if (SUCCEEDED(hr)) state->renderLatencyMs = LatencyMs(client.Get(), Buffer);
+    std::vector<int16_t> block;
+    while (SUCCEEDED(hr) && !state->renderStop) {
+      WaitForSingleObject(event, 100);
+      UINT32 padding = 0;
+      if (FAILED(hr = client->GetCurrentPadding(&padding))) break;
+      const UINT32 available = bufferFrames - padding;
+      if (!available) continue;
+      // Fill the whole free space, with silence when no reply is queued, so the
+      // stream and the AEC reference stay continuous.
+      block.assign(available, 0);
+      {
+        std::lock_guard<std::mutex> lock(state->renderMutex);
+        const size_t audible = (std::min)(static_cast<size_t>(available), state->pending.size());
+        for (size_t i = 0; i < audible; ++i)
+          block[i] = static_cast<int16_t>(std::lround(state->pending[i] * state->volume));
+        state->pending.erase(state->pending.begin(), state->pending.begin() + audible);
+        if (audible) state->audibleUntil = AudioClock::now() +
+            std::chrono::milliseconds((padding + audible) * 1000 / Rate);
+      }
+      BYTE* data = nullptr;
+      if (FAILED(hr = render->GetBuffer(available, &data))) break;
+      std::memcpy(data, block.data(), available * sizeof(int16_t));
+      render->ReleaseBuffer(available, 0);
+      if (state->echo) state->echo->Render(block.data(), block.size());
+    }
+    if (FAILED(hr)) {
+      state->queue->Push(Event::Type::Diagnostic, "[Voice] Render failed hr=" + Hresult(hr));
+      state->queue->Push(Event::Type::Error, "无法播放轴伊的回复，请检查声音输出设备");
+      std::lock_guard<std::mutex> lock(state->renderMutex);
+      state->pending.clear();
+      state->audibleUntil = {};
+    }
+    if (client) client->Stop();
+    if (event) CloseHandle(event);
+    state->renderFailed = FAILED(hr);
+  }
+
   std::shared_ptr<WinState> state_ = std::make_shared<WinState>();
-  std::thread receiver_, sender_, microphone_;
+  std::thread receiver_, sender_, microphone_, renderer_;
+  AudioClock::time_point lastAudio_{};
 };
 std::wstring CredentialTarget(const std::string& profile) { return L"JPet/Qwen/" + Wide(profile); }
 }  // namespace

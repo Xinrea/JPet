@@ -28,6 +28,9 @@ set(SDK_ROOT_PATH ${THIRD_PARTY_PATH}/CubismSdkForNative)
 set(CORE_PATH ${SDK_ROOT_PATH}/Core)
 set(FRAMEWORK_PATH ${SDK_ROOT_PATH}/Framework)
 
+# vcpkg ports maintained in this repository; must be set before project().
+list(APPEND VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/build-scripts/ports")
+
 # Set project.
 project(${APP_NAME} CXX)
 
@@ -59,6 +62,7 @@ find_package(cpr CONFIG REQUIRED)
 find_package(cryptopp CONFIG REQUIRED)
 find_package(croncpp CONFIG REQUIRED)
 find_package(semver CONFIG REQUIRED)
+find_package(unofficial-webrtc-audio-processing CONFIG REQUIRED)
 find_path(TOMLPLUSPLUS_INCLUDE_DIR toml++/toml.hpp REQUIRED)
 if(WIN32)
   find_package(unofficial-wintoast CONFIG REQUIRED)
@@ -246,6 +250,7 @@ else()
   target_link_libraries(${APP_NAME} PRIVATE GLEW::GLEW)
   target_include_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/inc)
   target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/)
+  target_link_libraries(${APP_NAME} PRIVATE unofficial::webrtc-audio-processing::webrtc-audio-processing)
   target_link_libraries(${APP_NAME} PRIVATE rocksdb fmod_vc Dbghelp Crypt32
     Winhttp Winmm Advapi32 Gdiplus Ole32 Gdi32
     unofficial::wintoast::wintoast unofficial::webview2::webview2)
@@ -340,6 +345,12 @@ if(JPET_BUILD_VOICE_TESTS)
   target_compile_options(voice_tools_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
   target_link_libraries(voice_tools_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads cpr::cpr)
   add_test(NAME voice_tools COMMAND voice_tools_test)
+  add_executable(voice_echo_test tests/voice_echo_test.cpp src/VoiceEcho.cpp)
+  set_target_properties(voice_echo_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_echo_test PRIVATE src)
+  target_compile_options(voice_echo_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_echo_test PRIVATE unofficial::webrtc-audio-processing::webrtc-audio-processing)
+  add_test(NAME voice_echo COMMAND voice_echo_test)
   if(APPLE)
     add_executable(voice_audio_mac_test tests/voice_audio_mac_test.mm)
     set_target_properties(voice_audio_mac_test PROPERTIES
