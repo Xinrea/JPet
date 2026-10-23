@@ -128,21 +128,12 @@ int main() {
     Check(!unavailable.Clear() && unavailable.Snapshot()["list"].empty(), "clearing reports storage failures");
 
     Voice::EventQueue queue;
-    queue.connections[Voice::SynthesisChannel] = 2;
-    queue.Network(Voice::SynthesisChannel, 1, Voice::Event::Type::Error, "old connection");
-    queue.Network(Voice::SynthesisChannel, 2, Voice::Event::Type::Message, "current connection");
-    auto events = queue.Poll();
-    queue.Network(Voice::SynthesisChannel, 2, Voice::Event::Type::Binary, "audio");
-    queue.Clear(Voice::SynthesisChannel);
-    Check(queue.Poll().empty(), "clearing a channel drops its queued events");
-    Check(events.size() == 1 && events[0].data == "current connection" && events[0].channel == Voice::SynthesisChannel,
-        "closed connections cannot poison a new session");
     queue.capture = 2;
     queue.capturing = true;
     queue.Captured(1, Voice::Event::Type::Microphone, "old recording");
     queue.Captured(1, Voice::Event::Type::Error, "old failure");
     queue.Captured(2, Voice::Event::Type::Microphone, "current recording");
-    events = queue.Poll();
+    auto events = queue.Poll();
     Check(events.size() == 1 && events[0].data == "current recording" && queue.capturing,
         "old audio callbacks cannot stop or feed a new recording");
     queue.capturing = false;

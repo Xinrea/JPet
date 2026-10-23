@@ -279,7 +279,6 @@ void VoiceChat::Drain() {
       LAppPal::PrintLog("%s", event.data.c_str());
       continue;
     }
-    if (event.channel != Voice::LocalChannel) continue;  // No network channel is opened.
     if (event.type == Voice::Event::Type::Error) { Fail(event.data); break; }
     if (event.type != Voice::Event::Type::Microphone || !pipeline_) continue;
     if (event.data.size() % 2) { Fail("轴伊没能听清这段语音，请重新说话"); break; }
