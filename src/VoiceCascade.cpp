@@ -242,10 +242,24 @@ void Pipeline::OnTranscript(const std::string& text, bool tentative) {
 
 // ---- Chat --------------------------------------------------------------------
 
-void Pipeline::StartReply(const std::string& text) {
+void Pipeline::SubmitText(const std::string& text) {
+  const auto message = Trimmed(text);
+  if (message.empty()) return;
+  if (BotBusy()) Interrupt();
+  StartReply(message, false);
+}
+
+void Pipeline::StopReply() {
+  if (!BotBusy()) return;
+  Interrupt();
+  if (listen_ != Listen::Active) Status(inputOpen_ ? "listening" : "idle");
+}
+
+void Pipeline::StartReply(const std::string& text, bool voice) {
   ++turn_;
   round_ = rounds_ = 0;
   replyActive_ = true;
+  voiceReply_ = voice && synthesizer_;
   audible_ = false;
   replyText_.clear();
   segments_.clear();
@@ -255,7 +269,7 @@ void Pipeline::StartReply(const std::string& text) {
     callbacks_.stopPlayback();
     enqueued_ = 0;
   }
-  Record(ConversationEvent::Type::Started);
+  Record(ConversationEvent::Type::Started, "", "", voice ? nlohmann::json::object() : nlohmann::json{{"input", "text"}});
   Record(ConversationEvent::Type::UserTranscript, text);
   messages_.push_back({{"role", "user"}, {"content", text}});
   TrimContext();
@@ -274,8 +288,9 @@ void Pipeline::RequestChat() {
   splitter_.Reset();
   roundDone_ = false;
   chatActive_ = true;
-  auto messages = nlohmann::json::array({{{"role", "system"}, {"content", Instructions() +
-      "你的回复会被转成语音朗读：不要使用 Markdown、列表符号、表情或链接，一般不超过三句话。"}}});
+  auto messages = nlohmann::json::array({{{"role", "system"}, {"content", Instructions() + (voiceReply_ ?
+      "你的回复会被转成语音朗读：不要使用 Markdown、列表符号、表情或链接，一般不超过三句话。" :
+      "用户正在 JPet 设置面板里打字和你聊天，回复以纯文本显示、不会朗读：可以分段，需要时给出完整链接，不要使用 Markdown 符号，保持简洁。")}}});
   for (const auto& message : messages_) messages.push_back(message);
   nlohmann::json body = {{"model", config_.chatModel}, {"stream", true}, {"messages", messages}, {"max_tokens", 1024}};
   if (!tools_.empty()) body["tools"] = tools_;
@@ -291,6 +306,10 @@ void Pipeline::OnChat(const ChatEvent& event) {
     replyText_ += event.text;
     if (callbacks_.transcript) callbacks_.transcript(replyText_);
     Record(ConversationEvent::Type::AssistantTranscript, roundText_, ReplyId());
+    if (!voiceReply_) {
+      if (!audible_) { audible_ = true; Status("replying"); }
+      return;
+    }
     for (const auto& sentence : splitter_.Push(event.text)) Speak(sentence);
     return;
   }
@@ -301,7 +320,7 @@ void Pipeline::OnChat(const ChatEvent& event) {
     Status(inputOpen_ ? "listening" : "idle", event.text);
     return;
   }
-  const auto rest = splitter_.Flush();
+  const auto rest = voiceReply_ ? splitter_.Flush() : std::string{};
   if (!rest.empty()) Speak(rest);
   if (event.tools.empty()) { roundDone_ = true; return; }
   auto calls = nlohmann::json::array();
@@ -356,7 +375,7 @@ void Pipeline::Speak(const std::string& sentence) {
 }
 
 void Pipeline::StartSynthesis() {
-  if (synthesizing_ || queued_.empty()) return;
+  if (!synthesizer_ || synthesizing_ || queued_.empty()) return;
   taskSegment_ = queued_.front();
   queued_.pop_front();
   synthesizing_ = true;
@@ -394,7 +413,7 @@ void Pipeline::Interrupt() {
   chat_->Cancel();
   chatActive_ = false;
   queued_.clear();
-  synthesizer_->Cancel();
+  if (synthesizer_) synthesizer_->Cancel();
   synthesizing_ = false;
   if (!pendingTools_.empty()) {
     if (callbacks_.interruptTools) callbacks_.interruptTools();
@@ -406,8 +425,8 @@ void Pipeline::Interrupt() {
     }
     pendingTools_.clear();
   } else {
-    // Only what the user heard of this round stays in the conversation.
-    const auto spoken = SpokenText(played);
+    // Only what the user heard (or, for a typed message, saw) of this round stays in the conversation.
+    const auto spoken = voiceReply_ ? SpokenText(played) : roundText_;
     if (!spoken.empty()) messages_.push_back({{"role", "assistant"}, {"content", spoken}});
     Record(ConversationEvent::Type::AssistantTranscript, spoken, ReplyId());
   }
@@ -429,6 +448,10 @@ void Pipeline::Reset(bool failed) {
   if (replyActive_) {
     chat_->Cancel();
     replyActive_ = chatActive_ = false;
+    // The context outlives this pipeline: every tool call keeps a result.
+    for (const auto& id : pendingTools_)
+      messages_.push_back({{"role", "tool"}, {"tool_call_id", id}, {"content", nlohmann::json{{"ok", false}, {"interrupted", true},
+          {"error", "对话已中断，操作可能已经生效，请查询实际状态。"}}.dump()}});
     Record(failed ? ConversationEvent::Type::Failed : ConversationEvent::Type::Interrupted);
   }
   callbacks_.stopPlayback();
@@ -440,7 +463,7 @@ void Pipeline::Reset(bool failed) {
   commits_.clear();
   queued_.clear();
   pendingTools_.clear();
-  synthesizer_->Cancel();
+  if (synthesizer_) synthesizer_->Cancel();
   synthesizing_ = false;
   if (analyzer_) analyzer_->Reset();
   local_->Reset();
@@ -478,7 +501,7 @@ bool Pipeline::Tick() {
     OnTranscript(Trimmed(result.text), tentative);
   }
   for (const auto& event : chat_->Poll()) { progressed = true; OnChat(event); }
-  for (auto& output : synthesizer_->Poll()) {
+  if (synthesizer_) for (auto& output : synthesizer_->Poll()) {
     if (!synthesizing_ || output.id != taskId_) continue;
     progressed = true;
     if (!output.pcm.empty()) OnAudio(output.pcm);

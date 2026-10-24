@@ -48,7 +48,8 @@ class Pipeline {
   // Transcribes one utterance of 16 kHz mono PCM on this machine.
   using Transcriber = std::function<std::string(const std::string& pcm)>;
   // A null analyzer limits the pipeline to push-to-talk turns. Recognition runs
-  // on a worker thread unless threadedRecognition is false (tests).
+  // on a worker thread unless threadedRecognition is false (tests). A null
+  // synthesizer gives a text-only pipeline that only takes SubmitText().
   Pipeline(CascadeConfig config, Callbacks callbacks, nlohmann::json tools,
            std::unique_ptr<TurnAnalyzer> analyzer, std::unique_ptr<ChatBackend> chat,
            std::unique_ptr<Synthesizer> synthesizer, Transcriber transcribe, bool threadedRecognition = true);
@@ -59,7 +60,16 @@ class Pipeline {
   void AppendInput(const std::string& pcm);
   void EndInput();
   void CompleteTool(const std::string& callId, const nlohmann::json& result);
+  // A typed message from the panel: interrupts any reply and is answered in
+  // text only, never spoken.
+  void SubmitText(const std::string& text);
+  // Stops the current reply, keeping what was shown or heard in the context.
+  void StopReply();
+  // Chat context, carried across pipelines so voice and text share one conversation.
+  const nlohmann::json& Context() const { return messages_; }
+  void SetContext(nlohmann::json messages) { messages_ = std::move(messages); TrimContext(); }
   bool Recording() const { return inputOpen_; }
+  bool Replying() const { return replyActive_; }
   bool WaitingForReply() const;
   bool Busy() const;
   bool HandsFree() const { return analyzer_ != nullptr; }
@@ -86,7 +96,7 @@ class Pipeline {
   void OnInterim(const std::string& text);
   void OnTranscript(const std::string& text, bool tentative);
 
-  void StartReply(const std::string& text);
+  void StartReply(const std::string& text, bool voice = true);
   void RequestChat();
   void OnChat(const ChatEvent& event);
   void Speak(const std::string& sentence);
@@ -128,6 +138,7 @@ class Pipeline {
   uint64_t turn_ = 0;
   int round_ = 0, rounds_ = 0;
   bool replyActive_ = false, chatActive_ = false, roundDone_ = false, audible_ = false;
+  bool voiceReply_ = true;           // Spoken; typed messages get text-only replies.
   std::string roundText_, replyText_;
   SentenceSplitter splitter_;
   std::set<std::string> pendingTools_;

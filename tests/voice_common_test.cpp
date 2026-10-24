@@ -104,6 +104,12 @@ int main() {
     Check(messageRestore.Snapshot()["list"] == flat, "flat message history restores without changing ordering or summaries");
     messageRestore.Apply({Event::Type::Started, 1, ""});
     Check(messageRestore.Snapshot()["list"].back()["id"] > flat.back()["id"], "new message IDs remain unique after restart");
+    json typedSave;
+    Voice::History typed(json::array(), [&](const json& data) { typedSave = data; });
+    typed.Apply({Event::Type::Started, 4, "", "", {{"input", "text"}}});
+    typed.Apply({Event::Type::UserTranscript, 4, "你好"});
+    Check(typed.Snapshot()["list"][0]["input"] == "text" && Voice::History(typedSave).Snapshot()["list"][0]["input"] == "text" &&
+          !flat[0].contains("input"), "typed messages are marked apart from voice transcripts and restored");
     auto huge = json::object();
     for (const auto* field : {"action", "section", "query", "question", "target", "url"}) huge[field] = std::string(1500, 'x');
     messageRestore.Apply({Event::Type::ToolStarted, 1, "web_search", "huge", huge});

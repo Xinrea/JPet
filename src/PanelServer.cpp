@@ -578,6 +578,23 @@ void PanelServer::doServe() {
     }
     res.set_content(VoiceChat::GetInstance()->SpeechModelStatus().dump(), "application/json");
   });
+  server->Post("/api/voice/chat", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, true, 8192)) return;
+    const auto payload = nlohmann::json::parse(req.body, nullptr, false);
+    std::string error = "消息格式不正确";
+    if (!payload.is_object() || !payload.contains("text") || !payload["text"].is_string() ||
+        !VoiceChat::GetInstance()->SendText(payload["text"].get<std::string>(), error)) {
+      res.status = 400;
+      res.set_content(nlohmann::json{{"error", error}}.dump(), "application/json");
+      return;
+    }
+    res.set_content(R"({"success":true})", "application/json");
+  });
+  server->Post("/api/voice/chat/stop", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, false)) return;
+    VoiceChat::GetInstance()->StopReply();
+    res.set_content(R"({"success":true})", "application/json");
+  });
   server->Get("/api/voice/history", [](const httplib::Request&, httplib::Response& res) {
     res.set_header("Cache-Control", "no-store");
     res.set_content(VoiceChat::GetInstance()->History().dump(), "application/json");

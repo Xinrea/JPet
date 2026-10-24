@@ -86,7 +86,7 @@ bool VoiceChat::SpeechModelAction(const std::string& action, std::string& error)
   if (action == "download") for (auto* store : stores) store->Download();
   else if (action == "cancel") for (auto* store : stores) store->Cancel();
   else if (action == "remove") {
-    if (connected_) { error = "请先结束语音对话再删除模型"; return false; }
+    if (connected_ && voice_) { error = "请先结束语音对话再删除模型"; return false; }
     std::lock_guard<std::mutex> lock(recognizerMutex_);
     localRecognizer_.reset();
     recognizerError_.clear();
@@ -97,21 +97,25 @@ bool VoiceChat::SpeechModelAction(const std::string& action, std::string& error)
   return true;
 }
 
-bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& key) {
+bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& key, bool voice) {
   auto* data = DataManager::GetInstance();
   const auto settings = data->GetVoiceSettings();
-  const auto stores = ModelStores();
-  const auto modelDirectory = stores[0]->Installed(), synthesisDirectory = stores[1]->Installed();
-  if (modelDirectory.empty() || synthesisDirectory.empty()) {
-    SetState("error", "本机语音模型尚未下载，请在对话 → 语音对话设置中下载");
-    return false;
-  }
-  std::string synthesisError;
-  Voice::VoiceReference voice;
-  if (!Voice::LocalSynthesisAvailable(synthesisError) || !Voice::LoadVoiceReference(
-          LAppPal::WStringToString(LAppDefine::execPath) + "resources/models/joi-voice.json", voice, synthesisError)) {
-    SetState("error", synthesisError);
-    return false;
+  std::string modelDirectory, synthesisDirectory;
+  Voice::VoiceReference reference;
+  if (voice) {
+    const auto stores = ModelStores();
+    modelDirectory = stores[0]->Installed();
+    synthesisDirectory = stores[1]->Installed();
+    if (modelDirectory.empty() || synthesisDirectory.empty()) {
+      SetState("error", "本机语音模型尚未下载，请在对话 → 语音对话设置中下载");
+      return false;
+    }
+    std::string synthesisError;
+    if (!Voice::LocalSynthesisAvailable(synthesisError) || !Voice::LoadVoiceReference(
+            LAppPal::WStringToString(LAppDefine::execPath) + "resources/models/joi-voice.json", reference, synthesisError)) {
+      SetState("error", synthesisError);
+      return false;
+    }
   }
   const auto profile = LAppPal::WStringToString(LAppDefine::documentPath);
   Voice::CascadeConfig config;
@@ -132,7 +136,7 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
   // Hands-free turns need the local models; without them the shortcut still
   // works as push-to-talk (press to speak, press or release to send).
   std::unique_ptr<Voice::TurnAnalyzer> analyzer;
-  if (!vad_ && turnModelError_.empty()) {
+  if (voice && !vad_ && turnModelError_.empty()) {
     const auto directory = LAppPal::WStringToString(LAppDefine::execPath) + "resources/models/";
     auto vadModel = Voice::OnnxModel::Load(directory + "silero_vad.onnx", turnModelError_);
     auto turnModel = vadModel ? Voice::OnnxModel::Load(directory + "smart-turn-v3.2-cpu.onnx", turnModelError_) : nullptr;
@@ -141,17 +145,20 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
       smartTurn_ = std::make_unique<Voice::SmartTurn>(std::move(turnModel));
     } else LAppPal::PrintLog(LogLevel::Error, "[Voice] Local turn detection unavailable: %s", turnModelError_.c_str());
   }
-  if (vad_) {
+  if (voice && vad_) {
     vad_->Reset();
     analyzer = std::make_unique<Voice::TurnAnalyzer>(std::make_unique<Voice::TurnDetector>(
         [this](const float* frame) { return vad_->Probability(frame); },
         [this](const std::vector<int16_t>& audio) { return smartTurn_->Probability(audio); }));
   }
   // The synthesis model starts loading now, while the user is still speaking.
-  const auto& files = Voice::SpeechModelStore::SynthesisFiles();
-  auto synthesizer = Voice::MakeLocalSynthesizer(
-      {synthesisDirectory + "/" + files[0].name, synthesisDirectory + "/" + files[1].name}, std::move(voice),
-      [](const std::string& line) { LAppPal::PrintLog("%s", line.c_str()); });
+  std::unique_ptr<Voice::Synthesizer> synthesizer;
+  if (voice) {
+    const auto& files = Voice::SpeechModelStore::SynthesisFiles();
+    synthesizer = Voice::MakeLocalSynthesizer(
+        {synthesisDirectory + "/" + files[0].name, synthesisDirectory + "/" + files[1].name}, std::move(reference),
+        [](const std::string& line) { LAppPal::PrintLog("%s", line.c_str()); });
+  }
   Voice::Pipeline::Callbacks callbacks{
     [this](const std::string& pcm) { PlayReply(pcm); },
     [this] { return platform_->IsPlaying(); },
@@ -178,9 +185,11 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
     }
     return localRecognizer_ ? localRecognizer_->Transcribe(pcm) : std::string{};
   });
-  LAppPal::PrintLog("[Voice] Connect chat_model=%s custom_chat=%d hands_free=%d",
-      settings.at("chat_model").get<std::string>().c_str(), baseUrl.empty() ? 0 : 1, pipeline_->HandsFree() ? 1 : 0);
-  if (!pipeline_->HandsFree() && !turnModelError_.empty())
+  pipeline_->SetContext(context_);
+  LAppPal::PrintLog("[Voice] Connect chat_model=%s custom_chat=%d voice=%d hands_free=%d context=%zu",
+      settings.at("chat_model").get<std::string>().c_str(), baseUrl.empty() ? 0 : 1, voice ? 1 : 0,
+      pipeline_->HandsFree() ? 1 : 0, context_.size());
+  if (voice && !pipeline_->HandsFree() && !turnModelError_.empty())
     SetState("connecting", turnModelError_ + "；快捷键改为按一下开始、再按一下发送");
   return true;
 }
@@ -194,6 +203,7 @@ void VoiceChat::SetState(const std::string& state, const std::string& message) {
     else if (state == "thinking") text = "轴伊正在思考…";
     // A muted reply still plays (silently) and keeps its timing, so say why nothing is heard.
     else if (state == "speaking") text = ReplyVolume() > 0 ? "轴伊正在回复…" : "JPet 已静音，听不到轴伊的回复";
+    else if (state == "replying") text = "轴伊正在回复…";
     else text = std::string(holdMode ? "按住 " : "按 ") + Shortcut + " 开启麦克风";
   }
   const bool microphoneOn = Recording();
@@ -231,27 +241,53 @@ nlohmann::json VoiceChat::Status() {
 
 bool VoiceChat::IsBusy() const { return busy_; }
 
-void VoiceChat::Begin() {
+bool VoiceChat::SendText(const std::string& text, std::string& error) {
+  const auto first = text.find_first_not_of(" \t\r\n");
+  if (first == std::string::npos) { error = "消息不能为空"; return false; }
+  if (text.size() > 6000) { error = "消息太长，请精简后再发送"; return false; }
+  auto* data = DataManager::GetInstance();
+  if (!Voice::ValidWorkspace(data->GetConfig<std::string>("voice", "workspace_id", "")) ||
+      !data->GetConfig<bool>("voice", "has_api_key", false)) {
+    error = "请先在语音对话设置中填写 API Key 和业务空间 ID";
+    return false;
+  }
+  if (!data->GetVoiceSettings().at("chat_base_url").get<std::string>().empty() &&
+      !data->GetConfig<bool>("voice", "has_chat_api_key", false)) {
+    error = "请在语音对话设置中填写自定义大模型的 API Key";
+    return false;
+  }
+  std::lock_guard<std::mutex> lock(textMutex_);
+  if (texts_.size() >= 4) { error = "消息发送太快了，请稍后再试"; return false; }
+  texts_.push_back(text);
+  return true;
+}
+
+bool VoiceChat::Connect(bool voice) {
+  if (connected_ && (voice_ || !voice)) return true;
   auto* data = DataManager::GetInstance();
   const auto workspace = data->GetConfig<std::string>("voice", "workspace_id", "");
   if (!Voice::ValidWorkspace(workspace) || !data->GetConfig<bool>("voice", "has_api_key", false)) {
     SetState("error", "请先在对话 → 语音对话设置中填写 API Key 和业务空间 ID");
+    return false;
+  }
+  std::string error;
+  const auto key = Voice::LoadApiKey(LAppPal::WStringToString(LAppDefine::documentPath), error);
+  if (!error.empty() || key.empty()) {
+    SetState("error", error.empty() ? "未找到 API Key，请在语音对话设置中重新保存" : error);
+    return false;
+  }
+  if (connected_) Close();  // Text-only so far; the conversation continues with voice.
+  if (!StartPipeline(workspace, key, voice)) return false;
+  connected_ = true;
+  voice_ = voice;
+  return true;
+}
+
+void VoiceChat::Begin() {
+  auto* data = DataManager::GetInstance();
+  if (!Connect(true)) {
     shortcut_.BlockUntilRelease();
     return;
-  }
-  if (!connected_) {
-    std::string error;
-    const auto key = Voice::LoadApiKey(LAppPal::WStringToString(LAppDefine::documentPath), error);
-    if (!error.empty() || key.empty()) {
-      SetState("error", error.empty() ? "未找到 API Key，请在语音对话设置中重新保存" : error);
-      shortcut_.BlockUntilRelease();
-      return;
-    }
-    if (!StartPipeline(workspace, key)) {
-      shortcut_.BlockUntilRelease();
-      return;
-    }
-    connected_ = true;
   }
   if (!tools_) tools_ = std::make_unique<Voice::ToolExecutor>(Voice::MakeToolDependencies());
   capturedBytes_ = 0;
@@ -305,7 +341,10 @@ void VoiceChat::Close(bool failed) {
   if (tools_) tools_->Cancel();
   Voice::CancelSettingsTools();
   platform_->StopCapture();
-  if (pipeline_) pipeline_->Reset(failed);
+  if (pipeline_) {
+    pipeline_->Reset(failed);
+    context_ = pipeline_->Context();
+  }
   pipeline_.reset();  // Joins its recognition and synthesis workers; the synthesis model goes with it.
   {
     // SenseVoice holds about half a gigabyte; reload it (about a second) next time.
@@ -313,7 +352,7 @@ void VoiceChat::Close(bool failed) {
     localRecognizer_.reset();
     recognizerError_.clear();
   }
-  connected_ = microphoneEnabled_ = false;
+  connected_ = voice_ = microphoneEnabled_ = false;
   busy_ = false;
 }
 
@@ -333,6 +372,7 @@ void VoiceChat::Tick(GLFWwindow* window) {
   const bool held = platform_->ShortcutHeld();
   if (resetRequested_.exchange(false)) {
     Close();
+    context_ = nlohmann::json::array();
     shortcut_.BlockUntilRelease(held);
     SetState("idle");
   }
@@ -348,6 +388,22 @@ void VoiceChat::Tick(GLFWwindow* window) {
   if (action == Voice::ShortcutControl::Action::Begin) Begin();
   else if (action == Voice::ShortcutControl::Action::End) End();
   Drain();
+  std::vector<std::string> texts;
+  {
+    std::lock_guard<std::mutex> lock(textMutex_);
+    texts.swap(texts_);
+  }
+  for (const auto& text : texts) {
+    if (!Connect(false)) break;
+    LAppPal::PrintLog("[Voice] Text message bytes=%zu", text.size());
+    if (!tools_) tools_ = std::make_unique<Voice::ToolExecutor>(Voice::MakeToolDependencies());
+    pipeline_->SubmitText(text);
+    lastActivity_ = Clock::now();
+  }
+  if (stopRequested_.exchange(false) && pipeline_) {
+    pipeline_->StopReply();
+    lastActivity_ = Clock::now();
+  }
   Voice::DrainSettingsTools();
   if (tools_) for (const auto& result : tools_->Poll()) {
     LAppPal::PrintLog("[Voice] Tool completed ok=%d code=%s output_bytes=%zu",
@@ -372,12 +428,16 @@ void VoiceChat::Tick(GLFWwindow* window) {
   }
   if (pipeline_ && pipeline_->Tick()) lastActivity_ = Clock::now();
   if (connected_ && pipeline_->WaitingForReply() && now - lastActivity_ > std::chrono::seconds(45))
-    Fail("轴伊回复超时，请按快捷键重新开启麦克风");
+    Fail(voice_ ? "轴伊回复超时，请按快捷键重新开启麦克风" : "轴伊回复超时，请重新发送消息");
   else if (connected_ && !pipeline_->Busy() && !platform_->IsPlaying() && now - lastActivity_ > std::chrono::minutes(2)) {
     Close();
     SetState("idle");
   }
   busy_ = (pipeline_ && pipeline_->Busy()) || platform_->IsPlaying();
+  {
+    std::lock_guard<std::mutex> lock(statusMutex_);
+    status_["replying"] = pipeline_ && pipeline_->Replying();
+  }
   const auto state = Status().value("state", std::string{});
   if (state == "speaking" && !(pipeline_ && pipeline_->WaitingForReply()) && !platform_->IsPlaying())
     SetState(Recording() ? "listening" : "idle");

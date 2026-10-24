@@ -35,6 +35,7 @@ class History {
         const auto id = item["id"].get<uint64_t>(), turn = item["turn_id"].get<uint64_t>();
         if ((role != "user" && role != "assistant" && role != "tool") || id <= nextId_ || item["text"].get_ref<const std::string&>().size() > 16000) continue;
         auto message = json{{"id", id}, {"turn_id", turn}, {"created_at", item["created_at"]}, {"role", role}, {"text", item["text"]}, {"state", state}};
+        if (role == "user" && item.value("input", json()) == "text") message["input"] = "text";  // Typed, not transcribed.
         if (role == "tool") {
           message["name"] = KnownTool(item.contains("name") && item["name"].is_string() ? item["name"].get<std::string>() : "");
           message["text"] = "";
@@ -54,6 +55,7 @@ class History {
       const auto turn = ++nextTurn_;
       turns_[event.turn] = turn;
       Add(turn, "user", "", "pending");
+      if (event.data.value("input", "") == "text") entries_.back()["input"] = "text";
     } else {
       const auto found = turns_.find(event.turn);
       if (found == turns_.end()) return;

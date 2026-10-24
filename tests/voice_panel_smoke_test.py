@@ -94,6 +94,12 @@ def main(gui=False, app=APP):
             assert voice["speech_model"]["state"] == "missing" and voice["speech_model"]["total"] > 1_500_000_000
             code, history = request(port, "/api/voice/history")
             assert code == 200 and history == {"list": [], "limit": 200, "error": ""}
+            # Typed chat needs a message and the AI service settings; nothing is queued without them.
+            assert voice["replying"] is False
+            for message, error in [({"text": "  "}, "消息不能为空"), ({"text": 1}, "消息格式不正确"), ({"text": "你好"}, "API Key")]:
+                code, result = request(port, "/api/voice/chat", message)
+                assert code == 400 and error in result["error"], result
+            assert request(port, "/api/voice/chat/stop", {})[0] == 200
             # These requests never create a credential in the real keychain.
             assert request(port, "/api/config/voice", {"workspace_id": "ws-123"})[0] == 200
             assert request(port, "/api/config/voice")[1]["workspace_id"] == "ws-123"
