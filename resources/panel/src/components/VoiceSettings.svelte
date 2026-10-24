@@ -255,19 +255,17 @@
       </div>
       {#if modelsError}<p class="feedback error" role="alert">{modelsError}</p>{/if}
       {#if chatModel && typeof listedVision === "boolean"}
-      <p class="setting-help">{listedVision ? "该模型支持图片输入，轴伊可以查看桌面；截图只发给这个模型，只用于当次回复。" : "该模型不支持图片输入，轴伊无法查看桌面。"}</p>
+      <p class="setting-help">{listedVision ? "支持图片，可以查看桌面" : "不支持图片，无法查看桌面"}</p>
       {:else if chatModel}
-      <SettingToggle label="支持图片输入" description="模型能读取图片时开启，轴伊就可以查看桌面" bind:checked={chatVision} disabled={voiceLoading || chatSaving} />
+      <SettingToggle label="支持图片输入" bind:checked={chatVision} disabled={voiceLoading || chatSaving} />
       {/if}
-      {#if chatProvider === "openrouter"}<p class="setting-help">只列出支持工具调用、且可以关闭推理的模型，以便语音回复尽快开始。</p>{/if}
       {/if}
-      <p class="setting-help">API Key 保存在本机系统凭据存储中，只发送给所选服务。保存后下一次对话生效。</p>
       <div class="setting-actions"><Button size="sm" on:click={() => saveChatSettings()} disabled={voiceLoading || chatSaving || !chatProvider}>{chatSaving ? "保存中…" : "保存大模型设置"}</Button>{#if chatProvider && chatHasKey && chatProvider === savedProvider}<Button size="sm" color="alternative" on:click={() => saveChatSettings(true)} disabled={voiceLoading || chatSaving}>移除 Key</Button>{/if}</div>
       {#if voiceError || chatError}<p class="feedback error" role="alert">{chatError || voiceError}</p>{/if}
       {#if chatMessage}<p class="feedback success" role="status">{chatMessage}</p>{/if}
     </SettingCard>
     <SettingCard title="对话与工具状态" description="查看最近的回复和执行结果" icon="spark">
-      <p class="setting-help">可调整声音、显示、桌面互动、通知、轮盘和装扮，查看桌面、查询游戏数据、安排或取消任务、升级属性、搜索 B 站，以及用默认浏览器打开网页。B 站搜索使用当前登录账号；模型支持图片输入时可以查看桌面，截图会发送给所选大模型，Mac 首次使用需允许录屏权限。</p>
+      <p class="setting-help">可调整声音、显示、桌面互动、通知、轮盘和装扮，查看桌面、查询游戏数据、安排或取消任务、升级属性、搜索 B 站，以及用默认浏览器打开网页。B 站搜索使用当前登录账号；查看桌面会把截图发给所选大模型，Mac 首次使用需允许录屏权限。</p>
       {#if voiceStatus?.message}<p class="feedback" class:error={voiceStatus.state === "error"} aria-live="polite">{voiceStatus.message}</p>{/if}
       {#if voiceStatus?.reply}<p class="voice-reply">{voiceStatus.reply}</p>{/if}
       {#if voiceStatus?.last_tool}
