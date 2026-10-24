@@ -456,7 +456,11 @@ if(JPET_BUILD_GAME_TESTS)
   foreach(test_target game_test achievements_test)
     set_target_properties(${test_target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
     target_include_directories(${test_target} PRIVATE src)
-    target_compile_options(${test_target} PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+    # These tests use assert(); keep their checks active in Release CI builds.
+    target_compile_options(${test_target} PRIVATE
+      "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>"
+      "$<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>"
+      "$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>")
     target_link_libraries(${test_target} PRIVATE nlohmann_json::nlohmann_json)
   endforeach()
   add_test(NAME game COMMAND game_test)
