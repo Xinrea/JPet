@@ -1,6 +1,8 @@
 #include "VoiceToolsNetwork.hpp"
 #include "VoiceTools.hpp"
 #include "VoiceBilibili.hpp"
+#include "VoiceWebSearch.hpp"
+#include "VoiceToolArgs.hpp"
 #include "BilibiliDynamic.hpp"
 #include <cpr/cpr.h>
 #include <algorithm>
@@ -34,6 +36,37 @@ HttpResult Request(const std::string& url, const cpr::Header& headers) {
 }
 
 } // namespace
+json QueryWebSearch(const json& request, const std::function<bool()>& cancelled) {
+  // Fixed HTTPS endpoint only; never send JPet cookies, model keys, or follow result links.
+  ToolArgs::Fields(request, {"query", "limit"});
+  const auto query = ToolArgs::Text(request, "query", 512);
+  if (query.empty()) return Fail("请提供搜索关键词query");
+  const auto limit = ToolArgs::Number(request, "limit", 1, 5, 5);
+  const auto live = [&] { return !cancelled || !cancelled(); };
+  if (!live()) return Fail("网页搜索已取消");
+  std::string received;
+  bool tooLarge = false;
+  const cpr::WriteCallback write{[&](std::string data, intptr_t) {
+    if (!live()) return false;
+    if (received.size() + data.size() > 2 * 1024 * 1024) { tooLarge = true; return false; }
+    received += data;
+    return true;
+  }};
+  const cpr::ProgressCallback progress{[&](cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, cpr::cpr_pf_arg_t, intptr_t) {
+    return live();
+  }};
+  const auto response = cpr::Get(cpr::Url{"https://html.duckduckgo.com/html/"},
+    cpr::Parameters{{"q", query}}, cpr::Header{{"User-Agent", "JPet/3.0 (web search)"}, {"Accept", "text/html"}},
+    cpr::Timeout{15000}, cpr::ConnectTimeout{3000}, cpr::Redirect{false}, write, progress);
+  if (!live()) return Fail("网页搜索已取消");
+  if (tooLarge) return Fail("DuckDuckGo搜索响应过大，请缩小搜索范围");
+  if (response.status_code == 202 || response.status_code == 403 || response.status_code == 429)
+    return Fail("DuckDuckGo要求验证或暂时限流，请稍后重试");
+  if (response.error.code != cpr::ErrorCode::OK) return Fail("网页搜索网络请求失败或超时，请稍后重试");
+  if (response.status_code != 200) return Fail("DuckDuckGo搜索服务暂时不可用，请稍后重试");
+  return ParseDuckDuckGoSearch(received, query, static_cast<size_t>(limit));
+}
+
 json QueryBilibili(const json& request, const std::string& cookies, const std::string& uid) {
   if (cookies.size() > 65536 || cookies.find_first_of("\r\n") != std::string::npos) return Fail("B站登录信息格式异常，请重新登录");
   const auto built = BilibiliDynamic::BuildHeaders(cookies, BilibiliDynamic::kDefaultUserAgent, {},

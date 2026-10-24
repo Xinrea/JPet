@@ -17,7 +17,7 @@ Voice::ToolCall Call(const char* name, json args) { return {"c1", name, args.dum
 int main() {
   try {
     const auto definitions = Voice::ToolDefinitions();
-    Check(definitions.size() == 13, "focused queries and action tools registered within relay limit");
+    Check(definitions.size() == 15, "focused queries and action tools registered within relay limit");
     for (const auto& definition : definitions) Check(definition["type"] == "function" &&
       definition["function"]["parameters"]["additionalProperties"] == false, "nested Qwen schema with closed arguments");
     const std::map<std::string, WatchTarget> watchTargets = {
@@ -224,7 +224,53 @@ int main() {
     Check(run("view_desktop", json::object())["ok"] == true && last["display"] == 0, "desktop defaults to main monitor");
     Check(run("view_desktop", {{"display", 8}})["ok"] == false, "bounded monitor selection");
     Check(run("view_desktop", {{"question", "看看屏幕"}})["code"] == "invalid_arguments", "the model looks at the screenshot itself");
-    Check(run("web_search", {{"query", "今天的天气"}})["ok"] == false, "web search is no longer a tool");
+    Check(run("web_search", {{"query", "今天的天气"}})["ok"] == false, "missing web search adapter reports failure");
+    int searches = 0;
+    dependencies.webSearch = [&](const json& request, const std::function<bool()>& cancelled) {
+      ++searches; last = request;
+      Check(!cancelled || !cancelled(), "search adapter receives cancellation predicate");
+      return json{{"ok", true}, {"results", json::array({{{"title", "天气"}, {"url", "https://example.com"}, {"snippet", "天气信息"}}})}};
+    };
+    Check(run("web_search", {{"query", "  今天的天气  "}})["ok"] == true &&
+      last == json{{"query", "今天的天气"}, {"limit", 5}}, "web search trims query and defaults to five results");
+    Check(run("web_search", {{"query", "C++ & 中文"}, {"limit", 1}})["results"].size() == 1 && last["limit"] == 1,
+      "web search forwards explicit limit and structured results");
+    const int beforeBadSearches = searches;
+    for (const auto& request : {json::object(), json::array(), json{{"query", ""}}, json{{"query", "   "}},
+      json{{"query", 42}}, json{{"query", std::string(513, 'x')}}, json{{"query", "x\nCookie: secret"}},
+      json{{"query", std::string("x\0y", 3)}}, json{{"query", "x"}, {"limit", 0}}, json{{"query", "x"}, {"limit", 6}},
+      json{{"query", "x"}, {"limit", 1.5}}, json{{"query", "x"}, {"limit", "2"}},
+      json{{"query", "x"}, {"url", "https://evil.test"}}})
+      Check(run("web_search", request)["code"] == "invalid_arguments", "invalid web searches rejected before network dispatch");
+    Check(Voice::ExecuteTool(Call("web_search", {{"query", "x"}}), dependencies, [] { return true; })["ok"] == false && searches == beforeBadSearches,
+      "invalid or already cancelled web searches never reach network adapter");
+    Check(Voice::ToolLabel("web_search") == "正在搜索网页…", "web search has a readable progress label");
+    dependencies.webSearch = [](const json&, const std::function<bool()>&) { return json{{"ok", false}, {"error", "DuckDuckGo暂时限流"}}; };
+    Check(run("web_search", {{"query", "x"}})["error"] == "DuckDuckGo暂时限流", "search service errors remain failures");
+    dependencies.webSearch = [](const json&, const std::function<bool()>&) -> json { throw std::runtime_error("private request headers"); };
+    Check(run("web_search", {{"query", "x"}})["error"] != "private request headers", "raw network exceptions are not exposed");
+    dependencies.webSearch = {};
+    Check(run("web_fetch", {{"url", "https://example.com"}})["ok"] == false, "missing fetch adapter fails");
+    int fetches = 0;
+    dependencies.webFetch = [&](const json& request, const std::function<bool()>& cancelled) {
+      ++fetches; last = request;
+      Check(!cancelled || !cancelled(), "fetch cancellation predicate forwarded");
+      return json{{"ok", true}, {"content", "Page text"}, {"url", request["url"]}};
+    };
+    Check(run("web_fetch", {{"url", " HTTPS://example.com/a%2Fb?sig=x%2Fy "}})["content"] == "Page text" &&
+      last == json{{"url", "https://example.com/a%2Fb?sig=x%2Fy"}}, "fetch validates URL and preserves signed query bytes");
+    const int beforeBadFetches = fetches;
+    for (const auto& request : {json::object(), json::array(), json{{"url", ""}}, json{{"url", 42}},
+      json{{"url", "file:///etc/passwd"}}, json{{"url", "https://user:pass@example.com"}},
+      json{{"url", "https://example.com/%ZZ"}}, json{{"url", "https://example.com/" + std::string(2048, 'x')}},
+      json{{"url", "https://example.com"}, {"headers", {{"Cookie", "secret"}}}}})
+      Check(run("web_fetch", request)["code"] == "invalid_arguments", "invalid fetch request rejected before dispatch");
+    Check(Voice::ExecuteTool(Call("web_fetch", {{"url", "https://example.com"}}), dependencies, [] { return true; })["ok"] == false && fetches == beforeBadFetches,
+      "invalid or cancelled fetch never dispatches");
+    dependencies.webFetch = [](const json&, const std::function<bool()>&) { return json{{"ok", false}, {"error", "网页不可用"}}; };
+    Check(run("web_fetch", {{"url", "https://example.com"}})["error"] == "网页不可用", "fetch service errors remain failures");
+    Check(Voice::ToolLabel("web_fetch") == "正在读取网页…", "fetch progress label");
+    dependencies.webFetch = {};
     for (const auto* type : {"video", "user", "live", "article", "bangumi", "film"})
       Check(run("bilibili", {{"action", "search"}, {"query", "千问"}, {"type", type}})["ok"] == true && last["type"] == type, "six Bilibili search categories");
     Check(run("bilibili", {{"action", "search"}, {"query", "千问"}})["ok"] == true &&

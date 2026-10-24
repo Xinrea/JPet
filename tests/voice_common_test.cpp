@@ -129,6 +129,13 @@ int main() {
     const auto compact = messageRestore.Snapshot()["list"].back();
     Check(compact["arguments"].dump().size() <= 4096 && compact["result"].dump().size() <= 4096,
         "invalid fields and saved summaries are bounded by total bytes, not just per-field size");
+    messageRestore.Apply({Event::Type::ToolStarted, 1, "web_fetch", "fetch", {{"url", "https://example.com"}}});
+    messageRestore.Apply({Event::Type::ToolCompleted, 1, "", "fetch", {{"ok", true}, {"provider", "deepseek"},
+      {"url", "https://example.com"}, {"title", "Example"}, {"format", "markdown"}, {"truncated", true},
+      {"content", "private page body"}, {"api_key", "private credential"}}});
+    const auto fetched = messageRestore.Snapshot()["list"].back();
+    Check(fetched["name"] == "web_fetch" && fetched["result"]["provider"] == "deepseek" && fetched["result"]["truncated"] == true &&
+      !fetched["result"].contains("content") && !fetched["result"].contains("api_key"), "fetch history retains only bounded metadata, never page body or credentials");
     bool rejectSave = true;
     Voice::History unavailable(json::array(), [&](const json&) { if (rejectSave) throw std::runtime_error("disk failure"); });
     unavailable.Apply({Event::Type::Started, 1, ""});

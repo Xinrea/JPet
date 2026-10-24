@@ -22,7 +22,7 @@
   let destroyed = false;
   let stickToBottom = true;
   const states = { pending: "进行中", completed: "已完成", interrupted: "已打断", failed: "失败" };
-  const tools = { view_desktop: "查看桌面", get_game_profile: "查询属性", get_game_clothes: "查询服装", get_task_catalog: "查询任务目录", get_current_task: "查询当前任务", get_task_queue: "查询任务队列", get_task_history: "查询任务历史", get_game_achievements: "查询成就", get_game_statistics: "查询统计", game_action: "游戏操作", jpet_settings: "JPet 设置", web_search: "网页搜索", bilibili: "B站", bilibili_search: "B站搜索", open_url: "打开网页" };
+  const tools = { view_desktop: "查看桌面", get_game_profile: "查询属性", get_game_clothes: "查询服装", get_task_catalog: "查询任务目录", get_current_task: "查询当前任务", get_task_queue: "查询任务队列", get_task_history: "查询任务历史", get_game_achievements: "查询成就", get_game_statistics: "查询统计", game_action: "游戏操作", jpet_settings: "JPet 设置", web_search: "网页搜索", web_fetch: "读取网页", bilibili: "B站", bilibili_search: "B站搜索", open_url: "打开网页" };
   const suggestions = ["我现在有多少经验？", "有哪些任务可以做？", "搜一下今天的新闻", "把音量调到 30"];
   const format = value => JSON.stringify(value || {}, null, 2);
 
