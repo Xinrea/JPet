@@ -19,6 +19,8 @@
 
 @interface JPetVoiceIndicatorView : NSView
 @property(nonatomic) BOOL error;
+@property(nonatomic, copy) NSString* shortcutHint;
+@property(nonatomic) int pulseFrame;
 @end
 
 @implementation JPetVoiceIndicatorView
@@ -55,11 +57,23 @@
     NSForegroundColorAttributeName:NSColor.whiteColor
   }];
   [NSColor.whiteColor setFill];
-  [[NSBezierPath bezierPathWithRoundedRect:NSMakeRect(277, 5, 49, 18) xRadius:7 yRadius:7] fill];
-  [@"Option" drawAtPoint:NSMakePoint(285, 7) withAttributes:@{
+  [[NSBezierPath bezierPathWithRoundedRect:NSMakeRect(150, 5, Width - 164, 18) xRadius:7 yRadius:7] fill];
+  NSMutableParagraphStyle* centered = [[NSMutableParagraphStyle alloc] init];
+  centered.alignment = NSTextAlignmentCenter;
+  [self.shortcutHint drawInRect:NSMakeRect(154, 7, Width - 172, 14) withAttributes:@{
     NSFontAttributeName:[NSFont systemFontOfSize:10 weight:NSFontWeightBold],
-    NSForegroundColorAttributeName:color(self.error ? Error : Ink)
+    NSForegroundColorAttributeName:color(self.error ? Error : Ink),
+    NSParagraphStyleAttributeName:centered
   }];
+  if (self.pulseFrame >= 0) {
+    const double phase = self.pulseFrame / 30.0;
+    const double radius = 18 + 5 * phase;
+    [[color(Accent) colorWithAlphaComponent:.65 * (1 - phase)] setStroke];
+    NSBezierPath* ring = [NSBezierPath bezierPathWithOvalInRect:
+        NSMakeRect(31 - radius, 56 - radius, radius * 2, radius * 2)];
+    ring.lineWidth = 1.5;
+    [ring stroke];
+  }
   [color(soft) setFill];
   [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(14, 39, 34, 34)] fill];
   [color(self.error ? Error : Accent) setStroke];
@@ -79,7 +93,7 @@
   stand.lineCapStyle = NSLineCapStyleRound;
   [stand stroke];
   [color(soft) setFill];
-  NSRectFill(NSMakeRect(0, Height - 5, Width, 5));
+  NSRectFill(NSMakeRect(0, NSHeight(self.bounds) - 5, Width, 5));
   [color(self.error ? ErrorTop : Border) setStroke];
   card.lineWidth = 1;
   [card stroke];
@@ -348,10 +362,10 @@ class MacPlatform final : public Platform {
     state_->player = nil;
   }
 
-  void ShowIndicator(GLFWwindow* window, const std::string& text, bool error) override {
-    if (text.empty()) { [state_->indicator orderOut:nil]; return; }
+  void ShowIndicator(GLFWwindow* window, const Indicator::Content& content) override {
+    if (content.text.empty()) { [state_->indicator orderOut:nil]; return; }
     if (!state_->indicator) {
-      state_->indicator = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, Indicator::Width, Indicator::Height)
+      state_->indicator = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, Indicator::Width, Indicator::MinHeight)
           styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
           backing:NSBackingStoreBuffered defer:NO];
       state_->indicator.releasedWhenClosed = NO;
@@ -363,27 +377,48 @@ class MacPlatform final : public Platform {
       state_->indicator.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
           NSWindowCollectionBehaviorFullScreenAuxiliary;
       state_->indicator.contentView = [[JPetVoiceIndicatorView alloc] initWithFrame:
-          NSMakeRect(0, 0, Indicator::Width, Indicator::Height)];
+          NSMakeRect(0, 0, Indicator::Width, Indicator::MinHeight)];
       state_->label = [NSTextField wrappingLabelWithString:@""];
-      state_->label.frame = NSMakeRect(60, 34, 264, 46);
+      state_->label.frame = NSMakeRect(Indicator::BodyLeft, Indicator::BodyTop, Indicator::BodyWidth,
+          Indicator::MinHeight - Indicator::BodyTop - Indicator::BodyBottom);
       state_->label.font = [NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
       state_->label.alignment = NSTextAlignmentLeft;
-      state_->label.maximumNumberOfLines = 3;
+      state_->label.maximumNumberOfLines = 5;
+      state_->label.lineBreakMode = NSLineBreakByWordWrapping;
+      state_->label.cell.truncatesLastVisibleLine = YES;
       [state_->indicator.contentView addSubview:state_->label];
     }
-    NSString* value = Text(text);
-    if (![state_->label.stringValue isEqualToString:value]) state_->label.stringValue = value;
-    const auto ink = error ? Indicator::Error : Indicator::Ink;
+    NSString* value = Text(content.text);
+    CGFloat height = NSHeight(state_->indicator.frame);
+    if (![state_->label.stringValue isEqualToString:value]) {
+      state_->label.stringValue = value;
+      const auto textSize = [state_->label.cell cellSizeForBounds:NSMakeRect(0, 0, Indicator::BodyWidth, CGFLOAT_MAX)];
+      height = Indicator::HeightForText(static_cast<int>(std::ceil(textSize.height)));
+    }
+    const auto ink = content.error ? Indicator::Error : Indicator::Ink;
     state_->label.textColor = [NSColor colorWithRed:ink.red / 255.0 green:ink.green / 255.0
                                             blue:ink.blue / 255.0 alpha:1];
     JPetVoiceIndicatorView* view = (JPetVoiceIndicatorView*)state_->indicator.contentView;
-    if (view.error != error) { view.error = error; view.needsDisplay = YES; }
+    NSString* hint = Text(content.shortcutHint);
+    const int pulse = content.microphoneOn && !content.error ? Indicator::PulseFrame() : -1;
+    if (view.error != content.error || ![view.shortcutHint isEqualToString:hint] || view.pulseFrame != pulse) {
+      view.error = content.error;
+      view.shortcutHint = hint;
+      view.pulseFrame = pulse;
+      view.needsDisplay = YES;
+    }
     NSWindow* pet = glfwGetCocoaWindow(window);
     NSRect frame = pet.frame;
     NSRect screen = (pet.screen ?: NSScreen.mainScreen).visibleFrame;
     const CGFloat x = std::clamp(NSMidX(frame) - Indicator::Width / 2.0, NSMinX(screen), NSMaxX(screen) - Indicator::Width);
-    const CGFloat y = std::clamp(NSMaxY(frame) + 8, NSMinY(screen), NSMaxY(screen) - Indicator::Height);
-    [state_->indicator setFrameOrigin:NSMakePoint(x, y)];
+    const CGFloat y = std::clamp(NSMaxY(frame) + 8, NSMinY(screen), NSMaxY(screen) - height);
+    state_->label.frame = NSMakeRect(Indicator::BodyLeft, Indicator::BodyTop, Indicator::BodyWidth,
+        height - Indicator::BodyTop - Indicator::BodyBottom);
+    const NSRect target = NSMakeRect(x, y, Indicator::Width, height);
+    if (!NSEqualRects(state_->indicator.frame, target)) {
+      view.needsDisplay = YES;
+      [state_->indicator setFrame:target display:YES];
+    }
     [state_->indicator orderFrontRegardless];
   }
 

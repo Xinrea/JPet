@@ -208,6 +208,7 @@ bool VoiceChat::StartPipeline(Voice::CascadeConfig config, nlohmann::json tools,
     [this](const std::string& reply) {
       std::lock_guard<std::mutex> lock(statusMutex_);
       status_["reply"] = reply;
+      if (!reply.empty()) stateChangedAt_ = Clock::now();
     },
     [this](const std::vector<Voice::ToolCall>& calls) { SubmitTools(calls); },
     [this](const Voice::ConversationEvent& event) { history_.Apply(event); },
@@ -234,7 +235,6 @@ bool VoiceChat::StartPipeline(Voice::CascadeConfig config, nlohmann::json tools,
 }
 
 void VoiceChat::SetState(const std::string& state, const std::string& message) {
-  const bool holdMode = DataManager::GetInstance()->GetConfig<std::string>("voice", "input_mode", "toggle") == "hold";
   std::string text = message;
   if (text.empty()) {
     if (state == "listening") text = "正在听…";
@@ -243,13 +243,10 @@ void VoiceChat::SetState(const std::string& state, const std::string& message) {
     // A muted reply still plays (silently) and keeps its timing, so say why nothing is heard.
     else if (state == "speaking") text = ReplyVolume() > 0 ? "轴伊正在回复…" : "JPet 已静音，听不到轴伊的回复";
     else if (state == "replying") text = "轴伊正在回复…";
-    else text = std::string(holdMode ? "按住 " : "按 ") + Shortcut + " 开启麦克风";
+    else if (state == "error") text = "语音对话出现错误";
+    else text = "等待对话…";
   }
   const bool microphoneOn = Recording();
-  if (microphoneOn && state != "error") {
-    if (holdMode) text += std::string(" 松开 ") + Shortcut + " 后回复";
-    else text += std::string(" 麦克风已开启，再按 ") + Shortcut + " 关闭";
-  }
   {
     std::lock_guard<std::mutex> lock(statusMutex_);
     if (status_["state"] != state || status_["message"] != text) {
@@ -262,6 +259,7 @@ void VoiceChat::SetState(const std::string& state, const std::string& message) {
   }
   indicator_ = text;
   indicatorError_ = state == "error";
+  indicatorNotice_ = indicatorError_ || !message.empty();
 }
 
 nlohmann::json VoiceChat::Status() {
@@ -472,12 +470,23 @@ void VoiceChat::Tick(GLFWwindow* window) {
   {
     std::lock_guard<std::mutex> lock(statusMutex_);
     status_["replying"] = pipeline_ && pipeline_->Replying();
+    status_["microphone_on"] = Recording();
   }
   const auto state = Status().value("state", std::string{});
   if (state == "speaking" && !(pipeline_ && pipeline_->WaitingForReply()) && !platform_->IsPlaying())
     SetState(Recording() ? "listening" : "idle");
-  const bool show = busy_ || now - stateChangedAt_ < std::chrono::seconds(indicatorError_ ? 6 : 2);
-  platform_->ShowIndicator(window_, show ? indicator_ : "", indicatorError_);
+  std::string reply;
+  {
+    std::lock_guard<std::mutex> lock(statusMutex_);
+    reply = status_.value("reply", std::string{});
+  }
+  // Keep the microphone visible for the entire capture, including silent gaps,
+  // and leave the completed reply readable for a few seconds afterwards.
+  const bool show = Recording() || busy_ ||
+      now - stateChangedAt_ < std::chrono::seconds(indicatorError_ || !reply.empty() ? 6 : 2);
+  platform_->ShowIndicator(window_, {
+      show ? Voice::Indicator::BodyText(reply, indicator_, indicatorNotice_) : "",
+      Voice::Indicator::ShortcutHint(Shortcut, holdMode), indicatorError_, Recording()});
 }
 
 void VoiceChat::Stop() {
@@ -485,6 +494,6 @@ void VoiceChat::Stop() {
   Voice::StopSettingsTools();
   // Join before DataManager/platform teardown; no worker may outlive game data.
   tools_.reset();
-  if (window_) platform_->ShowIndicator(window_, "", false);
+  if (window_) platform_->ShowIndicator(window_, {});
   window_ = nullptr;
 }

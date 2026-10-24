@@ -86,6 +86,6 @@ class VoiceChat {
   double capturedEnergy_ = 0;
   int capturedPeak_ = 0;
   std::string indicator_;
-  bool indicatorError_ = false;
+  bool indicatorError_ = false, indicatorNotice_ = false;
   Clock::time_point lastActivity_, stateChangedAt_;
 };

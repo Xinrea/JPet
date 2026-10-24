@@ -1,5 +1,6 @@
 #pragma once
 
+#include "VoiceIndicatorStyle.hpp"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -29,8 +30,8 @@ class Platform {
   // 24 kHz reply samples heard since the last StopPlayback (approximate on
   // devices that buffer ahead).
   virtual uint64_t PlayedSamples() const = 0;
-  virtual void ShowIndicator(GLFWwindow* window, const std::string& text,
-                             bool error) = 0;
+  // Empty content.text hides the HUD. Recording animation is independent of replies.
+  virtual void ShowIndicator(GLFWwindow* window, const Indicator::Content& content) = 0;
   // Microphone and speaker ids from ListAudioDevices; empty means the system
   // default. Streams opened afterwards use them, and a device that is no
   // longer connected falls back to the default.
