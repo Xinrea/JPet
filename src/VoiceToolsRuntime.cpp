@@ -27,7 +27,7 @@ const std::pair<const char*, const char*> appearanceParts[] = {
   {"shoes", "ParamShoes"}, {"tail", "ParamTail"}, {"gun", "ParamGun"}
 };
 
-json ReadSettings(const std::string& section) {
+json ReadSettingsValues(const std::string& section) {
   auto* data = DataManager::GetInstance();
   auto* app = LAppDelegate::GetInstance();
   std::lock_guard<std::recursive_mutex> lock(data->GameMutex());
@@ -71,6 +71,20 @@ json ReadSettings(const std::string& section) {
   return result;
 }
 
+json ReadSettings(const std::string& section) {
+  auto result = ReadSettingsValues(section);
+  if (result.contains("notifications")) {
+    // Snapshot watcher names only after releasing GameMutex: the watcher thread
+    // can acquire GameMutex while holding its own mutex.
+    std::map<std::string, WatchTarget> targets;
+    if (auto* manager = LAppDelegate::GetInstance()->GetUserStateManager())
+      manager->GetTargetList(targets);
+    auto& list = result["notifications"]["watch_list"];
+    list = WatchListView(list.get<std::vector<std::string>>(), targets);
+  }
+  return result;
+}
+
 json ApplySettings(const json& request) {
   auto* data = DataManager::GetInstance();
   auto* app = LAppDelegate::GetInstance();
@@ -81,7 +95,7 @@ json ApplySettings(const json& request) {
     section = request.at("section");
     // Read and merge under one lock so a partial update keeps other settings.
     std::lock_guard<std::recursive_mutex> lock(data->GameMutex());
-    auto values = ReadSettings(section).at(section);
+    auto values = ReadSettingsValues(section).at(section);
     values.update(request.at("settings"));
     if (section == "audio") data->UpdateAudio(values.at("volume"), values.at("mute"), values.at("idle_audio"), values.at("touch_audio"));
     else if (section == "display") {
@@ -108,7 +122,7 @@ json ApplySettings(const json& request) {
   } else if (action == "add_watch" || action == "remove_watch") {
     section = "notifications";
     // The watcher mutex must not be taken while holding GameMutex.
-    ReadSettings(section); // Initialize notify defaults before changing its list.
+    ReadSettingsValues(section); // Initialize notify defaults before changing its list.
     if (!app->GetUserStateManager()) return Fail("通知服务尚未就绪");
     const auto uid = request.at("uid").get<std::string>();
     if (action == "add_watch") { app->AddWatch(uid); data->AddFollow(uid); }
