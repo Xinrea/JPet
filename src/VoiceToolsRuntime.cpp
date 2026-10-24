@@ -170,7 +170,7 @@ json ReadBilibili(const json& query) {
     cookies = data->GetWithDefault("cookies", std::string{});
     uid = data->GetWithDefault("uid", std::string{});
   }
-  return SearchBilibili(query, cookies, uid);
+  return QueryBilibili(query, cookies, uid);
 }
 } // namespace
 

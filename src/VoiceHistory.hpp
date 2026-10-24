@@ -111,7 +111,7 @@ class History {
     return state == "pending" || state == "completed" || state == "interrupted" || state == "failed";
   }
   static std::string KnownTool(const std::string& name) {
-    for (const auto* tool : {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"}) if (name == tool) return name;
+    for (const auto* tool : {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "game_action", "jpet_settings", "web_search", "bilibili", "bilibili_search", "open_url"}) if (name == tool) return name;
     return "unknown";
   }
   static json Select(const json& data, std::initializer_list<const char*> fields) {
@@ -128,7 +128,7 @@ class History {
     return Select(data, {"volume", "scale", "mute", "idle_audio", "touch_audio", "green", "limit", "track", "dropfile", "dynamic", "live", "update", "long_hair", "left_ear", "right_ear", "hat", "glasses", "star_eyes", "dizzy_eyes", "sweat", "dark_face", "blush", "leg_accessories", "shoes", "tail", "gun", "mouth"});
   }
   static json Arguments(const json& data) {
-    auto summary = Select(data, {"action", "section", "task_id", "entry_id", "direction", "attribute", "clothes_id", "offset", "limit", "metric", "question", "display", "query", "type", "order", "page", "url", "uid", "shortcut_type", "target"});
+    auto summary = Select(data, {"action", "section", "task_id", "entry_id", "direction", "attribute", "clothes_id", "offset", "limit", "metric", "question", "display", "query", "type", "order", "page", "url", "uid", "shortcut_type", "target", "video", "part", "mid", "room_id", "folder_id", "category", "days"});
     if (!data.is_object()) summary["notice"] = "参数不是有效的 JSON 对象";
     else if (data.contains("settings")) summary["settings"] = Settings(data["settings"]);
     return Bounded(std::move(summary));

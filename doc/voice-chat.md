@@ -128,7 +128,7 @@ Apple M2 Max（Metal）实测：每句开始出声约 0.2–0.4 秒，合成速�
 ## 语音工具
 
 可直接说「看看我的桌面」「现在有多少经验，哪些任务能做」「把读书加入队列」
-「取消当前任务」「智力升一点」「搜一下今天的新闻」「去B站搜千问教程」「用浏览器打开B站」
+「取消当前任务」「智力升一点」「搜一下今天的新闻」「去B站搜千问教程」「这个视频讲了什么」「我关注的主播谁在直播」「看看我的稍后再看」「用浏览器打开B站」
 「打开刚才搜索的第一个结果」「把音量调到30」「关闭鼠标追踪」「换成粉色衣服」。
 工具执行状态显示在宠物旁边和语音设置中，设置页还会显示最近一次搜索的来源链接。
 
@@ -146,7 +146,7 @@ Apple M2 Max（Metal）实测：每句开始出声约 0.2–0.4 秒，合成速�
 | `game_action` | 开始/安排/取消任务，移除/移动队列项，队列扩容，属性加点/退点，升星和换衣服。任务ID和队列entry_id从游戏状态读取，每次属性操作为一点。 |
 | `jpet_settings` | 读取或调整音量/静音/互动与闲置语音、绿幕/帧率限制/角色缩放、鼠标追踪/文件回收、动态/直播/更新通知、本机通知关注列表、四方向轮盘入口、衣服，以及发型/耳饰/帽子/眼镜/眼睛与脸颊效果/腿饰/鞋子/尾巴/枪/嘴型。仅更新指定字段，服装复用游戏的解锁校验；返回实际设置。 |
 | `web_search` | 独立调用千问联网搜索，返回摘要、引用编号和真实来源链接。 |
-| `bilibili_search` | 复用JPet登录Cookie，验证账号、获取WBI密钥并签名搜索，支持视频、用户、直播间、专栏、番剧和影视，以及视频的最新/播放量/收藏排序。 |
+| `bilibili` | 只读的B站查询，用 `action` 选择功能（见下表）。需要时获取WBI密钥签名；账号相关功能先验证Cookie属于JPet登录账号。不点赞、投币、关注或发消息。 |
 | `open_url` | 将完整HTTP/HTTPS地址交给系统默认浏览器打开，可打开用户提供的链接或搜索结果；返回系统是否接受打开请求，不判断网页加载状态。 |
 
 打开网页使用系统原生API，URL不作为命令执行。支持域名、IP、端口、查询参数与片段；
@@ -171,7 +171,28 @@ Windows使用GDI捕获。图片最长边不超过1920像素，JPEG不超过512KB
 搜索使用独立的[联网搜索请求](https://help.aliyun.com/zh/model-studio/web-search)，与对话所用的大模型无关。
 视觉请求格式参见[图像理解文档](https://help.aliyun.com/zh/model-studio/vision)。
 
-B站Cookie仅用于发往 `api.bilibili.com` 的HTTPS请求，不交给大模型、不写入日志，也不跟随重定向。
+`bilibili` 工具的 `action`：
+
+| 分类 | action | 内容 |
+| --- | --- | --- |
+| 发现 | `search` | 搜索视频、用户、直播间、专栏、番剧和影视；视频可按最新/播放量/收藏排序 |
+| | `hot_search`、`popular`、`ranking` | 热搜词、综合热门，全站或番剧/国创/纪录片/电影/电视剧/综艺排行榜 |
+| | `bangumi_timeline` | 番剧或国创从今天起1–7天的更新时间表 |
+| 视频 | `video_info`、`video_comments`、`related_videos` | 详情与数据（含分P标题）、热门或最新评论、相关推荐 |
+| | `video_summary`、`video_subtitle` | B站AI总结与分段提纲、带时间戳的AI字幕（长字幕分页）；需要登录 |
+| UP主与直播 | `user_info`、`user_videos`、`user_dynamics` | 资料与粉丝数、投稿、最近动态 |
+| | `live_room`、`live_recommend` | 按UID或房间号查开播状态、标题和分区；推荐直播 |
+| 登录账号 | `my_info`、`unread` | 等级、硬币、关注/粉丝数；回复、@、点赞、系统和私信未读数 |
+| | `following_live`、`following_feed` | 关注中正在直播的主播、关注动态（全部或仅视频） |
+| | `history`、`watch_later`、`favorites`、`followings` | 观看历史、稍后再看、收藏夹及其内容、关注列表 |
+
+视频参数接受BV号、av号或视频链接；`mid` 为用户UID，可先用 `search` 的 `type=user` 查得。
+列表默认每页5项、最多10项，结果按16 KB限制裁剪并提示翻页。返回中的 `url` 可交给 `open_url` 打开。
+AI字幕取自B站AI总结接口返回的字幕，与请求的分P一一对应；B站没有为视频生成AI处理（纯音乐、无人声等）时，
+总结和字幕都返回 `null` 与说明。UP主上传的CC字幕暂不读取：登录状态下的 `/x/player/wbi/v2` 会返回412，旧版 `/x/player/v2` 可能返回其他视频的AI字幕。
+
+B站Cookie仅用于发往 `api.bilibili.com`、`api.live.bilibili.com` 和 `api.vc.bilibili.com` 的HTTPS请求，不交给大模型、不写入日志，也不跟随重定向。
+未登录时公开查询仍可使用，账号相关功能会提示先在JPet中登录。
 搜索服务限流、Cookie过期、录屏权限或模型权限不足时，工具返回可读错误，不能编造搜索或画面结果。
 截图与搜索中的文字按外部数据处理，不作为额外操作指令。
 
@@ -202,7 +223,7 @@ AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量�
 | `voice_turn` | VAD 状态机、Whisper 特征、Silero 与 Smart Turn 实际模型（Mac 用系统语音合成测试音频） |
 | `voice_models` | 模型下载：镜像回退、哈希校验失败、取消与重新下载，识别与合成模型的合并状态 |
 | `voice_echo` | AEC3 回声衰减、单讲与双讲时近端语音保留，以及无参考信号时的对照 |
-| `voice_tools` | 工具参数、游戏操作映射、搜索解析、取消 |
+| `voice_tools` | 工具参数、游戏操作映射、搜索解析、B站各 action 的请求编排与结果裁剪（离线模拟接口）、取消 |
 
 `python3 tests/voice_panel_smoke_test.py` 使用临时资料目录测试原生启动、设置接口、持久化与参数校验，不写入 API Key。
 `build/macos-arm64/tests/voice_speech_probe <模型目录> [test_wavs 目录]` 在本机测量识别延迟与字错率。
@@ -212,7 +233,7 @@ AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量�
 
 macOS 可额外启用 `JPET_BUILD_VOICE_NETWORK_PROBE=ON`，手动运行
 `build/macos-arm64/tests/voice_tools_network_probe "JPet资料目录"`：只读打开游戏数据库，验证 B 站搜索、
-联网搜索和合成图片的视觉请求，不修改游戏数据、不获取实际桌面截图、不打印凭据；加 `--bilibili-only` 只检查 B 站搜索。
+联网搜索和合成图片的视觉请求，不修改游戏数据、不获取实际桌面截图、不打印凭据；加 `--bilibili-only` 只检查 `bilibili` 工具的全部 action（账号相关 action 需要该资料已登录 B 站）。
 
 语音诊断记录在用户数据目录的 `jpet.log`，以 `[Voice]` 为前缀：采集时长、RMS 与峰值，轮次结束时的 Smart Turn 概率，
 识别与合成模型加载耗时，每句合成开始出声的时间与总耗时，回声丢弃与打断，合成失败码，工具调用名称与结果大小。日志不保存 API Key、音频内容或对话文本。

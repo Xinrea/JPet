@@ -1,9 +1,11 @@
 #include "VoiceTools.hpp"
+#include "VoiceBilibili.hpp"
 #include "VoiceSettingsQueue.hpp"
 #include <chrono>
 #include <atomic>
 #include <future>
 #include <iostream>
+#include <map>
 #include <stdexcept>
 
 namespace {
@@ -211,12 +213,38 @@ int main() {
     Check(run("view_desktop", {{"display", 8}})["ok"] == false, "bounded monitor selection");
     Check(run("web_search", {{"query", "今天的天气"}})["ok"] == true && last["limit"] == 5, "web search dispatch");
     for (const auto* type : {"video", "user", "live", "article", "bangumi", "film"})
-      Check(run("bilibili_search", {{"query", "千问"}, {"type", type}})["ok"] == true, "six Bilibili categories");
+      Check(run("bilibili", {{"action", "search"}, {"query", "千问"}, {"type", type}})["ok"] == true && last["type"] == type, "six Bilibili search categories");
+    Check(run("bilibili", {{"action", "search"}, {"query", "千问"}})["ok"] == true &&
+      last == json{{"action", "search"}, {"query", "千问"}, {"type", "video"}, {"order", "relevance"}, {"page", 1}, {"limit", 5}},
+      "search defaults are filled before dispatch");
+    Check(run("bilibili", {{"action", "video_info"}, {"video", "https://www.bilibili.com/video/BV1GJ411x7h7/?p=2"}})["ok"] == true &&
+      last == json{{"action", "video_info"}, {"bvid", "BV1GJ411x7h7"}}, "video links normalize to BV ids");
+    for (const auto* video : {"av170001", "AV170001", "170001", "https://www.bilibili.com/video/av170001"})
+      Check(run("bilibili", {{"action", "video_info"}, {"video", video}})["ok"] == true && last["aid"] == 170001, "av ids normalize to aid");
+    Check(run("bilibili", {{"action", "live_room"}, {"room_id", "1024"}})["ok"] == true && last["room_id"] == 1024 && !last.contains("mid"),
+      "digit-string IDs accepted");
+    Check(run("bilibili", {{"action", "video_comments"}, {"video", "BV1GJ411x7h7"}})["ok"] == true &&
+      last["order"] == "hot" && last["page"] == 1 && last["limit"] == 5, "comment defaults");
+    Check(run("bilibili", {{"action", "following_feed"}})["ok"] == true && last["type"] == "all", "feed type defaults to all");
+    Check(run("bilibili", {{"action", "bangumi_timeline"}})["ok"] == true && last["category"] == "bangumi" && last["days"] == 1, "timeline defaults");
+    Check(run("bilibili", {{"action", "unread"}})["ok"] == true && last == json{{"action", "unread"}}, "parameterless account action");
     const auto beforeBadSearch = external;
-    for (const auto& args : {json{{"query", ""}}, json{{"query", "test\nCookie: secret"}},
-      json{{"query", "x"}, {"url", "https://evil.test"}}, json{{"query", "x"}, {"page", 51}},
-      json{{"query", "x"}, {"type", "user"}, {"order", "latest"}}})
-      Check(run("bilibili_search", args)["ok"] == false, "bad search arguments rejected");
+    for (const auto& args : {json::object(), json{{"action", "shell"}}, json{{"action", "search"}},
+      json{{"action", "search"}, {"query", ""}}, json{{"action", "search"}, {"query", "test\nCookie: secret"}},
+      json{{"action", "search"}, {"query", "x"}, {"url", "https://evil.test"}}, json{{"action", "search"}, {"query", "x"}, {"page", 51}},
+      json{{"action", "search"}, {"query", "x"}, {"type", "user"}, {"order", "latest"}},
+      json{{"action", "search"}, {"query", "x"}, {"type", "all"}}, json{{"action", "following_feed"}, {"type", "user"}},
+      json{{"action", "video_info"}}, json{{"action", "video_info"}, {"video", "hello"}}, json{{"action", "video_info"}, {"video", "av0"}},
+      json{{"action", "video_info"}, {"video", "BV1GJ411x7h7"}, {"mid", 2}}, json{{"action", "user_info"}},
+      json{{"action", "user_info"}, {"mid", "0"}}, json{{"action", "user_info"}, {"mid", -1}}, json{{"action", "user_info"}, {"mid", "2x"}},
+      json{{"action", "live_room"}}, json{{"action", "live_room"}, {"mid", 1}, {"room_id", 2}},
+      json{{"action", "ranking"}, {"category", "games"}}, json{{"action", "bangumi_timeline"}, {"category", "all"}},
+      json{{"action", "bangumi_timeline"}, {"days", 8}}, json{{"action", "video_comments"}, {"video", "BV1GJ411x7h7"}, {"order", "relevance"}},
+      json{{"action", "my_info"}, {"mid", 2}}, json{{"action", "favorites"}, {"folder_id", "abc"}}, json{{"action", "video_subtitle"}, {"video", "BV1GJ411x7h7"}, {"part", 0}}})
+      Check(run("bilibili", args)["ok"] == false, "bad Bilibili arguments rejected");
+    Check(run("bilibili", {{"action", "video_info"}, {"video", "BV1GJ411x7h7"}, {"mid", 2}})["code"] == "invalid_arguments",
+      "per-action fields are reported as parameter errors");
+    Check(run("bilibili_search", {{"query", "x"}})["ok"] == false, "the replaced search tool is unknown");
     Check(external == beforeBadSearch && Voice::ExecuteTool({"c", "game_action", "{"}, dependencies)["ok"] == false,
       "malformed JSON and search input have no effects");
     Check(run("shell", {{"command", "ls"}})["ok"] == false, "unknown tools cannot execute arbitrary code");
@@ -303,6 +331,162 @@ int main() {
       bili["results"][0]["url"] == "https://www.bilibili.com/video/BV1xx411c7mD", "Bilibili highlights normalized and links resolved");
     Check(Voice::BilibiliSearchResults({{"code", 0}, {"data", {{"result", nullptr}}}}, "video", 5)["results"].empty(), "empty Bilibili search is success");
     for (int code : {-101, -352, -412, -400}) Check(Voice::BilibiliSearchResults({{"code", code}}, "video", 5)["ok"] == false, "Bilibili login/risk errors are actionable");
+
+    {
+      // Offline Bilibili flows: a fake HTTP layer answers by longest URL prefix.
+      const std::string api = "https://api.bilibili.com", live = "https://api.live.bilibili.com";
+      std::map<std::string, Voice::BilibiliReply> routes;
+      std::vector<std::string> urls;
+      const Voice::BilibiliGet get = [&](const std::string& url, const std::string&) -> Voice::BilibiliReply {
+        urls.push_back(url);
+        const std::pair<const std::string, Voice::BilibiliReply>* match = nullptr;
+        for (const auto& route : routes)
+          if (url.compare(0, route.first.size(), route.first) == 0 && (!match || route.first.size() > match->first.size())) match = &route;
+        return match ? match->second : Voice::BilibiliReply{{}, 404, ""};
+      };
+      const auto ok = [](json body) { return Voice::BilibiliReply{std::move(body), 200, ""}; };
+      const auto bili = [&](const json& args, const std::string& uid = "42") {
+        return Voice::RunBilibili(Voice::BilibiliRequest(args), uid, get, 1700000000);
+      };
+      const auto requested = [&](const std::string& part) {
+        return std::any_of(urls.begin(), urls.end(), [&](const std::string& url) { return url.find(part) != std::string::npos; });
+      };
+      const json wbi = {{"img_url", "https://i0.hdslb.com/bfs/wbi/7cd084941338484aae1ad9425b84077c.png"},
+        {"sub_url", "https://i0.hdslb.com/bfs/wbi/4932caff0ff746eab6f01bf08b70ac45.png"}};
+      routes[api + "/x/web-interface/nav"] = ok({{"code", 0}, {"data", {{"isLogin", true}, {"mid", 42}, {"uname", "轴伊"},
+        {"money", 12.5}, {"level_info", {{"current_level", 6}}}, {"vip_label", {{"text", ""}}}, {"wbi_img", wbi}}}});
+      routes[api + "/x/web-interface/nav/stat"] = ok({{"code", 0}, {"data", {{"following", 3}, {"follower", 4}, {"dynamic_count", 5}}}});
+
+      Check(bili({{"action", "history"}}, "")["error"] == "请先在JPet中登录B站账号" && urls.empty(), "account actions require a JPet login before any request");
+      Check(bili({{"action", "history"}}, "7")["error"].get<std::string>().find("不一致") != std::string::npos, "cookies must belong to the JPet account");
+      const auto account = bili({{"action", "my_info"}});
+      Check(account["account"]["name"] == "轴伊" && account["account"]["coins"] == 12.5 && account["account"]["followers"] == 4 &&
+        !account["account"].contains("vip"), "my_info merges nav and stat, dropping empty fields");
+
+      json videos = json::array();
+      for (int i = 0; i < 3; ++i) videos.push_back({{"title", "<em>视频</em>" + std::to_string(i)}, {"bvid", "BV1GJ411x7h7"}, {"aid", i},
+        {"owner", {{"name", "UP"}, {"mid", 9}}}, {"stat", {{"view", 100}, {"like", 7}}}, {"desc", std::string(5000, 'x')}});
+      routes[api + "/x/web-interface/popular"] = ok({{"code", 0}, {"data", {{"list", videos}, {"no_more", false}}}});
+      urls.clear();
+      const auto popular = bili({{"action", "popular"}, {"limit", 2}}, "");
+      Check(popular["ok"] == true && popular["results"].size() == 2 && popular["results"][0]["title"] == "视频0" &&
+        popular["results"][0]["author"] == "UP" && popular["results"][0]["views"] == 100 && !popular["results"][0].contains("desc") &&
+        popular["results"][0]["url"] == "https://www.bilibili.com/video/BV1GJ411x7h7" && popular["has_more"] == true &&
+        popular["external_content"] == true, "public lists work logged out and are compact");
+      Check(urls.size() == 1 && urls[0].find("ps=2") != std::string::npos && urls[0].find("pn=1") != std::string::npos, "public calls skip nav");
+
+      routes[api + "/x/web-interface/wbi/search/square"] = ok({{"code", 0}, {"data", {{"trending", {{"list", {{{"keyword", "k"}, {"show_name", "热词"}, {"heat_score", 9}}}}}}}}});
+      urls.clear();
+      Check(bili({{"action", "hot_search"}}, "")["results"][0] == json{{"keyword", "k"}, {"title", "热词"}, {"heat", 9}} &&
+        requested("wts=1700000000") && requested("w_rid="), "WBI-signed endpoints fetch keys from nav");
+
+      routes[api + "/x/web-interface/view"] = ok({{"code", 0}, {"data", {{"bvid", "BV1GJ411x7h7"}, {"aid", 80433022}, {"title", "MV"},
+        {"cid", 11}, {"owner", {{"name", "索尼"}, {"mid", 99}}}, {"videos", 2}, {"desc", "简介"}, {"stat", {{"view", 1}, {"coin", 2}}},
+        {"pages", {{{"cid", 11}, {"part", "上"}}, {{"cid", 12}, {"part", "下"}}}}}}});
+      const auto info = bili({{"action", "video_info"}, {"video", "BV1GJ411x7h7"}}, "");
+      Check(info["video"]["description"] == "简介" && info["video"]["stat"]["coin"] == 2 && info["video"]["part_titles"] == json{"上", "下"},
+        "video_info returns description, stats and parts");
+
+      routes[api + "/x/web-interface/view/conclusion/get"] = ok({{"code", 0}, {"data", {{"code", 0}, {"model_result", {{"summary", "总结"},
+        {"outline", {{{"title", "开场"}, {"timestamp", 0}, {"part_outline", {{{"timestamp", 65}, {"content", "要点"}}}}}}}}}}}});
+      urls.clear();
+      const auto summary = bili({{"action", "video_summary"}, {"video", "BV1GJ411x7h7"}, {"part", 2}});
+      Check(summary["summary"] == "总结" && summary["outline"][0]["points"][0] == "[1:05] 要点" && summary["video"]["title"] == "MV" &&
+        requested("cid=12") && requested("up_mid=99"), "summary resolves the requested part and uploader");
+      Check(bili({{"action", "video_summary"}, {"video", "BV1GJ411x7h7"}, {"part", 3}})["error"].get<std::string>().find("2 个分P") != std::string::npos,
+        "missing parts are reported");
+      routes[api + "/x/web-interface/view/conclusion/get"] = ok({{"code", 0}, {"data", {{"code", 1}, {"model_result", {{"summary", ""}, {"subtitle", json::array()}}}}}});
+      const auto noSummary = bili({{"action", "video_summary"}, {"video", "BV1GJ411x7h7"}});
+      Check(noSummary["ok"] == true && noSummary["summary"].is_null() && noSummary.contains("notice"), "videos without an AI summary say so");
+      const auto noSubtitle = bili({{"action", "video_subtitle"}, {"video", "BV1GJ411x7h7"}});
+      Check(noSubtitle["ok"] == true && noSubtitle["subtitle"].is_null() && noSubtitle.contains("notice"), "videos without AI subtitles say so");
+
+      json lines = json::array();
+      for (int i = 0; i < 400; ++i) lines.push_back({{"start_timestamp", i * 2.5}, {"end_timestamp", i * 2.5 + 2}, {"content", "第" + std::to_string(i) + "句字幕"}});
+      json transcript = {{"code", 0}, {"model_result", {{"summary", "总结"}, {"subtitle", {{{"timestamp", 0}, {"part_subtitle", lines}}}}}}};
+      routes[api + "/x/web-interface/view/conclusion/get"] = ok({{"code", 0}, {"data", transcript}});
+      urls.clear();
+      const auto subtitle = bili({{"action", "video_subtitle"}, {"video", "BV1GJ411x7h7"}, {"part", 2}});
+      Check(subtitle["subtitle"].get<std::string>().rfind("[0:00] 第0句字幕\n[0:02] 第1句字幕\n", 0) == 0 &&
+        subtitle["total_pages"].get<int>() >= 2 && subtitle["has_more"] == true && subtitle.dump().size() < 16000 && requested("cid=12"),
+        "AI subtitles for the requested part carry timestamps and page under the result limit");
+      const auto lastPage = bili({{"action", "video_subtitle"}, {"video", "BV1GJ411x7h7"}, {"page", subtitle["total_pages"]}});
+      Check(lastPage["has_more"] == false && lastPage["subtitle"].get<std::string>().find("第399句字幕") != std::string::npos, "last subtitle page");
+      Check(bili({{"action", "video_subtitle"}, {"video", "BV1GJ411x7h7"}, {"page", 50}})["ok"] == false, "subtitle page past the end");
+      Check(bili({{"action", "video_subtitle"}, {"video", "BV1GJ411x7h7"}}, "")["ok"] == false, "subtitles need the JPet login");
+
+      json replies = json::array();
+      for (int i = 0; i < 10; ++i) replies.push_back({{"member", {{"uname", std::string(400, 'u')}}}, {"content", {{"message", std::string(2000, 'c')}}}, {"like", i}});
+      routes[api + "/x/v2/reply"] = ok({{"code", 0}, {"data", {{"replies", replies}, {"page", {{"count", 30}}}}}});
+      urls.clear();
+      const auto comments = bili({{"action", "video_comments"}, {"video", "BV1GJ411x7h7"}, {"limit", 10}}, "");
+      Check(comments["ok"] == true && comments.dump().size() < 16000 && requested("oid=80433022") && requested("sort=1") &&
+        (comments["results"].size() == 10 || comments.contains("notice")), "comments resolve aid and stay within the result budget");
+
+      routes[live + "/room/v1/Room/room_init"] = ok({{"code", 0}, {"data", {{"room_id", 1024}, {"uid", 2}}}});
+      routes[live + "/room/v1/Room/get_status_info_by_uids"] = ok({{"code", 0}, {"data", {{"2", {{"room_id", 1024}, {"uid", 2}, {"uname", "碧诗"},
+        {"title", "直播"}, {"live_status", 1}, {"online", 100}, {"live_time", 1699999000}, {"area_v2_name", "单机"}}}}}});
+      urls.clear();
+      const auto room = bili({{"action", "live_room"}, {"room_id", 1024}}, "");
+      Check(room["room"]["status"] == "live" && room["room"]["online"] == 100 && room["room"]["url"] == "https://live.bilibili.com/1024" &&
+        room["room"]["live_since"] == 1699999000 && requested("uids%5B%5D=2"), "room ids resolve to the streamer's live status");
+      Check(bili({{"action", "live_room"}, {"mid", 3}}, "")["error"] == "该用户没有开通直播间", "users without rooms");
+
+      json seasons = json::array();
+      for (int i = 0; i < 5; ++i) seasons.push_back({{"title", "番" + std::to_string(i)}, {"season_id", 100 + i}, {"new_ep", {{"index_show", "更新至第1话"}}}});
+      routes[api + "/pgc/web/rank/list"] = ok({{"code", 0}, {"result", {{"list", seasons}}}});
+      const auto ranking = bili({{"action", "ranking"}, {"category", "bangumi"}, {"page", 2}, {"limit", 2}}, "");
+      Check(ranking["results"][0]["rank"] == 3 && ranking["results"][0]["title"] == "番2" &&
+        ranking["results"][0]["url"] == "https://www.bilibili.com/bangumi/play/ss102" && ranking["has_more"] == true && ranking["total"] == 5,
+        "PGC rankings page locally with absolute ranks");
+
+      routes[api + "/x/web-interface/history/cursor"] = ok({{"code", 0}, {"data", {{"list", {
+        {{"title", "看完的"}, {"progress", -1}, {"history", {{"business", "archive"}, {"bvid", "BV1GJ411x7h7"}}}},
+        {{"title", "直播"}, {"history", {{"business", "live"}, {"oid", 1024}}}}}}}}});
+      const auto history = bili({{"action", "history"}});
+      Check(history["results"][0]["finished"] == true && !history["results"][0].contains("progress") &&
+        history["results"][0]["url"] == "https://www.bilibili.com/video/BV1GJ411x7h7" && history["results"][1]["url"] == "https://live.bilibili.com/1024",
+        "history links each business type");
+
+      json post = {{"id_str", "1245284537985925159"}, {"type", "DYNAMIC_TYPE_AV"}};
+      post["modules"]["module_author"] = {{"name", "UP"}, {"pub_ts", 1699990000}};
+      post["modules"]["module_dynamic"]["desc"]["text"] = "新视频";
+      post["modules"]["module_dynamic"]["major"]["archive"] = {{"title", "标题"}, {"bvid", "BV1GJ411x7h7"}};
+      routes[api + "/x/polymer/web-dynamic/v1/feed/space"] = ok({{"code", 0}, {"data", {{"items", json::array({post})}}}});
+      const auto dynamics = bili({{"action", "user_dynamics"}, {"mid", 2}}, "");
+      Check(dynamics["results"][0] == json{{"type", "av"}, {"author", "UP"}, {"published_at", 1699990000}, {"text", "新视频"},
+        {"video", {{"title", "标题"}, {"bvid", "BV1GJ411x7h7"}, {"url", "https://www.bilibili.com/video/BV1GJ411x7h7"}}}, {"url", "https://t.bilibili.com/1245284537985925159"}},
+        "dynamics reuse the notifier's text extraction and keep 19-digit IDs");
+
+      routes[api + "/pgc/web/timeline"] = ok({{"code", 0}, {"result", {{{"date", "10-24"}, {"day_of_week", 6}, {"is_today", 1}, {"episodes", {
+        {{"title", "已更新"}, {"pub_index", "第4话"}, {"published", 1}, {"episode_id", 7065884}}, {{"title", "待更新"}, {"published", 0}, {"episode_id", 0}}}}}}}});
+      const auto timeline = bili({{"action", "bangumi_timeline"}}, "");
+      Check(timeline["days"][0]["today"] == 1 && timeline["days"][0]["episodes"][0]["url"] == "https://www.bilibili.com/bangumi/play/ep7065884" &&
+        !timeline["days"][0]["episodes"][1].contains("url") && requested("types=1") && requested("after=0"),
+        "unpublished episodes get no placeholder link");
+
+      routes[api + "/x/v3/fav/folder/created/list-all"] = ok({{"code", 0}, {"data", {{"list", {{{"id", 5542}, {"title", "默认收藏夹"}, {"media_count", 8}}}}}}});
+      urls.clear();
+      Check(bili({{"action", "favorites"}})["results"][0] == json{{"folder_id", 5542}, {"title", "默认收藏夹"}, {"count", 8}} && requested("up_mid=42"),
+        "favorites list the JPet account's folders");
+
+      routes[api + "/x/msgfeed/unread"] = ok({{"code", 0}, {"data", {{"reply", 2}, {"at", 1}, {"like", 0}, {"sys_msg", 3}, {"up", 0}}}});
+      routes["https://api.vc.bilibili.com/"] = {{}, 412, ""};
+      const auto unread = bili({{"action", "unread"}});
+      Check(unread["ok"] == true && unread["unread"]["replies"] == 2 && unread["unread"]["system"] == 3 && unread.contains("notice"),
+        "a failing private-message count does not hide the other counts");
+
+      for (const auto& [reply, expected] : {std::pair{ok({{"code", -352}}), "访问限制"}, {Voice::BilibiliReply{{}, 412, ""}, "访问限制"},
+          {ok({{"code", -404}}), "不存在"}, {ok({{"code", -101}}), "重新登录"}, {ok({{"code", 12345}, {"message", "<b>参数</b>错误"}}), "参数错误"},
+          {Voice::BilibiliReply{{}, 0, "工具网络请求失败或超时，请稍后重试"}, "超时"}}) {
+        routes[api + "/x/web-interface/card"] = reply;
+        const auto failed = bili({{"action", "user_info"}, {"mid", 2}}, "");
+        Check(failed["ok"] == false && failed["error"].get<std::string>().find(expected) != std::string::npos, "Bilibili errors are readable");
+      }
+      routes[api + "/x/web-interface/nav"] = ok({{"code", -101}, {"data", {{"isLogin", false}, {"wbi_img", wbi}}}});
+      Check(bili({{"action", "history"}})["error"] == "B站登录已失效，请重新登录JPet" &&
+        bili({{"action", "hot_search"}}, "")["ok"] == true, "expired logins block account actions but keep WBI keys for public ones");
+    }
     auto web = Voice::WebSearchResults({{"output", {{"choices", {{{"message", {{"content", "结论[ref_1]"}}}}}},
       {"search_info", {{"search_results", {{{"index", 1}, {"title", "来源"}, {"url", "https://example.com/page"}}}}}}}}}, 5);
     Check(web["sources"][0]["url"] == "https://example.com/page" && web["summary"] == "结论[ref_1]", "web search retains citations and sources");

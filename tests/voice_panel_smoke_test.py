@@ -89,7 +89,7 @@ def main(gui=False, app=APP):
                 assert missing.code == 404
             voice = request(port, "/api/voice")[1]
             assert voice["microphone_on"] is False and voice["input_mode"] == "hold" and voice["model"] == "qwen-plus"
-            assert set(voice["available_tools"]) == {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"}
+            assert set(voice["available_tools"]) == {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "game_action", "jpet_settings", "web_search", "bilibili", "open_url"}
             # Recognition (SenseVoice) and synthesis (Qwen3-TTS) download as one model set.
             assert voice["speech_model"]["state"] == "missing" and voice["speech_model"]["total"] > 1_500_000_000
             code, history = request(port, "/api/voice/history")
