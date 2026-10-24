@@ -3,6 +3,7 @@
 #include <cpr/cpr.h>
 
 #include <algorithm>
+#include <cctype>
 
 namespace Voice {
 namespace {
@@ -19,6 +20,16 @@ std::string ProviderError(const nlohmann::json& body) {
   if (message.size() > 200) message = message.substr(0, 200);
   const auto code = error.contains("code") && error["code"].is_string() ? error["code"].get<std::string>() : "";
   return "大模型返回错误" + (code.empty() ? std::string{} : "（" + code + "）") + (message.empty() ? "" : "：" + message);
+}
+
+// {base}{path}, accepting a base that already ends with /chat/completions.
+std::string ChatApiUrl(const std::string& baseUrl, const std::string& path) {
+  auto url = baseUrl;
+  while (!url.empty() && url.back() == '/') url.pop_back();
+  const std::string suffix = "/chat/completions";
+  if (url.size() >= suffix.size() && url.compare(url.size() - suffix.size(), suffix.size(), suffix) == 0)
+    url.erase(url.size() - suffix.size());
+  return url + path;
 }
 }  // namespace
 
@@ -155,13 +166,86 @@ std::vector<ChatClient::Event> ChatClient::Poll() {
   return events;
 }
 
-std::string ChatCompletionsUrl(const std::string& baseUrl, const std::string& workspace) {
-  if (baseUrl.empty()) return "https://" + workspace + ".cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions";
-  auto url = baseUrl;
-  while (!url.empty() && url.back() == '/') url.pop_back();
-  const std::string suffix = "/chat/completions";
-  if (url.size() < suffix.size() || url.compare(url.size() - suffix.size(), suffix.size(), suffix) != 0) url += suffix;
-  return url;
+const std::vector<ChatProvider>& ChatProviders() {
+  static const std::vector<ChatProvider> providers = {
+    {"deepseek", "DeepSeek", "https://api.deepseek.com"},
+    {"openrouter", "OpenRouter", "https://openrouter.ai/api/v1"},
+    {"thirdparty", "第三方（OpenAI 兼容）", ""}};
+  return providers;
+}
+
+const ChatProvider* FindChatProvider(const std::string& id) {
+  for (const auto& provider : ChatProviders()) if (id == provider.id) return &provider;
+  return nullptr;
+}
+
+nlohmann::json ChatRequestOptions(const std::string& provider) {
+  if (provider == "deepseek") return {{"thinking", {{"type", "disabled"}}}};
+  // Models whose reasoning is mandatory are not offered (see ParseChatModels).
+  if (provider == "openrouter") return {{"reasoning", {{"effort", "none"}}}};
+  return nlohmann::json::object();
+}
+
+std::vector<ChatModel> ParseChatModels(const std::string& provider, const nlohmann::json& body) {
+  std::vector<ChatModel> models;
+  if (!body.is_object() || !body.contains("data") || !body["data"].is_array()) return models;
+  for (const auto& item : body["data"]) {
+    if (!item.is_object() || !item.contains("id") || !item["id"].is_string()) continue;
+    const auto id = item["id"].get<std::string>();
+    if (!ValidChatModel(id)) continue;
+    if (provider == "openrouter") {
+      const auto& parameters = item.contains("supported_parameters") ? item["supported_parameters"] : nlohmann::json();
+      if (!parameters.is_array() || std::find(parameters.begin(), parameters.end(), "tools") == parameters.end()) continue;
+      if (item.contains("reasoning") && item["reasoning"].is_object() && item["reasoning"].value("mandatory", false)) continue;
+    }
+    auto name = item.contains("name") && item["name"].is_string() ? item["name"].get<std::string>() : id;
+    if (name.empty() || name.size() > 128) name = id;
+    // DeepSeek lists input_modalities on the model, OpenRouter under architecture.
+    const auto& architecture = item.contains("architecture") && item["architecture"].is_object() ? item["architecture"] : item;
+    std::optional<bool> vision;
+    for (const auto* source : {&item, &architecture})
+      if (source->contains("input_modalities") && (*source)["input_modalities"].is_array()) {
+        const auto& inputs = (*source)["input_modalities"];
+        vision = std::find(inputs.begin(), inputs.end(), "image") != inputs.end();
+      }
+    models.push_back({id, name, vision});
+    if (models.size() >= 2000) break;
+  }
+  const auto lower = [](std::string text) {
+    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+  };
+  std::stable_sort(models.begin(), models.end(), [&](const ChatModel& a, const ChatModel& b) { return lower(a.name) < lower(b.name); });
+  return models;
+}
+
+std::vector<ChatModel> FetchChatModels(const std::string& provider, const std::string& baseUrl,
+                                       const std::string& apiKey, std::string& error) {
+  cpr::Header header{{"Accept", "application/json"}};
+  if (!apiKey.empty()) header["Authorization"] = "Bearer " + apiKey;
+  cpr::Parameters parameters;
+  if (provider == "openrouter") parameters.Add({"supported_parameters", "tools"});
+  const auto response = cpr::Get(cpr::Url{ChatApiUrl(baseUrl, "/models")}, header, parameters,
+      cpr::ConnectTimeout{5000}, cpr::Timeout{20000}, cpr::Redirect{false});
+  if (response.error.code != cpr::ErrorCode::OK) { error = "无法获取模型列表，请检查网络和接口地址"; return {}; }
+  if (response.status_code == 401 || response.status_code == 403) { error = "获取模型列表失败：API Key 无效或没有权限"; return {}; }
+  if (response.status_code == 404) { error = "获取模型列表失败：接口地址不正确，或该服务不提供模型列表"; return {}; }
+  if (response.status_code < 200 || response.status_code >= 300) {
+    error = "获取模型列表失败（HTTP " + std::to_string(response.status_code) + "）";
+    return {};
+  }
+  const auto body = nlohmann::json::parse(response.text, nullptr, false);
+  auto models = ParseChatModels(provider, body);
+  if (models.empty()) error = body.is_object() && body.contains("data") ? "该服务没有可用的模型" : "模型列表格式不正确，请检查接口地址";
+  return models;
+}
+
+std::string ChatCompletionsUrl(const std::string& baseUrl) { return ChatApiUrl(baseUrl, "/chat/completions"); }
+
+bool ValidChatModel(const std::string& model) {
+  return !model.empty() && model.size() <= 128 && std::all_of(model.begin(), model.end(), [](unsigned char c) {
+    return std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == ':' || c == '/' || c == '@' || c == '~';
+  });
 }
 
 bool ValidChatBaseUrl(const std::string& url) {

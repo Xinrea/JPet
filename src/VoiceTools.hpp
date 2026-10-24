@@ -14,7 +14,8 @@ std::string ToolLabel(const std::string& name);
 struct ToolDependencies {
   std::function<nlohmann::json(const nlohmann::json&)> game;
   std::function<std::string(const nlohmann::json&)> command;
-  std::function<nlohmann::json(const nlohmann::json&)> desktop, web, bilibili;
+  // desktop returns the screenshot as base64 JPEG in ToolImageField.
+  std::function<nlohmann::json(const nlohmann::json&)> desktop, bilibili;
   std::function<bool(const std::string&, std::string&)> openUrl;
   std::function<nlohmann::json(const nlohmann::json&, const std::function<bool()>&)> settings;
 };
@@ -22,7 +23,6 @@ nlohmann::json ExecuteTool(const ToolCall& call, const ToolDependencies& depende
     const std::function<bool()>& cancelled = {});
 // `game` is a GameManager snapshot whose profile may carry the medal level.
 nlohmann::json GameView(const nlohmann::json& game, const std::string& section, size_t offset = 0, size_t limit = 5);
-nlohmann::json WebSearchResults(const nlohmann::json& response, int limit);
 
 class ToolExecutor {
  public:

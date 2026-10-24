@@ -32,6 +32,9 @@ class VoiceChat {
   // download, cancel or remove them.
   bool SpeechModelAction(const std::string& action, std::string& error);
   nlohmann::json SpeechModelStatus();
+  // Models of a chat service for the settings panel ({provider, base_url?,
+  // api_key?}; the saved key when none is typed): {models: [{id, name}]}.
+  nlohmann::json ChatModels(const nlohmann::json& request, std::string& error);
 
  private:
   using Clock = std::chrono::steady_clock;
@@ -46,7 +49,7 @@ class VoiceChat {
   void Fail(const std::string& error);
   void SetState(const std::string& state, const std::string& message = "");
   bool Recording() const { return pipeline_ && pipeline_->Recording(); }
-  bool StartPipeline(const std::string& workspace, const std::string& key, bool voice);
+  bool StartPipeline(Voice::CascadeConfig config, nlohmann::json tools, bool voice);
   void PlayReply(const std::string& pcm);
   void SubmitTools(const std::vector<Voice::ToolCall>& calls);
   std::vector<Voice::SpeechModelStore*> ModelStores();  // Recognition, synthesis.

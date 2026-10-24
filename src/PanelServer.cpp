@@ -530,6 +530,19 @@ void PanelServer::doServe() {
     res.set_header("Cache-Control", "no-store");
     res.set_content(VoiceChat::GetInstance()->Status().dump(), "application/json");
   });
+  // POST because the request may carry an API key that is not saved yet.
+  server->Post("/api/voice/chat-models", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, true, 4096)) return;
+    const auto payload = nlohmann::json::parse(req.body, nullptr, false);
+    std::string error;
+    const auto models = payload.is_object() ? VoiceChat::GetInstance()->ChatModels(payload, error) : nlohmann::json();
+    if (!models.is_object()) {
+      res.status = 400;
+      res.set_content(nlohmann::json{{"error", error.empty() ? "请求格式不正确" : error}}.dump(), "application/json");
+      return;
+    }
+    res.set_content(models.dump(), "application/json");
+  });
   server->Post("/api/voice/speech-model", [localRequest](const httplib::Request& req, httplib::Response& res) {
     if (!localRequest(req, res, true)) return;
     const auto payload = nlohmann::json::parse(req.body, nullptr, false);

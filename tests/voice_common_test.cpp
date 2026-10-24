@@ -17,10 +17,6 @@ void Check(bool condition, const char* description) {
 
 int main() {
   try {
-    Check(Voice::ValidWorkspace("123456") && Voice::ValidWorkspace("ws-abc123"), "valid workspace IDs");
-    for (const auto& invalid : {"", "evil.example", "a/../../b", "x?model=other", "bad\nheader", "-id", "id-"})
-      Check(!Voice::ValidWorkspace(invalid), "workspace cannot replace the credential destination");
-    Check(!Voice::ValidWorkspace(std::string(64, 'a')), "workspace fits one DNS label");
     Check(Voice::Trim(" \n sk-test \r") == "sk-test" && !Voice::ValidApiKey("sk-test\r\nHeader: injected"), "credential header validation");
     Check(Voice::ValidAudioDeviceId("") && Voice::ValidAudioDeviceId("{0.0.1.00000000}.{6f1e7a3c-0b2d-4e5f-9a8b-1c2d3e4f5a6b}") &&
           Voice::ValidAudioDeviceId("AppleUSBAudioEngine:Logitech:StreamCam:1:2"), "audio device ids");

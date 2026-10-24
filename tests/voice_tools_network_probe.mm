@@ -1,19 +1,11 @@
-// Opt-in integration probe. Reads selected credentials without printing them,
-// opens RocksDB read-only, never changes game state and never reads the desktop.
+// Opt-in integration probe for the bilibili tool. Reads the login cookie without
+// printing it, opens RocksDB read-only and never changes game state.
 #import <Foundation/Foundation.h>
-#import <Security/Security.h>
-#import <LocalAuthentication/LocalAuthentication.h>
-#import <CoreGraphics/CoreGraphics.h>
 #include "VoiceToolsNetwork.hpp"
 #include "VoiceTools.hpp"
 #include "VoiceBilibili.hpp"
 #include <rocksdb/db.h>
-#include <toml++/toml.hpp>
 #include <iostream>
-#include <fstream>
-#include <chrono>
-
-namespace Voice { bool EncodeDesktopImage(CGImageRef, DesktopImage&, std::string&); }
 namespace {
 using nlohmann::json;
 int failures = 0;
@@ -61,30 +53,6 @@ int main(int argc, char** argv) {
         return failures ? 1 : 0;
       }
       bilibili("Bilibili video search", {{"action", "search"}, {"query", "千问"}, {"limit", 3}});
-      const auto settings = toml::parse_file(profile + "/jpet.toml");
-      const auto workspace = settings["voice"]["workspace_id"].value_or(std::string{});
-      LAContext* authentication = [[LAContext alloc] init];
-      authentication.interactionNotAllowed = YES;
-      NSDictionary* query = @{(__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
-        (__bridge id)kSecAttrService: @"cn.vjoi.jpet.qwen", (__bridge id)kSecAttrAccount: @(profile.c_str()),
-        (__bridge id)kSecReturnData: @YES, (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne,
-        (__bridge id)kSecUseAuthenticationContext: authentication};
-      CFTypeRef stored = nullptr;
-      const auto status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &stored);
-      if (status != errSecSuccess) { std::cout << "Qwen probes SKIP: credential unavailable without interactive keychain access\n"; return failures ? 1 : 0; }
-      NSData* data = CFBridgingRelease(stored);
-      const std::string key(static_cast<const char*>(data.bytes), data.length);
-      Report("Qwen web search", Voice::SearchWeb({{"query", "阿里云百炼官方文档网址"}, {"limit", 5}}, workspace, key));
-      auto color = CGColorSpaceCreateDeviceRGB();
-      auto context = CGBitmapContextCreate(nullptr, 300, 200, 8, 1200, color, kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big);
-      CGColorSpaceRelease(color);
-      CGContextSetRGBFillColor(context, 1, 1, 1, 1); CGContextFillRect(context, CGRectMake(0, 0, 300, 200));
-      CGContextSetRGBFillColor(context, 1, 0, 0, 1); CGContextFillEllipseInRect(context, CGRectMake(100, 50, 100, 100));
-      auto source = CGBitmapContextCreateImage(context); CGContextRelease(context);
-      Voice::DesktopImage image; std::string error;
-      const bool encoded = Voice::EncodeDesktopImage(source, image, error); CGImageRelease(source);
-      if (!encoded) throw std::runtime_error("synthetic image failed");
-      Report("Qwen vision with synthetic image", Voice::DescribeDesktop({{"question", "图片中是什么颜色的什么形状？"}, {"display", 0}}, image, workspace, key));
       return failures ? 1 : 0;
     } catch (const std::exception&) { std::cerr << "integration probe failed; raw service/credential data suppressed\n"; return 1; }
   }

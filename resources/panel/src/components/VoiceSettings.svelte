@@ -46,10 +46,13 @@
       if (response.ok && !voiceDisposed) audioDevices = settings.audio_devices || audioDevices;
     } catch (_) { /* Keep the current list. */ } finally { devicesRefreshing = false; }
   }
-  // Chat model (free text, optional OpenAI-compatible endpoint).
-  let chatModel = "", chatBaseUrl = "", chatApiKey = "", chatHasKey = false, catalog = { chat_models: [] };
-  let voiceApiKey = "", voiceWorkspace = "", voiceHasKey = false;
-  let voiceLoading = true, voiceSaving = false, voiceError = "", voiceMessage = "";
+  // Chat service: DeepSeek, OpenRouter or a third-party OpenAI-compatible endpoint,
+  // each with its own write-only key; the model is picked from the service's list.
+  let chatProviders = [], chatProvider = "", savedProvider = "", chatModel = "", chatBaseUrl = "", savedBaseUrl = "";
+  let chatApiKey = "", chatKeys = {}, chatVision = false;
+  let chatModels = [], modelsLoading = false, modelsError = "", modelsRequest = 0;
+  let chatSaving = false, chatError = "", chatMessage = "";
+  let voiceLoading = true, voiceError = "";
   let voiceStatus = null, voiceTimer = null, voiceDisposed = false, voiceRefreshing = false;
   // Local speech recognition (SenseVoice) and synthesis (Qwen3-TTS) models, downloaded on demand.
   let modelBusy = false, modelError = "";
@@ -82,12 +85,60 @@
     outputDevice = savedOutputDevice = settings.output_device || "";
     audioDevices = settings.audio_devices || audioDevices;
   }
+  $: providerName = chatProviders.find(provider => provider.id === chatProvider)?.name || "";
+  $: chatHasKey = !!chatKeys[chatProvider];
+  // OpenRouter lists models without a key; the others need a saved or typed one.
+  // A function, so handlers see the values they just assigned.
+  const listable = (provider, baseUrl, apiKey, keys) => !!provider && (provider !== "thirdparty" || !!baseUrl.trim()) &&
+    (provider === "openrouter" || !!keys[provider] || !!apiKey.trim());
+  $: canListModels = listable(chatProvider, chatBaseUrl, chatApiKey, chatKeys);
+  // Image input decides whether Joi can look at the desktop. The list says so
+  // for DeepSeek and OpenRouter; otherwise the user ticks it.
+  $: listedVision = chatModels.find(model => model.id === chatModel)?.vision;
+  function changeModel() { if (typeof listedVision === "boolean") chatVision = listedVision; }
+  // A saved model missing from the list (or before it loads) stays selectable.
+  $: modelItems = [...(chatModel && !chatModels.some(model => model.id === chatModel) ? [{ value: chatModel, name: `${chatModel}（当前）` }] : []),
+    ...chatModels.map(model => ({ value: model.id, name: model.name === model.id ? model.id : `${model.name} · ${model.id}` }))];
+  async function loadModels() {
+    if (!listable(chatProvider, chatBaseUrl, chatApiKey, chatKeys)) return;
+    const request = ++modelsRequest;
+    modelsLoading = true; modelsError = "";
+    const payload = { provider: chatProvider };
+    if (chatProvider === "thirdparty") payload.base_url = chatBaseUrl.trim();
+    if (chatApiKey.trim()) payload.api_key = chatApiKey.trim();
+    try {
+      const response = await fetch("/api/voice/chat-models", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "无法获取模型列表");
+      if (voiceDisposed || request !== modelsRequest) return;
+      chatModels = result.models || [];
+      changeModel();
+    } catch (error) {
+      if (voiceDisposed || request !== modelsRequest) return;
+      chatModels = []; modelsError = error.message;
+    } finally {
+      if (!voiceDisposed && request === modelsRequest) modelsLoading = false;
+    }
+  }
+  function changeProvider() {
+    ++modelsRequest;
+    chatModels = []; modelsError = ""; modelsLoading = false; chatApiKey = ""; chatMessage = ""; chatError = "";
+    chatModel = ""; chatVision = false; chatBaseUrl = chatProvider === "thirdparty" ? savedBaseUrl : "";
+    loadModels();
+  }
+  function applyChatSettings(settings) {
+    chatProviders = settings.chat_providers || chatProviders;
+    chatProvider = savedProvider = settings.chat_provider || "";
+    chatModel = settings.chat_model || "";
+    chatVision = !!settings.chat_vision;
+    chatBaseUrl = savedBaseUrl = settings.chat_base_url || "";
+    chatKeys = settings.chat_keys || {};
+  }
   function applySettings(settings) {
     applyAudioSettings(settings);
-    voiceWorkspace = settings.workspace_id || "";
-    voiceHasKey = !!settings.has_api_key;
-    catalog = settings.catalog || catalog;
-    chatModel = settings.chat_model || ""; chatBaseUrl = settings.chat_base_url || ""; chatHasKey = !!settings.has_chat_api_key;
+    applyChatSettings(settings);
   }
   async function loadVoiceSettings() {
     try {
@@ -96,6 +147,7 @@
       const settings = await response.json();
       if (voiceDisposed) return;
       applySettings(settings);
+      loadModels();
       await refreshVoiceStatus();
     } catch (error) {
       if (!voiceDisposed) voiceError = error.message;
@@ -103,31 +155,35 @@
       if (!voiceDisposed) voiceLoading = false;
     }
   }
-  async function saveVoiceSettings(clearKey = false, clearChatKey = false) {
-    voiceSaving = true; voiceError = ""; voiceMessage = "";
-    const payload = { workspace_id: voiceWorkspace.trim(), chat_model: chatModel.trim(), chat_base_url: chatBaseUrl.trim() };
-    if (clearKey) payload.clear_api_key = true;
-    else if (voiceApiKey.trim()) payload.api_key = voiceApiKey.trim();
-    if (clearChatKey) payload.clear_chat_api_key = true;
+  async function postSettings(payload) {
+    const response = await fetch("/api/config/voice", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    });
+    const settings = await response.json();
+    if (!response.ok) throw new Error(settings.error || "保存设置失败");
+    return settings;
+  }
+  async function saveChatSettings(clearKey = false) {
+    chatSaving = true; chatError = ""; chatMessage = "";
+    const payload = { chat_provider: chatProvider, chat_model: chatModel.trim(), chat_base_url: chatBaseUrl.trim(), chat_vision: chatVision };
+    if (clearKey) payload.clear_chat_api_key = true;
     else if (chatApiKey.trim()) payload.chat_api_key = chatApiKey.trim();
     try {
-      const response = await fetch("/api/config/voice", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-      });
-      const settings = await response.json();
-      if (!response.ok) throw new Error(settings.error || "保存语音设置失败");
+      const settings = await postSettings(payload);
       if (voiceDisposed) return;
-      applySettings(settings);
-      voiceApiKey = ""; chatApiKey = "";
-      voiceMessage = clearKey || clearChatKey ? "API Key 已移除" : "语音设置已保存";
+      const typedKey = !!payload.chat_api_key;
+      applyChatSettings(settings);
+      chatApiKey = "";
+      chatMessage = clearKey ? `${providerName} 的 API Key 已移除` : "大模型设置已保存";
+      if (clearKey) chatModels = [];
+      else if (typedKey && !chatModels.length) loadModels();
       await refreshVoiceStatus();
     } catch (error) {
-      if (!voiceDisposed) voiceError = error.message;
+      if (!voiceDisposed) chatError = error.message;
     } finally {
-      if (!voiceDisposed) voiceSaving = false;
+      if (!voiceDisposed) chatSaving = false;
     }
   }
-
   const dispatch = createEventDispatcher();
   let historyConfirm = false, historyClearing = false, historyError = "", historyMessage = "";
   async function clearHistory() {
@@ -182,30 +238,41 @@
         {#if modelError}<p class="feedback error" role="alert">{modelError}</p>{/if}
       </div>
     </SettingCard>
-    <SettingCard title="对话设置" description="百炼 API Key 和大模型" icon="settings">
-      <div class="setting-field"><label for="voice-api-key">百炼 API Key<span>{voiceHasKey ? "已保存" : "待设置"}</span></label><Input id="voice-api-key" type="password" bind:value={voiceApiKey} placeholder={voiceHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
-      <div class="setting-field"><label for="voice-workspace">业务空间 ID</label><Input id="voice-workspace" bind:value={voiceWorkspace} placeholder="填写 API Key 所属的业务空间 ID" autocomplete="off" spellcheck="false" maxlength={63} disabled={voiceLoading || voiceSaving} /></div>
-      <p class="setting-help">北京地域的 API Key 和业务空间，用于网页搜索、查看桌面，以及未填写接口地址时的大模型。API Key 保存在本机系统凭据存储中。</p>
-      <div class="setting-field"><label for="chat-model">大模型</label><Input id="chat-model" list="chat-models" bind:value={chatModel} placeholder="qwen-plus" autocomplete="off" spellcheck="false" maxlength={128} disabled={voiceLoading || voiceSaving} />
-        <datalist id="chat-models">{#each catalog.chat_models as model}<option value={model.id}>{model.name}</option>{/each}</datalist></div>
-      <div class="setting-field"><label for="chat-base-url">大模型接口地址<span>可选</span></label><Input id="chat-base-url" bind:value={chatBaseUrl} placeholder="留空使用百炼；或填写 OpenAI 兼容的 Base URL" autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
-      {#if chatBaseUrl.trim()}
-      <div class="setting-field"><label for="chat-api-key">大模型 API Key<span>{chatHasKey ? "已保存" : "待设置"}</span></label><Input id="chat-api-key" type="password" bind:value={chatApiKey} placeholder={chatHasKey ? "已保存；输入新 Key 可替换" : "该接口的 API Key"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
+    <SettingCard title="大模型" description="轴伊用来思考和回复的模型服务" icon="settings">
+      <div class="setting-field"><label for="chat-provider">服务</label><Select id="chat-provider" items={chatProviders.map(provider => ({ value: provider.id, name: provider.name }))} bind:value={chatProvider} on:change={changeProvider} placeholder="请选择大模型服务" disabled={voiceLoading || chatSaving} /></div>
+      {#if chatProvider === "thirdparty"}
+      <div class="setting-field"><label for="chat-base-url">接口地址</label><Input id="chat-base-url" bind:value={chatBaseUrl} on:change={loadModels} placeholder="OpenAI 兼容的 Base URL，如 https://api.example.com/v1" autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || chatSaving} /></div>
       {/if}
-      <p class="setting-help">保存后下一次对话生效。</p>
-      <div class="setting-actions"><Button size="sm" on:click={() => saveVoiceSettings()} disabled={voiceLoading || voiceSaving}>{voiceSaving ? "保存中…" : "保存语音设置"}</Button>{#if voiceHasKey}<Button size="sm" color="alternative" on:click={() => saveVoiceSettings(true)} disabled={voiceLoading || voiceSaving}>移除 Key</Button>{/if}{#if chatHasKey}<Button size="sm" color="alternative" on:click={() => saveVoiceSettings(false, true)} disabled={voiceLoading || voiceSaving}>移除大模型 Key</Button>{/if}</div>
-      {#if voiceError}<p class="feedback error" role="alert">{voiceError}</p>{/if}
-      {#if voiceMessage}<p class="feedback success" role="status">{voiceMessage}</p>{/if}
+      {#if chatProvider}
+      <div class="setting-field"><label for="chat-api-key">{providerName} API Key<span>{chatHasKey ? "已保存" : "待设置"}</span></label><Input id="chat-api-key" type="password" bind:value={chatApiKey} on:change={loadModels} placeholder={chatHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || chatSaving} /></div>
+      <div class="setting-field"><label for="chat-model">模型<button type="button" class="link-button" on:click={loadModels} disabled={!canListModels || modelsLoading}>{modelsLoading ? "获取中…" : chatModels.length ? "刷新列表" : "获取模型列表"}</button></label>
+        {#if chatProvider === "thirdparty" && modelsError}
+          <Input id="chat-model" bind:value={chatModel} on:change={changeModel} placeholder="无法获取列表时可直接填写模型名称" autocomplete="off" spellcheck="false" maxlength={128} disabled={voiceLoading || chatSaving} />
+        {:else}
+          <Select id="chat-model" items={modelItems} bind:value={chatModel} on:change={changeModel} placeholder={modelsLoading ? "正在获取模型列表…" : canListModels ? "请选择模型" : "填写 API Key 后获取模型列表"} disabled={voiceLoading || chatSaving || !modelItems.length} />
+        {/if}
+      </div>
+      {#if modelsError}<p class="feedback error" role="alert">{modelsError}</p>{/if}
+      {#if chatModel}
+      <label class="vision-toggle"><input type="checkbox" bind:checked={chatVision} disabled={voiceLoading || chatSaving || typeof listedVision === "boolean"} />
+        <span>模型支持图片输入{typeof listedVision === "boolean" ? "（来自模型列表）" : ""}<small>开启后轴伊可以查看桌面：截图直接发给这个模型，只用于当次回复。</small></span></label>
+      {/if}
+      {#if chatProvider === "openrouter"}<p class="setting-help">只列出支持工具调用、且可以关闭推理的模型，以便语音回复尽快开始。</p>{/if}
+      {/if}
+      <p class="setting-help">API Key 保存在本机系统凭据存储中，只发送给所选服务。保存后下一次对话生效。</p>
+      <div class="setting-actions"><Button size="sm" on:click={() => saveChatSettings()} disabled={voiceLoading || chatSaving || !chatProvider}>{chatSaving ? "保存中…" : "保存大模型设置"}</Button>{#if chatProvider && chatHasKey && chatProvider === savedProvider}<Button size="sm" color="alternative" on:click={() => saveChatSettings(true)} disabled={voiceLoading || chatSaving}>移除 Key</Button>{/if}</div>
+      {#if voiceError || chatError}<p class="feedback error" role="alert">{chatError || voiceError}</p>{/if}
+      {#if chatMessage}<p class="feedback success" role="status">{chatMessage}</p>{/if}
     </SettingCard>
     <SettingCard title="对话与工具状态" description="查看最近的回复和执行结果" icon="spark">
-      <p class="setting-help">可调整声音、显示、桌面互动、通知、轮盘和装扮，查看桌面、查询游戏数据、安排或取消任务、升级属性、搜索网页和 B 站，以及用默认浏览器打开网页。B 站搜索使用当前登录账号；查看桌面时会截图并发送给百炼视觉模型，Mac 首次使用需允许录屏权限。</p>
+      <p class="setting-help">可调整声音、显示、桌面互动、通知、轮盘和装扮，查看桌面、查询游戏数据、安排或取消任务、升级属性、搜索 B 站，以及用默认浏览器打开网页。B 站搜索使用当前登录账号；模型支持图片输入时可以查看桌面，截图会发送给所选大模型，Mac 首次使用需允许录屏权限。</p>
       {#if voiceStatus?.message}<p class="feedback" class:error={voiceStatus.state === "error"} aria-live="polite">{voiceStatus.message}</p>{/if}
       {#if voiceStatus?.reply}<p class="voice-reply">{voiceStatus.reply}</p>{/if}
       {#if voiceStatus?.last_tool}
         <div class="voice-tool"><strong>{voiceStatus.last_tool.label} · {voiceStatus.last_tool.ok ? "完成" : "失败"}</strong>
           {#if voiceStatus.last_tool.error}<p class="feedback error">{voiceStatus.last_tool.error}</p>{/if}
           {#if voiceStatus.last_tool.url}<p><a href={voiceStatus.last_tool.url} target="_blank" rel="noopener noreferrer">{voiceStatus.last_tool.url}</a></p>{/if}
-          {#each (voiceStatus.last_tool.sources || voiceStatus.last_tool.results || []) as source}{#if source.url}<p><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title || source.url}</a></p>{/if}{/each}
+          {#each (voiceStatus.last_tool.results || []) as source}{#if source.url}<p><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title || source.url}</a></p>{/if}{/each}
         </div>
       {/if}
     </SettingCard>
@@ -243,4 +310,7 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23578a27' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
   .voice-shortcut .mode-select:hover:not(:disabled) { border-color: #a0c46e; }
   .voice-shortcut .mode-select:disabled { cursor: default; opacity: .7; }
+  .vision-toggle { display: flex; gap: 8px; align-items: flex-start; margin: 2px 0 10px; font-size: 13px; font-weight: 700; color: var(--ink, inherit); cursor: pointer; }
+  .vision-toggle input { margin-top: 2px; accent-color: var(--green-ink); }
+  .vision-toggle small { display: block; font-weight: 400; color: var(--muted); }
 </style>

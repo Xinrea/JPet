@@ -507,7 +507,33 @@ class WinPlatform final : public Platform {
   std::thread microphone_, renderer_;
   AudioClock::time_point lastAudio_{};
 };
-std::wstring CredentialTarget(const std::string& profile) { return L"JPet/Qwen/" + Wide(profile); }
+// Legacy; only removed.
+std::wstring BailianTarget(const std::string& profile) { return L"JPet/Qwen/" + Wide(profile); }
+// Chat service keys: the third-party key keeps the former custom endpoint's credential.
+std::wstring ChatTarget(const std::string& profile, const std::string& provider) {
+  return L"JPet/Chat/" + (provider == "thirdparty" ? std::wstring{} : Wide(provider) + L"/") + Wide(profile);
+}
+
+// An empty key removes the saved one.
+bool SaveSecret(std::wstring target, const std::string& key) {
+  if (key.empty()) return CredDeleteW(target.c_str(), CRED_TYPE_GENERIC, 0) || GetLastError() == ERROR_NOT_FOUND;
+  CREDENTIALW credential{};
+  credential.Type = CRED_TYPE_GENERIC;
+  credential.TargetName = target.data();
+  credential.CredentialBlobSize = static_cast<DWORD>(key.size());
+  credential.CredentialBlob = reinterpret_cast<LPBYTE>(const_cast<char*>(key.data()));
+  credential.Persist = CRED_PERSIST_LOCAL_MACHINE;
+  return CredWriteW(&credential, 0);
+}
+
+// Empty when no key is saved; false only when the credential cannot be read.
+bool LoadSecret(const std::wstring& target, std::string& key) {
+  PCREDENTIALW credential = nullptr;
+  if (!CredReadW(target.c_str(), CRED_TYPE_GENERIC, 0, &credential)) return GetLastError() == ERROR_NOT_FOUND;
+  key.assign(reinterpret_cast<const char*>(credential->CredentialBlob), credential->CredentialBlobSize);
+  CredFree(credential);
+  return true;
+}
 }  // namespace
 
 std::unique_ptr<Platform> MakePlatform() { return std::make_unique<WinPlatform>(); }
@@ -534,58 +560,17 @@ AudioDevices ListAudioDevices() {
   return devices;
 }
 
-bool SaveApiKey(const std::string& profile, const std::string& key, std::string& error) {
-  auto target = CredentialTarget(profile);
-  if (key.empty()) {
-    if (CredDeleteW(target.c_str(), CRED_TYPE_GENERIC, 0) || GetLastError() == ERROR_NOT_FOUND) return true;
-  } else {
-    CREDENTIALW credential{};
-    credential.Type = CRED_TYPE_GENERIC;
-    credential.TargetName = target.data();
-    credential.CredentialBlobSize = static_cast<DWORD>(key.size());
-    credential.CredentialBlob = reinterpret_cast<LPBYTE>(const_cast<char*>(key.data()));
-    credential.Persist = CRED_PERSIST_LOCAL_MACHINE;
-    if (CredWriteW(&credential, 0)) return true;
-  }
-  error = "无法保存 API Key，请检查 Windows 凭据管理器";
-  return false;
-}
+void RemoveLegacyApiKey(const std::string& profile) { SaveSecret(BailianTarget(profile), ""); }
 
-std::string LoadApiKey(const std::string& profile, std::string& error) {
-  PCREDENTIALW credential = nullptr;
-  if (!CredReadW(CredentialTarget(profile).c_str(), CRED_TYPE_GENERIC, 0, &credential)) {
-    if (GetLastError() != ERROR_NOT_FOUND) error = "无法读取 API Key，请检查 Windows 凭据管理器";
-    return {};
-  }
-  const std::string key(reinterpret_cast<const char*>(credential->CredentialBlob), credential->CredentialBlobSize);
-  CredFree(credential);
-  return key;
-}
-bool SaveChatApiKey(const std::string& profile, const std::string& key, std::string& error) {
-  auto target = L"JPet/Chat/" + Wide(profile);
-  if (key.empty()) {
-    if (CredDeleteW(target.c_str(), CRED_TYPE_GENERIC, 0) || GetLastError() == ERROR_NOT_FOUND) return true;
-  } else {
-    CREDENTIALW credential{};
-    credential.Type = CRED_TYPE_GENERIC;
-    credential.TargetName = target.data();
-    credential.CredentialBlobSize = static_cast<DWORD>(key.size());
-    credential.CredentialBlob = reinterpret_cast<LPBYTE>(const_cast<char*>(key.data()));
-    credential.Persist = CRED_PERSIST_LOCAL_MACHINE;
-    if (CredWriteW(&credential, 0)) return true;
-  }
+bool SaveChatApiKey(const std::string& profile, const std::string& provider, const std::string& key, std::string& error) {
+  if (SaveSecret(ChatTarget(profile, provider), key)) return true;
   error = "无法保存大模型 API Key，请检查 Windows 凭据管理器";
   return false;
 }
 
-std::string LoadChatApiKey(const std::string& profile, std::string& error) {
-  PCREDENTIALW credential = nullptr;
-  if (!CredReadW((L"JPet/Chat/" + Wide(profile)).c_str(), CRED_TYPE_GENERIC, 0, &credential)) {
-    if (GetLastError() != ERROR_NOT_FOUND) error = "无法读取大模型 API Key，请检查 Windows 凭据管理器";
-    return {};
-  }
-  const std::string key(reinterpret_cast<const char*>(credential->CredentialBlob), credential->CredentialBlobSize);
-  CredFree(credential);
+std::string LoadChatApiKey(const std::string& profile, const std::string& provider, std::string& error) {
+  std::string key;
+  if (!LoadSecret(ChatTarget(profile, provider), key)) error = "无法读取大模型 API Key，请检查 Windows 凭据管理器";
   return key;
 }
 

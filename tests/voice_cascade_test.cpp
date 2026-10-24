@@ -75,7 +75,8 @@ struct Fixture {
     chat = fake.get();
     auto fakeSynth = voice ? std::make_unique<FakeSynthesizer>() : nullptr;
     synth = fakeSynth.get();
-    Voice::CascadeConfig config{"https://chat.example/v1/chat/completions", "chat-key", "qwen-plus", true};
+    Voice::CascadeConfig config{"https://chat.example/v1/chat/completions", "chat-key", "deepseek-chat",
+                                Voice::ChatRequestOptions("deepseek")};
     Voice::Pipeline::Callbacks callbacks{
       [this](const std::string& pcm) { played += pcm; playing = true; },
       [this] { return playing; },
@@ -156,11 +157,45 @@ void Parser() {
   failed.Feed("{\"error\":{\"code\":\"InvalidApiKey\",\"message\":\"bad key\"}}");
   failed.Finish(401);
   Check(failed.Error().find("认证失败") != std::string::npos && failed.Error().find("InvalidApiKey") != std::string::npos, "HTTP errors are readable");
-  Check(Voice::ChatCompletionsUrl("", "ws-1") == "https://ws-1.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions" &&
-        Voice::ChatCompletionsUrl("https://api.deepseek.com/v1/", "ws-1") == "https://api.deepseek.com/v1/chat/completions", "chat endpoints");
+  Check(Voice::ChatCompletionsUrl("https://api.deepseek.com") == "https://api.deepseek.com/chat/completions" &&
+        Voice::ChatCompletionsUrl("https://api.example.com/v1/") == "https://api.example.com/v1/chat/completions" &&
+        Voice::ChatCompletionsUrl("https://api.example.com/v1/chat/completions") == "https://api.example.com/v1/chat/completions",
+        "chat endpoints");
   Check(Voice::ValidChatBaseUrl("https://api.deepseek.com/v1") && Voice::ValidChatBaseUrl("http://127.0.0.1:11434/v1") &&
         !Voice::ValidChatBaseUrl("http://example.com/v1") && !Voice::ValidChatBaseUrl("https://user:pass@example.com") &&
         !Voice::ValidChatBaseUrl("https://example.com/v1#x") && !Voice::ValidChatBaseUrl("ftp://example.com"), "chat base URL validation");
+  Check(Voice::ValidChatModel("deepseek-chat") && Voice::ValidChatModel("openai/gpt-4o:free") && Voice::ValidChatModel("@cf/meta/llama") &&
+        !Voice::ValidChatModel("") && !Voice::ValidChatModel("bad model") && !Voice::ValidChatModel(std::string(129, 'a')), "model ids");
+}
+
+void Providers() {
+  std::vector<std::string> ids;
+  for (const auto& provider : Voice::ChatProviders()) ids.push_back(provider.id);
+  Check(ids == std::vector<std::string>{"deepseek", "openrouter", "thirdparty"} && !Voice::FindChatProvider("bailian") &&
+        std::string(Voice::FindChatProvider("deepseek")->baseUrl) == "https://api.deepseek.com" &&
+        std::string(Voice::FindChatProvider("thirdparty")->baseUrl).empty(), "chat services");
+  Check(Voice::ChatRequestOptions("deepseek") == json({{"thinking", {{"type", "disabled"}}}}) &&
+        Voice::ChatRequestOptions("openrouter") == json({{"reasoning", {{"effort", "none"}}}}) &&
+        Voice::ChatRequestOptions("thirdparty") == json::object(), "reasoning is turned off where the service allows it");
+
+  const auto deepseek = Voice::ParseChatModels("deepseek", json::parse(R"({"object":"list","data":[
+    {"id":"deepseek-v4-pro","object":"model","name":"DeepSeek-V4-Pro","input_modalities":["text","image"]},{"id":"deepseek-chat","object":"model"},
+    {"id":"bad model"},{"object":"model"},"x"]})"));
+  Check(deepseek.size() == 2 && deepseek[0].id == "deepseek-chat" && deepseek[0].name == "deepseek-chat" &&
+        deepseek[1].name == "DeepSeek-V4-Pro", "models are named, sorted by name and invalid ids dropped");
+  Check(!deepseek[0].vision && deepseek[1].vision == true, "image input is read from the model list when listed");
+  const auto openrouter = Voice::ParseChatModels("openrouter", json::parse(R"({"data":[
+    {"id":"a/tools","name":"A: Tools","supported_parameters":["tools","reasoning"],"reasoning":{"mandatory":false},
+     "architecture":{"input_modalities":["text","image"]}},
+    {"id":"b/plain","name":"B: Plain","supported_parameters":["tools"],"reasoning":null,"architecture":{"input_modalities":["text"]}},
+    {"id":"c/reasoning-only","name":"C: Always thinks","supported_parameters":["tools"],"reasoning":{"mandatory":true}},
+    {"id":"d/no-tools","name":"D: No tools","supported_parameters":["max_tokens"]}]})"));
+  Check(openrouter.size() == 2 && openrouter[0].id == "a/tools" && openrouter[1].id == "b/plain" &&
+        openrouter[0].vision == true && openrouter[1].vision == false,
+        "OpenRouter offers models with tools whose reasoning can be turned off");
+  Check(Voice::ParseChatModels("thirdparty", json::parse(R"({"data":[{"id":"local-model"}]})")).size() == 1 &&
+        Voice::ParseChatModels("thirdparty", json::parse(R"({"error":"nope"})")).empty() &&
+        Voice::ParseChatModels("thirdparty", json::array()).empty(), "third-party lists and malformed bodies");
 }
 
 void Conversation() {
@@ -173,7 +208,7 @@ void Conversation() {
   Check(f.transcribed.size() == 1 && f.transcribed[0] >= size_t(1.6 * 32000), "the whole utterance with pre-roll is transcribed once");
   Check(f.chat->requests.size() == 1, "a transcript starts the chat request");
   const auto& body = f.chat->requests[0];
-  Check(body["stream"] == true && body["enable_thinking"] == false && body["tools"].size() == 1 &&
+  Check(body["stream"] == true && body["model"] == "deepseek-chat" && body["thinking"]["type"] == "disabled" && body["tools"].size() == 1 &&
         body["messages"][0]["role"] == "system" && body["messages"][1] == json({{"role", "user"}, {"content", "今天天气怎么样"}}),
         "the chat request carries the prompt, tools and the user's words");
 
@@ -285,6 +320,29 @@ void TypedMessages() {
   Check(f.chat->requests.size() == 3, "blank messages are ignored");
 }
 
+void DesktopImage() {
+  Fixture f(false, false, false);
+  f.pipeline->SubmitText("看看我的桌面");
+  f.Stream({}, {{"call_d", "view_desktop", "{}"}});
+  f.pipeline->CompleteTool("call_d", {{"ok", true}, {"width", 1920}, {Voice::ToolImageField, "SlBFRw=="}});
+  const auto follow = f.chat->requests.back()["messages"];
+  const auto& tool = follow[follow.size() - 2];
+  Check(tool["role"] == "tool" && tool["content"].get<std::string>().find("SlBFRw==") == std::string::npos &&
+        json::parse(tool["content"].get<std::string>()).value("width", 0) == 1920, "the tool result carries no image data");
+  Check(follow.back()["role"] == "user" && follow.back()["content"][1]["type"] == "image_url" &&
+        follow.back()["content"][1]["image_url"]["url"] == "data:image/jpeg;base64,SlBFRw==",
+        "the screenshot follows the tool result as an image for the model");
+  f.Stream({"你在看视频。"});
+  Check(f.pipeline->Context().dump().find("SlBFRw==") == std::string::npos &&
+        f.pipeline->Context().back() == json({{"role", "assistant"}, {"content", "你在看视频。"}}),
+        "the screenshot stays out of the context");
+  f.pipeline->SubmitText("谢谢");
+  Check(f.chat->requests.back()["messages"].dump().find("image_url") == std::string::npos, "the next reply sends no screenshot");
+  bool historyClean = true;
+  for (const auto& event : f.history) historyClean = historyClean && event.data.dump().find("SlBFRw==") == std::string::npos;
+  Check(historyClean, "the screenshot is not recorded in the history");
+}
+
 void WorkerThread() {
   Fixture f(true, true);
   const auto settle = [&](const std::function<bool()>& done) {
@@ -316,9 +374,11 @@ int main() {
   try {
     Text();
     Parser();
+    Providers();
     Conversation();
     SynthesisFailure();
     TypedMessages();
+    DesktopImage();
     WorkerThread();
     PushToTalk();
     std::cout << "PASS voice cascade pipeline\n";

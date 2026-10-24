@@ -16,14 +16,9 @@
 namespace Voice {
 constexpr int ReplySampleRate = 24000;
 
-constexpr const char* DefaultChatModel = "qwen-plus";
-// Bailian chat models offered in settings: {chat_models: [{id, name}]}.
-const nlohmann::json& CascadeCatalog();
-bool ValidChatModel(const std::string& model);  // Any provider's model name.
-
 struct CascadeConfig {
   std::string chatUrl, chatKey, chatModel;
-  bool bailianChat = true;              // Adds Bailian-only request fields.
+  nlohmann::json chatOptions = nlohmann::json::object();  // Provider-specific request fields.
 };
 
 // Voice conversation engine (speech recognition + chat model + speech
@@ -143,6 +138,10 @@ class Pipeline {
   SentenceSplitter splitter_;
   std::set<std::string> pendingTools_;
   size_t toolCount_ = 0;
+  // Base64 JPEGs returned by tools in this reply. Sent with each of its chat
+  // requests but kept out of the context: a screenshot is large and only
+  // matters to the reply that asked for it.
+  std::vector<std::string> images_;
 
   // Synthesis: one sentence at a time, so each segment's audio interval is known.
   std::vector<Segment> segments_;

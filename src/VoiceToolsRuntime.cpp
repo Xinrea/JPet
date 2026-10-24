@@ -1,5 +1,6 @@
 #include "VoiceTools.hpp"
 #include "VoiceToolsNetwork.hpp"
+#include "VoiceDesktop.hpp"
 #include "VoicePlatform.hpp"
 #include "DataManager.hpp"
 #include "GameManager.hpp"
@@ -11,6 +12,7 @@
 #include "PanelServer.hpp"
 #include "VoiceSettingsQueue.hpp"
 #include "PartStateManager.h"
+#include <ctime>
 #include <filesystem>
 
 namespace Voice {
@@ -140,27 +142,14 @@ json ReadGame(const json& query) {
   return GameView(game, query.at("section").get<std::string>(), query.value("offset", size_t{0}), query.value("limit", size_t{5}));
 }
 
-struct AICredentials { std::string workspace, key, error; };
-AICredentials Credentials() {
-  auto* data = DataManager::GetInstance();
-  AICredentials result;
-  result.workspace = data->GetConfig<std::string>("voice", "workspace_id", "");
-  result.key = LoadApiKey(LAppPal::WStringToString(LAppDefine::documentPath), result.error);
-  if (result.error.empty() && (!ValidWorkspace(result.workspace) || !ValidApiKey(result.key))) result.error = "请在语音设置中保存有效的 API Key 和业务空间 ID";
-  return result;
-}
+// The screenshot goes to the chat model as an image (see ToolImageField).
 json ReadDesktop(const json& query) {
-  const auto credentials = Credentials();
-  if (!credentials.error.empty()) return Fail(credentials.error);
   DesktopImage image;
   std::string error;
   if (!CaptureDesktop(query.at("display").get<int>(), image, error)) return Fail(error);
-  return DescribeDesktop(query, image, credentials.workspace, credentials.key);
-}
-json ReadWeb(const json& query) {
-  const auto credentials = Credentials();
-  if (!credentials.error.empty()) return Fail(credentials.error);
-  return SearchWeb(query, credentials.workspace, credentials.key);
+  return {{"ok", true}, {"captured_at", static_cast<int64_t>(std::time(nullptr))}, {"width", image.width}, {"height", image.height},
+    {"display", query.at("display")}, {"display_count", image.displayCount}, {"external_content", true},
+    {ToolImageField, EncodeBase64(image.jpeg)}};
 }
 json ReadBilibili(const json& query) {
   auto* data = DataManager::GetInstance();
@@ -177,7 +166,7 @@ json ReadBilibili(const json& query) {
 ToolDependencies MakeToolDependencies() {
   settingsQueue.Start();
   return {ReadGame, [](const json& command) { return GameManager::GetInstance()->Command(command); },
-    ReadDesktop, ReadWeb, ReadBilibili, ::Platform::OpenWebURL,
+    ReadDesktop, ReadBilibili, ::Platform::OpenWebURL,
     [](const json& request, const std::function<bool()>& cancelled) {
       return settingsQueue.Invoke([request] { return ApplySettings(request); }, cancelled);
     }};

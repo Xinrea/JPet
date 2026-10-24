@@ -17,7 +17,7 @@ Voice::ToolCall Call(const char* name, json args) { return {"c1", name, args.dum
 int main() {
   try {
     const auto definitions = Voice::ToolDefinitions();
-    Check(definitions.size() == 14, "focused queries and action tools registered within relay limit");
+    Check(definitions.size() == 13, "focused queries and action tools registered within relay limit");
     for (const auto& definition : definitions) Check(definition["type"] == "function" &&
       definition["function"]["parameters"]["additionalProperties"] == false, "nested Qwen schema with closed arguments");
     int mutations = 0, queries = 0, external = 0, opens = 0;
@@ -26,7 +26,6 @@ int main() {
     Voice::ToolDependencies dependencies{
       [&](const json& query) { ++queries; last = query; return json{{"ok", true}, {"profile", {{"starcnt", 3}}}}; },
       [&](const json& command) { ++mutations; last = command; return std::string{}; },
-      [&](const json& query) { ++external; last = query; return json{{"ok", true}}; },
       [&](const json& query) { ++external; last = query; return json{{"ok", true}}; },
       [&](const json& query) { ++external; last = query; return json{{"ok", true}}; },
       [&](const std::string& url, std::string&) { ++opens; openedUrl = url; return true; }
@@ -211,7 +210,8 @@ int main() {
       "server rejection remains failure without success state");
     Check(run("view_desktop", json::object())["ok"] == true && last["display"] == 0, "desktop defaults to main monitor");
     Check(run("view_desktop", {{"display", 8}})["ok"] == false, "bounded monitor selection");
-    Check(run("web_search", {{"query", "今天的天气"}})["ok"] == true && last["limit"] == 5, "web search dispatch");
+    Check(run("view_desktop", {{"question", "看看屏幕"}})["code"] == "invalid_arguments", "the model looks at the screenshot itself");
+    Check(run("web_search", {{"query", "今天的天气"}})["ok"] == false, "web search is no longer a tool");
     for (const auto* type : {"video", "user", "live", "article", "bangumi", "film"})
       Check(run("bilibili", {{"action", "search"}, {"query", "千问"}, {"type", type}})["ok"] == true && last["type"] == type, "six Bilibili search categories");
     Check(run("bilibili", {{"action", "search"}, {"query", "千问"}})["ok"] == true &&
@@ -487,10 +487,6 @@ int main() {
       Check(bili({{"action", "history"}})["error"] == "B站登录已失效，请重新登录JPet" &&
         bili({{"action", "hot_search"}}, "")["ok"] == true, "expired logins block account actions but keep WBI keys for public ones");
     }
-    auto web = Voice::WebSearchResults({{"output", {{"choices", {{{"message", {{"content", "结论[ref_1]"}}}}}},
-      {"search_info", {{"search_results", {{{"index", 1}, {"title", "来源"}, {"url", "https://example.com/page"}}}}}}}}}, 5);
-    Check(web["sources"][0]["url"] == "https://example.com/page" && web["summary"] == "结论[ref_1]", "web search retains citations and sources");
-    Check(!Voice::WebSearchResults({{"output", {{"choices", {{{"message", {{"content", "没有来源"}}}}}}}}}, 5)["ok"].get<bool>(), "uncited generation is not represented as successful search");
 
     const auto bad = ExecuteTool({"c1", "jpet_settings", R"({"action":"update","section":"appearance","settings":{"volume":40}})"}, dependencies);
     Check(bad["ok"] == false && bad["code"] == "invalid_arguments" && bad["error"].get<std::string>().find("sweat") != std::string::npos,
