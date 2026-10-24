@@ -396,6 +396,11 @@ if(JPET_BUILD_VOICE_TESTS)
     cryptopp::cryptopp httplib::httplib OpenSSL::SSL OpenSSL::Crypto)
   if(WIN32)
     target_link_libraries(voice_web_search_probe PRIVATE Ws2_32)
+    # Match JPet's Windows SDK compatibility setting: curl's Windows headers
+    # otherwise expose an ambiguous byte alongside C++17's std::byte.
+    foreach(test_target voice_tools_test voice_web_search_probe)
+      target_compile_definitions(${test_target} PRIVATE _HAS_STD_BYTE=0)
+    endforeach()
   endif()
   add_executable(voice_echo_test tests/voice_echo_test.cpp src/VoiceEcho.cpp)
   set_target_properties(voice_echo_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
