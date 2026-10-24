@@ -211,6 +211,12 @@ void Conversation() {
   Check(body["stream"] == true && body["model"] == "deepseek-chat" && body["thinking"]["type"] == "disabled" && body["tools"].size() == 1 &&
         body["messages"][0]["role"] == "system" && body["messages"][1] == json({{"role", "user"}, {"content", "今天天气怎么样"}}),
         "the chat request carries the prompt, tools and the user's words");
+  const auto prompt = body["messages"][0]["content"].get<std::string>();
+  Check(prompt.find(Voice::Instructions()) == 0 && prompt.find("性格：") != std::string::npos &&
+        prompt.find("说话习惯：") != std::string::npos && prompt.find("语音表达：") != std::string::npos &&
+        prompt.find("使用正常中文和标点来断句") != std::string::npos &&
+        prompt.find("不用‘8’代替‘不’") != std::string::npos && prompt.find("文字表达：") == std::string::npos,
+        "voice requests share the persona but use pronunciation-safe speech rules");
 
   f.Stream({"好的，今天", "是晴天。明天", "可能下雨。"});
   Check(f.synth->spoken.size() == 1 && f.synth->spoken[0].second == "好的，今天是晴天。",
@@ -292,6 +298,12 @@ void TypedMessages() {
   Check(body["messages"][0]["content"].get<std::string>().find("打字") != std::string::npos &&
         body["messages"][1]["content"] == "早上好" && body["messages"].back() == json({{"role", "user"}, {"content", "帮我看看今天的任务"}}),
         "typed messages continue the carried context with text-reply instructions");
+  const auto prompt = body["messages"][0]["content"].get<std::string>();
+  Check(prompt.find(Voice::Instructions()) == 0 && prompt.find("性格：") != std::string::npos &&
+        prompt.find("说话习惯：") != std::string::npos && prompt.find("文字表达：") != std::string::npos &&
+        prompt.find("偶尔用‘8’代替‘不’") != std::string::npos &&
+        prompt.find("链接、代码、数据和工具参数保持原样") != std::string::npos && prompt.find("语音表达：") == std::string::npos,
+        "typed requests share the persona and allow chat mannerisms without corrupting literal data");
   Check(f.history[0].type == Voice::ConversationEvent::Type::Started && f.history[0].data == json({{"input", "text"}}) &&
         f.history[1].text == "帮我看看今天的任务", "history marks the message as typed");
   f.Stream({"今天有三个任务。", "要我帮你安排吗？"});

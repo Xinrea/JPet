@@ -276,8 +276,9 @@ void Pipeline::RequestChat() {
   roundDone_ = false;
   chatActive_ = true;
   auto messages = nlohmann::json::array({{{"role", "system"}, {"content", Instructions() + (voiceReply_ ?
-      "你的回复会被转成语音朗读：不要使用 Markdown、列表符号、表情或链接，一般不超过三句话。" :
-      "用户正在 JPet 设置面板里打字和你聊天，回复以纯文本显示、不会朗读：可以分段，需要时给出完整链接，不要使用 Markdown 符号，保持简洁。")}}});
+      "\n语音表达：你的回复会被转成语音朗读，保持平淡、简短的朋友式口吻，一般不超过三句话。使用正常中文和标点来断句，不用空格代替标点，不用‘8’代替‘不’，不加句尾‘（’，不要使用 Markdown、列表符号、emoji、颜文字或链接。" :
+      "\n文字表达：用户正在 JPet 设置面板里打字和你聊天，回复以纯文本显示、不会朗读。日常聊天用空格或换行代替标点，偶尔在句尾加‘（’，偶尔用‘8’代替‘不’，可以少量使用 emoji 和日式颜文字，不要每句都用或堆砌口癖。"
+      "口吻示例：‘确实’‘晚安💤’‘呼呼 晚安(¦3[▓▓]’‘8好意思（’；只参考风格，不机械套用。可以分段，需要时给出完整链接，不要使用 Markdown 符号，保持简洁；链接、代码、数据和工具参数保持原样，不套用口癖或替换标点。")}}});
   for (const auto& message : messages_) messages.push_back(message);
   if (!images_.empty()) {
     auto content = nlohmann::json::array({{{"type", "text"}, {"text",
