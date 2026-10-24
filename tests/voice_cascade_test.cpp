@@ -70,10 +70,10 @@ struct Fixture {
   std::vector<size_t> transcribed;
   std::unique_ptr<Voice::Pipeline> pipeline;
 
-  explicit Fixture(bool handsFree = true, bool threaded = false) {
+  explicit Fixture(bool handsFree = true, bool threaded = false, bool voice = true) {
     auto fake = std::make_unique<FakeChat>();
     chat = fake.get();
-    auto fakeSynth = std::make_unique<FakeSynthesizer>();
+    auto fakeSynth = voice ? std::make_unique<FakeSynthesizer>() : nullptr;
     synth = fakeSynth.get();
     Voice::CascadeConfig config{"https://chat.example/v1/chat/completions", "chat-key", "qwen-plus", true};
     Voice::Pipeline::Callbacks callbacks{
@@ -248,6 +248,43 @@ void SynthesisFailure() {
   Check(!f.pipeline->WaitingForReply(), "a failed reply waits for nothing");
 }
 
+void TypedMessages() {
+  Fixture f(false, false, false);  // Text-only: no synthesizer, no microphone.
+  f.pipeline->SetContext(json::array({{{"role", "user"}, {"content", "早上好"}}, {{"role", "assistant"}, {"content", "早呀"}}}));
+  f.pipeline->SubmitText("  帮我看看今天的任务\n");
+  Check(f.chat->requests.size() == 1 && f.state == "thinking", "a typed message starts the chat request");
+  const auto& body = f.chat->requests.back();
+  Check(body["messages"][0]["content"].get<std::string>().find("打字") != std::string::npos &&
+        body["messages"][1]["content"] == "早上好" && body["messages"].back() == json({{"role", "user"}, {"content", "帮我看看今天的任务"}}),
+        "typed messages continue the carried context with text-reply instructions");
+  Check(f.history[0].type == Voice::ConversationEvent::Type::Started && f.history[0].data == json({{"input", "text"}}) &&
+        f.history[1].text == "帮我看看今天的任务", "history marks the message as typed");
+  f.Stream({"今天有三个任务。", "要我帮你安排吗？"});
+  Check(f.played.empty() && f.state == "idle" && !f.pipeline->Replying(), "a typed reply finishes without speech");
+  Check(f.pipeline->Context().back() == json({{"role", "assistant"}, {"content", "今天有三个任务。要我帮你安排吗？"}}),
+        "the shown reply stays in the context");
+
+  f.pipeline->SubmitText("讲个长故事");
+  f.chat->pending.push_back({ChatEvent::Type::Text, "从前有座山，", {}, {}});
+  f.pipeline->Tick();
+  Check(f.state == "replying" && f.pipeline->Replying(), "streaming text is a reply in progress");
+  f.pipeline->StopReply();
+  Check(!f.pipeline->Replying() && f.chat->cancels > 0 && f.state == "idle" &&
+        f.history.back().type == Voice::ConversationEvent::Type::Interrupted, "stop cancels the reply");
+  Check(f.pipeline->Context().back() == json({{"role", "assistant"}, {"content", "从前有座山，"}}),
+        "a stopped typed reply keeps what was shown");
+
+  f.pipeline->SubmitText("我有多少经验");
+  f.Stream({}, {{"call_3", "get_game_profile", "{}"}});
+  Check(f.tools.size() == 1 && f.pipeline->Replying(), "typed messages may call tools");
+  f.pipeline->Reset();
+  const auto context = f.pipeline->Context();
+  Check(context.back()["role"] == "tool" && context.back()["tool_call_id"] == "call_3",
+        "a reset keeps every tool call paired with a result");
+  f.pipeline->SubmitText("   ");
+  Check(f.chat->requests.size() == 3, "blank messages are ignored");
+}
+
 void WorkerThread() {
   Fixture f(true, true);
   const auto settle = [&](const std::function<bool()>& done) {
@@ -281,6 +318,7 @@ int main() {
     Parser();
     Conversation();
     SynthesisFailure();
+    TypedMessages();
     WorkerThread();
     PushToTalk();
     std::cout << "PASS voice cascade pipeline\n";

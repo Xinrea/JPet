@@ -25,6 +25,9 @@ class VoiceChat {
     return history_.Clear();
   }
   bool IsBusy() const;
+  // A typed message from the panel's chat; answered in text by the next Tick.
+  bool SendText(const std::string& text, std::string& error);
+  void StopReply() { stopRequested_ = true; }
   // Local speech recognition and synthesis models, managed as one download:
   // download, cancel or remove them.
   bool SpeechModelAction(const std::string& action, std::string& error);
@@ -33,6 +36,9 @@ class VoiceChat {
  private:
   using Clock = std::chrono::steady_clock;
   VoiceChat();
+  // Starts the pipeline: with voice for the shortcut, text-only for typed
+  // messages. A text-only pipeline is replaced when the microphone opens.
+  bool Connect(bool voice);
   void Begin();
   void End();
   void Drain();
@@ -40,7 +46,7 @@ class VoiceChat {
   void Fail(const std::string& error);
   void SetState(const std::string& state, const std::string& message = "");
   bool Recording() const { return pipeline_ && pipeline_->Recording(); }
-  bool StartPipeline(const std::string& workspace, const std::string& key);
+  bool StartPipeline(const std::string& workspace, const std::string& key, bool voice);
   void PlayReply(const std::string& pcm);
   void SubmitTools(const std::vector<Voice::ToolCall>& calls);
   std::vector<Voice::SpeechModelStore*> ModelStores();  // Recognition, synthesis.
@@ -61,10 +67,16 @@ class VoiceChat {
   std::atomic<bool> resetRequested_{false};
   std::atomic<bool> historyClearRequested_{false};
   std::atomic<bool> busy_{false};
+  std::atomic<bool> stopRequested_{false};
+  std::mutex textMutex_;
+  std::vector<std::string> texts_;
+  // Voice and text share one conversation; kept when an idle pipeline closes,
+  // reset with the settings or history.
+  nlohmann::json context_ = nlohmann::json::array();
   std::mutex statusMutex_;
-  nlohmann::json status_ = {{"state", "idle"}, {"message", ""}, {"reply", ""}, {"microphone_on", false}};
+  nlohmann::json status_ = {{"state", "idle"}, {"message", ""}, {"reply", ""}, {"microphone_on", false}, {"replying", false}};
   GLFWwindow* window_ = nullptr;
-  bool connected_ = false;
+  bool connected_ = false, voice_ = false;
   Voice::ShortcutControl shortcut_;
   bool microphoneEnabled_ = false;
   size_t capturedBytes_ = 0;
