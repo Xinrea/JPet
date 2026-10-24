@@ -15,9 +15,15 @@ if(EXISTS "${CURRENT_INSTALLED_DIR}/lib/pkgconfig/abseil_dll.pc")
     string(APPEND VCPKG_CXX_FLAGS " -DABSL_CONSUME_DLL")
 endif()
 
+# APM uses designated initializers, which MSVC rejects below C++20 (C7555);
+# clang only warns, so other platforms keep the project's C++17 default.
+if(VCPKG_TARGET_IS_WINDOWS)
+    set(cpp_std -Dcpp_std=c++20)
+endif()
 vcpkg_configure_meson(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
+        ${cpp_std}
         -Dneon=auto
         -Dinline-sse=true
 )

@@ -93,7 +93,7 @@ cd JPet
 
 ### Windows · x64
 
-准备 Visual Studio 2022 的 C++ 桌面开发组件、Windows SDK、CMake 3.27+、Node.js 22+ 和 vcpkg。
+准备 Visual Studio 2022 的 C++ 桌面开发组件、Windows SDK、CMake 3.27+、Node.js 22+、vcpkg 和 Vulkan SDK（与 CI 相同的 1.4.328.1，并设置 `VULKAN_SDK`）。
 在仓库根目录的 PowerShell 中执行，按本机位置修改 `$vcpkgDir`：
 
 ```powershell
