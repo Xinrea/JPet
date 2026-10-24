@@ -49,6 +49,16 @@ jobs:
           g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/game_test.cpp src/GameRules.cpp -o game_test && ./game_test
           g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/achievements_test.cpp -o achievements_test && ./achievements_test
 
+  login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test Bilibili QR login
+        run: g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/bilibili_login_test.cpp -o bilibili_login_test && ./bilibili_login_test
+
   python:
     runs-on: ubuntu-latest
     timeout-minutes: 10
