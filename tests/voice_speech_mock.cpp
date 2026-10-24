@@ -12,7 +12,9 @@
 #include <string>
 
 #ifdef _WIN32
-#define MOCK_EXPORT __declspec(dllexport)
+// CMake exports the defined symbols via a .def file. Adding dllexport here
+// conflicts with the undecorated sherpa C API declarations under MSVC.
+#define MOCK_EXPORT
 #else
 #define MOCK_EXPORT __attribute__((visibility("default")))
 #endif
