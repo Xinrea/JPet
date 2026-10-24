@@ -31,7 +31,21 @@ class Platform {
   virtual uint64_t PlayedSamples() const = 0;
   virtual void ShowIndicator(GLFWwindow* window, const std::string& text,
                              bool error) = 0;
+  // Microphone and speaker ids from ListAudioDevices; empty means the system
+  // default. Streams opened afterwards use them, and a device that is no
+  // longer connected falls back to the default.
+  virtual void SetDevices(const std::string& input, const std::string& output) = 0;
 };
+
+struct AudioDevice {
+  std::string id, name;
+};
+struct AudioDevices {
+  std::vector<AudioDevice> inputs, outputs;
+};
+// Connected microphones and speakers. Ids (Windows endpoint ids, Core Audio
+// device UIDs) stay the same across restarts. Callable from any thread.
+AudioDevices ListAudioDevices();
 
 std::unique_ptr<Platform> MakePlatform();
 // Store secrets in the current user's Keychain / Windows Credential Manager.

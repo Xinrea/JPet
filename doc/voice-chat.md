@@ -25,6 +25,9 @@
 2. 填写北京地域的**百炼 API Key 和业务空间 ID**。用于网页搜索、查看桌面，以及未填写接口地址时的大模型。
 3. **大模型**：默认 `qwen-plus`，可选或填写其他模型名。填写「大模型接口地址」后改用该 OpenAI 兼容接口（如 DeepSeek、本机 Ollama），
    并需填写该接口的 API Key；地址必须是 HTTPS，本机地址可用 HTTP，不能包含账号信息。
+4. **麦克风和扬声器**：默认跟随系统默认设备，也可以单独选择。系统默认设备是远程桌面、串流或虚拟声卡时（例如 UU 远程、Steam 串流、VoiceMeeter），
+   轴伊的回复会播放到那里，此时应在这里选择实际的扬声器。保存的是设备 ID（Windows 端点 ID / Core Audio 设备 UID），
+   设备未连接时暂用系统默认，重新接入后自动恢复；插拔设备后可在设置中刷新设备列表。
 
 两个 API Key 都只写不读，保存在 macOS 钥匙串或 Windows 凭据管理器中，不上传到 JPet 云端。保存设置后，下一次对话生效。
 
@@ -163,14 +166,15 @@ B站Cookie仅用于发往 `api.bilibili.com` 的HTTPS请求，不交给大模型
 
 ## 回声消除（Windows）
 
-Windows 录音和播放使用 WASAPI 共享模式，打开默认设备；由系统音频引擎在设备格式与 16 kHz（录音）/24 kHz（播放）
+Windows 录音和播放使用 WASAPI 共享模式，打开设置中选择的设备（未选择或未连接时用默认设备）；由系统音频引擎在设备格式与 16 kHz（录音）/24 kHz（播放）
 单声道 16 bit PCM 之间转换。麦克风经过 WebRTC AudioProcessing（AEC3 回声消除、中等强度降噪、高通滤波）后再交给轮次检测和识别；
 AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量），没有回复时写入静音，保证参考流连续。
 麦克风开启期间播放流保持运行；麦克风关闭且回复播完 3 秒后释放播放设备，避免音频流阻止系统睡眠。
 只消除轴伊自己的声音，其他程序播放的音乐、视频不在参考信号内。Mac 暂无回声消除，外放时只能依靠上面的回声文字比对。
 
 - 设置环境变量 `JPET_VOICE_AEC=0` 后启动可关闭回声处理，用于对比原始录音。
-- `jpet.log` 中 `[Voice] Capture wasapi ...` 记录录音延迟和 AEC 开关；麦克风开启时每 5 秒输出
+- `jpet.log` 中 `[Voice] Capture wasapi ...` 与 `[Voice] Render wasapi ...` 记录实际打开的设备名称和延迟，以及 AEC 开关
+  （Mac 为 `[Voice] Capture format ... device=` 与 `[Voice] Playback device=`）；麦克风开启时每 5 秒输出
   `[Voice] AEC ... reduction=…dB`，即处理前后麦克风电平差（包含降噪的作用）。
 - 依赖 `webrtc-audio-processing` 2.1，由 [`build-scripts/ports`](../build-scripts/ports) 中的 vcpkg overlay port 构建为静态库；
   它要求 abseil 不低于 20240722 且仍提供 `absl::Nullable`，因此 `vcpkg.json` 将 abseil 固定为 20250127.1。
@@ -181,7 +185,7 @@ AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量�
 
 | 测试 | 内容 |
 | --- | --- |
-| `voice_common` | 凭据与业务空间校验、Base64、快捷键状态、对话记录、事件队列 |
+| `voice_common` | 凭据、业务空间与声音设备 ID 校验、Base64、快捷键状态、对话记录、事件队列 |
 | `voice_cascade` | 切句、数字读法、SSE 解析、一轮完整对话、按句合成、回声与真实打断、只保留已播出文字、合成失败、工具续答、按住说话 |
 | `voice_synthesis` | 静音裁剪、每句帧数上限、音色文件读写与随包音色的维度 |
 | `voice_turn` | VAD 状态机、Whisper 特征、Silero 与 Smart Turn 实际模型（Mac 用系统语音合成测试音频） |

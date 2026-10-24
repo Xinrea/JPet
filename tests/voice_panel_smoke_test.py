@@ -72,6 +72,16 @@ def main(gui=False, app=APP):
             for invalid_mode in ["", "invalid", None, 123, False]:
                 assert request(port, "/api/config/voice", {"input_mode": invalid_mode})[0] == 400
             assert request(port, "/api/config/voice")[1]["input_mode"] == "hold"
+            # Microphone and speaker default to the system devices; a saved id need not be connected.
+            assert config["input_device"] == "" and config["output_device"] == ""
+            assert all(isinstance(config["audio_devices"][kind], list) for kind in ("inputs", "outputs"))
+            assert all(device["id"] for device in config["audio_devices"]["inputs"] + config["audio_devices"]["outputs"])
+            code, saved = request(port, "/api/config/voice", {"input_device": "unplugged-mic", "output_device": "unplugged-speaker"})
+            assert code == 200 and saved["input_device"] == "unplugged-mic" and saved["output_device"] == "unplugged-speaker"
+            assert request(port, "/api/config/voice", {"input_mode": "toggle"})[1]["output_device"] == "unplugged-speaker"
+            for invalid in [{"input_device": "mic\nother"}, {"output_device": 1}, {"output_device": "x" * 257}]:
+                assert request(port, "/api/config/voice", invalid)[0] == 400, invalid
+            assert request(port, "/api/config/voice", {"input_device": "", "output_device": "", "input_mode": "hold"})[1]["input_device"] == ""
             try:
                 urllib.request.urlopen(f"http://127.0.0.1:{port}/api/powerlive")
                 raise AssertionError("the PowerLive account API is gone")

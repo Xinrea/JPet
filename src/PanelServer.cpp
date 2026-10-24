@@ -11,6 +11,7 @@
 #include "Platform.hpp"
 #include "UpdateManager.hpp"
 #include "VoiceChat.hpp"
+#include "VoicePlatform.hpp"
 
 #include <cstdlib>
 #include <map>
@@ -238,6 +239,19 @@ std::string CookieValue(const std::string& cookies, std::string_view wanted) {
     start = end + 1;
   }
   return {};
+}
+
+// Voice settings plus the connected microphones and speakers to choose from.
+nlohmann::json VoiceSettingsWithDevices() {
+  auto settings = DataManager::GetInstance()->GetVoiceSettings();
+  const auto devices = Voice::ListAudioDevices();
+  const auto list = [](const std::vector<Voice::AudioDevice>& items) {
+    auto out = nlohmann::json::array();
+    for (const auto& device : items) out.push_back({{"id", device.id}, {"name", device.name}});
+    return out;
+  };
+  settings["audio_devices"] = {{"inputs", list(devices.inputs)}, {"outputs", list(devices.outputs)}};
+  return settings;
 }
 
 }  // namespace
@@ -523,7 +537,7 @@ void PanelServer::doServe() {
               });
   server->Get("/api/config/voice", [](const httplib::Request&, httplib::Response& res) {
     res.set_header("Cache-Control", "no-store");
-    res.set_content(DataManager::GetInstance()->GetVoiceSettings().dump(), "application/json");
+    res.set_content(VoiceSettingsWithDevices().dump(), "application/json");
   });
   server->Post("/api/config/voice", [localRequest](const httplib::Request& req, httplib::Response& res) {
     if (!localRequest(req, res, true, 4096)) return;
@@ -542,7 +556,7 @@ void PanelServer::doServe() {
         return;
       }
       VoiceChat::GetInstance()->ConfigurationChanged();
-      res.set_content(DataManager::GetInstance()->GetVoiceSettings().dump(), "application/json");
+      res.set_content(VoiceSettingsWithDevices().dump(), "application/json");
     } catch (const nlohmann::json::exception&) {
       res.status = 400;
       res.set_content(R"({"error":"语音设置格式不正确"})", "application/json");

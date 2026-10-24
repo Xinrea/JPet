@@ -134,9 +134,14 @@ nlohmann::json DataManager::GetVoiceSettings() {
   if (!chatUrl.empty() && !Voice::ValidChatBaseUrl(chatUrl)) chatUrl.clear();
   auto inputMode = GetConfig<std::string>("voice", "input_mode", "toggle");
   if (inputMode != "hold") inputMode = "toggle";
+  auto inputDevice = GetConfig<std::string>("voice", "input_device", "");
+  if (!Voice::ValidAudioDeviceId(inputDevice)) inputDevice.clear();
+  auto outputDevice = GetConfig<std::string>("voice", "output_device", "");
+  if (!Voice::ValidAudioDeviceId(outputDevice)) outputDevice.clear();
   return {{"workspace_id", GetConfig<std::string>("voice", "workspace_id", "")},
           {"has_api_key", GetConfig<bool>("voice", "has_api_key", false)},
           {"input_mode", inputMode},
+          {"input_device", inputDevice}, {"output_device", outputDevice},
           {"chat_model", chatModel}, {"chat_base_url", chatUrl},
           {"has_chat_api_key", GetConfig<bool>("voice", "has_chat_api_key", false)},
           {"catalog", Voice::CascadeCatalog()}};
@@ -163,13 +168,20 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
     value = Voice::Trim(payload[key].get<std::string>());
     return true;
   };
-  std::string workspace, inputMode, chatModel, chatUrl;
+  std::string workspace, inputMode, inputDevice, outputDevice, chatModel, chatUrl;
   if (!text("workspace_id", workspace) || (!workspace.empty() && !Voice::ValidWorkspace(workspace))) {
     error = "业务空间 ID 应为 1～63 位字母、数字或连字符，且不能以连字符开头或结尾";
     return false;
   }
   if (!text("input_mode", inputMode) || (inputMode != "toggle" && inputMode != "hold")) {
     error = "请选择开关或按住的快捷键方式";
+    return false;
+  }
+  // Not checked against connected devices: an unplugged device stays selected
+  // and the default is used until it returns.
+  if (!text("input_device", inputDevice) || !Voice::ValidAudioDeviceId(inputDevice) ||
+      !text("output_device", outputDevice) || !Voice::ValidAudioDeviceId(outputDevice)) {
+    error = "请重新选择麦克风和扬声器";
     return false;
   }
   if (!text("chat_model", chatModel) || !Voice::ValidChatModel(chatModel)) { error = "请填写有效的大模型名称"; return false; }
@@ -200,6 +212,8 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
   for (const auto* legacy : {"provider", "model", "voice", "engine", "stt", "tts_model", "tts_voice"}) table.erase(legacy);
   table.insert_or_assign("workspace_id", workspace);
   table.insert_or_assign("input_mode", inputMode);
+  table.insert_or_assign("input_device", inputDevice);
+  table.insert_or_assign("output_device", outputDevice);
   table.insert_or_assign("chat_model", chatModel);
   table.insert_or_assign("chat_base_url", chatUrl);
   if (updateKey) table.insert_or_assign("has_api_key", !apiKey.empty());

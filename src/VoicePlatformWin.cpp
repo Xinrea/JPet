@@ -7,6 +7,8 @@
 #include <wincred.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
+#include <propkeydef.h>
+#include <functiondiscoverykeys_devpkey.h>
 #include <wrl/client.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -30,6 +32,14 @@ std::wstring Wide(const std::string& value) {
   return out;
 }
 
+std::string Narrow(const wchar_t* value) {
+  const int length = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
+  if (length <= 1) return {};
+  std::string out(length - 1, '\0');
+  WideCharToMultiByte(CP_UTF8, 0, value, -1, out.data(), length, nullptr, nullptr);
+  return out;
+}
+
 using Microsoft::WRL::ComPtr;
 using AudioClock = std::chrono::steady_clock;
 
@@ -38,15 +48,34 @@ struct ComScope {
   ~ComScope() { if (owned) CoUninitialize(); }
 };
 
-// Opens the default endpoint in shared, event-driven mode. The audio engine
-// converts between the device mix format and 16-bit mono at `rate`, so neither
-// direction needs its own resampler.
-HRESULT OpenStream(EDataFlow flow, DWORD rate, REFERENCE_TIME duration, HANDLE event,
-                   ComPtr<IAudioClient>& client) {
+std::string DeviceName(IMMDevice* device) {
+  ComPtr<IPropertyStore> properties;
+  PROPVARIANT value;
+  PropVariantInit(&value);
+  std::string name;
+  if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &properties)) &&
+      SUCCEEDED(properties->GetValue(PKEY_Device_FriendlyName, &value)) && value.vt == VT_LPWSTR)
+    name = Narrow(value.pwszVal);
+  PropVariantClear(&value);
+  return name;
+}
+
+// Opens endpoint `id` in shared, event-driven mode: the default endpoint when
+// `id` is empty or the device is no longer active. The audio engine converts
+// between the device mix format and 16-bit mono at `rate`, so neither
+// direction needs its own resampler. `description` names the opened device.
+HRESULT OpenStream(EDataFlow flow, const std::string& id, DWORD rate, REFERENCE_TIME duration, HANDLE event,
+                   ComPtr<IAudioClient>& client, std::string& description) {
   ComPtr<IMMDeviceEnumerator> enumerator;
   ComPtr<IMMDevice> device;
   HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator));
-  if (SUCCEEDED(hr)) hr = enumerator->GetDefaultAudioEndpoint(flow, eConsole, &device);
+  DWORD active = 0;
+  if (SUCCEEDED(hr) && !id.empty() && (FAILED(enumerator->GetDevice(Wide(id).c_str(), &device)) ||
+      FAILED(device->GetState(&active)) || active != DEVICE_STATE_ACTIVE))
+    device.Reset();
+  const bool fallback = !id.empty() && !device;
+  if (SUCCEEDED(hr) && !device) hr = enumerator->GetDefaultAudioEndpoint(flow, eConsole, &device);
+  if (SUCCEEDED(hr)) description = "\"" + DeviceName(device.Get()) + "\"" + (fallback ? " (saved device missing, default)" : "");
   if (SUCCEEDED(hr)) hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
       reinterpret_cast<void**>(client.ReleaseAndGetAddressOf()));
   WAVEFORMATEX format{};
@@ -81,6 +110,13 @@ struct WinState {
   std::shared_ptr<EchoCanceller> echo;
   std::atomic<bool> captureStop{false}, captureRunning{false};
   std::atomic<int> renderLatencyMs{0};
+  // Endpoint ids chosen in the voice settings (empty: default), read when a stream opens.
+  std::mutex deviceMutex;
+  std::string inputDevice, outputDevice;
+  std::string Device(bool input) {
+    std::lock_guard<std::mutex> lock(deviceMutex);
+    return input ? inputDevice : outputDevice;
+  }
   // Reply PCM (24 kHz mono) waiting for the render thread, guarded by renderMutex.
   std::mutex renderMutex;
   std::deque<int16_t> pending;
@@ -322,6 +358,22 @@ class WinPlatform final : public Platform {
     if (changed) InvalidateRect(state_->indicator, nullptr, FALSE);
   }
 
+  void SetDevices(const std::string& input, const std::string& output) override {
+    bool outputChanged;
+    {
+      std::lock_guard<std::mutex> lock(state_->deviceMutex);
+      outputChanged = state_->outputDevice != output;
+      state_->inputDevice = input;
+      state_->outputDevice = output;
+    }
+    // The microphone reopens on every StartCapture; the speaker stream stays
+    // open between replies, so close it to reopen on the new device.
+    if (outputChanged && !microphone_.joinable()) {
+      StopRender();
+      StopPlayback();
+    }
+  }
+
  private:
   void StartRender() {
     if (renderer_.joinable()) {
@@ -351,7 +403,9 @@ class WinPlatform final : public Platform {
     HANDLE event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     ComPtr<IAudioClient> client;
     ComPtr<IAudioCaptureClient> capture;
-    HRESULT hr = event ? OpenStream(eCapture, EchoCanceller::CaptureRate, Buffer, event, client) : E_OUTOFMEMORY;
+    std::string device;
+    HRESULT hr = event ? OpenStream(eCapture, state->Device(true), EchoCanceller::CaptureRate, Buffer, event, client, device)
+                       : E_OUTOFMEMORY;
     if (SUCCEEDED(hr)) hr = client->GetService(IID_PPV_ARGS(&capture));
     if (SUCCEEDED(hr)) hr = client->Start();
     if (FAILED(hr)) {
@@ -363,7 +417,7 @@ class WinPlatform final : public Platform {
     const int captureLatency = LatencyMs(client.Get(), Buffer);
     if (state->echo) state->echo->SetStreamDelay(captureLatency + state->renderLatencyMs);
     state->queue->Captured(generation, Event::Type::Diagnostic, "[Voice] Capture wasapi rate=16000 latency_ms=" +
-        std::to_string(captureLatency) + " aec=" + (state->echo ? "on" : "off"));
+        std::to_string(captureLatency) + " aec=" + (state->echo ? "on" : "off") + " device=" + device);
     auto reported = AudioClock::now();
     std::string chunk;
     for (;;) {
@@ -401,11 +455,16 @@ class WinPlatform final : public Platform {
     ComPtr<IAudioClient> client;
     ComPtr<IAudioRenderClient> render;
     UINT32 bufferFrames = 0;
-    HRESULT hr = event ? OpenStream(eRender, Rate, Buffer, event, client) : E_OUTOFMEMORY;
+    std::string device;
+    HRESULT hr = event ? OpenStream(eRender, state->Device(false), Rate, Buffer, event, client, device) : E_OUTOFMEMORY;
     if (SUCCEEDED(hr)) hr = client->GetBufferSize(&bufferFrames);
     if (SUCCEEDED(hr)) hr = client->GetService(IID_PPV_ARGS(&render));
     if (SUCCEEDED(hr)) hr = client->Start();
-    if (SUCCEEDED(hr)) state->renderLatencyMs = LatencyMs(client.Get(), Buffer);
+    if (SUCCEEDED(hr)) {
+      state->renderLatencyMs = LatencyMs(client.Get(), Buffer);
+      state->queue->Push(Event::Type::Diagnostic, "[Voice] Render wasapi rate=24000 latency_ms=" +
+          std::to_string(state->renderLatencyMs.load()) + " device=" + device);
+    }
     std::vector<int16_t> block;
     while (SUCCEEDED(hr) && !state->renderStop) {
       WaitForSingleObject(event, 100);
@@ -452,6 +511,28 @@ std::wstring CredentialTarget(const std::string& profile) { return L"JPet/Qwen/"
 }  // namespace
 
 std::unique_ptr<Platform> MakePlatform() { return std::make_unique<WinPlatform>(); }
+
+AudioDevices ListAudioDevices() {
+  ComScope com;
+  AudioDevices devices;
+  ComPtr<IMMDeviceEnumerator> enumerator;
+  if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator)))) return devices;
+  for (const auto& [flow, list] : {std::pair{eCapture, &devices.inputs}, std::pair{eRender, &devices.outputs}}) {
+    ComPtr<IMMDeviceCollection> collection;
+    UINT count = 0;
+    if (FAILED(enumerator->EnumAudioEndpoints(flow, DEVICE_STATE_ACTIVE, &collection)) ||
+        FAILED(collection->GetCount(&count)))
+      continue;
+    for (UINT i = 0; i < count; ++i) {
+      ComPtr<IMMDevice> device;
+      LPWSTR id = nullptr;
+      if (FAILED(collection->Item(i, &device)) || FAILED(device->GetId(&id))) continue;
+      list->push_back({Narrow(id), DeviceName(device.Get())});
+      CoTaskMemFree(id);
+    }
+  }
+  return devices;
+}
 
 bool SaveApiKey(const std::string& profile, const std::string& key, std::string& error) {
   auto target = CredentialTarget(profile);

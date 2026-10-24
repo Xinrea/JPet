@@ -248,6 +248,7 @@ target_include_directories(${APP_NAME} PRIVATE ${GLEW_INCLUDE_DIRS} ${Stb_INCLUD
 if(APPLE)
   target_link_libraries(${APP_NAME} PRIVATE RocksDB::rocksdb
     "-framework AppKit" "-framework WebKit" "-framework AVFoundation"
+    "-framework AudioToolbox" "-framework CoreAudio"
     "-framework Foundation" "-framework UserNotifications")
   target_link_libraries(${APP_NAME} PRIVATE "-framework Security")
   target_link_libraries(${APP_NAME} PRIVATE "-weak_framework ScreenCaptureKit" "-framework ImageIO")

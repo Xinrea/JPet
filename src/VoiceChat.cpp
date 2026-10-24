@@ -255,6 +255,8 @@ void VoiceChat::Begin() {
   capturedEnergy_ = 0;
   capturedPeak_ = 0;
   pipeline_->BeginInput(data->GetConfig<std::string>("voice", "input_mode", "toggle") == "hold");
+  const auto settings = data->GetVoiceSettings();
+  platform_->SetDevices(settings.at("input_device"), settings.at("output_device"));
   platform_->StartCapture();
   microphoneEnabled_ = true;
   lastActivity_ = Clock::now();

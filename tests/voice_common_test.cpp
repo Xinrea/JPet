@@ -22,6 +22,9 @@ int main() {
       Check(!Voice::ValidWorkspace(invalid), "workspace cannot replace the credential destination");
     Check(!Voice::ValidWorkspace(std::string(64, 'a')), "workspace fits one DNS label");
     Check(Voice::Trim(" \n sk-test \r") == "sk-test" && !Voice::ValidApiKey("sk-test\r\nHeader: injected"), "credential header validation");
+    Check(Voice::ValidAudioDeviceId("") && Voice::ValidAudioDeviceId("{0.0.1.00000000}.{6f1e7a3c-0b2d-4e5f-9a8b-1c2d3e4f5a6b}") &&
+          Voice::ValidAudioDeviceId("AppleUSBAudioEngine:Logitech:StreamCam:1:2"), "audio device ids");
+    Check(!Voice::ValidAudioDeviceId("id\nother") && !Voice::ValidAudioDeviceId(std::string(257, 'a')), "audio device id limits");
     for (size_t count = 0; count < 300; ++count) {
       std::string bytes;
       for (size_t i = 0; i < count; ++i) bytes += static_cast<char>((i * 73) & 255);

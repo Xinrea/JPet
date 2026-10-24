@@ -7,6 +7,23 @@
   // Credentials are write-only; the API never returns a saved key.
   let voiceInputMode = "toggle";
   const voiceInputModes = [{ value: "toggle", name: "开关 · 全双工" }, { value: "hold", name: "按住 · 半双工" }];
+  // Microphone and speaker; "" is the system default. A saved device that is
+  // not connected stays selectable, and the default is used until it returns.
+  let inputDevice = "", outputDevice = "", savedInputDevice = "", savedOutputDevice = "";
+  let audioDevices = { inputs: [], outputs: [] }, devicesRefreshing = false;
+  const deviceItems = (devices, saved) => [{ value: "", name: "系统默认" },
+    ...devices.map(device => ({ value: device.id, name: device.name || device.id })),
+    ...(saved && !devices.some(device => device.id === saved) ? [{ value: saved, name: "已选择的设备（未连接，暂用系统默认）" }] : [])];
+  $: inputItems = deviceItems(audioDevices.inputs, savedInputDevice);
+  $: outputItems = deviceItems(audioDevices.outputs, savedOutputDevice);
+  async function refreshDevices() {
+    devicesRefreshing = true;
+    try {
+      const response = await fetch("/api/config/voice", { cache: "no-store" });
+      const settings = await response.json();
+      if (response.ok && !voiceDisposed) audioDevices = settings.audio_devices || audioDevices;
+    } catch (_) { /* Keep the current list. */ } finally { devicesRefreshing = false; }
+  }
   // Chat model (free text, optional OpenAI-compatible endpoint).
   let chatModel = "", chatBaseUrl = "", chatApiKey = "", chatHasKey = false, catalog = { chat_models: [] };
   let voiceApiKey = "", voiceWorkspace = "", voiceHasKey = false;
@@ -38,6 +55,9 @@
   }
   function applySettings(settings) {
     voiceInputMode = settings.input_mode || "toggle";
+    inputDevice = savedInputDevice = settings.input_device || "";
+    outputDevice = savedOutputDevice = settings.output_device || "";
+    audioDevices = settings.audio_devices || audioDevices;
     voiceWorkspace = settings.workspace_id || "";
     voiceHasKey = !!settings.has_api_key;
     catalog = settings.catalog || catalog;
@@ -59,8 +79,8 @@
   }
   async function saveVoiceSettings(clearKey = false, clearChatKey = false) {
     voiceSaving = true; voiceError = ""; voiceMessage = "";
-    const payload = { workspace_id: voiceWorkspace.trim(), input_mode: voiceInputMode, chat_model: chatModel.trim(),
-      chat_base_url: chatBaseUrl.trim() };
+    const payload = { workspace_id: voiceWorkspace.trim(), input_mode: voiceInputMode, input_device: inputDevice,
+      output_device: outputDevice, chat_model: chatModel.trim(), chat_base_url: chatBaseUrl.trim() };
     if (clearKey) payload.clear_api_key = true;
     else if (voiceApiKey.trim()) payload.api_key = voiceApiKey.trim();
     if (clearChatKey) payload.clear_chat_api_key = true;
@@ -125,8 +145,11 @@
         {#if modelError}<p class="feedback error" role="alert">{modelError}</p>{/if}
       </div>
     </SettingCard>
-    <SettingCard title="对话设置" description="快捷键方式和大模型" icon="settings">
+    <SettingCard title="对话设置" description="快捷键方式、声音设备和大模型" icon="settings">
       <div class="setting-field"><label for="voice-input-mode">Option / Ctrl 使用方式</label><Select id="voice-input-mode" items={voiceInputModes} bind:value={voiceInputMode} disabled={voiceLoading || voiceSaving} /></div>
+      <div class="setting-field"><label for="voice-input-device">麦克风</label><Select id="voice-input-device" items={inputItems} bind:value={inputDevice} placeholder="" disabled={voiceLoading || voiceSaving} /></div>
+      <div class="setting-field"><label for="voice-output-device">扬声器</label><Select id="voice-output-device" items={outputItems} bind:value={outputDevice} placeholder="" disabled={voiceLoading || voiceSaving} /></div>
+      <p class="setting-help">轴伊的回复从所选扬声器播放。插拔设备后可<button type="button" class="link-button" on:click={refreshDevices} disabled={devicesRefreshing}>{devicesRefreshing ? "刷新中…" : "刷新设备列表"}</button>；所选设备未连接时暂用系统默认。</p>
       <div class="setting-field"><label for="voice-api-key">百炼 API Key<span>{voiceHasKey ? "已保存" : "待设置"}</span></label><Input id="voice-api-key" type="password" bind:value={voiceApiKey} placeholder={voiceHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
       <div class="setting-field"><label for="voice-workspace">业务空间 ID</label><Input id="voice-workspace" bind:value={voiceWorkspace} placeholder="填写 API Key 所属的业务空间 ID" autocomplete="off" spellcheck="false" maxlength={63} disabled={voiceLoading || voiceSaving} /></div>
       <p class="setting-help">北京地域的 API Key 和业务空间，用于网页搜索、查看桌面，以及未填写接口地址时的大模型。API Key 保存在本机系统凭据存储中。</p>
@@ -170,4 +193,6 @@
 
 <style>
   .voice-settings { display: flex; flex-direction: column; gap: 16px; }
+  .link-button { color: var(--green-ink); text-decoration: underline; padding: 0 2px; }
+  .link-button:disabled { color: var(--muted); text-decoration: none; }
 </style>

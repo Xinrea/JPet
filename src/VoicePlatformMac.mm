@@ -6,6 +6,8 @@
 
 #import <AppKit/AppKit.h>
 #import <AVFoundation/AVFoundation.h>
+#import <AudioToolbox/AudioToolbox.h>
+#import <CoreAudio/CoreAudio.h>
 #import <Security/Security.h>
 
 #define GLFW_EXPOSE_NATIVE_COCOA
@@ -91,6 +93,54 @@ NSString* Text(const std::string& value) {
   return [[NSString alloc] initWithBytes:value.data() length:value.size() encoding:NSUTF8StringEncoding];
 }
 
+constexpr AudioObjectPropertyElement MainElement = 0;  // kAudioObjectPropertyElementMain needs macOS 12.
+
+// Core Audio devices with streams in `scope` (input or output), by UID and name.
+std::vector<std::pair<AudioDeviceID, AudioDevice>> CoreAudioDevices(AudioObjectPropertyScope scope) {
+  std::vector<std::pair<AudioDeviceID, AudioDevice>> out;
+  AudioObjectPropertyAddress address{kAudioHardwarePropertyDevices, kAudioObjectPropertyScopeGlobal, MainElement};
+  UInt32 size = 0;
+  if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &address, 0, nullptr, &size) != noErr) return out;
+  std::vector<AudioDeviceID> ids(size / sizeof(AudioDeviceID));
+  if (ids.empty() || AudioObjectGetPropertyData(kAudioObjectSystemObject, &address, 0, nullptr, &size, ids.data()) != noErr)
+    return out;
+  for (const auto id : ids) {
+    AudioObjectPropertyAddress streams{kAudioDevicePropertyStreams, scope, MainElement};
+    UInt32 streamSize = 0;
+    if (AudioObjectGetPropertyDataSize(id, &streams, 0, nullptr, &streamSize) != noErr || streamSize == 0) continue;
+    const auto text = [id](AudioObjectPropertySelector selector) {
+      AudioObjectPropertyAddress property{selector, kAudioObjectPropertyScopeGlobal, MainElement};
+      CFStringRef value = nullptr;
+      UInt32 valueSize = sizeof(value);
+      std::string result;
+      if (AudioObjectGetPropertyData(id, &property, 0, nullptr, &valueSize, &value) == noErr && value) {
+        const char* utf8 = [(__bridge NSString*)value UTF8String];
+        if (utf8) result = utf8;
+        CFRelease(value);
+      }
+      return result;
+    };
+    auto uid = text(kAudioDevicePropertyDeviceUID);
+    if (!uid.empty()) out.push_back({id, {std::move(uid), text(kAudioObjectPropertyName)}});
+  }
+  return out;
+}
+
+// Points an engine's input or output unit at the device `uid` and returns its
+// name; with no UID, or one no longer connected, the unit keeps the default.
+std::string SelectDevice(AVAudioIONode* node, const std::string& uid, AudioObjectPropertyScope scope) {
+  if (uid.empty()) return "default";
+  for (const auto& [id, device] : CoreAudioDevices(scope)) {
+    if (device.id != uid) continue;
+    AudioDeviceID value = id;
+    if (AudioUnitSetProperty(node.audioUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                             &value, sizeof(value)) == noErr)
+      return "\"" + device.name + "\"";
+    break;
+  }
+  return "default (saved device missing)";
+}
+
 struct MacState {
   std::shared_ptr<EventQueue> queue = std::make_shared<EventQueue>();
   AVAudioEngine* __strong inputEngine = nil;
@@ -98,6 +148,8 @@ struct MacState {
   AVAudioPlayerNode* __strong player = nil;
   NSPanel* __strong indicator = nil;
   NSTextField* __strong label = nil;
+  // Device UIDs chosen in the voice settings (empty: system default).
+  std::string inputDevice, outputDevice;
   uint64_t captureRequest = 0;
   bool captureWanted = false;
   bool tapInstalled = false;
@@ -111,6 +163,8 @@ struct MacState {
     @try {
       inputEngine = [[AVAudioEngine alloc] init];
       AVAudioInputNode* input = inputEngine.inputNode;
+      // Before reading the format, which follows the selected device.
+      const auto device = SelectDevice(input, inputDevice, kAudioObjectPropertyScopeInput);
       AVAudioFormat* hardware = [input outputFormatForBus:0];
       if (hardware.sampleRate <= 0 || hardware.channelCount == 0) {
         queue->Push(Event::Type::Error, "没有可用的麦克风，请检查系统声音设置");
@@ -123,8 +177,8 @@ struct MacState {
       }
       AVAudioFormat* target = converter.outputFormat;
       LAppPal::PrintLog("[Voice] Capture format input_rate=%.0f input_channels=%u input_layout=0x%x "
-          "selected_channel=1 output_rate=16000 output_channels=1 sample_format=s16le",
-          hardware.sampleRate, hardware.channelCount, hardware.channelLayout.layoutTag);
+          "selected_channel=1 output_rate=16000 output_channels=1 sample_format=s16le device=%s",
+          hardware.sampleRate, hardware.channelCount, hardware.channelLayout.layoutTag, device.c_str());
       const auto events = queue;
       const auto generation = ++events->capture;
       queue->capturing = true;
@@ -219,6 +273,9 @@ class MacPlatform final : public Platform {
           sampleRate:24000 channels:1 interleaved:NO];
       if (!state_->outputEngine) {
         state_->outputEngine = [[AVAudioEngine alloc] init];
+        // Before mainMixerNode connects the output unit.
+        const auto device = SelectDevice(state_->outputEngine.outputNode, state_->outputDevice, kAudioObjectPropertyScopeOutput);
+        LAppPal::PrintLog("[Voice] Playback device=%s", device.c_str());
         state_->player = [[AVAudioPlayerNode alloc] init];
         [state_->outputEngine attachNode:state_->player];
         [state_->outputEngine connect:state_->player to:state_->outputEngine.mainMixerNode format:format];
@@ -280,6 +337,17 @@ class MacPlatform final : public Platform {
     [state_->player stop];
   }
 
+  void SetDevices(const std::string& input, const std::string& output) override {
+    state_->inputDevice = input;  // The input engine is rebuilt on every StartCapture.
+    if (state_->outputDevice == output) return;
+    state_->outputDevice = output;
+    // The output engine lives between replies; rebuild it on the new device.
+    StopPlayback();
+    [state_->outputEngine stop];
+    state_->outputEngine = nil;
+    state_->player = nil;
+  }
+
   void ShowIndicator(GLFWwindow* window, const std::string& text, bool error) override {
     if (text.empty()) { [state_->indicator orderOut:nil]; return; }
     if (!state_->indicator) {
@@ -331,6 +399,13 @@ NSMutableDictionary* KeyQuery(const std::string& profile, NSString* service = @"
 }  // namespace
 
 std::unique_ptr<Platform> MakePlatform() { return std::make_unique<MacPlatform>(); }
+
+AudioDevices ListAudioDevices() {
+  AudioDevices devices;
+  for (auto& [id, device] : CoreAudioDevices(kAudioObjectPropertyScopeInput)) devices.inputs.push_back(std::move(device));
+  for (auto& [id, device] : CoreAudioDevices(kAudioObjectPropertyScopeOutput)) devices.outputs.push_back(std::move(device));
+  return devices;
+}
 
 bool SaveApiKey(const std::string& profile, const std::string& key, std::string& error) {
   @autoreleasepool {

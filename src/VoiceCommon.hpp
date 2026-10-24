@@ -11,6 +11,9 @@ constexpr size_t InputBytesPerSecond = 16000 * 2;  // 16 kHz mono s16le micropho
 std::string Trim(const std::string& value);
 bool ValidWorkspace(const std::string& value);
 bool ValidApiKey(const std::string& value);
+// Saved microphone or speaker id: empty for the system default, otherwise a
+// Windows endpoint id or Core Audio device UID without control characters.
+bool ValidAudioDeviceId(const std::string& value);
 std::string EncodeBase64(const std::string& bytes);
 std::string DecodeBase64(const std::string& encoded);
 // Readable message for a Bailian error code or HTTP status.

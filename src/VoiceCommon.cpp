@@ -25,6 +25,11 @@ bool ValidApiKey(const std::string& value) {
       std::all_of(value.begin(), value.end(), [](unsigned char c) { return c >= 33 && c <= 126; });
 }
 
+bool ValidAudioDeviceId(const std::string& value) {
+  return value.size() <= 256 &&
+      std::all_of(value.begin(), value.end(), [](unsigned char c) { return c >= 32 && c != 127; });
+}
+
 std::string EncodeBase64(const std::string& bytes) {
   constexpr char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   std::string out;
