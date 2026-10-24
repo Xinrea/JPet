@@ -77,7 +77,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .setting-field { margin-top: 14px; }
 .setting-field > label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; font-weight: 800; }
 .setting-field > label > span { font-size: 10px; color: #a1a38f; font-weight: 500; }
-.setting-help { color: var(--muted); font-size: 11px; line-height: 1.9; margin: 13px 0; }
+.setting-help { color: var(--muted); font-size: 11px; line-height: 1.6; margin: 8px 0; }
 .setting-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .setting-tip { display: flex; gap: 8px; padding: 12px; margin-top: 13px; background: #f8faef; border: 1px solid #e9edda; border-radius: 8px; color: #96a26f; }
 .setting-tip svg { flex-shrink: 0; margin-top: 2px; }
