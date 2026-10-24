@@ -448,6 +448,18 @@ if(JPET_BUILD_UPDATE_TESTS)
   target_link_libraries(update_release_test PRIVATE OpenSSL::Crypto nlohmann_json::nlohmann_json semver::semver)
   add_test(NAME update_release COMMAND update_release_test)
 endif()
+option(JPET_BUILD_LOGIN_TESTS "Build Bilibili QR login tests" OFF)
+if(JPET_BUILD_LOGIN_TESTS)
+  enable_testing()
+  add_executable(bilibili_login_test tests/bilibili_login_test.cpp)
+  target_include_directories(bilibili_login_test PRIVATE src)
+  target_compile_options(bilibili_login_test PRIVATE
+    "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>"
+    "$<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>"
+    "$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>")
+  add_test(NAME bilibili_login COMMAND bilibili_login_test)
+endif()
+
 option(JPET_BUILD_GAME_TESTS "Build game rule and achievement tests" OFF)
 if(JPET_BUILD_GAME_TESTS)
   enable_testing()

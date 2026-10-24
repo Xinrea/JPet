@@ -1,4 +1,5 @@
 #include "PanelServer.hpp"
+#include "BilibiliLogin.hpp"
 #include "BuffManager.hpp"
 #include "GameManager.hpp"
 #include "DataManager.hpp"
@@ -19,204 +20,38 @@
 
 namespace {
 
-constexpr int kQrRedirectLimit = 5;
-
-std::string UrlDecode(std::string_view value) {
-  std::string decoded;
-  decoded.reserve(value.size());
-  for (size_t i = 0; i < value.size(); ++i) {
-    if (value[i] == '%' && i + 2 < value.size()) {
-      const auto hex = [](char c) -> int {
-        if (c >= '0' && c <= '9') return c - '0';
-        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-        return -1;
-      };
-      const int high = hex(value[i + 1]);
-      const int low = hex(value[i + 2]);
-      if (high >= 0 && low >= 0) {
-        decoded.push_back(static_cast<char>((high << 4) | low));
-        i += 2;
-        continue;
-      }
-    }
-    decoded.push_back(value[i] == '+' ? ' ' : value[i]);
-  }
-  return decoded;
+// Use the same request identity for QR generation, polling and ticket exchange.
+httplib::Headers LoginHeaders() {
+  return {{"User-Agent", BilibiliLogin::UserAgent},
+          {"Referer", "https://passport.bilibili.com/"}};
 }
 
-bool IsLoginCookie(std::string_view name) {
-  return name == "DedeUserID" || name == "DedeUserID__ckMd5" ||
-         name == "SESSDATA" || name == "bili_jct" || name == "sid";
-}
-
-void AddCookie(std::map<std::string, std::string>& cookies,
-               std::string_view value) {
-  const auto end = value.find(';');
-  const auto pair = value.substr(0, end);
-  const auto separator = pair.find('=');
-  if (separator == std::string_view::npos) return;
-  const auto name = pair.substr(0, separator);
-  if (!IsLoginCookie(name)) return;
-  const auto cookieName = std::string(name);
-  cookies[cookieName] = std::string(pair.substr(separator + 1));
-}
-
-void AddCookiesFromQuery(std::map<std::string, std::string>& cookies,
-                         std::string_view url) {
-  const auto queryStart = url.find('?');
-  if (queryStart == std::string_view::npos) return;
-  auto query = url.substr(queryStart + 1);
-  const auto fragmentStart = query.find('#');
-  if (fragmentStart != std::string_view::npos) query = query.substr(0, fragmentStart);
-  while (!query.empty()) {
-    const auto separator = query.find('&');
-    const auto item = query.substr(0, separator);
-    const auto equals = item.find('=');
-    if (equals != std::string_view::npos) {
-      const auto name = UrlDecode(item.substr(0, equals));
-      if (IsLoginCookie(name)) {
-        // Keep the value encoded as returned by the ticket URL. Cookie values
-        // such as SESSDATA may legitimately contain percent escapes.
-        cookies[name] = std::string(item.substr(equals + 1));
-      }
-    }
-    if (separator == std::string_view::npos) break;
-    query.remove_prefix(separator + 1);
-  }
-}
-
-bool ParseHttpsUrl(const std::string& url, std::string& host,
-                   std::string& path) {
-  constexpr std::string_view prefix = "https://";
-  if (url.compare(0, prefix.size(), prefix) != 0) return false;
-  const auto authorityStart = prefix.size();
-  const auto authorityEnd = url.find_first_of("/?#", authorityStart);
-  const auto authority = url.substr(
-      authorityStart, authorityEnd == std::string::npos
-                          ? std::string::npos
-                          : authorityEnd - authorityStart);
-  if (authority.empty() || authority.find(':') != std::string::npos) return false;
-  host = authority;
-  if (authorityEnd == std::string::npos) {
-    path = "/";
-  } else if (url[authorityEnd] == '?') {
-    path = "/" + url.substr(authorityEnd);
-  } else if (url[authorityEnd] == '#') {
-    path = "/";
-  } else {
-    path = url.substr(authorityEnd);
-  }
-  const auto fragment = path.find('#');
-  if (fragment != std::string::npos) path.resize(fragment);
-  return true;
-}
-
-bool IsAllowedLoginHost(const std::string& host) {
-  return host == "passport.bilibili.com" ||
-         host == "passport-api.bilibili.com" ||
-         host == "account.bilibili.com" || host == "www.bilibili.com" ||
-         host == "bilibili.com";
-}
-
-std::string CookieHeader(
-    const std::map<std::string, std::string>& cookies) {
-  std::string result;
-  for (const auto& [name, value] : cookies) {
-    if (!result.empty()) result += "; ";
-    result += name + "=" + value;
+BilibiliLogin::Response LoginResponse(const httplib::Response& response) {
+  BilibiliLogin::Response result;
+  result.status = response.status;
+  result.location = response.get_header_value("Location");
+  const auto count = response.get_header_value_count("Set-Cookie");
+  for (size_t i = 0; i < count; ++i) {
+    result.setCookies.push_back(response.get_header_value("Set-Cookie", i));
   }
   return result;
 }
 
-bool HasLoginCookies(const std::map<std::string, std::string>& cookies) {
-  const auto hasValue = [&cookies](const char* name) {
-    const auto it = cookies.find(name);
-    return it != cookies.end() && !it->second.empty();
-  };
-  return hasValue("DedeUserID") && hasValue("SESSDATA") &&
-         hasValue("bili_jct");
-}
-
-bool IsValidUid(const std::string& uid) {
-  if (uid.empty()) return false;
-  for (const char c : uid) {
-    if (c < '0' || c > '9') return false;
-  }
-  return uid != "0";
-}
-
-// The QR poll endpoint returns a ticket URL, not a Cookie header. Resolve that
-// URL like a browser and retain the Set-Cookie values from every redirect.
-std::string ResolveQrLoginCookies(const std::string& loginUrl) {
-  std::map<std::string, std::string> cookies;
-  AddCookiesFromQuery(cookies, loginUrl);
-  std::string currentUrl = loginUrl;
-
-  for (int redirectCount = 0; redirectCount <= kQrRedirectLimit;
-       ++redirectCount) {
-    std::string host;
-    std::string path;
-    if (!ParseHttpsUrl(currentUrl, host, path)) {
-      LAppPal::PrintLog(LogLevel::Warn,
-                        "[PanelServer]QR login returned an invalid HTTPS URL");
-      return {};
-    }
-    if (!IsAllowedLoginHost(host)) {
-      LAppPal::PrintLog(LogLevel::Warn,
-                        "[PanelServer]QR login redirected outside Bilibili");
-      return {};
-    }
-
-    httplib::SSLClient client(host, 443);
-    client.set_follow_location(false);
-    client.set_connection_timeout(std::chrono::seconds(3));
-    client.set_read_timeout(std::chrono::seconds(5));
-    httplib::Headers headers = {
-        {"Referer", "https://passport.bilibili.com/"}};
-    const auto existingCookies = CookieHeader(cookies);
-    if (!existingCookies.empty()) headers.emplace("Cookie", existingCookies);
-    auto response = client.Get(path, headers);
-    if (!response) {
-      LAppPal::PrintLog(LogLevel::Warn,
-                        "[PanelServer]QR login cookie exchange failed");
-      return {};
-    }
-    const auto setCookieCount = response->get_header_value_count("Set-Cookie");
-    for (size_t i = 0; i < setCookieCount; ++i) {
-      AddCookie(cookies, response->get_header_value("Set-Cookie", i));
-    }
-    if (setCookieCount > 0 && HasLoginCookies(cookies)) {
-      return CookieHeader(cookies);
-    }
-
-    if (response->status < 300 || response->status >= 400 ||
-        !response->has_header("Location") ||
-        redirectCount == kQrRedirectLimit) {
-      break;
-    }
-    auto location = response->get_header_value("Location");
-    if (location.compare(0, 2, "//") == 0) {
-      currentUrl = "https:" + location;
-    } else if (location.compare(0, 8, "https://") == 0) {
-      currentUrl = location;
-    } else if (!location.empty() && location[0] == '/') {
-      currentUrl = "https://" + host + location;
-    } else if (!location.empty()) {
-      const auto query = path.find('?');
-      const auto pathOnly = path.substr(0, query);
-      const auto slash = pathOnly.rfind('/');
-      currentUrl = "https://" + host +
-                   pathOnly.substr(0, slash == std::string::npos ? 0 : slash + 1) +
-                   location;
-    } else {
-      LAppPal::PrintLog(LogLevel::Warn,
-                        "[PanelServer]QR login returned an invalid redirect");
-      return {};
-    }
-  }
-
-  return HasLoginCookies(cookies) ? CookieHeader(cookies) : std::string{};
+BilibiliLogin::Result ResolveQrLoginCookies(const httplib::Response& poll,
+                                           const std::string& loginUrl) {
+  return BilibiliLogin::Resolve(LoginResponse(poll), loginUrl,
+      [](const std::string& host, const std::string& path,
+         const std::string& cookies) -> std::optional<BilibiliLogin::Response> {
+        httplib::SSLClient client(host, 443);
+        client.set_follow_location(false);
+        client.set_connection_timeout(std::chrono::seconds(3));
+        client.set_read_timeout(std::chrono::seconds(5));
+        auto headers = LoginHeaders();
+        if (!cookies.empty()) headers.emplace("Cookie", cookies);
+        auto response = client.Get(path, headers);
+        if (!response) return std::nullopt;
+        return LoginResponse(*response);
+      });
 }
 
 std::string CookieValue(const std::string& cookies, std::string_view wanted) {
@@ -903,7 +738,7 @@ void PanelServer::doServe() {
         req.get_param_value("uid"), req.get_param_value("v"), directory,
         [](const std::string& source) -> std::string {
           std::string host, path;
-          if (!ParseHttpsUrl(source, host, path)) return {};
+          if (!BilibiliLogin::ParseHttpsUrl(source, host, path)) return {};
           httplib::SSLClient client(host, 443);
           client.set_connection_timeout(std::chrono::seconds(3));
           client.set_read_timeout(std::chrono::seconds(5));
@@ -933,17 +768,15 @@ void PanelServer::doServe() {
   server->Get("/api/account/qr", [&](const httplib::Request &req,
                                           httplib::Response &res) {
       httplib::SSLClient login_cli("passport.bilibili.com", 443);
-      login_cli.set_follow_location(true);
+      login_cli.set_follow_location(false);
       login_cli.set_connection_timeout(std::chrono::seconds(3));
       login_cli.set_read_timeout(std::chrono::seconds(5));
-      auto resp = login_cli.Get("/x/passport-login/web/qrcode/generate");
+      auto resp = login_cli.Get("/x/passport-login/web/qrcode/generate", LoginHeaders());
       if (resp && resp->status == 200) {
         try {
           auto json = nlohmann::json::parse(resp->body);
           const auto qrKey =
               json.at("data").at("qrcode_key").get<std::string>();
-          LAppPal::PrintLog(LogLevel::Debug, "[PanelServer]Get QrCode oauth %s",
-                            qrKey.c_str());
           nlohmann::json resp_json = {};
           resp_json["url"] = json.at("data").at("url");
           resp_json["key"] = qrKey;
@@ -974,11 +807,12 @@ void PanelServer::doServe() {
         return;
       }
       httplib::SSLClient login_cli("passport.bilibili.com", 443);
-      login_cli.set_follow_location(true);
+      login_cli.set_follow_location(false);
       login_cli.set_connection_timeout(std::chrono::seconds(3));
       login_cli.set_read_timeout(std::chrono::seconds(5));
       auto resp = login_cli.Get(
-          "/x/passport-login/web/qrcode/poll?qrcode_key=" + currentOauthKey);
+          "/x/passport-login/web/qrcode/poll?qrcode_key=" + currentOauthKey,
+          LoginHeaders());
       if (!resp || resp->status != 200) {
         res.status = 502;
         resp_json["success"] = false;
@@ -992,15 +826,20 @@ void PanelServer::doServe() {
         resp_json["code"] = code;
         resp_json["success"] = false;
         if (code == 0) {
-          const auto url = json.at("data").at("url").get<std::string>();
-          const auto cookies = ResolveQrLoginCookies(url);
-          const auto uid = CookieValue(cookies, "DedeUserID");
-          if (cookies.empty() || !IsValidUid(uid)) {
+          // A complete poll response needs no ticket URL or second request.
+          const auto& data = json.at("data");
+          const auto url = data.contains("url") && data.at("url").is_string()
+                               ? data.at("url").get<std::string>() : std::string{};
+          const auto login = ResolveQrLoginCookies(*resp, url);
+          if (!login.error.empty()) {
+            LAppPal::PrintLog(LogLevel::Warn, "[PanelServer]QR login failed: %s",
+                              login.error.c_str());
             res.status = 502;
             resp_json["error"] = "登录成功但未获得完整账号凭据";
           } else {
-            DataManager::GetInstance()->SetRaw("cookies", cookies);
-            DataManager::GetInstance()->SetRaw("uid", uid);
+            DataManager::GetInstance()->SetRaw(
+                "cookies", BilibiliLogin::CookieHeader(login.cookies));
+            DataManager::GetInstance()->SetRaw("uid", login.cookies.at("DedeUserID"));
             resp_json["success"] = true;
             BuffManager::GetInstance()->Update();
           }
