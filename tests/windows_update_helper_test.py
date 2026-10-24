@@ -64,7 +64,8 @@ exit $LASTEXITCODE
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((self.target / "JPet.exe").read_text(), "old")
         self.assertTrue(self.error.exists())
-        self.assertEqual(len(self.launches.read_text().splitlines()), 2)
+        # The mock Start-Process appends UTF-8; the default locale codec may be GBK.
+        self.assertEqual(len(self.launches.read_text(encoding="utf-8").splitlines()), 2)
 
     def test_missing_executable_keeps_old_version(self):
         (self.stage / "JPet.exe").unlink()
