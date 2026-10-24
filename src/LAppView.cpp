@@ -12,6 +12,7 @@
 #include <math.h>
 
 #include "DataManager.hpp"
+#include "GameManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppDelegate.hpp"
 #include "LAppLive2DManager.hpp"
@@ -99,7 +100,9 @@ void LAppView::Render() {
     task_progress_->Hide();
   }
 
-  float p = DataManager::GetInstance()->CloudTaskProgress();
+  auto* game = GameManager::GetInstance();
+  if (const int clothes = game->TakeClothesChange(); clothes >= 0) Live2DManager->SwitchClothes(clothes);
+  float p = game->TaskProgress();
   task_progress_->UpdateProgress(p);
 #ifndef __APPLE__
   // save vao

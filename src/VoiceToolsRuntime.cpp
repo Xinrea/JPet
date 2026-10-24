@@ -2,7 +2,7 @@
 #include "VoiceToolsNetwork.hpp"
 #include "VoicePlatform.hpp"
 #include "DataManager.hpp"
-#include "CloudGame.hpp"
+#include "GameManager.hpp"
 #include "BuffManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
@@ -56,11 +56,8 @@ json ReadSettings(const std::string& section) {
     }
   }
   if (section == "all" || section == "clothes") {
-    const auto snapshot = data->GetCloudSnapshot();
-    const auto profile = data->GetCloudProfile();
     result["clothes"] = {{"names", {{"0", "绿色"}, {"1", "粉色"}, {"2", "冬装"}}},
-      {"state", profile.at("clothes")}, {"online", profile.value("online", false)},
-      {"confirmed", snapshot.is_object() && snapshot.contains("revision")}};
+      {"state", GameManager::GetInstance()->Snapshot()["profile"]["clothes"]}};
   }
   if (section == "all" || section == "appearance") {
     const auto parts = PartStateManager::GetInstance()->GetStatus();
@@ -138,24 +135,9 @@ json ApplySettings(const json& request) {
 }
 
 json ReadGame(const json& query) {
-  auto* data = DataManager::GetInstance();
-  const auto section = query.at("section").get<std::string>();
-  if (section == "rank") {
-    const auto uid = data->GetWithDefault("uid", std::string{});
-    return ReadGameRank(query, CloudGame::ServiceUrl(), uid);
-  }
-  std::lock_guard<std::recursive_mutex> lock(data->GameMutex());
-  auto snapshot = data->GetCloudSnapshot();
-  if (!snapshot.is_object()) snapshot = json::object();
-  auto connection = CloudGame::GetInstance()->Status();
-  // Lease expiry is authoritative even when the transport is still connected.
-  connection["online"] = snapshot.value("online", false);
-  auto profile = snapshot.contains("profile") ? snapshot["profile"] : data->GetCloudProfile();
-  profile["medal_level"] = BuffManager::GetInstance()->MedalLevel();
-  return GameView(snapshot, profile,
-    snapshot.contains("tasks") ? snapshot["tasks"] : data->GetTaskState(),
-    snapshot.contains("achievements") ? snapshot["achievements"] : data->GetAchievementState(), connection,
-    {{"uid", data->GetWithDefault("uid", std::string{})}, {"name", data->GetWithDefault("uname", std::string{})}}, section, query.value("offset", size_t{0}), query.value("limit", size_t{5}));
+  auto game = GameManager::GetInstance()->Snapshot();
+  game["profile"]["medal_level"] = BuffManager::GetInstance()->MedalLevel();
+  return GameView(game, query.at("section").get<std::string>(), query.value("offset", size_t{0}), query.value("limit", size_t{5}));
 }
 
 struct AICredentials { std::string workspace, key, error; };
@@ -194,7 +176,7 @@ json ReadBilibili(const json& query) {
 
 ToolDependencies MakeToolDependencies() {
   settingsQueue.Start();
-  return {ReadGame, [](const json& command) { return CloudGame::GetInstance()->Command(command); },
+  return {ReadGame, [](const json& command) { return GameManager::GetInstance()->Command(command); },
     ReadDesktop, ReadWeb, ReadBilibili, ::Platform::OpenWebURL,
     [](const json& request, const std::function<bool()>& cancelled) {
       return settingsQueue.Invoke([request] { return ApplySettings(request); }, cancelled);

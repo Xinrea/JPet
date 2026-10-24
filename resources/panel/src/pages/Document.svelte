@@ -71,7 +71,7 @@
   <p class="font-medium text-sm">毅力会影响任务的成功率，当毅力为 0 的情况下，任务成功率最高为 70%；天有不测风云，任务成功率不会超过 95%。</p>
   </section>
 <section class="guide-card game-card"><h2>配置文件与游戏数据</h2>
-  <p class="font-medium text-sm">本地配置与缓存保存在用户数据目录，游戏进度由云端同步，点击 <a class="underline decoration-green-500 decoration-2 font-bold" href={"#"} on:click={()=>openDataFolder()}>此处</a> 打开目录。</p>
+  <p class="font-medium text-sm">本地配置与缓存保存在用户数据目录，游戏进度也保存在这里，点击 <a class="underline decoration-green-500 decoration-2 font-bold" href={"#"} on:click={()=>openDataFolder()}>此处</a> 打开目录。</p>
   </section>
 <section class="guide-card game-card"><h2>动态与直播提醒</h2>
   <p class="font-medium text-sm">由于 B 站风控机制的限制，添加太多监控目标会导致状态更新不及时，请尽量登录使用。</p>

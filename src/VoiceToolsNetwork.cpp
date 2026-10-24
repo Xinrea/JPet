@@ -106,10 +106,4 @@ json SearchBilibili(const json& query, const std::string& cookies, const std::st
   if (result.value("ok", false)) result["query"] = query.at("query");
   return result;
 }
-json ReadGameRank(const json& query, const std::string& serviceUrl, const std::string& uid) {
-  const auto response = Request(serviceUrl + "/v1/rank?metric=" + query.value("metric", std::string("starcnt")) +
-    "&offset=" + std::to_string(query.value("offset", 0)) + "&limit=" + std::to_string(query.value("limit", 10)) + "&uid=" + cpr::util::urlEncode(uid), {});
-  if (!response.error.empty() || response.status != 200) return Fail("排行榜连接失败，请稍后重试");
-  return {{"ok", true}, {"rank", response.body}};
-}
 } // namespace Voice

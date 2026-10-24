@@ -3,7 +3,6 @@
   import SettingCard from "../components/SettingCard.svelte";
   import SettingToggle from "../components/SettingToggle.svelte";
   import UiIcon from "../components/UiIcon.svelte";
-  export let online = false;
   let category = "general";
   const categories = [
     { id: "general", label: "通用", icon: "settings" },
@@ -15,17 +14,6 @@
   import fanAvatar from "../assets/fan.png";
   import { sse } from "../sse.js";
   import { onDestroy } from "svelte";
-  let cloudError = "", cloudMessage = "", cloudBusy = false;
-  async function reconnectCloud(takeOver = false) {
-    cloudBusy = true; cloudError = ""; cloudMessage = "";
-    try {
-      const response = await fetch("/api/cloud/reconnect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ take_over: takeOver }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "重新连接失败");
-      cloudMessage = "正在连接云端";
-    } catch (failure) { cloudError = failure.message; }
-    finally { cloudBusy = false; }
-  }
   // audio
   let _volume = "20";
   let _mute = false;
@@ -343,7 +331,7 @@
       const res = await fetch("/api/account", { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      account_info = { login: false, info: { confirm: false } };
+      account_info = { login: false, info: {} };
       account_error = "";
     } catch (e) {
       account_error = `注销失败：${e.message || "网络错误"}`;
@@ -385,14 +373,6 @@
         <Button on:click={() => account_modal = true} size="sm"><UiIcon name="user" size={16} /><span class="ml-2">Bilibili 登录</span></Button>
       {/if}
       {#if account_error}<p class="feedback error" role="alert">{account_error}</p>{/if}
-    </SettingCard>
-
-    <SettingCard title="云端游戏服务" description="让成长与陪伴保持同步" icon="cloud">
-      <div class="connection-label" class:connected={online}><span class="status-dot"></span>{online ? "云端已连接" : "等待云端连接"}</div>
-      <p class="setting-help">连接后同步云端存档。关闭或断网时，任务和经验暂停。首次连接会导入本机旧存档。</p>
-      <div class="setting-actions"><Button size="sm" disabled={cloudBusy} on:click={() => reconnectCloud()}>重新连接</Button><Button size="sm" color="alternative" disabled={cloudBusy} on:click={() => reconnectCloud(true)}>接管其他设备会话</Button></div>
-      {#if cloudError}<p class="feedback error" role="alert">{cloudError}</p>{/if}
-      {#if cloudMessage}<p class="feedback success" role="status">{cloudMessage}</p>{/if}
     </SettingCard>
 
     <SettingCard title="显示设置" description="调整适合你的桌面效果" icon="display">

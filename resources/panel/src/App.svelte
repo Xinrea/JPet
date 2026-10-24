@@ -5,7 +5,6 @@
   import Document from "./pages/Document.svelte";
   import Setting from "./pages/Setting.svelte";
   import Custom from "./pages/Custom.svelte";
-  import Rank from "./pages/Rank.svelte";
   import Achievement from "./pages/Achievement.svelte";
   import Conversation from "./pages/Conversation.svelte";
   import AchievementIcon from "./components/AchievementIcon.svelte";
@@ -24,7 +23,6 @@
     { id: "achievement", name: "成就", icon: "trophy", title: "闪闪发光的陪伴回忆", description: "收藏一路走来的每个小小里程碑。", label: "COLLECTION" },
     { id: "custom", name: "装扮", icon: "dress", title: "换上今天的好心情", description: "搭配喜欢的装扮，留下可爱的瞬间。", label: "DRESS UP" },
     { id: "setting", name: "设置", icon: "settings", title: "你的专属陪伴设置", description: "声音、互动与通知，都按你的喜好来。", label: "OPTIONS" },
-    { id: "rank", name: "排行榜", icon: "rank", title: "一起见证成长", description: "查看大家的成长记录与自己的排名。", label: "RANKING" },
     { id: "document", name: "说明", icon: "book", title: "陪伴指南", description: "了解成长规则，发现更多陪伴方式。", label: "GUIDE" },
   ];
   const tabIndex = (id) => tabs.findIndex((item) => item.id === id);
@@ -50,7 +48,7 @@
   };
   let buffs = [];
   let account_info = null;
-  let game = { online: false, cloud: { error: "正在同步云端状态" } };
+  let game = {};
 
   // fetch current status
   function updateProfile() {
@@ -148,20 +146,18 @@
       </button>
     {/each}
   </nav>
-  <div class="cloud-strip" class:offline={!game.online} role="status"><span class="status-dot"></span><span>{game.online ? "云端已连接 · 任务和经验正在推进" : `${game.cloud?.error || "连接中断"} · 任务和经验已暂停`}</span><UiIcon name="cloud" size={16} /></div>
   <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
   <div bind:this={contentViewport} class="panel-content panel-scroll" role="region" aria-label={tabs[activeTab].name + "内容"} tabindex="0">
     <div class="panel-inner">
       <div class="page-heading"><div><span class="page-eyebrow">{tabs[activeTab].label}</span><h1>{tabs[activeTab].title}</h1><p>{tabs[activeTab].description}</p></div><span class="page-heading-icon" aria-hidden="true"><UiIcon name={tabs[activeTab].icon} size={32} /></span></div>
       <div class="page-view profile-view" class:hide={activeTab !== tabIndex("profile")}>
-        <Profile {attributes} {expdiff} {clothes} {buffs} {starcnt} online={game.online} expProgress={game.exp_progress_seconds ?? 0} buycost={game.buycost ?? 0} revertgain={game.revertgain ?? 0} starAvailable={game.star_available ?? false} />
+        <Profile {attributes} {expdiff} {clothes} {buffs} {starcnt} expProgress={game.exp_progress_seconds ?? 0} buycost={game.buycost ?? 0} revertgain={game.revertgain ?? 0} starAvailable={game.star_available ?? false} />
       </div>
-      <div class="page-view" class:hide={activeTab !== tabIndex("task")}><Task {attributes} online={game.online} /></div>
+      <div class="page-view" class:hide={activeTab !== tabIndex("task")}><Task {attributes} /></div>
       {#if activeTab === tabIndex("achievement")}<div class="page-view"><Achievement /></div>{/if}
       <div class="page-view custom-view" class:hide={activeTab !== tabIndex("custom")}><Custom current={clothes.current} /></div>
-      <div class="page-view" class:hide={activeTab !== tabIndex("setting")}><Setting bind:account_info={account_info} online={game.online} /></div>
+      <div class="page-view" class:hide={activeTab !== tabIndex("setting")}><Setting bind:account_info={account_info} /></div>
       {#if activeTab === tabIndex("chat")}<div class="page-view"><Conversation /></div>{/if}
-      {#if activeTab === tabIndex("rank")}<div class="page-view game-card rank-view"><Rank {account_info} /></div>{/if}
       <div class="page-view document-view" class:hide={activeTab !== tabIndex("document")}><Document bind:updater on:refresh={fetchVersionInfo} /></div>
       <footer class="panel-footer"><span class="footer-line"></span><UiIcon name="spark" size={12} /><span>和轴伊一起，把平凡的日子过得闪闪发光</span><span class="footer-line"></span></footer>
     </div>
@@ -196,10 +192,6 @@
   .panel-tabs button:not(.active):hover { color: var(--green-ink); background: var(--green-soft); }
   .panel-tabs button.active { color: #fff; border-color: #65b417; background: var(--green-gradient); box-shadow: inset 0 1px 0 #ffffff66, 0 3px 0 #519e19; text-shadow: 0 1px 1px #458c19; }
   .update-dot { width: 7px; height: 7px; background: #ed7291; border: 1px solid white; border-radius: 50%; position: absolute; right: 6px; top: 6px; }
-  .cloud-strip { display: flex; align-items: center; gap: 7px; flex-shrink: 0; padding: 8px 27px; font-size: 11px; color: #63844c; background: #f5faed; border-bottom: 1px solid #e1ead6; }
-  .cloud-strip > :global(svg) { margin-left: auto; flex-shrink: 0; }
-  .cloud-strip.offline { color: #ad7e37; background: #fff8e9; border-bottom-color: #efe4cd; }
-  .cloud-strip.offline :global(.status-dot) { background: #e5af55; box-shadow: 0 0 0 3px #e5af551b; }
   .panel-content { position: relative; flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; padding: 24px 26px 16px; }
   .panel-content:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
   .panel-inner { width: 100%; max-width: 980px; margin: 0 auto; }
@@ -209,7 +201,6 @@
   .page-heading p { font-size: 12px; color: var(--muted); }
   .page-heading-icon { display: grid; place-items: center; width: 58px; height: 58px; flex-shrink: 0; border: 2px solid #fff; border-radius: 18px; color: #79b84c; background: #e7f2d7; box-shadow: 0 3px 0 #dbe8cf; transform: rotate(-6deg); }
   .page-view { min-width: 0; }
-  .rank-view { padding: 20px; }
   .panel-footer { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 26px 0 3px; color: #a4ad96; font-size: 10px; }
   .footer-line { height: 1px; max-width: 36px; flex: 1; background: #dce5d0; }
   .hide { display: none; }
@@ -218,6 +209,6 @@
   .notice-content small { font-size: 11px; }
   .notice-content strong, .notice-content span { display: flex; align-items: center; gap: 6px; }
   .notice-dismiss { align-self: flex-start; padding: 12px; }
-  @media (max-width: 560px) { .panel-header { padding: 14px 16px; } .panel-tabs { padding: 9px 12px; gap: 3px; } .panel-tabs button { gap: 5px; padding: 8px 10px; font-size: 12px; } .panel-tabs button :global(svg) { width: 17px; } .cloud-strip { padding: 8px 17px; } .panel-content { padding: 20px 14px 14px; } .page-heading h1 { font-size: 21px; } .page-heading-icon { width: 48px; height: 48px; } .panel-brand { gap: 8px; } .panel-brand strong span { font-size: 14px; } .brand-eyebrow { font-size: 8px; letter-spacing: 1px; } .header-resources { gap: 5px; } .resource-chip { padding-right: 8px; gap: 4px; font-size: 11px; } }
+  @media (max-width: 560px) { .panel-header { padding: 14px 16px; } .panel-tabs { padding: 9px 12px; gap: 3px; } .panel-tabs button { gap: 5px; padding: 8px 10px; font-size: 12px; } .panel-tabs button :global(svg) { width: 17px; } .panel-content { padding: 20px 14px 14px; } .page-heading h1 { font-size: 21px; } .page-heading-icon { width: 48px; height: 48px; } .panel-brand { gap: 8px; } .panel-brand strong span { font-size: 14px; } .brand-eyebrow { font-size: 8px; letter-spacing: 1px; } .header-resources { gap: 5px; } .resource-chip { padding-right: 8px; gap: 4px; font-size: 11px; } }
   @media (max-width: 380px) { .panel-brand strong span { display: none; } .panel-brand img { height: 40px; width: 40px; } .page-heading-icon { display: none; } .panel-footer { font-size: 9px; gap: 5px; } }
 </style>

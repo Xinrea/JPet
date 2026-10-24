@@ -67,13 +67,10 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/BilibiliDynamic.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DataManager.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerCloud.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/CloudGame.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/CloudGame.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/CloudSocket.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/CloudSocketInbox.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerTasks.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/DataManagerAchievements.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/GameRules.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/GameRules.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/GameManager.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/GameManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Achievements.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/GamePanel.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/CookieWindow.hpp
@@ -94,9 +91,9 @@ target_sources(${APP_NAME}
 
 if(APPLE)
   target_sources(${APP_NAME} PRIVATE
-    mainMac.mm PlatformMac.mm MacDesktop.mm MacWebViews.mm AudioManagerMac.mm VoicePlatformMac.mm VoiceDesktopMac.mm CloudSocketMac.mm)
+    mainMac.mm PlatformMac.mm MacDesktop.mm MacWebViews.mm AudioManagerMac.mm VoicePlatformMac.mm VoiceDesktopMac.mm)
 else()
   target_sources(${APP_NAME} PRIVATE
     main.cpp PlatformWin.cpp AudioManager.cpp WinToastEventHandler.cpp
-    GamePanel.cpp CookieWindow.cpp JPet.rc VoicePlatformWin.cpp VoiceEcho.cpp VoiceEcho.hpp VoiceDesktopWin.cpp CloudSocketWin.cpp)
+    GamePanel.cpp CookieWindow.cpp JPet.rc VoicePlatformWin.cpp VoiceEcho.cpp VoiceEcho.hpp VoiceDesktopWin.cpp)
 endif()

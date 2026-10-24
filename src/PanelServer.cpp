@@ -1,6 +1,6 @@
 #include "PanelServer.hpp"
 #include "BuffManager.hpp"
-#include "CloudGame.hpp"
+#include "GameManager.hpp"
 #include "DataManager.hpp"
 #include "GameTask.hpp"
 #include "LAppDefine.hpp"
@@ -309,7 +309,7 @@ void PanelServer::initSSE() {
 }
 
 nlohmann::json PanelServer::getTaskStatus() {
-  return DataManager::GetInstance()->GetTaskState();
+  return GameManager::GetInstance()->Snapshot()["tasks"];
 }
 
 void PanelServer::doServe() {
@@ -362,57 +362,22 @@ void PanelServer::doServe() {
       res.status = 400;
     }
   });
-  auto gameAction = [this](httplib::Response& res, const nlohmann::json& action) {
-    auto error = CloudGame::GetInstance()->Command(action);
+  auto gameAction = [](httplib::Response& res, const nlohmann::json& action) {
+    auto* game = GameManager::GetInstance();
+    auto error = game->Command(action);
     res.status = error.empty() ? 200 : 409;
-    res.set_content(error.empty() ? DataManager::GetInstance()->GetCloudProfile().dump()
+    res.set_content(error.empty() ? game->Snapshot()["profile"].dump()
         : nlohmann::json{{"error", error}}.dump(), "application/json");
   };
   server->Post("/api/star", [gameAction](const auto&, auto& res) { gameAction(res, {{"type", "star"}}); });
   server->Post("/api/attr/:attr", [gameAction](const auto& req, auto& res) { gameAction(res, {{"type", "attr.buy"}, {"attr", req.path_params.at("attr")}}); });
   server->Delete("/api/attr/:attr", [gameAction](const auto& req, auto& res) { gameAction(res, {{"type", "attr.refund"}, {"attr", req.path_params.at("attr")}}); });
   server->Get("/api/profile", [](const auto&, auto& res) {
-    res.set_content(DataManager::GetInstance()->GetCloudProfile().dump(), "application/json");
-  });
-  server->Get("/api/cloud", [](const auto&, auto& res) {
-    auto state = CloudGame::GetInstance()->Status();
-    state["url"] = CloudGame::ServiceUrl();
-    res.set_content(state.dump(), "application/json");
-  });
-  server->Post("/api/cloud/reconnect", [](const auto& req, auto& res) {
-    try {
-      const auto payload = nlohmann::json::parse(req.body);
-      CloudGame::GetInstance()->Wake(payload.value("take_over", false));
-      res.set_content("{\"success\":true}", "application/json");
-    } catch (const std::exception& e) {
-      res.status = 400;
-      res.set_content(nlohmann::json{{"error", e.what()}}.dump(), "application/json");
-    }
-  });
-  server->Get("/api/rank", [](const auto& req, auto& res) {
-    try {
-      const auto url = CloudGame::ServiceUrl();
-      const auto split = url.find('/', url.find("://") + 3);
-      auto prefix = split == std::string::npos ? std::string{} : url.substr(split);
-      while (!prefix.empty() && prefix.back() == '/') prefix.pop_back();
-      httplib::Client client(split == std::string::npos ? url : url.substr(0, split));
-      client.set_connection_timeout(2, 0); client.set_read_timeout(4, 0);
-      const auto metric = req.has_param("metric") ? req.get_param_value("metric") : "starcnt";
-      const auto offset = req.has_param("offset") ? req.get_param_value("offset") : "0";
-      if (metric != "starcnt" && metric != "exp" && metric != "attr") throw std::runtime_error("无效榜单");
-      if (offset.empty() || offset.size() > 5 || offset.find_first_not_of("0123456789") != std::string::npos) throw std::runtime_error("无效分页");
-      const auto uid = DataManager::GetInstance()->GetWithDefault("uid", std::string{});
-      auto response = client.Get(prefix + "/v1/rank?metric=" + metric + "&offset=" + offset + "&uid=" + uid);
-      if (!response) throw std::runtime_error("排行榜连接失败，请稍后重试");
-      res.status = response->status;
-      res.set_content(response->body, "application/json");
-    } catch (const std::exception& e) {
-      res.status = 503; res.set_content(nlohmann::json{{"error", e.what()}}.dump(), "application/json");
-    }
+    res.set_content(GameManager::GetInstance()->Snapshot()["profile"].dump(), "application/json");
   });
   server->Get("/api/achievements", [](const httplib::Request&, httplib::Response& res) {
     try {
-      res.set_content(DataManager::GetInstance()->GetAchievementState().dump(), "application/json");
+      res.set_content(GameManager::GetInstance()->Snapshot()["achievements"].dump(), "application/json");
     } catch (const std::exception& e) {
       LAppPal::PrintLog(LogLevel::Error, "[Achievements]Load failed: %s", e.what());
       res.status = 500;
@@ -445,7 +410,7 @@ void PanelServer::doServe() {
       res.status = 400;
       return;
     }
-    auto error = CloudGame::GetInstance()->Command({{"type", "clothes"}, {"id", id}});
+    auto error = GameManager::GetInstance()->Command({{"type", "clothes"}, {"id", id}});
     res.status = error.empty() ? 200 : 409;
     res.set_content(error.empty() ? "{\"success\":true}" : nlohmann::json{{"error", error}}.dump(), "application/json");
   });
@@ -464,7 +429,6 @@ void PanelServer::doServe() {
   auto taskResponse = [this](httplib::Response& res,
                              const std::function<std::string()>& action) {
     try {
-      auto dm = DataManager::GetInstance();
       auto error = action();
       if (!error.empty()) {
         res.status = 409;
@@ -480,38 +444,38 @@ void PanelServer::doServe() {
   };
   server->Post("/api/task/queue/upgrade", [taskResponse](const httplib::Request&,
                                                       httplib::Response& res) {
-    taskResponse(res, [] { return DataManager::GetInstance()->UpgradeTaskQueue(); });
+    taskResponse(res, [] { return GameManager::GetInstance()->Command({{"type", "queue.upgrade"}}); });
   });
   server->Post("/api/task/:id/start", [taskResponse](const httplib::Request& req,
                                                    httplib::Response& res) {
     taskResponse(res, [&] {
-      return DataManager::GetInstance()->StartTask(std::stoi(req.path_params.at("id")));
+      return GameManager::GetInstance()->Command({{"type", "task.start"}, {"id", std::stoi(req.path_params.at("id"))}});
     });
   });
   server->Post("/api/task/:id/queue", [taskResponse](const httplib::Request& req,
                                                    httplib::Response& res) {
     taskResponse(res, [&] {
-      return DataManager::GetInstance()->QueueTask(std::stoi(req.path_params.at("id")));
+      return GameManager::GetInstance()->Command({{"type", "task.queue"}, {"id", std::stoi(req.path_params.at("id"))}});
     });
   });
   server->Delete("/api/task/queue/:entryId", [taskResponse](const httplib::Request& req,
                                                          httplib::Response& res) {
     taskResponse(res, [&] {
-      return DataManager::GetInstance()->RemoveQueuedTask(std::stoll(req.path_params.at("entryId")));
+      return GameManager::GetInstance()->Command({{"type", "queue.remove"}, {"entry_id", std::stoll(req.path_params.at("entryId"))}});
     });
   });
   server->Post("/api/task/queue/:entryId/move", [taskResponse](const httplib::Request& req,
                                                            httplib::Response& res) {
     taskResponse(res, [&] {
       auto payload = nlohmann::json::parse(req.body);
-      return DataManager::GetInstance()->MoveQueuedTask(
-          std::stoll(req.path_params.at("entryId")), payload.at("direction").get<int>());
+      return GameManager::GetInstance()->Command({{"type", "queue.move"},
+          {"entry_id", std::stoll(req.path_params.at("entryId"))}, {"direction", payload.at("direction").get<int>()}});
     });
   });
   server->Post("/api/task/:id/cancel", [taskResponse](const httplib::Request& req,
                                                     httplib::Response& res) {
     taskResponse(res, [&] {
-      return DataManager::GetInstance()->CancelTask(std::stoi(req.path_params.at("id")));
+      return GameManager::GetInstance()->Command({{"type", "task.cancel"}, {"id", std::stoi(req.path_params.at("id"))}});
     });
   });
   server->Post("/api/config/folder", [](const httplib::Request &req, httplib::Response &res) {
@@ -819,7 +783,6 @@ void PanelServer::doServe() {
     string cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
     DataManager::GetInstance()->SetRaw("cookies", string(""));
     DataManager::GetInstance()->SetRaw("uid", string(""));
-    CloudGame::GetInstance()->Disconnect();
     httplib::Headers headers = {{"cookie", cookies}};
     const auto bili_jct = CookieValue(cookies, "bili_jct");
     if (!bili_jct.empty()) {
@@ -863,14 +826,12 @@ void PanelServer::doServe() {
     if (cookies.empty()) {
       avatarCache_.ClearAccount();
       resp_json["login"] = false;
-      resp_json["info"] = {{"confirm", false}};
+      resp_json["info"] = nlohmann::json::object();
       res.set_content(resp_json.dump(), "application/json");
       return;
     }
     resp_json["login"] = false;
     resp_json["info"] = nlohmann::json::object();
-    resp_json["info"]["confirm"] =
-        DataManager::GetInstance()->GetWithDefault("data-share", 0) == 1;
 
     httplib::Headers headers = {
         {"cookie", cookies},
@@ -892,10 +853,8 @@ void PanelServer::doServe() {
         if (loggedIn && data.contains("mid") && !data.at("mid").is_null() &&
             data.at("mid").get<long long>() > 0) {
           const auto uid = std::to_string(data.at("mid").get<long long>());
-          const auto previousUid = DataManager::GetInstance()->GetWithDefault("uid", std::string{});
           DataManager::GetInstance()->SetRaw("uid", uid);
           DataManager::GetInstance()->SetRaw("uname", data.value("uname", std::string{"用户 "} + uid));
-          if (previousUid != uid) CloudGame::GetInstance()->Wake();
           resp_json["login"] = true;
           resp_json["info"]["uname"] =
               data.value("uname", std::string{});
@@ -1041,17 +1000,6 @@ void PanelServer::doServe() {
                           "[PanelServer]Parse QR status failed: %s", e.what());
       }
       res.set_content(resp_json.dump(), "application/json");
-  });
-  server->Post("/api/account/share",
-               [](const httplib::Request &req, httplib::Response &res) {
-                 auto error = CloudGame::GetInstance()->Command({{"type", "share"}, {"enabled", true}});
-                 res.status = error.empty() ? 200 : 409;
-                 res.set_content(error.empty() ? "{\"success\":true}" : nlohmann::json{{"error", error}}.dump(), "application/json");
-               });
-  server->Delete("/api/account/share", [](const auto&, auto& res) {
-    auto error = CloudGame::GetInstance()->Command({{"type", "share"}, {"enabled", false}});
-    res.status = error.empty() ? 200 : 409;
-    res.set_content(error.empty() ? "{\"success\":true}" : nlohmann::json{{"error", error}}.dump(), "application/json");
   });
 
   initSSE();

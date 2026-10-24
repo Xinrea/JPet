@@ -234,9 +234,9 @@ void BuffManager::updateGuard(const httplib::Headers& headers) {
   httplib::SSLClient guard_cli("api.live.bilibili.com", 443);
   guard_cli.set_connection_timeout(std::chrono::seconds(1));
 
-  string uid = DataManager::GetInstance()->GetWithDefault("uid", "");
+  std::string uid = DataManager::GetInstance()->GetWithDefault("uid", "");
   if (uid.empty()) {
-    string cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
+    std::string cookies = DataManager::GetInstance()->GetWithDefault("cookies", "");
     // get uid from cookies string, find DedeUserID
     std::regex pattern("DedeUserID=([0-9]+)");
     std::smatch match;
@@ -296,9 +296,6 @@ std::vector<std::string> BuffManager::GetBuffList() {
   if (is_guard_) {
     buffs.push_back("guard");
   }
-  if (IsFail()) {
-    buffs.push_back("fail");
-  }
   if (IsMonday()) {
     buffs.push_back("monday");
   }
@@ -306,10 +303,6 @@ std::vector<std::string> BuffManager::GetBuffList() {
     buffs.push_back("birthday");
   }
   return buffs;
-}
-
-bool BuffManager::IsFail() {
-  return DataManager::GetInstance()->GetWithDefault("buff.failcount", 0) >= 2;
 }
 
 bool BuffManager::IsMonday() {

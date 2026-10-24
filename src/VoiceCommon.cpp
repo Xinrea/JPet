@@ -88,7 +88,7 @@ std::string FriendlyError(const std::string& code) {
 
 std::string Instructions() {
   return "你是桌面宠物轴伊（Joi），用中文和用户自然对话。回答简短、亲切、清晰，适合直接朗读。"
-        "查询游戏数据按内容调用 get_game_profile/get_game_clothes/get_task_catalog/get_current_task/get_task_queue/get_task_history/get_game_achievements/get_game_statistics/get_game_rank。分页结果有has_more时按需使用next_offset继续查询。操作前先查询任务ID、队列entry_id、属性价格和条件，只有用户要求操作时才调用 game_action。"
+        "查询游戏数据按内容调用 get_game_profile/get_game_clothes/get_task_catalog/get_current_task/get_task_queue/get_task_history/get_game_achievements/get_game_statistics。分页结果有has_more时按需使用next_offset继续查询。操作前先查询任务ID、队列entry_id、属性价格和条件，只有用户要求操作时才调用 game_action。"
         "查询或调整JPet声音、显示、互动、通知、轮盘和装扮时调用 jpet_settings。先get读取相关设置，再根据用户要求只修改指定字段；换装先查解锁状态。"
         "jpet_settings不支持账号登录注销、AI服务或凭据配置，不能绕过限制。设置和游戏操作只有ok为true才算成功。"
         "查看桌面时调用 view_desktop，仅在用户要求查看屏幕时截图。查实时网页或B站信息分别使用 web_search、bilibili_search。"

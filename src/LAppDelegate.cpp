@@ -42,7 +42,7 @@
 #include <stb_image_write.h>
 
 #include "DataManager.hpp"
-#include "CloudGame.hpp"
+#include "GameManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppLive2DManager.hpp"
 #include "LAppModel.hpp"
@@ -326,7 +326,7 @@ bool LAppDelegate::Initialize() {
     }
   });
 
-  if (!std::getenv("JPET_SMOKE_TEST")) CloudGame::GetInstance()->Start();
+  if (!std::getenv("JPET_SMOKE_TEST")) GameManager::GetInstance()->Start();
 
   return GL_TRUE;
 }
@@ -360,7 +360,7 @@ void LAppDelegate::SetLimit(bool limit) {
 void LAppDelegate::Release() {
   VoiceChat::GetInstance()->Stop();
   UpdateManager::GetInstance()->Stop();
-  if (!std::getenv("JPET_SMOKE_TEST")) CloudGame::GetInstance()->Stop();
+  if (!std::getenv("JPET_SMOKE_TEST")) GameManager::GetInstance()->Stop();
   PanelServer::GetInstance()->Stop();
   delete _us;
   _us = nullptr;

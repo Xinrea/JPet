@@ -35,29 +35,19 @@ jobs:
       - name: Build
         run: npm run build
 
-  cloud:
+  game:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: cloud
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: cloud/package-lock.json
-      - run: npm ci --no-audit --no-fund
-      # worker-configuration.d.ts is generated from wrangler.jsonc and not committed.
-      - name: Generate Worker types
-        run: npm run types
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Test
-        run: npm test
+      - run: sudo apt-get update && sudo apt-get install -y nlohmann-json3-dev
+      # Game rules and achievements only depend on nlohmann/json.
+      - name: Test game rules
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/game_test.cpp src/GameRules.cpp -o game_test && ./game_test
+          g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/achievements_test.cpp -o achievements_test && ./achievements_test
 
   python:
     runs-on: ubuntu-latest
@@ -69,5 +59,3 @@ jobs:
       # Errors only (syntax, undefined names, unused imports); the scripts keep a compact style.
       - name: Lint scripts
         run: pipx run ruff==0.14.0 check --select E9,F tests build-scripts
-      - name: Test cloud build configuration
-        run: python3 tests/cloud_config_test.py

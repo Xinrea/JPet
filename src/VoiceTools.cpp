@@ -116,8 +116,7 @@ const std::pair<const char*, const char*> GameQueries[] = {
   {"get_game_profile", "profile"}, {"get_game_clothes", "clothes"},
   {"get_task_catalog", "task_catalog"}, {"get_current_task", "current_task"},
   {"get_task_queue", "task_queue"}, {"get_task_history", "task_history"},
-  {"get_game_achievements", "achievements"}, {"get_game_statistics", "statistics"},
-  {"get_game_rank", "rank"}
+  {"get_game_achievements", "achievements"}, {"get_game_statistics", "statistics"}
 };
 json ActionResult(const ToolDependencies& dependencies, const std::string& action, const char* section) {
   json result = {{"ok", true}, {"action", action}};
@@ -158,7 +157,7 @@ json ToolDefinitions() {
   return json::array({
     Definition("view_desktop", "获取当前桌面截图并读取画面内容。仅在用户要求查看屏幕时调用；display=0为主屏，其余为附加屏。返回视觉观察及截图尺寸，不执行鼠标键盘操作。",
       {{"question", String("想从截图中了解什么，默认描述当前桌面", 1500)}, {"display", Integer(0, 7)}}),
-    Definition("get_game_profile", "查询属性、经验、属性升级/退还价格、星星、Buff和轴芯等级。属性或升星操作前先查此工具；离线结果标记为缓存。", json::object()),
+    Definition("get_game_profile", "查询属性、经验、属性升级/退还价格、星星、Buff和轴芯等级。属性或升星操作前先查此工具。", json::object()),
     Definition("get_game_clothes", "查询当前服装和各服装解锁状态，换装前先查询。", json::object()),
     Definition("get_task_catalog", "分页查询可选任务的ID、条件、成功率、耗时和收益；安排任务前查询，包含正在进行的任务。使用next_offset读取后续页。",
       {{"offset", Integer(0, 10000)}, {"limit", Integer(1, 10)}}),
@@ -169,13 +168,11 @@ json ToolDefinitions() {
     Definition("get_game_achievements", "分页查询成就条件、进度和解锁情况，使用next_offset读取后续页。",
       {{"offset", Integer(0, 10000)}, {"limit", Integer(1, 10)}}),
     Definition("get_game_statistics", "查询游戏累计统计、连胜和陪伴日期，不返回成就目录。", json::object()),
-    Definition("get_game_rank", "分页查询排行榜，metric为starcnt星星/exp经验/attr属性。",
-      {{"metric", Enum({"starcnt", "exp", "attr"})}, {"offset", Integer(0, 10000)}, {"limit", Integer(1, 10)}}),
-    Definition("game_action", "按用户明确要求执行一个游戏操作，云端验证费用和条件。先用对应查询工具查任务、队列或属性。每个action只接受自己的参数：start_task/queue_task/cancel_task需要task_id（任务目录ID）；remove_queued_task需要entry_id（队列实例ID）；move_queued_task需要entry_id和direction；upgrade_attribute/refund_attribute需要attribute，每次一点；change_clothes需要clothes_id；upgrade_task_queue和star_up无其他参数。失败不要盲目重试。",
+    Definition("game_action", "按用户明确要求执行一个游戏操作，游戏会验证费用和条件。先用对应查询工具查任务、队列或属性。每个action只接受自己的参数：start_task/queue_task/cancel_task需要task_id（任务目录ID）；remove_queued_task需要entry_id（队列实例ID）；move_queued_task需要entry_id和direction；upgrade_attribute/refund_attribute需要attribute，每次一点；change_clothes需要clothes_id；upgrade_task_queue和star_up无其他参数。失败不要盲目重试。",
       {{"action", Enum({"start_task", "queue_task", "cancel_task", "remove_queued_task", "move_queued_task", "upgrade_attribute", "refund_attribute", "upgrade_task_queue", "star_up", "change_clothes"})},
        {"task_id", Integer(1, 13)}, {"entry_id", Integer(1, INT64_MAX)}, {"direction", Enum({"up", "down"})},
        {"attribute", Enum({"speed", "endurance", "strength", "will", "intellect"})}, {"clothes_id", Integer(0, 2)}}, {"action"}),
-    Definition("jpet_settings", "读取或按用户要求调整JPet日常设置。get的section默认all，可选audio/display/interaction/notifications/shortcuts/clothes/appearance。update一次修改一个section，只修改settings中提供的字段，其余保持原样；section和settings字段对应为：audio为volume(0-100)、mute、idle_audio、touch_audio；display为scale(0-3)、green、limit；interaction为track、dropfile；notifications为dynamic、live、update；appearance为long_hair(长发true/短发false)、left_ear、right_ear、hat(贝雷帽)、glasses、star_eyes、dizzy_eyes、sweat、dark_face、blush、leg_accessories、shoes、tail、gun等布尔开关和mouth(嘴型1-6)。add_watch/remove_watch修改本机通知关注列表（不是B站账号关注），需要uid。set_shortcut配置轮盘方向与类型，application/folder的target必须是用户提供的本机绝对路径，website必须是完整HTTP/HTTPS链接；settings/disabled无需target，不会自动打开入口。change_clothes需要先get clothes查解锁状态，clothes_id为0绿色、1粉色、2冬装，云端验证解锁条件。不能读取或修改账号登录、Cookie、AI服务、凭据或云端连接配置。",
+    Definition("jpet_settings", "读取或按用户要求调整JPet日常设置。get的section默认all，可选audio/display/interaction/notifications/shortcuts/clothes/appearance。update一次修改一个section，只修改settings中提供的字段，其余保持原样；section和settings字段对应为：audio为volume(0-100)、mute、idle_audio、touch_audio；display为scale(0-3)、green、limit；interaction为track、dropfile；notifications为dynamic、live、update；appearance为long_hair(长发true/短发false)、left_ear、right_ear、hat(贝雷帽)、glasses、star_eyes、dizzy_eyes、sweat、dark_face、blush、leg_accessories、shoes、tail、gun等布尔开关和mouth(嘴型1-6)。add_watch/remove_watch修改本机通知关注列表（不是B站账号关注），需要uid。set_shortcut配置轮盘方向与类型，application/folder的target必须是用户提供的本机绝对路径，website必须是完整HTTP/HTTPS链接；settings/disabled无需target，不会自动打开入口。change_clothes需要先get clothes查解锁状态，clothes_id为0绿色、1粉色、2冬装，游戏会验证解锁条件。不能读取或修改账号登录、Cookie、AI服务或凭据。",
       {{"action", Enum({"get", "update", "add_watch", "remove_watch", "set_shortcut", "change_clothes"})},
        {"section", Enum({"all", "audio", "display", "interaction", "notifications", "shortcuts", "clothes", "appearance"})},
        {"settings", {{"type", "object"}, {"additionalProperties", false}, {"properties", {
@@ -292,13 +289,9 @@ json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies, con
     for (const auto& [name, section] : GameQueries) if (call.name == name) {
       const std::string type = section;
       json query = {{"section", type}};
-      if (type == "rank") {
-        Fields(args, {"metric", "offset", "limit"});
-        query["metric"] = Choice(args, "metric", {"starcnt", "exp", "attr"}, "starcnt");
-      } else if (type == "task_catalog" || type == "task_history" || type == "achievements")
-        Fields(args, {"offset", "limit"});
-      else Fields(args, {});
-      if (type == "rank" || type == "task_catalog" || type == "task_history" || type == "achievements") {
+      const bool paged = type == "task_catalog" || type == "task_history" || type == "achievements";
+      Fields(args, paged ? std::initializer_list<const char*>{"offset", "limit"} : std::initializer_list<const char*>{});
+      if (paged) {
         query["offset"] = Number(args, "offset", 0, 10000, 0);
         query["limit"] = Number(args, "limit", 1, 10, 5);
       }
@@ -306,11 +299,10 @@ json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies, con
     }
     // Existing sessions may still issue the old tool. Never restore an unbounded all-state query.
     if (call.name == "get_game_state") {
-      Fields(args, {"section", "metric", "offset", "limit"});
-      const auto section = Choice(args, "section", {"profile", "clothes", "tasks", "task_catalog", "current_task", "task_queue", "task_history", "achievements", "statistics", "rank"});
+      Fields(args, {"section", "offset", "limit"});
+      const auto section = Choice(args, "section", {"profile", "clothes", "tasks", "task_catalog", "current_task", "task_queue", "task_history", "achievements", "statistics"});
       json query = {{"section", section == "tasks" ? "task_catalog" : section},
         {"offset", Number(args, "offset", 0, 10000, 0)}, {"limit", Number(args, "limit", 1, 10, 5)}};
-      if (section == "rank") query["metric"] = Choice(args, "metric", {"starcnt", "exp", "attr"}, "starcnt");
       return dependencies.game(query);
     }
     if (call.name == "game_action") {
@@ -381,15 +373,11 @@ json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies, con
   }
 }
 
-json GameView(const json& snapshot, const json& profile, const json& tasks, const json& achievements,
-    const json& connection, const json& identity, const std::string& section, size_t offset, size_t limit) {
-  const bool confirmed = snapshot.contains("revision");
-  json result = {{"ok", true}, {"online", connection.value("online", false)}, {"confirmed", confirmed},
-    {"source", connection.value("online", false) ? "cloud" : confirmed ? "cloud_cache" : "local_unconfirmed"},
-    {"account", Selected(identity, {"uid", "name"})}};
-  if (!confirmed) result["notice"] = "尚未同步云端游戏数据；以下仅是本地默认值或迁移资料，不能当作当前云端状态";
-  for (const auto* key : {"revision", "server_time", "lease_remaining_ms"})
-    if (snapshot.contains(key)) result[key] = snapshot[key];
+json GameView(const json& game, const std::string& section, size_t offset, size_t limit) {
+  const auto profile = game.value("profile", json::object());
+  const auto tasks = game.value("tasks", json::object());
+  const auto achievements = game.value("achievements", json::object());
+  json result = {{"ok", true}};
   limit = std::clamp<size_t>(limit, 1, 10);
   if (section == "profile" || section == "attributes") {
     result["attribute_names"] = {{"speed", "速度"}, {"endurance", "耐力"}, {"strength", "力量"}, {"will", "毅力"}, {"intellect", "智力"}, {"exp", "经验"}};
@@ -400,17 +388,17 @@ json GameView(const json& snapshot, const json& profile, const json& tasks, cons
         {"guard", "舰长：经验增加25%"}, {"fail", "连败：经验增加25%"}, {"monday", "周一：经验增加25%"}, {"birthday", "生日：经验增加250%"}};
       result["rules"] = {{"exp_interval_seconds", 60}, {"star_up_cost_per_attribute", 53},
         {"medal", "轴芯等级为本机最近一次B站观测值，每3级提升1点有效智力；经验速度以expdiff为准"},
-        {"offline", "断网或关闭游戏时任务与经验进度暂停"}};
+        {"offline", "关闭 JPet 时任务与经验进度暂停，重新打开后继续"}};
     }
   } else if (section == "clothes") {
     result["clothes"] = profile.value("clothes", json::object());
     result["clothes_names"] = {{"0", "绿色"}, {"1", "粉色"}, {"2", "冬装"}};
   } else if (section == "current_task" || section == "task_status") {
     const auto current = tasks.value("current", json(nullptr));
-    result["current"] = current.is_object() ? Selected(current, {"id", "title", "cost", "rate", "requirements", "rewards", "elapsed_seconds", "remaining_seconds", "start_time", "paused"}) : json(nullptr);
+    result["current"] = current.is_object() ? Selected(current, {"id", "title", "cost", "rate", "requirements", "rewards", "elapsed_seconds", "remaining_seconds", "start_time"}) : json(nullptr);
   } else if (section == "task_catalog") {
     auto catalog = tasks.value("list", json::array());
-    // The cloud omits the active task from its catalog; it can still be queued again.
+    // The catalog omits the active task; it can still be queued again.
     const auto current = tasks.value("current", json(nullptr));
     if (current.is_object() && std::none_of(catalog.begin(), catalog.end(), [&](const json& item) { return item.value("id", 0) == current.value("id", 0); })) catalog.push_back(current);
     std::sort(catalog.begin(), catalog.end(), [](const json& a, const json& b) { return a.value("id", 0) < b.value("id", 0); });
@@ -421,7 +409,7 @@ json GameView(const json& snapshot, const json& profile, const json& tasks, cons
     result["achievements"] = Page(achievements.value("list", json::array()), offset, limit, {"id", "title", "description", "category", "target", "progress", "unlocked", "unlocked_at"});
     result["achievements"]["unlocked"] = achievements.value("unlocked", 0);
   } else if (section == "statistics") {
-    const auto save = snapshot.value("save", json::object());
+    const auto save = game.value("save", json::object());
     result["statistics"] = Selected(save, {"failcount"});
     if (save.contains("achievements")) result["statistics"]["achievements"] = Selected(save["achievements"], {"metrics", "streak", "last_failed", "dates"});
   } else if (section != "task_queue") return Fail("请使用对应的游戏查询工具，不支持查询完整状态");

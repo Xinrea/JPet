@@ -63,7 +63,6 @@
   export let buffs = ["live", "dynamic", "guard"];
 
   export let starcnt = 0;
-  export let online = false;
   export let expProgress = 0;
   export let buycost = 0;
   export let revertgain = 0;
@@ -76,7 +75,7 @@
   let receivedAt = 0;
   $: { expProgress; receivedAt = performance.now(); }
   function updateTimeToNextPoint() {
-    const elapsed = online ? (performance.now() - receivedAt) / 1000 : 0;
+    const elapsed = (performance.now() - receivedAt) / 1000;
     timeToNextPoint = Math.max(0, 60 - expProgress - elapsed);
   }
   onMount(() => {
@@ -84,7 +83,7 @@
     return () => clearInterval(timer);
   });
   async function gameAction(url, method = "POST") {
-    if (!online || busy) return;
+    if (busy) return;
     busy = true; error = "";
     try {
       const response = await fetch(url, { method });
@@ -131,7 +130,7 @@
   const tooltips = [
     "前期智力对经验值的加成非常可观",
     "一些任务是可重复完成的",
-    "关闭或断网时，任务与经验进度会暂停",
+    "关闭 JPet 时，任务与经验进度会暂停",
     "我的头围是 53cm",
     "经验值可用于加点，但加点的消耗会越来越多",
     "装扮完可以试试给我拍张照",
@@ -154,8 +153,8 @@
     <div class="character-stage"><span class="character-spark spark-one">✦</span><span class="character-spark spark-two">✧</span><img src={clothesImages[clothes.current]} alt="轴伊的当前衣装" /><span class="character-name">轴伊 <small>Joi</small></span></div>
     <div class="growth-summary"><span class="growth-eyebrow">一起积攒的成长</span>
       <div class="exp-ring"><Progress max={60} value={60 - timeToNextPoint}><div class="exp-value"><strong>{currentExp.toLocaleString()}</strong><span>EXP</span></div></Progress></div>
-      <p class="next-exp">{online ? `下次获得 +${expdiff} EXP` : "连接云端后继续成长"}</p>
-      <div class="stars-row"><span>当前星级</span><button class="star-button" aria-label="提升星级" disabled={!online || busy} on:click={() => starModal = true}>
+      <p class="next-exp">下次获得 +{expdiff} EXP</p>
+      <div class="stars-row"><span>当前星级</span><button class="star-button" aria-label="提升星级" disabled={busy} on:click={() => starModal = true}>
         {#if starcnt > 0}{#each { length: Math.floor(starcnt / 5) } as _}<img alt="五星" src={crownIcon} />{/each}{#each { length: starcnt % 5 } as _}<img alt="一星" src={starIcon} />{/each}{:else}<img alt="零星" src={starOutlineIcon} />{/if}<span>＋</span>
       </button><Tooltip>星星提升经验获取量和属性上限、降低任务成功率，也可消耗星星解锁任务队列容量</Tooltip></div>
       <div id="buff-ref" class="buff-row">{#each buffs as buff}<BuffIcon type={buff} />{:else}<span>期待下一次成长加成</span>{/each}</div>
@@ -166,19 +165,19 @@
     <div class="attribute-grid">{#each attributeArray as attr, i}<div class="attribute-card game-card" style={`--attribute-color: ${["#6bb8c5", "#e58ca4", "#e8ad51", "#9e9bd0", "#80b554"][i]}`}>
       <div class="attribute-name"><img src={attributeIcons[i]} alt="" /><span>{attributeNames[i]}</span></div><Tooltip>{attributeDescriptions[i]}</Tooltip>
       <strong class="attribute-value">{attributes[attr]}</strong>
-      <div class="attribute-actions"><button aria-label={`撤销${attributeNames[i]}属性`} disabled={busy || !online} on:mousedown={(event) => { if (event.button === 1) { targetAttr = attr; revertHandle(); } }} on:click={() => { revertModal = true; targetAttr = attr; }}>−</button><button aria-label={`增加${attributeNames[i]}属性`} disabled={busy || !online} on:mousedown={(event) => { if (event.button === 1) { targetAttr = attr; attrHandle(); } }} on:click={() => { addModal = true; targetAttr = attr; }}>＋</button></div>
+      <div class="attribute-actions"><button aria-label={`撤销${attributeNames[i]}属性`} disabled={busy} on:mousedown={(event) => { if (event.button === 1) { targetAttr = attr; revertHandle(); } }} on:click={() => { revertModal = true; targetAttr = attr; }}>−</button><button aria-label={`增加${attributeNames[i]}属性`} disabled={busy} on:mousedown={(event) => { if (event.button === 1) { targetAttr = attr; attrHandle(); } }} on:click={() => { addModal = true; targetAttr = attr; }}>＋</button></div>
     </div>{/each}</div>
   </section>
 
   <section class="outfit-section game-card"><div class="section-title"><UiIcon name="dress" size={18} /><h2>今日衣装</h2><span>选择你喜欢的样子</span></div>
-    <div class="outfit-grid">{#each clothesList as outfit, i}<button class="outfit-choice" class:selected={clothes.current === i} disabled={busy || !online || !clothes.unlock[i]} aria-pressed={clothes.current === i} on:click={() => changeClothes(i)}><img src={clothesImages[i]} alt="" /><span><strong>{outfit.name}</strong><small>{!clothes.unlock[i] ? "尚未解锁" : clothes.current === i ? "正在穿着" : "点击换装"}</small></span>{#if clothes.current === i}<UiIcon name="check" size={15} />{/if}</button>{#if !clothes.unlock[i]}<Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>{/if}{/each}</div>
+    <div class="outfit-grid">{#each clothesList as outfit, i}<button class="outfit-choice" class:selected={clothes.current === i} disabled={busy || !clothes.unlock[i]} aria-pressed={clothes.current === i} on:click={() => changeClothes(i)}><img src={clothesImages[i]} alt="" /><span><strong>{outfit.name}</strong><small>{!clothes.unlock[i] ? "尚未解锁" : clothes.current === i ? "正在穿着" : "点击换装"}</small></span>{#if clothes.current === i}<UiIcon name="check" size={15} />{/if}</button>{#if !clothes.unlock[i]}<Tooltip>目前还未解锁，请提升属性完成任务解锁</Tooltip>{/if}{/each}</div>
   </section>
   <div class="profile-tip"><UiIcon name="spark" size={18} /><p><strong>陪伴小贴士</strong>{tooltips[cur_tip]}</p></div>
 </div>
 
-<Modal title="属性加点" bind:open={addModal} size="xs" autoclose><p class="mb-5 text-sm leading-relaxed text-gray-500">此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？</p><div class="setting-actions"><Button disabled={busy || !online || currentExp < buycost || attributes[targetAttr] >= 100 + 10 * starcnt} on:click={attrHandle}>确认</Button><Button color="alternative">取消</Button></div></Modal>
-<Modal title="属性撤销" bind:open={revertModal} size="xs" autoclose><p class="mb-5 text-sm leading-relaxed text-gray-500">此次操作会返还 {revertgain} EXP，确认撤销吗？</p><div class="setting-actions"><Button disabled={busy || !online} on:click={revertHandle}>确认</Button><Button color="alternative">取消</Button></div></Modal>
-<Modal title="星级提升" bind:open={starModal} size="xs" autoclose><p class="mb-5 text-sm leading-relaxed text-gray-500">此次操作会消耗所有属性各 53 点换取一颗星，要换取吗？</p><div class="setting-actions"><Button disabled={!starAvailable || !online || busy} on:click={fetchStar}>确认</Button><Button color="alternative">取消</Button></div></Modal>
+<Modal title="属性加点" bind:open={addModal} size="xs" autoclose><p class="mb-5 text-sm leading-relaxed text-gray-500">此次操作需要消耗 {buycost} EXP，后续撤销仅会返还一半，确认加点吗？</p><div class="setting-actions"><Button disabled={busy || currentExp < buycost || attributes[targetAttr] >= 100 + 10 * starcnt} on:click={attrHandle}>确认</Button><Button color="alternative">取消</Button></div></Modal>
+<Modal title="属性撤销" bind:open={revertModal} size="xs" autoclose><p class="mb-5 text-sm leading-relaxed text-gray-500">此次操作会返还 {revertgain} EXP，确认撤销吗？</p><div class="setting-actions"><Button disabled={busy} on:click={revertHandle}>确认</Button><Button color="alternative">取消</Button></div></Modal>
+<Modal title="星级提升" bind:open={starModal} size="xs" autoclose><p class="mb-5 text-sm leading-relaxed text-gray-500">此次操作会消耗所有属性各 53 点换取一颗星，要换取吗？</p><div class="setting-actions"><Button disabled={!starAvailable || busy} on:click={fetchStar}>确认</Button><Button color="alternative">取消</Button></div></Modal>
 
 <style>
   .profile-page { display: flex; flex-direction: column; gap: 22px; }
