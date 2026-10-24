@@ -16,6 +16,8 @@ foreach(_variant IN ITEMS compatible stock wrong_version incomplete)
   target_compile_options(voice_speech_mock_${_variant} PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
   target_link_libraries(voice_speech_mock_${_variant} PRIVATE unofficial::sherpa-onnx-bin::headers)
   set_target_properties(voice_speech_mock_${_variant} PROPERTIES
+    # Export only implemented symbols, preserving intentionally incomplete mocks.
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
   add_dependencies(voice_speech_test voice_speech_mock_${_variant})
