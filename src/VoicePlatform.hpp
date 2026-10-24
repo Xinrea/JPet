@@ -50,10 +50,10 @@ AudioDevices ListAudioDevices();
 std::unique_ptr<Platform> MakePlatform();
 // Store secrets in the current user's Keychain / Windows Credential Manager.
 // The data directory identifies the profile, including isolated test profiles.
-bool SaveApiKey(const std::string& profile, const std::string& key,
-                std::string& error);
-std::string LoadApiKey(const std::string& profile, std::string& error);
-// API key for a custom OpenAI-compatible chat endpoint (cascade engine).
-bool SaveChatApiKey(const std::string& profile, const std::string& key, std::string& error);
-std::string LoadChatApiKey(const std::string& profile, std::string& error);
+// Deletes the Bailian key saved by versions that used it for search and vision.
+void RemoveLegacyApiKey(const std::string& profile);
+// API key of a chat service in ChatProviders(). "thirdparty" keeps the key of
+// the former custom endpoint setting.
+bool SaveChatApiKey(const std::string& profile, const std::string& provider, const std::string& key, std::string& error);
+std::string LoadChatApiKey(const std::string& profile, const std::string& provider, std::string& error);
 }  // namespace Voice

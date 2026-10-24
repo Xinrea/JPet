@@ -5,6 +5,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <thread>
@@ -72,8 +73,33 @@ class ChatClient final : public ChatBackend {
   bool active_ = false;
 };
 
-// Bailian's OpenAI-compatible endpoint in a Beijing workspace, or a custom base URL.
-std::string ChatCompletionsUrl(const std::string& baseUrl, const std::string& workspace);
+// OpenAI-compatible chat services offered in settings. Each keeps its own API key.
+struct ChatProvider {
+  const char* id;       // Saved in settings.
+  const char* name;
+  const char* baseUrl;  // Empty: the user supplies an OpenAI-compatible endpoint.
+};
+const std::vector<ChatProvider>& ChatProviders();
+const ChatProvider* FindChatProvider(const std::string& id);
+// Request fields that turn reasoning off: spoken replies need to start quickly,
+// and reasoning is not carried across tool rounds (DeepSeek rejects tool
+// follow-ups that omit it).
+nlohmann::json ChatRequestOptions(const std::string& provider);
+
+struct ChatModel {
+  std::string id, name;
+  std::optional<bool> vision;  // Accepts images; unset when the list does not say.
+};
+// The provider's GET {base}/models list, sorted by name. OpenRouter lists only
+// models that support tools and let reasoning be turned off.
+std::vector<ChatModel> ParseChatModels(const std::string& provider, const nlohmann::json& body);
+std::vector<ChatModel> FetchChatModels(const std::string& provider, const std::string& baseUrl,
+                                       const std::string& apiKey, std::string& error);
+
+// {base}/chat/completions; a base that already ends with it is kept.
+std::string ChatCompletionsUrl(const std::string& baseUrl);
 // HTTPS, or plain HTTP to this machine, with no credentials or fragments.
 bool ValidChatBaseUrl(const std::string& url);
+// Any provider's model id, e.g. deepseek-chat or openai/gpt-4o:free.
+bool ValidChatModel(const std::string& model);
 }  // namespace Voice

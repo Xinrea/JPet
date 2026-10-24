@@ -61,12 +61,14 @@ def main(gui=False, app=APP):
                     time.sleep(0.05)
             else:
                 raise RuntimeError("Panel server did not start")
-            assert code == 200 and config["has_api_key"] is False and "api_key" not in config
-            assert config["input_mode"] == "toggle" and config["chat_model"] == "qwen-plus" and config["chat_base_url"] == ""
-            assert {model["id"] for model in config["catalog"]["chat_models"]} == {"qwen-plus", "qwen-flash", "qwen-max"}
+            assert code == 200 and not {"api_key", "has_api_key", "workspace_id"} & config.keys()
+            # No chat service is chosen until the user picks one; each service keeps its own key.
+            assert config["input_mode"] == "toggle" and config["chat_provider"] == "" and config["chat_model"] == "" and config["chat_base_url"] == ""
+            assert [provider["id"] for provider in config["chat_providers"]] == ["deepseek", "openrouter", "thirdparty"]
+            assert config["chat_keys"] == {"deepseek": False, "openrouter": False, "thirdparty": False} and config["chat_vision"] is False
             # Speech is synthesised on this machine in Joi's voice: no synthesis model or voice to choose.
             assert not {"provider", "model", "voice", "engine", "cascade", "stt", "tts_model", "tts_voice"} & config.keys()
-            assert "tts_models" not in config["catalog"]
+            assert "catalog" not in config and "has_chat_api_key" not in config
             # Mode can be saved before credentials are configured.
             assert request(port, "/api/config/voice", {"input_mode": "hold"})[1]["input_mode"] == "hold"
             for invalid_mode in ["", "invalid", None, 123, False]:
@@ -88,33 +90,58 @@ def main(gui=False, app=APP):
             except urllib.error.HTTPError as missing:
                 assert missing.code == 404
             voice = request(port, "/api/voice")[1]
-            assert voice["microphone_on"] is False and voice["input_mode"] == "hold" and voice["model"] == "qwen-plus"
-            assert set(voice["available_tools"]) == {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "game_action", "jpet_settings", "web_search", "bilibili", "open_url"}
+            assert voice["microphone_on"] is False and voice["input_mode"] == "hold" and voice["model"] == ""
+            assert set(voice["available_tools"]) == {"get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "game_action", "jpet_settings", "bilibili", "open_url"}  # view_desktop needs a model that reads images
             # Recognition (SenseVoice) and synthesis (Qwen3-TTS) download as one model set.
             assert voice["speech_model"]["state"] == "missing" and voice["speech_model"]["total"] > 1_500_000_000
             code, history = request(port, "/api/voice/history")
             assert code == 200 and history == {"list": [], "limit": 200, "error": ""}
             # Typed chat needs a message and the AI service settings; nothing is queued without them.
             assert voice["replying"] is False
-            for message, error in [({"text": "  "}, "消息不能为空"), ({"text": 1}, "消息格式不正确"), ({"text": "你好"}, "API Key")]:
+            for message, error in [({"text": "  "}, "消息不能为空"), ({"text": 1}, "消息格式不正确"), ({"text": "你好"}, "大模型服务")]:
                 code, result = request(port, "/api/voice/chat", message)
                 assert code == 400 and error in result["error"], result
             assert request(port, "/api/voice/chat/stop", {})[0] == 200
             # These requests never create a credential in the real keychain.
-            assert request(port, "/api/config/voice", {"workspace_id": "ws-123"})[0] == 200
-            assert request(port, "/api/config/voice")[1]["workspace_id"] == "ws-123"
-            for invalid in [{"workspace_id": "evil.example"}, {"workspace_id": 123},
-                            {"workspace_id": "ws-123", "api_key": "sk-x\r\nInjected: yes"},
-                            {"chat_api_key": "key with spaces"}, {"chat_base_url": "http://example.com/v1"},
-                            {"chat_base_url": "https://user:pw@example.com"}, {"chat_model": "bad model"}]:
+            for invalid in [{"chat_provider": "deepseek", "chat_api_key": "key with spaces"},
+                            {"chat_provider": "deepseek", "chat_api_key": "sk-x\r\nInjected: yes"},
+                            {"chat_provider": "deepseek", "chat_model": "m", "chat_vision": "yes"},
+                            {"chat_api_key": "sk-no-service"}, {"chat_provider": "bailian"}, {"chat_provider": 1},
+                            {"chat_provider": "thirdparty"}, {"chat_provider": "thirdparty", "chat_base_url": "http://example.com/v1"},
+                            {"chat_provider": "thirdparty", "chat_base_url": "https://user:pw@example.com"},
+                            {"chat_provider": "deepseek", "chat_model": "bad model"}]:
                 assert request(port, "/api/config/voice", invalid)[0] == 400, invalid
-            assert request(port, "/api/config/voice", {"workspace_id": "ws-123"}, "text/plain")[0] == 403
+            # Model lists: a known service, a valid endpoint and a key are checked before any request is sent.
+            for invalid, error in [({"provider": "bailian"}, "大模型服务"), ({"provider": "deepseek"}, "API Key"),
+                                   ({"provider": "deepseek", "api_key": "bad key"}, "API Key"),
+                                   ({"provider": "thirdparty", "base_url": "http://example.com/v1", "api_key": "sk-x"}, "接口地址"),
+                                   ({"provider": "thirdparty", "base_url": "https://example.com/v1"}, "API Key")]:
+                code, result = request(port, "/api/voice/chat-models", invalid)
+                assert code == 400 and error in result["error"], (invalid, result)
+            assert request(port, "/api/voice/chat-models", {"provider": "openrouter"}, "text/plain")[0] == 403
+            assert request(port, "/api/config/voice", {"input_mode": "hold"}, "text/plain")[0] == 403
             # Fields of the removed CosyVoice synthesis are ignored, not errors.
-            code, saved = request(port, "/api/config/voice", {"chat_model": "deepseek-chat", "chat_base_url": "https://api.deepseek.com/v1",
+            code, saved = request(port, "/api/config/voice", {"chat_provider": "thirdparty", "chat_model": "llama3",
+                                                              "chat_base_url": "http://127.0.0.1:11434/v1",
                                                               "tts_model": "cosyvoice-v3-plus", "tts_voice": "longanyang"})
-            assert code == 200 and saved["chat_model"] == "deepseek-chat" and saved["chat_base_url"] == "https://api.deepseek.com/v1"
-            assert "tts_voice" not in saved and saved["has_chat_api_key"] is False and saved["workspace_id"] == "ws-123"
-            assert request(port, "/api/voice")[1]["model"] == "deepseek-chat"
+            assert code == 200 and saved["chat_provider"] == "thirdparty" and saved["chat_model"] == "llama3"
+            assert saved["chat_base_url"] == "http://127.0.0.1:11434/v1"
+            assert "tts_voice" not in saved and saved["chat_keys"]["thirdparty"] is False and saved["chat_vision"] is False
+            voice = request(port, "/api/voice")[1]
+            assert voice["model"] == "llama3" and "view_desktop" not in voice["available_tools"]
+            # A model that reads images may look at the desktop; another model starts text-only.
+            assert request(port, "/api/config/voice", {"chat_vision": True})[1]["chat_vision"] is True
+            assert "view_desktop" in request(port, "/api/voice")[1]["available_tools"]
+            assert request(port, "/api/config/voice", {"chat_model": "llama3.2"})[1]["chat_vision"] is False
+            assert request(port, "/api/config/voice", {"chat_model": "llama3", "chat_vision": True})[1]["chat_vision"] is True
+            # Without a saved key the chat is refused before anything is queued.
+            code, result = request(port, "/api/voice/chat", {"text": "你好"})
+            assert code == 400 and "API Key" in result["error"], result
+            # Another service drops the third-party model and endpoint.
+            code, saved = request(port, "/api/config/voice", {"chat_provider": "deepseek"})
+            assert code == 200 and saved["chat_provider"] == "deepseek" and saved["chat_model"] == "" and saved["chat_base_url"] == ""
+            code, saved = request(port, "/api/config/voice", {"chat_model": "deepseek-chat", "input_mode": "hold"})
+            assert code == 200 and saved["chat_provider"] == "deepseek" and saved["chat_model"] == "deepseek-chat"
             code, model = request(port, "/api/voice/speech-model", {"action": "cancel"})
             assert code == 200 and model["state"] == "missing"
             assert request(port, "/api/voice/speech-model", {"action": "format"})[0] == 400
@@ -122,7 +149,8 @@ def main(gui=False, app=APP):
             contents = Path(profile, "jpet.toml").read_text()
             assert re.search(r'^\s*input_mode\s*=\s*[\"\']hold[\"\']', contents, re.MULTILINE)
             assert not re.search(r'^\s*tts_(model|voice)\s*=', contents, re.MULTILINE)
-            assert "workspace_id" in contents and not re.search(r"^\s*(api_key|chat_api_key|provider|engine)\s*=", contents, re.MULTILINE)
+            assert not re.search(r"^\s*(api_key|chat_api_key|provider|engine|has_chat_api_key|has_api_key|workspace_id)\s*=", contents, re.MULTILINE)
+            assert re.search(r'^\s*chat_provider\s*=\s*[\"\']deepseek[\"\']', contents, re.MULTILINE)
             output, errors = process.communicate(timeout=10)
             if process.returncode:
                 raise RuntimeError((output + errors).decode(errors="replace")[-2000:])

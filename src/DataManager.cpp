@@ -115,23 +115,37 @@ void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {
 nlohmann::json DataManager::GetVoiceSettings() {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
   // Fall back to defaults when a saved value is no longer valid or offered.
-  auto chatModel = GetConfig<std::string>("voice", "chat_model", Voice::DefaultChatModel);
-  if (!Voice::ValidChatModel(chatModel)) chatModel = Voice::DefaultChatModel;
+  auto chatProvider = GetConfig<std::string>("voice", "chat_provider", "");
+  auto chatModel = GetConfig<std::string>("voice", "chat_model", "");
   auto chatUrl = GetConfig<std::string>("voice", "chat_base_url", "");
   if (!chatUrl.empty() && !Voice::ValidChatBaseUrl(chatUrl)) chatUrl.clear();
+  auto chatKeys = nlohmann::json::object();
+  for (const auto& provider : Voice::ChatProviders())
+    chatKeys[provider.id] = GetConfig<bool>("voice", std::string("chat_key_") + provider.id, false);
+  if (!VoiceTable().contains("chat_provider")) {
+    // Before chat services: a custom endpoint is now a third-party service with
+    // the same key; Bailian chat (no endpoint) has no counterpart.
+    chatProvider = chatUrl.empty() ? "" : "thirdparty";
+    if (chatUrl.empty()) chatModel.clear();
+    chatKeys["thirdparty"] = !chatUrl.empty() && GetConfig<bool>("voice", "has_chat_api_key", false);
+  }
+  if (!Voice::FindChatProvider(chatProvider) || (chatProvider == "thirdparty" && chatUrl.empty())) chatProvider.clear();
+  if (!Voice::ValidChatModel(chatModel)) chatModel.clear();
+  auto providers = nlohmann::json::array();
+  for (const auto& provider : Voice::ChatProviders())
+    providers.push_back({{"id", provider.id}, {"name", provider.name}, {"base_url", provider.baseUrl}});
   auto inputMode = GetConfig<std::string>("voice", "input_mode", "toggle");
   if (inputMode != "hold") inputMode = "toggle";
   auto inputDevice = GetConfig<std::string>("voice", "input_device", "");
   if (!Voice::ValidAudioDeviceId(inputDevice)) inputDevice.clear();
   auto outputDevice = GetConfig<std::string>("voice", "output_device", "");
   if (!Voice::ValidAudioDeviceId(outputDevice)) outputDevice.clear();
-  return {{"workspace_id", GetConfig<std::string>("voice", "workspace_id", "")},
-          {"has_api_key", GetConfig<bool>("voice", "has_api_key", false)},
-          {"input_mode", inputMode},
+  return {{"input_mode", inputMode},
           {"input_device", inputDevice}, {"output_device", outputDevice},
-          {"chat_model", chatModel}, {"chat_base_url", chatUrl},
-          {"has_chat_api_key", GetConfig<bool>("voice", "has_chat_api_key", false)},
-          {"catalog", Voice::CascadeCatalog()}};
+          {"chat_provider", chatProvider}, {"chat_model", chatModel}, {"chat_base_url", chatUrl},
+          // Whether the model reads images, i.e. may be offered view_desktop.
+          {"chat_vision", !chatModel.empty() && GetConfig<bool>("voice", "chat_vision", false)},
+          {"chat_keys", chatKeys}, {"chat_providers", providers}};
 }
 
 nlohmann::json DataManager::LoadVoiceHistory() {
@@ -155,11 +169,7 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
     value = Voice::Trim(payload[key].get<std::string>());
     return true;
   };
-  std::string workspace, inputMode, inputDevice, outputDevice, chatModel, chatUrl;
-  if (!text("workspace_id", workspace) || (!workspace.empty() && !Voice::ValidWorkspace(workspace))) {
-    error = "业务空间 ID 应为 1～63 位字母、数字或连字符，且不能以连字符开头或结尾";
-    return false;
-  }
+  std::string inputMode, inputDevice, outputDevice, chatProvider, chatModel, chatUrl;
   if (!text("input_mode", inputMode) || (inputMode != "toggle" && inputMode != "hold")) {
     error = "请选择开关或按住的快捷键方式";
     return false;
@@ -171,11 +181,30 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
     error = "请重新选择麦克风和扬声器";
     return false;
   }
-  if (!text("chat_model", chatModel) || !Voice::ValidChatModel(chatModel)) { error = "请填写有效的大模型名称"; return false; }
-  if (!text("chat_base_url", chatUrl) || (!chatUrl.empty() && !Voice::ValidChatBaseUrl(chatUrl))) {
-    error = "大模型接口地址需以 https:// 开头（本机地址可用 http://），且不能包含账号信息";
+  // The model and endpoint belong to the chat service; choosing another
+  // service without them clears the saved ones.
+  if (!text("chat_provider", chatProvider) || (!chatProvider.empty() && !Voice::FindChatProvider(chatProvider))) {
+    error = "请选择大模型服务";
     return false;
   }
+  const bool providerChanged = chatProvider != current.value("chat_provider", std::string{});
+  if (providerChanged && !payload.contains("chat_model")) chatModel.clear();
+  else if (!text("chat_model", chatModel) || (!chatModel.empty() && !Voice::ValidChatModel(chatModel))) {
+    error = "请选择有效的模型";
+    return false;
+  }
+  if (!text("chat_base_url", chatUrl) || (!chatUrl.empty() && !Voice::ValidChatBaseUrl(chatUrl))) {
+    error = "接口地址需以 https:// 开头（本机地址可用 http://），且不能包含账号信息";
+    return false;
+  }
+  if (chatProvider != "thirdparty") chatUrl.clear();
+  else if (chatUrl.empty()) { error = "请填写第三方服务的 OpenAI 兼容接口地址"; return false; }
+  // Image input is a property of the model: a new model without it is text-only.
+  bool chatVision = current.at("chat_vision");
+  if (payload.contains("chat_vision")) {
+    if (!payload["chat_vision"].is_boolean()) { error = "请选择模型是否支持图片输入"; return false; }
+    chatVision = payload["chat_vision"];
+  } else if (chatModel != current.value("chat_model", std::string{})) chatVision = false;
   // Keys are write-only: a new value replaces the saved one, "clear_*" removes it.
   const auto secret = [&](const char* key, const char* clear, std::string& value, bool& update) {
     update = payload.value(clear, false) || payload.contains(key);
@@ -184,27 +213,33 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
     value = Voice::Trim(payload[key].get<std::string>());
     return value.empty() || Voice::ValidApiKey(value);
   };
-  std::string apiKey, chatKey;
-  bool updateKey = false, updateChatKey = false;
-  if (!secret("api_key", "clear_api_key", apiKey, updateKey)) { error = "API Key 格式不正确，请检查是否包含空格"; return false; }
+  std::string chatKey;
+  bool updateChatKey = false;
   if (!secret("chat_api_key", "clear_chat_api_key", chatKey, updateChatKey)) {
     error = "大模型 API Key 格式不正确，请检查是否包含空格";
     return false;
   }
+  // A chat key belongs to the selected service.
+  if (updateChatKey && chatProvider.empty()) { error = "请先选择大模型服务"; return false; }
   const auto profile = LAppPal::WStringToString(LAppDefine::documentPath);
-  if (updateKey && !Voice::SaveApiKey(profile, apiKey, error)) return false;
-  if (updateChatKey && !Voice::SaveChatApiKey(profile, chatKey, error)) return false;
+  if (updateChatKey && !Voice::SaveChatApiKey(profile, chatProvider, chatKey, error)) return false;
   auto& table = VoiceTable();
-  // Settings of the removed Omni engine, JPet Server provider and CosyVoice synthesis.
-  for (const auto* legacy : {"provider", "model", "voice", "engine", "stt", "tts_model", "tts_voice"}) table.erase(legacy);
-  table.insert_or_assign("workspace_id", workspace);
+  // Settings of the removed Omni engine, JPet Server provider, CosyVoice
+  // synthesis, single custom chat key and Bailian search/vision key.
+  if (table["has_api_key"].value_or(false)) Voice::RemoveLegacyApiKey(profile);
+  for (const auto* legacy : {"provider", "model", "voice", "engine", "stt", "tts_model", "tts_voice", "has_chat_api_key",
+                             "workspace_id", "has_api_key"})
+    table.erase(legacy);
   table.insert_or_assign("input_mode", inputMode);
   table.insert_or_assign("input_device", inputDevice);
   table.insert_or_assign("output_device", outputDevice);
+  table.insert_or_assign("chat_provider", chatProvider);
   table.insert_or_assign("chat_model", chatModel);
   table.insert_or_assign("chat_base_url", chatUrl);
-  if (updateKey) table.insert_or_assign("has_api_key", !apiKey.empty());
-  if (updateChatKey) table.insert_or_assign("has_chat_api_key", !chatKey.empty());
+  table.insert_or_assign("chat_vision", chatVision);
+  for (const auto& provider : Voice::ChatProviders())
+    table.insert_or_assign(std::string("chat_key_") + provider.id, current["chat_keys"].value(provider.id, false));
+  if (updateChatKey) table.insert_or_assign("chat_key_" + chatProvider, !chatKey.empty());
   Save();
   return true;
 }

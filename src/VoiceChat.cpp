@@ -33,6 +33,29 @@ float ReplyVolume() {
   return data->GetConfig<bool>("audio", "mute", false) ? 0.0f :
       std::clamp(data->GetConfig<int>("audio", "volume", 20), 0, 100) / 100.0f;
 }
+
+std::string Profile() { return LAppPal::WStringToString(LAppDefine::documentPath); }
+
+// Why the saved chat service cannot be used yet; empty when it can.
+std::string ChatSettingsError(const nlohmann::json& settings) {
+  const auto* provider = Voice::FindChatProvider(settings.at("chat_provider"));
+  if (!provider) return "请先在对话设置中选择大模型服务";
+  if (!settings.at("chat_keys").value(provider->id, false))
+    return std::string("请在对话设置中填写 ") + provider->name + " 的 API Key";
+  if (settings.at("chat_model").get<std::string>().empty()) return "请在对话设置中选择模型";
+  return {};
+}
+
+// Tools offered to the saved chat model: one that cannot read images is not
+// offered the screenshot tool.
+nlohmann::json ChatTools(const nlohmann::json& settings) {
+  auto definitions = Voice::ToolDefinitions();
+  if (!settings.at("chat_vision").get<bool>())
+    definitions.erase(std::remove_if(definitions.begin(), definitions.end(), [](const nlohmann::json& definition) {
+      return definition["function"]["name"] == "view_desktop";
+    }), definitions.end());
+  return definitions;
+}
 }
 
 VoiceChat* VoiceChat::GetInstance() {
@@ -97,9 +120,41 @@ bool VoiceChat::SpeechModelAction(const std::string& action, std::string& error)
   return true;
 }
 
-bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& key, bool voice) {
-  auto* data = DataManager::GetInstance();
-  const auto settings = data->GetVoiceSettings();
+nlohmann::json VoiceChat::ChatModels(const nlohmann::json& request, std::string& error) {
+  const auto field = [&](const char* key) {
+    return request.contains(key) && request[key].is_string() ? Voice::Trim(request[key].get<std::string>()) : std::string{};
+  };
+  const auto* provider = Voice::FindChatProvider(field("provider"));
+  if (!provider) { error = "请选择大模型服务"; return {}; }
+  const auto settings = DataManager::GetInstance()->GetVoiceSettings();
+  std::string baseUrl = provider->baseUrl;
+  if (baseUrl.empty()) {
+    baseUrl = field("base_url");
+    if (!Voice::ValidChatBaseUrl(baseUrl)) {
+      error = "请填写有效的接口地址：以 https:// 开头（本机地址可用 http://），且不能包含账号信息";
+      return {};
+    }
+  }
+  // A typed key is tried before it is saved. A saved key only goes to the
+  // service it was saved for: a changed third-party endpoint needs the key again.
+  auto key = field("api_key");
+  if (!key.empty() && !Voice::ValidApiKey(key)) { error = "API Key 格式不正确，请检查是否包含空格"; return {}; }
+  if (key.empty() && settings.at("chat_keys").value(provider->id, false) &&
+      (*provider->baseUrl || baseUrl == settings.at("chat_base_url"))) {
+    key = Voice::LoadChatApiKey(Profile(), provider->id, error);
+    if (!error.empty()) return {};
+  }
+  // OpenRouter lists its models without a key.
+  if (key.empty() && std::string(provider->id) != "openrouter") { error = "请先填写 API Key"; return {}; }
+  const auto models = Voice::FetchChatModels(provider->id, baseUrl, key, error);
+  if (!error.empty()) return {};
+  auto list = nlohmann::json::array();
+  for (const auto& model : models)
+    list.push_back({{"id", model.id}, {"name", model.name}, {"vision", model.vision ? nlohmann::json(*model.vision) : nlohmann::json(nullptr)}});
+  return {{"models", list}};
+}
+
+bool VoiceChat::StartPipeline(Voice::CascadeConfig config, nlohmann::json tools, bool voice) {
   std::string modelDirectory, synthesisDirectory;
   Voice::VoiceReference reference;
   if (voice) {
@@ -117,22 +172,7 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
       return false;
     }
   }
-  const auto profile = LAppPal::WStringToString(LAppDefine::documentPath);
-  Voice::CascadeConfig config;
-  config.chatModel = settings.at("chat_model");
-  const std::string baseUrl = settings.at("chat_base_url");
-  config.bailianChat = baseUrl.empty();
-  config.chatUrl = Voice::ChatCompletionsUrl(baseUrl, workspace);
-  config.chatKey = key;
-  if (!config.bailianChat) {
-    std::string error;
-    config.chatKey = Voice::LoadChatApiKey(profile, error);
-    if (!error.empty() || config.chatKey.empty()) {
-      SetState("error", error.empty() ? "请在语音对话设置中填写自定义大模型的 API Key" : error);
-      return false;
-    }
-  }
-
+  const auto model = config.chatModel;  // For the log; the config moves into the pipeline.
   // Hands-free turns need the local models; without them the shortcut still
   // works as push-to-talk (press to speak, press or release to send).
   std::unique_ptr<Voice::TurnAnalyzer> analyzer;
@@ -173,7 +213,7 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
     [this](const Voice::ConversationEvent& event) { history_.Apply(event); },
     [this] { if (tools_) tools_->Cancel(); Voice::CancelSettingsTools(); },
     [](const std::string& line) { LAppPal::PrintLog("%s", line.c_str()); }};
-  pipeline_ = std::make_unique<Voice::Pipeline>(std::move(config), std::move(callbacks), Voice::ToolDefinitions(),
+  pipeline_ = std::make_unique<Voice::Pipeline>(std::move(config), std::move(callbacks), std::move(tools),
       std::move(analyzer), std::make_unique<Voice::ChatClient>(), std::move(synthesizer),
       [this, modelDirectory](const std::string& pcm) {
     std::lock_guard<std::mutex> lock(recognizerMutex_);
@@ -186,8 +226,7 @@ bool VoiceChat::StartPipeline(const std::string& workspace, const std::string& k
     return localRecognizer_ ? localRecognizer_->Transcribe(pcm) : std::string{};
   });
   pipeline_->SetContext(context_);
-  LAppPal::PrintLog("[Voice] Connect chat_model=%s custom_chat=%d voice=%d hands_free=%d context=%zu",
-      settings.at("chat_model").get<std::string>().c_str(), baseUrl.empty() ? 0 : 1, voice ? 1 : 0,
+  LAppPal::PrintLog("[Voice] Connect chat_model=%s voice=%d hands_free=%d context=%zu", model.c_str(), voice ? 1 : 0,
       pipeline_->HandsFree() ? 1 : 0, context_.size());
   if (voice && !pipeline_->HandsFree() && !turnModelError_.empty())
     SetState("connecting", turnModelError_ + "；快捷键改为按一下开始、再按一下发送");
@@ -235,7 +274,7 @@ nlohmann::json VoiceChat::Status() {
   status["shortcut"] = Shortcut;
   status["input_mode"] = settings.at("input_mode");
   status["available_tools"] = nlohmann::json::array();
-  for (const auto& definition : Voice::ToolDefinitions()) status["available_tools"].push_back(definition["function"]["name"]);
+  for (const auto& definition : ChatTools(settings)) status["available_tools"].push_back(definition["function"]["name"]);
   return status;
 }
 
@@ -245,17 +284,8 @@ bool VoiceChat::SendText(const std::string& text, std::string& error) {
   const auto first = text.find_first_not_of(" \t\r\n");
   if (first == std::string::npos) { error = "消息不能为空"; return false; }
   if (text.size() > 6000) { error = "消息太长，请精简后再发送"; return false; }
-  auto* data = DataManager::GetInstance();
-  if (!Voice::ValidWorkspace(data->GetConfig<std::string>("voice", "workspace_id", "")) ||
-      !data->GetConfig<bool>("voice", "has_api_key", false)) {
-    error = "请先在语音对话设置中填写 API Key 和业务空间 ID";
-    return false;
-  }
-  if (!data->GetVoiceSettings().at("chat_base_url").get<std::string>().empty() &&
-      !data->GetConfig<bool>("voice", "has_chat_api_key", false)) {
-    error = "请在语音对话设置中填写自定义大模型的 API Key";
-    return false;
-  }
+  error = ChatSettingsError(DataManager::GetInstance()->GetVoiceSettings());
+  if (!error.empty()) return false;
   std::lock_guard<std::mutex> lock(textMutex_);
   if (texts_.size() >= 4) { error = "消息发送太快了，请稍后再试"; return false; }
   texts_.push_back(text);
@@ -264,20 +294,26 @@ bool VoiceChat::SendText(const std::string& text, std::string& error) {
 
 bool VoiceChat::Connect(bool voice) {
   if (connected_ && (voice_ || !voice)) return true;
-  auto* data = DataManager::GetInstance();
-  const auto workspace = data->GetConfig<std::string>("voice", "workspace_id", "");
-  if (!Voice::ValidWorkspace(workspace) || !data->GetConfig<bool>("voice", "has_api_key", false)) {
-    SetState("error", "请先在对话 → 语音对话设置中填写 API Key 和业务空间 ID");
+  // Web search and desktop viewing use the Bailian key when they run; chat
+  // needs only the selected chat service.
+  const auto settings = DataManager::GetInstance()->GetVoiceSettings();
+  auto error = ChatSettingsError(settings);
+  Voice::CascadeConfig config;
+  const std::string provider = settings.at("chat_provider");
+  if (error.empty()) {
+    config.chatKey = Voice::LoadChatApiKey(Profile(), provider, error);
+    if (error.empty() && config.chatKey.empty()) error = "未找到大模型 API Key，请在对话设置中重新保存";
+  }
+  if (!error.empty()) {
+    SetState("error", error);
     return false;
   }
-  std::string error;
-  const auto key = Voice::LoadApiKey(LAppPal::WStringToString(LAppDefine::documentPath), error);
-  if (!error.empty() || key.empty()) {
-    SetState("error", error.empty() ? "未找到 API Key，请在语音对话设置中重新保存" : error);
-    return false;
-  }
+  const auto* service = Voice::FindChatProvider(provider);
+  config.chatUrl = Voice::ChatCompletionsUrl(*service->baseUrl ? std::string(service->baseUrl) : settings.at("chat_base_url").get<std::string>());
+  config.chatModel = settings.at("chat_model");
+  config.chatOptions = Voice::ChatRequestOptions(provider);
   if (connected_) Close();  // Text-only so far; the conversation continues with voice.
-  if (!StartPipeline(workspace, key, voice)) return false;
+  if (!StartPipeline(std::move(config), ChatTools(settings), voice)) return false;
   connected_ = true;
   voice_ = voice;
   return true;
@@ -415,11 +451,10 @@ void VoiceChat::Tick(GLFWwindow* window) {
       else if (result.call.name.compare(0, 4, "get_") == 0) visible["label"] = "查询游戏";
       else if (result.call.name == "game_action") visible["label"] = "游戏操作";
       else if (result.call.name == "jpet_settings") visible["label"] = "JPet 设置";
-      else if (result.call.name == "web_search") visible["label"] = "网页搜索";
       else if (result.call.name == "bilibili") visible["label"] = "B站";
       else if (result.call.name == "open_url") visible["label"] = "打开网页";
       else visible["label"] = "工具";
-      for (const auto* key : {"error", "sources", "results", "url"})
+      for (const auto* key : {"error", "results", "url"})
         if (result.value.contains(key)) visible[key] = result.value[key];
       status_["last_tool"] = std::move(visible);
     }

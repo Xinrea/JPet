@@ -391,10 +391,47 @@ class MacPlatform final : public Platform {
   std::shared_ptr<MacState> state_ = std::make_shared<MacState>();
 };
 
-NSMutableDictionary* KeyQuery(const std::string& profile, NSString* service = @"cn.vjoi.jpet.qwen") {
+NSMutableDictionary* KeyQuery(const std::string& profile, NSString* service) {
   return [@{(__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
       (__bridge id)kSecAttrService: service,
       (__bridge id)kSecAttrAccount: Text(profile)} mutableCopy];
+}
+
+NSString* const BailianService = @"cn.vjoi.jpet.qwen";  // Legacy; only removed.
+// Chat service keys: the third-party key keeps the former custom endpoint's item.
+NSString* ChatService(const std::string& provider) {
+  return provider == "thirdparty" ? @"cn.vjoi.jpet.chat" : [@"cn.vjoi.jpet.chat." stringByAppendingString:Text(provider)];
+}
+
+// An empty key removes the saved one.
+bool SaveSecret(NSMutableDictionary* query, const std::string& key) {
+  OSStatus result;
+  if (key.empty()) {
+    result = SecItemDelete((__bridge CFDictionaryRef)query);
+    return result == errSecSuccess || result == errSecItemNotFound;
+  }
+  NSData* data = [NSData dataWithBytes:key.data() length:key.size()];
+  NSDictionary* update = @{(__bridge id)kSecValueData: data};
+  result = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)update);
+  if (result == errSecItemNotFound) {
+    query[(__bridge id)kSecValueData] = data;
+    query[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
+    result = SecItemAdd((__bridge CFDictionaryRef)query, nullptr);
+  }
+  return result == errSecSuccess;
+}
+
+// Empty when no key is saved; false only when the Keychain refuses access.
+bool LoadSecret(NSMutableDictionary* query, std::string& key) {
+  query[(__bridge id)kSecReturnData] = @YES;
+  query[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
+  CFTypeRef result = nullptr;
+  const auto status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+  if (status == errSecItemNotFound) return true;
+  if (status != errSecSuccess) return false;
+  NSData* data = CFBridgingRelease(result);
+  key.assign(static_cast<const char*>(data.bytes), data.length);
+  return true;
 }
 }  // namespace
 
@@ -407,74 +444,23 @@ AudioDevices ListAudioDevices() {
   return devices;
 }
 
-bool SaveApiKey(const std::string& profile, const std::string& key, std::string& error) {
+void RemoveLegacyApiKey(const std::string& profile) {
+  @autoreleasepool { SaveSecret(KeyQuery(profile, BailianService), ""); }
+}
+
+bool SaveChatApiKey(const std::string& profile, const std::string& provider, const std::string& key, std::string& error) {
   @autoreleasepool {
-    NSMutableDictionary* query = KeyQuery(profile);
-    OSStatus result;
-    if (key.empty()) {
-      result = SecItemDelete((__bridge CFDictionaryRef)query);
-      if (result == errSecItemNotFound) result = errSecSuccess;
-    } else {
-      NSData* data = [NSData dataWithBytes:key.data() length:key.size()];
-      NSDictionary* update = @{(__bridge id)kSecValueData: data};
-      result = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)update);
-      if (result == errSecItemNotFound) {
-        query[(__bridge id)kSecValueData] = data;
-        query[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
-        result = SecItemAdd((__bridge CFDictionaryRef)query, nullptr);
-      }
-    }
-    if (result != errSecSuccess) error = "无法保存 API Key，请允许 JPet 访问系统钥匙串";
-    return result == errSecSuccess;
+    if (SaveSecret(KeyQuery(profile, ChatService(provider)), key)) return true;
+    error = "无法保存大模型 API Key，请允许 JPet 访问系统钥匙串";
+    return false;
   }
 }
 
-std::string LoadApiKey(const std::string& profile, std::string& error) {
+std::string LoadChatApiKey(const std::string& profile, const std::string& provider, std::string& error) {
   @autoreleasepool {
-    NSMutableDictionary* query = KeyQuery(profile);
-    query[(__bridge id)kSecReturnData] = @YES;
-    query[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
-    CFTypeRef result = nullptr;
-    const auto status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
-    if (status == errSecItemNotFound) return {};
-    if (status != errSecSuccess) { error = "无法读取 API Key，请允许 JPet 访问系统钥匙串"; return {}; }
-    NSData* data = CFBridgingRelease(result);
-    return std::string(static_cast<const char*>(data.bytes), data.length);
-  }
-}
-bool SaveChatApiKey(const std::string& profile, const std::string& key, std::string& error) {
-  @autoreleasepool {
-    NSMutableDictionary* query = KeyQuery(profile, @"cn.vjoi.jpet.chat");
-    OSStatus result;
-    if (key.empty()) {
-      result = SecItemDelete((__bridge CFDictionaryRef)query);
-      if (result == errSecItemNotFound) result = errSecSuccess;
-    } else {
-      NSData* data = [NSData dataWithBytes:key.data() length:key.size()];
-      NSDictionary* update = @{(__bridge id)kSecValueData: data};
-      result = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)update);
-      if (result == errSecItemNotFound) {
-        query[(__bridge id)kSecValueData] = data;
-        query[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
-        result = SecItemAdd((__bridge CFDictionaryRef)query, nullptr);
-      }
-    }
-    if (result != errSecSuccess) error = "无法保存大模型 API Key，请允许 JPet 访问系统钥匙串";
-    return result == errSecSuccess;
-  }
-}
-
-std::string LoadChatApiKey(const std::string& profile, std::string& error) {
-  @autoreleasepool {
-    NSMutableDictionary* query = KeyQuery(profile, @"cn.vjoi.jpet.chat");
-    query[(__bridge id)kSecReturnData] = @YES;
-    query[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
-    CFTypeRef result = nullptr;
-    const auto status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
-    if (status == errSecItemNotFound) return {};
-    if (status != errSecSuccess) { error = "无法读取大模型 API Key，请允许 JPet 访问系统钥匙串"; return {}; }
-    NSData* data = CFBridgingRelease(result);
-    return std::string(static_cast<const char*>(data.bytes), data.length);
+    std::string key;
+    if (!LoadSecret(KeyQuery(profile, ChatService(provider)), key)) error = "无法读取大模型 API Key，请允许 JPet 访问系统钥匙串";
+    return key;
   }
 }
 
