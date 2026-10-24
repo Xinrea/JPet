@@ -89,7 +89,8 @@
   .update-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
   .update-controls button { padding: 7px 12px; border: 1px solid #deded1; border-radius: 8px; background: linear-gradient(#fff, #f6f6f1); box-shadow: 0 2px 0 #dcdfd3; color: var(--ink); font-size: 12px; font-weight: 800; }
   .update-controls button.primary { background: var(--green-gradient); border-color: #72b72d; box-shadow: 0 3px 0 #579e22; color: white; border-color: #4d7c0f; }
-  .update-controls button.release-link { padding-inline: 4px; border-color: transparent; background: transparent; text-decoration: underline; color: #4d7c0f; }
+  .update-controls button.release-link { padding-inline: 4px; border-color: transparent; background: none; box-shadow: none; color: var(--green-ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .update-controls button.release-link:hover { color: #3f6212; }
   .update-controls button:disabled { opacity: .5; cursor: not-allowed; }
   .update-progress { display: block; width: 100%; height: 8px; margin-top: 10px; accent-color: #4d7c0f; }
   .release-notes { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 8px; font-weight: normal; }
