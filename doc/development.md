@@ -5,6 +5,7 @@
 ## 依赖与平台
 
 - 客户端：C++17、CMake 3.27+；Windows x64 使用 Visual Studio 2022，macOS ARM64 使用 Xcode Command Line Tools 和 Ninja。
+- Windows 本机语音合成（qwentts 的 GGML Vulkan 后端）需要 Vulkan SDK，并设置 `VULKAN_SDK` 环境变量；建议使用与 CI 相同的 1.4.328.1。1.4.309 没有提供 GGML 需要的 `SPIRV-Headers` CMake 配置，vcpkg 构建 qwentts 时会在配置阶段失败。
 - 设置面板：Node.js 22+、npm、Svelte + Vite；源码位于 `resources/panel/`。
 - C++ 依赖：部分随 `thirdparty/` 提供，包括 GLFW、FMOD CORE 和 Cubism SDK；其余见 [`vcpkg.json`](../vcpkg.json)。语音回声消除使用的 `webrtc-audio-processing` 由仓库内的 vcpkg overlay port（[`build-scripts/ports`](../build-scripts/ports)）提供，CMake 会自动加载；手动执行 `vcpkg install` 时需加 `--overlay-ports`。RocksDB 子模块需通过 `git submodule update --init --recursive` 初始化。
 - 云端服务：位于 `cloud/`，本地开发和部署见[云端游戏说明](cloud-game.md)。

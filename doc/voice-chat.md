@@ -77,7 +77,7 @@ Apple M2 Max 上的识别实测（`voice_speech_probe`，识别使用 2 个线�
 | 音色 | 随安装包分发 `resources/models/joi-voice.json`：一段 8 秒轴伊录音提取的说话人向量和编码，加上该段文字，用于上下文克隆；不包含原始录音 |
 | 运行库 | `libqwen.dylib` / `qwen.dll` 与 GGML，在运行时加载；由 [`build-scripts/ports/qwentts`](../build-scripts/ports/qwentts) 固定版本构建 |
 | macOS | 单个 `libqwen.dylib`，GGML 静态链接，用 Metal 计算；需要 macOS 12 或更新版本 |
-| Windows | GGML 以模块形式随 `qwen.dll` 分发：有 Vulkan 驱动时用显卡，否则按 CPU 指令集选择 CPU 版本；构建机需安装 Vulkan SDK |
+| Windows | GGML 以模块形式随 `qwen.dll` 分发：有 Vulkan 驱动时用显卡，否则按 CPU 指令集选择 CPU 版本；构建机需安装 Vulkan SDK 1.4.328.1（1.4.309 缺少 `SPIRV-Headers` 的 CMake 配置，无法构建） |
 
 - 开始对话时在独立线程加载模型（约 0.5 秒）并合成一句预热语音（约 1.4 秒，用于构建 GPU 管线），与用户说话同时进行。
 - 每句一次合成，流式输出；开头和结尾的静音被裁掉（分别保留 100 ms 与 200 ms），句内停顿保留。
