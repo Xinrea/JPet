@@ -418,6 +418,12 @@ if(JPET_BUILD_VOICE_TESTS)
   target_link_libraries(voice_cascade_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads cpr::cpr
     unofficial::sherpa-onnx-bin::headers unofficial::qwentts::headers ${CMAKE_DL_LIBS})
   add_test(NAME voice_cascade COMMAND voice_cascade_test)
+  add_executable(voice_chat_metadata_test tests/voice_chat_metadata_test.cpp src/VoiceLlm.cpp)
+  set_target_properties(voice_chat_metadata_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(voice_chat_metadata_test PRIVATE src)
+  target_compile_options(voice_chat_metadata_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+  target_link_libraries(voice_chat_metadata_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads cpr::cpr)
+  add_test(NAME voice_chat_metadata COMMAND voice_chat_metadata_test)
   add_executable(voice_synthesis_test tests/voice_synthesis_test.cpp src/VoiceSynthesis.cpp src/VoiceOnnx.cpp
     src/VoiceCommon.cpp src/VoiceText.cpp)
   set_target_properties(voice_synthesis_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")

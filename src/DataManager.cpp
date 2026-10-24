@@ -131,6 +131,10 @@ nlohmann::json DataManager::GetVoiceSettings() {
   }
   if (!Voice::FindChatProvider(chatProvider) || (chatProvider == "thirdparty" && chatUrl.empty())) chatProvider.clear();
   if (!Voice::ValidChatModel(chatModel)) chatModel.clear();
+  const auto contextDefault = Voice::kDefaultChatContextWindow;
+  const auto* savedContextWindow = VoiceTable()["chat_context_window"].as_integer();
+  const auto chatContextWindow = savedContextWindow ?
+      Voice::ParseChatContextWindow(savedContextWindow->get()).value_or(contextDefault) : contextDefault;
   auto providers = nlohmann::json::array();
   for (const auto& provider : Voice::ChatProviders())
     providers.push_back({{"id", provider.id}, {"name", provider.name}, {"base_url", provider.baseUrl}});
@@ -145,6 +149,7 @@ nlohmann::json DataManager::GetVoiceSettings() {
           {"chat_provider", chatProvider}, {"chat_model", chatModel}, {"chat_base_url", chatUrl},
           // Whether the model reads images, i.e. may be offered view_desktop.
           {"chat_vision", !chatModel.empty() && GetConfig<bool>("voice", "chat_vision", false)},
+          {"chat_context_window", chatContextWindow},
           {"chat_keys", chatKeys}, {"chat_providers", providers}};
 }
 
@@ -205,6 +210,16 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
     if (!payload["chat_vision"].is_boolean()) { error = "请选择模型是否支持图片输入"; return false; }
     chatVision = payload["chat_vision"];
   } else if (chatModel != current.value("chat_model", std::string{})) chatVision = false;
+  // Capacity belongs to the model AND endpoint, even when both services use the same model id.
+  size_t chatContextWindow = current.at("chat_context_window").get<size_t>();
+  if (payload.contains("chat_context_window")) {
+    const auto capacity = Voice::ParseChatContextWindow(payload["chat_context_window"]);
+    if (!capacity) { error = "上下文窗口需为 4096 至 10000000 之间的整数（token）"; return false; }
+    chatContextWindow = *capacity;
+  } else if (providerChanged || chatModel != current.value("chat_model", std::string{}) ||
+             chatUrl != current.value("chat_base_url", std::string{})) {
+    chatContextWindow = Voice::kDefaultChatContextWindow;
+  }
   // Keys are write-only: a new value replaces the saved one, "clear_*" removes it.
   const auto secret = [&](const char* key, const char* clear, std::string& value, bool& update) {
     update = payload.value(clear, false) || payload.contains(key);
@@ -237,6 +252,7 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
   table.insert_or_assign("chat_model", chatModel);
   table.insert_or_assign("chat_base_url", chatUrl);
   table.insert_or_assign("chat_vision", chatVision);
+  table.insert_or_assign("chat_context_window", static_cast<int64_t>(chatContextWindow));
   for (const auto& provider : Voice::ChatProviders())
     table.insert_or_assign(std::string("chat_key_") + provider.id, current["chat_keys"].value(provider.id, false));
   if (updateChatKey) table.insert_or_assign("chat_key_" + chatProvider, !chatKey.empty());

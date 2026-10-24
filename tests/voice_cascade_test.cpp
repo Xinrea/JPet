@@ -1,4 +1,5 @@
 #include "VoiceCascade.hpp"
+#include "VoiceContext.hpp"
 #include "VoiceLlm.hpp"
 #include "VoiceText.hpp"
 
@@ -70,13 +71,13 @@ struct Fixture {
   std::vector<size_t> transcribed;
   std::unique_ptr<Voice::Pipeline> pipeline;
 
-  explicit Fixture(bool handsFree = true, bool threaded = false, bool voice = true) {
+  explicit Fixture(bool handsFree = true, bool threaded = false, bool voice = true, size_t contextWindow = 32768) {
     auto fake = std::make_unique<FakeChat>();
     chat = fake.get();
     auto fakeSynth = voice ? std::make_unique<FakeSynthesizer>() : nullptr;
     synth = fakeSynth.get();
     Voice::CascadeConfig config{"https://chat.example/v1/chat/completions", "chat-key", "deepseek-chat",
-                                Voice::ChatRequestOptions("deepseek")};
+                                Voice::ChatRequestOptions("deepseek"), contextWindow};
     Voice::Pipeline::Callbacks callbacks{
       [this](const std::string& pcm) { played += pcm; playing = true; },
       [this] { return playing; },
@@ -355,6 +356,176 @@ void DesktopImage() {
   Check(historyClean, "the screenshot is not recorded in the history");
 }
 
+json LongContext() {
+  return json::array({{{"role", "user"}, {"content", "记住我的偏好"}},
+      {{"role", "assistant"}, {"content", std::string(18000, 'x')}},
+      {{"role", "user"}, {"content", "最近的话题"}},
+      {{"role", "assistant"}, {"content", "最近的回答"}}});
+}
+
+size_t CompactionWindow(const json& context) {
+  Fixture probe(false, false, false, 1000000);
+  probe.pipeline->SetContext(context);
+  probe.pipeline->SubmitText("继续");
+  const auto tokens = Voice::EstimateContextTokens(probe.chat->requests.back()) + 1024;
+  // ceil(tokens / 0.8): floor(window * 0.8) is exactly tokens.
+  return (tokens * 5 + 3) / 4;
+}
+
+void ContextCompaction() {
+  const auto context = LongContext();
+  const auto window = CompactionWindow(context);
+  Fixture below(false, false, false, window + 2);
+  below.pipeline->SetContext(context);
+  below.pipeline->SubmitText("继续");
+  Check(below.chat->requests.back().contains("tools"), "one token below 80% does not compact");
+
+  Fixture f(false, false, false, window);
+  f.pipeline->SetContext(context);
+  f.pipeline->SubmitText("继续");
+  const auto before = f.pipeline->Context();
+  const auto& summaryRequest = f.chat->requests.back();
+  Check(!summaryRequest.contains("tools") && summaryRequest["model"] == "deepseek-chat" &&
+        summaryRequest["thinking"]["type"] == "disabled" && f.pipeline->WaitingForReply(),
+        "at 80% a private, tool-free summary request uses the same model and provider options");
+  Check(Voice::EstimateContextTokens(summaryRequest["messages"]) + 1024 < window,
+        "summary input leaves room for its output");
+  f.chat->pending.push_back({ChatEvent::Type::Text, "用户喜欢橘子。", {}, {}});
+  f.pipeline->Tick();
+  Check(f.pipeline->Context() == before && f.history.size() == 2 && f.played.empty(),
+        "partial summary is neither committed nor shown nor spoken");
+  f.chat->pending.push_back({ChatEvent::Type::Done, {}, {}, "stop"});
+  f.pipeline->Tick();
+  Check(f.chat->requests.size() == 2 && f.chat->requests.back().contains("tools") &&
+        f.pipeline->Context()[0]["content"].get<std::string>().find("用户喜欢橘子") != std::string::npos &&
+        f.pipeline->Context()[1]["content"] == "最近的话题" && f.pipeline->Context().back()["content"] == "继续",
+        "successful compaction replaces old history with a summary, retains recent turns and resumes");
+  f.Stream({"好的"});
+  Check(!f.pipeline->Replying() && f.history.back().type == Voice::ConversationEvent::Type::Completed,
+        "the resumed reply completes normally");
+  Fixture restored(false, false, false, window);
+  restored.pipeline->SetContext(f.pipeline->Context());
+  restored.pipeline->SubmitText("还有呢");
+  Check(restored.chat->requests.back()["messages"][1] == f.pipeline->Context()[0],
+        "the summary survives pipeline recreation");
+
+  auto many = json::array();
+  for (size_t i = 0; i < 60; ++i) many.push_back({{"role", i % 2 ? "assistant" : "user"}, {"content", "你好"}});
+  Fixture shortTurns(false, false, false);
+  shortTurns.pipeline->SetContext(many);
+  shortTurns.pipeline->SubmitText("继续");
+  Check(shortTurns.pipeline->Context().size() == 61 && shortTurns.chat->requests.back().contains("tools"),
+        "short conversations are no longer silently discarded after 40 messages");
+  Check(Voice::EstimateContextTokens(json("中文")) > Voice::EstimateContextTokens(json("abcd")),
+        "token estimation accounts for Chinese, not only byte-count divided by four");
+}
+
+void CompactionFailures() {
+  const auto context = LongContext();
+  const auto window = CompactionWindow(context);
+  for (int mode = 0; mode < 6; ++mode) {
+    Fixture f(false, false, true, window);
+    // Use typed input even with a synthesizer: no summary may reach speech.
+    f.pipeline->SetContext(context);
+    f.pipeline->SubmitText("继续");
+    const auto before = f.pipeline->Context();
+    if (mode == 0) f.chat->pending.push_back({ChatEvent::Type::Failed, "network error", {}, {}});
+    else {
+      if (mode != 1) f.chat->pending.push_back({ChatEvent::Type::Text, mode == 4 ? std::string(16000, '"') : "摘要", {}, {}});
+      f.chat->pending.push_back({ChatEvent::Type::Done, {}, mode == 3 ?
+          std::vector<Voice::ToolCall>{{"bad", "game_action", "{}"}} : std::vector<Voice::ToolCall>{}, mode == 2 ? "length" : mode == 5 ? "" : "stop"});
+    }
+    f.pipeline->Tick();
+    Check(f.pipeline->Context() == before && !f.pipeline->Replying() && f.chat->requests.size() == 1 &&
+          f.tools.empty() && f.synth->spoken.empty() && f.message.find("压缩失败") != std::string::npos,
+          "failed, empty, truncated, tool-calling, non-shrinking or unterminated summaries retain original history and stop safely");
+  }
+  for (bool reset : {false, true}) {
+    Fixture f(false, false, false, window);
+    f.pipeline->SetContext(context);
+    f.pipeline->SubmitText("继续");
+    const auto before = f.pipeline->Context();
+    f.chat->pending.push_back({ChatEvent::Type::Text, "不能保存的部分摘要", {}, {}});
+    f.pipeline->Tick();
+    if (reset) f.pipeline->Reset(); else f.pipeline->StopReply();
+    f.Stream({"迟到的摘要"});
+    Check(f.pipeline->Context() == before && !f.pipeline->Replying(),
+          "stop and reset discard partial/late summaries without altering context");
+    f.pipeline->SubmitText("新的问题");
+    Check(!f.chat->requests.back().contains("tools"), "an interrupted compaction can be retried by the next turn");
+  }
+  Fixture huge(false, false, false, 10000);
+  huge.pipeline->SubmitText(std::string(60000, 'x'));
+  Check(huge.chat->requests.empty() && huge.pipeline->Context().size() == 1 && !huge.pipeline->Replying(),
+        "a single uncompressible oversized user input is not sent or discarded");
+}
+
+void ToolContextCompaction() {
+  Fixture f(false, false, false, 16000);
+  f.pipeline->SubmitText("查询数据再继续");
+  f.Stream({}, {{"a", "get_game_profile", "{}"}, {"b", "get_game_profile", "{}"}});
+  f.pipeline->CompleteTool("a", {{"ok", true}, {"data", std::string(16000, 'x')}});
+  Check(f.chat->requests.size() == 1, "compaction waits for all results of parallel tool calls");
+  f.pipeline->CompleteTool("b", {{"ok", true}, {"data", std::string(16000, 'x')}});
+  Check(f.chat->requests.size() == 2 && !f.chat->requests.back().contains("tools"),
+        "tool results crossing 80% trigger compaction within the same turn");
+  const auto prefix = json::parse(f.chat->requests.back()["messages"][1]["content"].get<std::string>());
+  Check(prefix.size() == 4 && prefix[1]["tool_calls"].size() == 2 && prefix[2]["tool_call_id"] == "a" &&
+        prefix[3]["tool_call_id"] == "b", "compaction never splits tool calls from their results");
+  f.Stream({"两个查询均已成功，结果已记录。"});
+  Check(f.chat->requests.back().contains("tools") && f.pipeline->Context().size() == 2 &&
+        f.pipeline->Context().back()["content"] == "查询数据再继续", "even when a whole tool round is summarized the latest user request is pinned");
+  f.Stream({"查好了"});
+  Check(!f.pipeline->Replying(), "tool-round compaction resumes and completes");
+
+  Fixture longUser(false, false, false, 20000);
+  const auto userText = std::string(18000, 'u');
+  longUser.pipeline->SubmitText(userText);
+  longUser.Stream({}, {{"long-a", "get_game_profile", "{}"}, {"long-b", "get_game_profile", "{}"}});
+  longUser.pipeline->CompleteTool("long-a", {{"ok", true}, {"data", std::string(16000, 'x')}});
+  longUser.pipeline->CompleteTool("long-b", {{"ok", true}, {"data", std::string(16000, 'x')}});
+  Check(!longUser.chat->requests.back().contains("tools") &&
+        json::parse(longUser.chat->requests.back()["messages"][1]["content"].get<std::string>()).size() == 4,
+        "a long pinned user is not incorrectly counted as removable history");
+  longUser.Stream({"查询已成功"});
+  Check(longUser.chat->requests.back().contains("tools") && longUser.pipeline->Context().back()["content"] == userText,
+        "long user input survives tool compaction without a pointless user-only summary");
+
+  Fixture voiceInterrupt(false, false, true, 16000);
+  voiceInterrupt.pipeline->BeginInput(true);
+  voiceInterrupt.Hear("查询数据");
+  voiceInterrupt.Say(Tone(0.5));
+  voiceInterrupt.pipeline->EndInput();
+  voiceInterrupt.pipeline->Tick();
+  voiceInterrupt.Stream({"我先查询。"}, {{"voice-a", "get_game_profile", "{}"}, {"voice-b", "get_game_profile", "{}"}});
+  voiceInterrupt.Synthesize(4800);
+  voiceInterrupt.heard = 4800;
+  voiceInterrupt.pipeline->CompleteTool("voice-a", {{"ok", true}, {"data", std::string(16000, 'x')}});
+  voiceInterrupt.pipeline->CompleteTool("voice-b", {{"ok", true}, {"data", std::string(16000, 'x')}});
+  const auto original = voiceInterrupt.pipeline->Context();
+  voiceInterrupt.pipeline->StopReply();
+  Check(voiceInterrupt.pipeline->Context() == original,
+        "interrupting compaction while an earlier tool preamble plays does not duplicate that preamble in context");
+
+  Fixture chunks(false, false, false, 20000);
+  auto many = json::array();
+  for (int i = 0; i < 6; ++i) {
+    many.push_back({{"role", "user"}, {"content", "旧问题"}});
+    many.push_back({{"role", "assistant"}, {"content", std::string(18000, 'x')}});
+  }
+  chunks.pipeline->SetContext(many);
+  chunks.pipeline->SubmitText("继续");
+  size_t summaries = 0;
+  while (chunks.pipeline->Replying() && !chunks.chat->requests.back().contains("tools") && summaries < 8) {
+    Check(Voice::EstimateContextTokens(chunks.chat->requests.back()["messages"]) + 1024 < 20000,
+          "restored oversized history is summarized in requests that each fit");
+    chunks.Stream({"合并后的历史摘要"});
+    ++summaries;
+  }
+  Check(summaries > 1 && chunks.chat->requests.back().contains("tools") && chunks.pipeline->Context().back()["content"] == "继续",
+        "bounded incremental compaction handles history larger than the selected model window");
+}
+
 void WorkerThread() {
   Fixture f(true, true);
   const auto settle = [&](const std::function<bool()>& done) {
@@ -391,6 +562,9 @@ int main() {
     SynthesisFailure();
     TypedMessages();
     DesktopImage();
+    ContextCompaction();
+    CompactionFailures();
+    ToolContextCompaction();
     WorkerThread();
     PushToTalk();
     std::cout << "PASS voice cascade pipeline\n";

@@ -150,7 +150,9 @@ nlohmann::json VoiceChat::ChatModels(const nlohmann::json& request, std::string&
   if (!error.empty()) return {};
   auto list = nlohmann::json::array();
   for (const auto& model : models)
-    list.push_back({{"id", model.id}, {"name", model.name}, {"vision", model.vision ? nlohmann::json(*model.vision) : nlohmann::json(nullptr)}});
+    list.push_back({{"id", model.id}, {"name", model.name},
+                    {"vision", model.vision ? nlohmann::json(*model.vision) : nlohmann::json(nullptr)},
+                    {"context_window", model.contextWindow ? nlohmann::json(*model.contextWindow) : nlohmann::json(nullptr)}});
   return {{"models", list}};
 }
 
@@ -310,6 +312,7 @@ bool VoiceChat::Connect(bool voice) {
   const auto* service = Voice::FindChatProvider(provider);
   config.chatUrl = Voice::ChatCompletionsUrl(*service->baseUrl ? std::string(service->baseUrl) : settings.at("chat_base_url").get<std::string>());
   config.chatModel = settings.at("chat_model");
+  config.contextWindow = settings.at("chat_context_window").get<size_t>();
   config.chatOptions = Voice::ChatRequestOptions(provider);
   if (connected_) Close();  // Text-only so far; the conversation continues with voice.
   if (!StartPipeline(std::move(config), ChatTools(settings), voice)) return false;
