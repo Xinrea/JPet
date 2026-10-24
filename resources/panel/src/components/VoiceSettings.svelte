@@ -3,6 +3,7 @@
   import { Input, Button, Select } from "flowbite-svelte";
   import SettingCard from "./SettingCard.svelte";
   import UiIcon from "./UiIcon.svelte";
+  import SettingToggle from "./SettingToggle.svelte";
 
   // Credentials are write-only; the API never returns a saved key.
   let voiceInputMode = "toggle", savedInputMode = "toggle";
@@ -253,9 +254,10 @@
         {/if}
       </div>
       {#if modelsError}<p class="feedback error" role="alert">{modelsError}</p>{/if}
-      {#if chatModel}
-      <label class="vision-toggle"><input type="checkbox" bind:checked={chatVision} disabled={voiceLoading || chatSaving || typeof listedVision === "boolean"} />
-        <span>模型支持图片输入{typeof listedVision === "boolean" ? "（来自模型列表）" : ""}<small>开启后轴伊可以查看桌面：截图直接发给这个模型，只用于当次回复。</small></span></label>
+      {#if chatModel && typeof listedVision === "boolean"}
+      <p class="setting-help">{listedVision ? "该模型支持图片输入，轴伊可以查看桌面；截图只发给这个模型，只用于当次回复。" : "该模型不支持图片输入，轴伊无法查看桌面。"}</p>
+      {:else if chatModel}
+      <SettingToggle label="支持图片输入" description="模型能读取图片时开启，轴伊就可以查看桌面" bind:checked={chatVision} disabled={voiceLoading || chatSaving} />
       {/if}
       {#if chatProvider === "openrouter"}<p class="setting-help">只列出支持工具调用、且可以关闭推理的模型，以便语音回复尽快开始。</p>{/if}
       {/if}
@@ -310,7 +312,4 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23578a27' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
   .voice-shortcut .mode-select:hover:not(:disabled) { border-color: #a0c46e; }
   .voice-shortcut .mode-select:disabled { cursor: default; opacity: .7; }
-  .vision-toggle { display: flex; gap: 8px; align-items: flex-start; margin: 2px 0 10px; font-size: 13px; font-weight: 700; color: var(--ink, inherit); cursor: pointer; }
-  .vision-toggle input { margin-top: 2px; accent-color: var(--green-ink); }
-  .vision-toggle small { display: block; font-weight: 400; color: var(--muted); }
 </style>
