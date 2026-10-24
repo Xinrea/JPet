@@ -15,7 +15,7 @@ Voice::ToolCall Call(const char* name, json args) { return {"c1", name, args.dum
 int main() {
   try {
     const auto definitions = Voice::ToolDefinitions();
-    Check(definitions.size() == 15, "focused queries and action tools registered within relay limit");
+    Check(definitions.size() == 14, "focused queries and action tools registered within relay limit");
     for (const auto& definition : definitions) Check(definition["type"] == "function" &&
       definition["function"]["parameters"]["additionalProperties"] == false, "nested Qwen schema with closed arguments");
     int mutations = 0, queries = 0, external = 0, opens = 0;
@@ -89,8 +89,8 @@ int main() {
       json{{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "disabled"}, {"target", "ignored"}},
       json{{"action", "change_clothes"}, {"clothes_id", 3}}, json{{"action", "change_clothes"}, {"clothes_id", 1}, {"unlock", true}}
     }) Check(run("jpet_settings", request)["ok"] == false, "invalid and excluded settings rejected before dispatch");
-    Check(settingsCalls == beforeBadSettings && mutations == 0, "invalid settings never reach the runtime or cloud command");
-    Check(run("jpet_settings", {{"action", "change_clothes"}, {"clothes_id", 1}})["ok"] == true && mutations == 1, "settings clothing changes use the existing cloud command");
+    Check(settingsCalls == beforeBadSettings && mutations == 0, "invalid settings never reach the runtime or game command");
+    Check(run("jpet_settings", {{"action", "change_clothes"}, {"clothes_id", 1}})["ok"] == true && mutations == 1, "settings clothing changes use the existing game command");
     dependencies.command = [&](const json& command) { ++mutations; Check(command == json{{"type", "clothes"}, {"id", 2}}, "clothing settings only submit an existing outfit ID"); return std::string("服装尚未解锁"); };
     const auto beforeLockedClothes = queries;
     Check(run("jpet_settings", {{"action", "change_clothes"}, {"clothes_id", 2}})["error"] == "服装尚未解锁" && queries == beforeLockedClothes, "locked clothing cannot claim success or bypass server conditions");
@@ -167,15 +167,15 @@ int main() {
     const std::pair<const char*, const char*> queriesByTool[] = {
       {"get_game_profile", "profile"}, {"get_game_clothes", "clothes"}, {"get_task_catalog", "task_catalog"},
       {"get_current_task", "current_task"}, {"get_task_queue", "task_queue"}, {"get_task_history", "task_history"},
-      {"get_game_achievements", "achievements"}, {"get_game_statistics", "statistics"}, {"get_game_rank", "rank"}
+      {"get_game_achievements", "achievements"}, {"get_game_statistics", "statistics"}
     };
     for (const auto& [tool, section] : queriesByTool)
       Check(run(tool, json::object())["ok"] == true && last["section"] == section, "query dispatch selects only its own content");
-    for (const auto* tool : {"get_task_catalog", "get_task_history", "get_game_achievements", "get_game_rank"}) {
+    for (const auto* tool : {"get_task_catalog", "get_task_history", "get_game_achievements"}) {
       Check(run(tool, {{"offset", 5}, {"limit", 10}})["ok"] == true && last["offset"] == 5 && last["limit"] == 10, "pagination passed to adapter");
       Check(run(tool, {{"limit", 11}})["ok"] == false && run(tool, {{"offset", -1}})["ok"] == false, "pagination bounds checked before read");
     }
-    Check(run("get_game_rank", {{"metric", "exp"}})["ok"] == true && last["metric"] == "exp", "rank metric forwarded");
+    Check(run("get_game_rank", json::object())["ok"] == false, "the removed leaderboard query is unknown");
     Check(run("get_game_profile", {{"section", "all"}})["ok"] == false, "focused tools reject extra content");
     Check(run("get_game_state", json::object())["ok"] == false && run("get_game_state", {{"section", "all"}})["ok"] == false, "legacy full-state query cannot exceed budget");
     Check(run("get_game_state", {{"section", "tasks"}})["ok"] == true && last["section"] == "task_catalog", "explicit legacy section migrates to paginated catalog");
@@ -221,10 +221,10 @@ int main() {
       "malformed JSON and search input have no effects");
     Check(run("shell", {{"command", "ls"}})["ok"] == false, "unknown tools cannot execute arbitrary code");
 
-    auto snapshot = json{{"revision", 9}, {"server_time", 1000}, {"cookie", "secret-cookie"}, {"session", "secret-session"},
+    auto snapshot = json{{"cookie", "secret-cookie"}, {"session", "secret-session"},
       {"save", {{"failcount", 2}, {"achievements", {{"metrics", {{"tasks", 3}}}, {"streak", 1}}}, {"private", "secret-private"}}}};
     json profile = {{"attributes", {{"exp", 50}}}, {"buffs", {"guard"}}, {"buycost", 11},
-      {"clothes", {{"current", 0}, {"unlock", {true, true, false}}}}, {"cloud", {{"session", "secret-cloud"}}}};
+      {"clothes", {{"current", 0}, {"unlock", {true, true, false}}}}, {"private", {{"session", "secret-profile"}}}};
     json taskData = {{"current", {{"id", 13}, {"title", "current"}, {"remaining_seconds", 120}}},
       {"list", json::array()}, {"queue", {{{"entry_id", 42}, {"id", 3}, {"title", "queued"}, {"desc", std::string(20000, 'x')}}}},
       {"history", json::array()}, {"queue_capacity", 2}, {"queue_upgrade", {{"cost", 1}}}};
@@ -235,14 +235,17 @@ int main() {
     for (int i = 0; i < 50; ++i) achievementData["list"].push_back({{"id", std::to_string(i)}, {"title", "成就"},
       {"description", "累计陪伴并完成指定任务"}, {"progress", i}, {"target", 50}, {"unlocked", false}, {"private", "secret-achievement"}});
     auto view = [&](const std::string& section, size_t offset = 0, size_t limit = 5) {
-      return Voice::GameView(snapshot, profile, taskData, achievementData, {{"online", true}},
-        {{"uid", "123"}, {"name", "测试"}, {"cookies", "secret-account"}}, section, offset, limit);
+      auto game = snapshot;
+      game["profile"] = profile;
+      game["tasks"] = taskData;
+      game["achievements"] = achievementData;
+      return Voice::GameView(game, section, offset, limit);
     };
     Check(view("profile")["profile"]["buycost"] == 11 && !view("profile")["profile"].contains("clothes"), "profile excludes unrelated outfit state");
     Check(view("task_queue")["queue"][0]["entry_id"] == 42 && !view("task_queue").contains("tasks"), "queue retains actionable IDs without catalogs");
     Check(view("statistics")["statistics"]["failcount"] == 2, "statistics retain metrics without catalogs");
     Check(view("clothes")["clothes"]["unlock"][1] == true && !view("clothes").contains("profile"), "outfit query retains unlock conditions");
-    for (const auto& [tool, section] : queriesByTool) if (std::string(section) != "rank") {
+    for (const auto& [tool, section] : queriesByTool) {
       const auto result = view(section);
       Check(result["ok"] == true && result.dump().size() < 16000, "every query fits the relay limit with large unrelated data");
       Check(result.dump().find("secret-") == std::string::npos, "focused game queries exclude credentials and raw save/config");

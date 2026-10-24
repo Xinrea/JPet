@@ -34,9 +34,6 @@ list(APPEND VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/build-scripts/ports
 # Set project.
 project(${APP_NAME} CXX)
 
-include(cmake/CloudConfig.cmake)
-jpet_configure_cloud("${CMAKE_CURRENT_BINARY_DIR}/generated/JPetCloudConfig.hpp")
-
 if(APPLE)
   enable_language(OBJCXX)
   set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "JPet supports Apple Silicon only")
@@ -86,7 +83,7 @@ set(CMAKE_CONFIGURATION_TYPES Debug Release
   CACHE STRING "Configurations" FORCE
 )
 
-# Reconfigure when build inputs, including the cloud domain, change.
+# Reconfigure when build inputs change.
 set(CMAKE_SUPPRESS_REGENERATION OFF)
 
 # Surpress GLEW and GLFW process.
@@ -247,8 +244,7 @@ target_link_libraries(${APP_NAME}
 )
 
 # Specify include directories.
-target_include_directories(${APP_NAME} PRIVATE ${GLEW_INCLUDE_DIRS} ${Stb_INCLUDE_DIR} ${TOMLPLUSPLUS_INCLUDE_DIR}
-  "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_include_directories(${APP_NAME} PRIVATE ${GLEW_INCLUDE_DIRS} ${Stb_INCLUDE_DIR} ${TOMLPLUSPLUS_INCLUDE_DIR})
 if(APPLE)
   target_link_libraries(${APP_NAME} PRIVATE RocksDB::rocksdb
     "-framework AppKit" "-framework WebKit" "-framework AVFoundation"
@@ -262,7 +258,7 @@ else()
   target_link_directories(${APP_NAME} PRIVATE ${FMOD_PATH}/core/lib/${FMOD_ARCH}/)
   target_link_libraries(${APP_NAME} PRIVATE unofficial::webrtc-audio-processing::webrtc-audio-processing)
   target_link_libraries(${APP_NAME} PRIVATE rocksdb fmod_vc Dbghelp Crypt32
-    Winhttp Winmm Advapi32 Gdiplus Ole32 Gdi32
+    Winmm Advapi32 Gdiplus Ole32 Gdi32
     unofficial::wintoast::wintoast unofficial::webview2::webview2)
 endif()
 
@@ -449,4 +445,18 @@ if(JPET_BUILD_UPDATE_TESTS)
   target_compile_options(update_release_test PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
   target_link_libraries(update_release_test PRIVATE OpenSSL::Crypto nlohmann_json::nlohmann_json semver::semver)
   add_test(NAME update_release COMMAND update_release_test)
+endif()
+option(JPET_BUILD_GAME_TESTS "Build game rule and achievement tests" OFF)
+if(JPET_BUILD_GAME_TESTS)
+  enable_testing()
+  add_executable(game_test tests/game_test.cpp src/GameRules.cpp)
+  add_executable(achievements_test tests/achievements_test.cpp)
+  foreach(test_target game_test achievements_test)
+    set_target_properties(${test_target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+    target_include_directories(${test_target} PRIVATE src)
+    target_compile_options(${test_target} PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+    target_link_libraries(${test_target} PRIVATE nlohmann_json::nlohmann_json)
+  endforeach()
+  add_test(NAME game COMMAND game_test)
+  add_test(NAME achievements COMMAND achievements_test)
 endif()

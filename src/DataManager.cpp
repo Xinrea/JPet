@@ -2,7 +2,6 @@
 
 #include "LAppDefine.hpp"
 #include "LAppPal.hpp"
-#include "LAppLive2DManager.hpp"
 #include "PanelServer.hpp"
 #include "VoicePlatform.hpp"
 #include "VoiceCascade.hpp"
@@ -34,24 +33,12 @@ bool DataManager::init() {
   }
 
   const std::wstring oldDataPath = LAppDefine::documentPath + L"/jpet.dat";
-  const std::wstring dataPath = LAppDefine::documentPath + L"/GameData";
   // initialize game data
-  bool firstData = !std::filesystem::exists(std::filesystem::path(dataPath)) && !std::filesystem::exists(std::filesystem::path(oldDataPath));
   gameData = std::make_shared<GameData>(oldDataPath);
   if (!gameData->Initialized()) {
     LAppPal::PrintLog(LogLevel::Error, "[DataManager]Failed to initialize GameData");
     return false;
   }
-  if (firstData) {
-    gameData->UpdateBatch({{"attr.speed", 2}, {"attr.strength", 1},
-        {"attr.endurance", 1}, {"attr.will", 3}, {"attr.intellect", 4}});
-  }
-  legacyBootstrap = nlohmann::json::parse(GetWithDefault("cloud.legacy_bootstrap", std::string{}), nullptr, false);
-  if (!legacyBootstrap.is_object()) {
-    legacyBootstrap = ExportCloudBootstrap("");
-    gameData->UpdateBatch({}, {{"cloud.legacy_bootstrap", legacyBootstrap.dump()}});
-  }
-  LoadCloudCache(GetWithDefault("uid", std::string{}));
   return true;
 }
 
@@ -363,21 +350,6 @@ void DataManager::Save() {
   file.close();
 }
 
-int DataManager::CurrentExpDiff() {
-  return GetCloudProfile().value("expdiff", 0);
-}
-
-std::vector<int> DataManager::GetAttributeList() {
-  std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  std::vector<int> attributes;
-  for (const auto& attr : {"speed", "endurance", "strength", "will",
-                           "intellect", "exp", "buycnt"}) {
-    int value = GetAttribute(attr);
-    attributes.push_back(value);
-  }
-  return attributes;
-}
-
 int DataManager::GetWithDefault(const std::string& key, int default_value) {
   int value = 0;
   if (gameData->Get(key, value)) {
@@ -394,33 +366,12 @@ float DataManager::GetWithDefault(const std::string& key, float default_value) {
   return default_value;
 }
 
-string DataManager::GetWithDefault(const std::string& key, const string& default_value) {
-  string value = default_value;
+std::string DataManager::GetWithDefault(const std::string& key, const std::string& default_value) {
+  std::string value = default_value;
   if (gameData->Get(key, value)) {
     return value;
   }
   return default_value;
-}
-
-void DataManager::PostProcess(const std::string& key, int value) {
-  // change clothes
-  if (key == "clothes.current") {
-    LAppLive2DManager::GetInstance()->SwitchClothes(value);
-  }
-}
-
-int DataManager::GetAttribute(const std::string& key) {
-  std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  int value = 0;
-  try {
-    gameData->Get("attr." + key, value);
-  } catch (const std::exception& e) {
-    LAppPal::PrintLog(LogLevel::Error,
-                      "[DataManager]Get Attribute failed %s: %s reset to 0",
-                      key.c_str(), e.what());
-    gameData->Update("attr." + key, 0);
-  }
-  return value;
 }
 
 std::vector<int> DataManager::TaskStatus(int id) {

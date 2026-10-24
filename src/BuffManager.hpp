@@ -55,8 +55,6 @@ public:
     return is_guard_;
   }
 
-  bool IsFail();
-
   bool IsMonday();
 
   bool IsBirthday();

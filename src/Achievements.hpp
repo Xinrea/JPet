@@ -118,8 +118,8 @@ inline Json Parse(const std::string& saved) {
 inline void Peak(Json& state, const std::string& metric, int64_t value) {
   state["metrics"][metric] = std::max(Number(state["metrics"], metric), value);
 }
-inline void Increment(Json& state, const std::string& metric) {
-  state["metrics"][metric] = std::min<int64_t>(999999999, Number(state["metrics"], metric) + 1);
+inline void Increment(Json& state, const std::string& metric, int64_t count = 1) {
+  state["metrics"][metric] = std::min<int64_t>(999999999, Number(state["metrics"], metric) + count);
 }
 inline void Observe(Json& state, const std::map<std::string, int>& values) {
   for (const auto& [key, value] : values) Peak(state, key, std::max(0, value));

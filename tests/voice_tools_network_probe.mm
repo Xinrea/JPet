@@ -46,7 +46,6 @@ int main(int argc, char** argv) {
       }
       {
         Report("Bilibili authenticated video search", Voice::SearchBilibili({{"query", "千问"}, {"type", "video"}, {"order", "relevance"}, {"page", 1}, {"limit", 3}}, cookies, uid));
-        Report("game rank read", Voice::ReadGameRank({{"metric", "starcnt"}, {"limit", 3}}, "https://s.jpet.powerlive.io", uid));
       }
       const auto settings = toml::parse_file(profile + "/jpet.toml");
       const auto workspace = settings["voice"]["workspace_id"].value_or(std::string{});

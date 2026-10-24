@@ -111,7 +111,7 @@ class History {
     return state == "pending" || state == "completed" || state == "interrupted" || state == "failed";
   }
   static std::string KnownTool(const std::string& name) {
-    for (const auto* tool : {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "get_game_rank", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"}) if (name == tool) return name;
+    for (const auto* tool : {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "game_action", "jpet_settings", "web_search", "bilibili_search", "open_url"}) if (name == tool) return name;
     return "unknown";
   }
   static json Select(const json& data, std::initializer_list<const char*> fields) {

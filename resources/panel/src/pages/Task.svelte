@@ -9,7 +9,6 @@
   import { reportFrontendError } from "../logger.js";
 
   export let attributes = { exp: 0, speed: 0, endurance: 0, strength: 0, will: 0, intellect: 0 };
-  export let online = false;
   let stateReceivedAt = 0;
 
   let currentTask = null;
@@ -29,7 +28,7 @@
   let unsubscribe;
 
   function updateClock() {
-    const elapsed = online && currentTask && !currentTask.paused ? (performance.now() - stateReceivedAt) / 1000 : 0;
+    const elapsed = currentTask ? (performance.now() - stateReceivedAt) / 1000 : 0;
     timeRemain = currentTask ? Math.max(0, currentTask.remaining_seconds - elapsed) : 0;
   }
 
@@ -96,7 +95,7 @@
   }
 
   function canQueue(task) {
-    return online && queue.length < queueCapacity && task.status !== 3 &&
+    return queue.length < queueCapacity && task.status !== 3 &&
       (task.repeatable || (!queue.some((entry) => entry.id === task.id) && currentTask?.id !== task.id));
   }
 
@@ -132,8 +131,8 @@
   {#if currentTask}
     <div class="task mb-4">
       <div class="header">
-        <span>{online ? "正在执行" : "已暂停"} · {currentTask.title}</span>
-        <span class="text-sm">{timeRemain > 0 ? formatRemain(timeRemain) : online ? "正在结算…" : "已暂停"}</span>
+        <span>正在执行 · {currentTask.title}</span>
+        <span class="text-sm">{timeRemain > 0 ? formatRemain(timeRemain) : "正在结算…"}</span>
       </div>
       <div class="content text-gray-600">
         <p class="mb-3 text-sm">{currentTask.desc}</p>
@@ -162,7 +161,7 @@
               <Button color="alternative" size="xs" disabled={busy || !canQueue(currentTask)}
                 on:click={() => taskAction(`/api/task/${currentTask.id}/queue`)}>再排一次</Button>
             {/if}
-            <Button color="alternative" size="xs" disabled={busy || !online}
+            <Button color="alternative" size="xs" disabled={busy}
               on:click={() => taskAction(`/api/task/${currentTask.id}/cancel`)}>中止</Button>
           </span>
         </div>
@@ -178,9 +177,9 @@
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-lime-100 bg-lime-50 p-3">
           <span class="flex items-center gap-1 text-sm text-gray-600"><img src={StarIcon} class="h-4 w-4" alt="" />持有 {queueUpgrade.stars} 颗星星</span>
           {#if queueUpgrade.cost !== null}
-            <Button color="alternative" size="xs" disabled={busy || !online || !queueUpgrade.available}
+            <Button color="alternative" size="xs" disabled={busy || !queueUpgrade.available}
               on:click={() => taskAction("/api/task/queue/upgrade")}>解锁第 {queueCapacity + 1} 个位置 · {queueUpgrade.cost} 颗星星</Button>
-            <p class="w-full text-xs text-gray-500">解锁后永久保留。{online && !queueUpgrade.available ? `星星不足，还需 ${queueUpgrade.cost - queueUpgrade.stars} 颗星星。` : ""}</p>
+            <p class="w-full text-xs text-gray-500">解锁后永久保留。{!queueUpgrade.available ? `星星不足，还需 ${queueUpgrade.cost - queueUpgrade.stars} 颗星星。` : ""}</p>
           {:else}
             <span class="text-sm text-lime-700">队列容量已全部解锁</span>
           {/if}
@@ -205,11 +204,11 @@
                 </div>
               </div>
               <div class="flex gap-1">
-                <Button color="alternative" size="xs" aria-label={`上移${task.title}`} disabled={busy || !online || index === 0}
+                <Button color="alternative" size="xs" aria-label={`上移${task.title}`} disabled={busy || index === 0}
                   on:click={() => taskAction(`/api/task/queue/${task.entry_id}/move`, "POST", { direction: -1 })}>↑</Button>
-                <Button color="alternative" size="xs" aria-label={`下移${task.title}`} disabled={busy || !online || index === queue.length - 1}
+                <Button color="alternative" size="xs" aria-label={`下移${task.title}`} disabled={busy || index === queue.length - 1}
                   on:click={() => taskAction(`/api/task/queue/${task.entry_id}/move`, "POST", { direction: 1 })}>↓</Button>
-                <Button color="alternative" size="xs" disabled={busy || !online}
+                <Button color="alternative" size="xs" disabled={busy}
                   on:click={() => taskAction(`/api/task/queue/${task.entry_id}`, "DELETE")}>移除</Button>
               </div>
             </li>

@@ -5,25 +5,17 @@
 #include <vector>
 #include <mutex>
 #include <cstdint>
-#include <chrono>
+#include <nlohmann/json.hpp>
 
 #include "GameData.hpp"
-#include "GameTask.hpp"
-#include "Achievements.hpp"
 
 class DataManager {
  private:
   toml::table data;
   std::shared_ptr<GameData> gameData;
   std::recursive_mutex gameMutex;
-  nlohmann::json cloudSnapshot;
-  nlohmann::json legacyBootstrap;
-  std::string cloudCacheUrl;
-  std::chrono::steady_clock::time_point cloudReceivedAt;
   bool init();
   DataManager();
-
-  void PostProcess(const std::string& key, int value);
 
   void initNotifySection();
   // The [voice] table, created when missing; callers hold gameMutex.
@@ -32,7 +24,7 @@ class DataManager {
  public:
   ~DataManager() { Save(); };
 
-  template <typename T> T GetConfig(const string &section, const string &key, T dvalue) {
+  template <typename T> T GetConfig(const std::string &section, const std::string &key, T dvalue) {
     std::lock_guard<std::recursive_mutex> lock(gameMutex);
     T ret;
     try {
@@ -77,54 +69,17 @@ class DataManager {
     gameData->Update(key, value);
   }
 
-  void SetRaw(const std::string& key, int value) {
-    gameData->Update(key, value);
-    PostProcess(key, value);
-  }
-
   int GetWithDefault(const std::string& key, int default_value);
-  string GetWithDefault(const std::string& key, const string& default_value);
+  std::string GetWithDefault(const std::string& key, const std::string& default_value);
   float GetWithDefault(const std::string& key, float default_value);
 
-  nlohmann::json GetAchievementState();
-  nlohmann::json GetCloudProfile();
-  nlohmann::json GetCloudSnapshot();
-  nlohmann::json ExportCloudBootstrap(const std::string& uid);
-  bool ApplyCloudSnapshot(const nlohmann::json& snapshot);
-  void PauseCloudView();
-  void LoadCloudCache(const std::string& uid, const std::string& endpoint = "");
-  float CloudTaskProgress();
-  void RecordAchievementEvent(const std::string& event, time_t now = time(nullptr));
-  int CurrentExpDiff();
-
   /**
-   * @brief   Get the list of attributes.
-   * @return The list of attributes.
-   * [0]speed,[1]endurance,[2]strength,[3]will,[4]intellect,[5]exp,[6]buycnt
-   */
-  std::vector<int> GetAttributeList();
-  
-
-  int GetAttribute(const std::string& key);
-
-
-
-  /**
-   * @brief   Get task status.
-   * @return  status list. [0]start_time, [1]end_time, [2]success, [3]status
+   * @brief   Status of a task in the pre-cloud save, read once to import it.
+   * @return  [0]start_time, [1]end_time, [2]success, [3]status, [4]cost_snapshot
    */
   std::vector<int> TaskStatus(int id);
-  // Serialize task transitions with API requests and attribute mutations.
+  // Serializes settings reads and writes shared with the voice tools.
   std::recursive_mutex& GameMutex() { return gameMutex; }
-  std::shared_ptr<GameTask> GetCurrentTask();
-  nlohmann::json GetTaskState();
-  int TaskQueueCapacity();
-  std::string UpgradeTaskQueue();
-  std::string StartTask(int id, time_t now = time(nullptr));
-  std::string QueueTask(int id, time_t now = time(nullptr));
-  std::string RemoveQueuedTask(int64_t entryId);
-  std::string MoveQueuedTask(int64_t entryId, int direction);
-  std::string CancelTask(int id, time_t now = time(nullptr));
 
   void Save();
 

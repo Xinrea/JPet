@@ -8,7 +8,6 @@
 - Windows 本机语音合成（qwentts 的 GGML Vulkan 后端）需要 Vulkan SDK，并设置 `VULKAN_SDK` 环境变量；建议使用与 CI 相同的 1.4.328.1。1.4.309 没有提供 GGML 需要的 `SPIRV-Headers` CMake 配置，vcpkg 构建 qwentts 时会在配置阶段失败。
 - 设置面板：Node.js 22+、npm、Svelte + Vite；源码位于 `resources/panel/`。
 - C++ 依赖：部分随 `thirdparty/` 提供，包括 GLFW、FMOD CORE 和 Cubism SDK；其余见 [`vcpkg.json`](../vcpkg.json)。语音回声消除使用的 `webrtc-audio-processing` 由仓库内的 vcpkg overlay port（[`build-scripts/ports`](../build-scripts/ports)）提供，CMake 会自动加载；手动执行 `vcpkg install` 时需加 `--overlay-ports`。RocksDB 子模块需通过 `git submodule update --init --recursive` 初始化。
-- 云端服务：位于 `cloud/`，本地开发和部署见[云端游戏说明](cloud-game.md)。
 
 Windows 面板使用 WebView2；macOS 使用 WKWebView、GLFW/Cocoa 透明窗口、AVFoundation 音频和菜单栏状态项。
 macOS 登录页使用系统持久化的 WebKit Cookie 存储。当前 Live2D 渲染仍使用 OpenGL，Apple 已弃用该接口。
@@ -62,8 +61,6 @@ cmake --build build/macos-arm64 --parallel
 open build/macos-arm64/bin/JPet/JPet.app
 ```
 
-构建时从 `cloud/wrangler.jsonc` 读取生产域名。开发环境的服务地址通过 CMake 参数 `JPET_CLOUD_URL` 指定，详见[云端服务本地开发](cloud-game.md#本地开发)。
-
 ## Windows 构建
 
 可直接使用 [README 中的 PowerShell 命令](../README.md#windows--x64)。
@@ -71,31 +68,24 @@ open build/macos-arm64/bin/JPet/JPet.app
 
 ## 回归检查
 
-以下命令复用已配置的 macOS 构建目录，并启用更新与语音测试：
+以下命令复用已配置的 macOS 构建目录，并启用更新、语音与游戏测试：
 
 ```sh
 cmake -S . -B build/macos-arm64 \
-  -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON
+  -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON -DJPET_BUILD_GAME_TESTS=ON
 cmake --build build/macos-arm64 --parallel
 ctest --test-dir build/macos-arm64 --output-on-failure
 python3 tests/update_helper_test.py
 ```
 
-云端任务、队列与存档检查：
+游戏规则与成就也可以不配置 CMake 单独检查，只依赖 nlohmann/json：
 
 ```sh
-cd cloud
-npm ci
-npm run types
-npm test
-cd ..
-python3 tests/cloud_config_test.py
-bash build-scripts/test_cloud_sync_macos.sh
+bash build-scripts/test_game_macos.sh
 bash build-scripts/test_achievements_macos.sh
-bash build-scripts/test_task_queue_macos.sh
 ```
 
-云端与成就回归使用临时存储，原生同步检查连接本机测试服务。
+游戏测试覆盖经验、任务、队列扩容、升星、衣装、存档读写和旧云端存档导入，规则见[游戏规则与存档](game.md)。
 语音协议、原生设置接口与显式联网检查见[语音验证说明](voice-chat.md#验证)。
 
 ## 自动发布

@@ -20,6 +20,7 @@
 #include <string>
 
 #include "AudioManager.hpp"
+#include "GameManager.hpp"
 #include "LAppDefine.hpp"
 #include "LAppDelegate.hpp"
 #include "LAppModel.hpp"
@@ -136,7 +137,7 @@ void LAppLive2DManager::OnTap(csmFloat32 x, csmFloat32 y) {
         _models[i]->HitTest(HitAreaEarL, x, y) || _models[i]->HitTest(HitAreaEarR, x, y) ||
         _models[i]->HitTest(HitAreaArmsL, x, y) || _models[i]->HitTest(HitAreaArmsR, x, y) ||
         _models[i]->HitTest(HitAreaLegs, x, y) || _models[i]->HitTest(HitAreaTail, x, y)) {
-      DataManager::GetInstance()->RecordAchievementEvent("touch");
+      GameManager::GetInstance()->Touch();
     }
     // no need to check other hitareas
     if (VoiceChat::GetInstance()->IsBusy() || !DataManager::GetInstance()->GetConfig<bool>("audio", "touch_audio",

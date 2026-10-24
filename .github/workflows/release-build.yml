@@ -73,9 +73,6 @@ jobs:
         run: |
           npm ci --legacy-peer-deps --no-audit --no-fund
           npm run build
-      - name: Test cloud build configuration
-        shell: bash
-        run: python3 tests/cloud_config_test.py
       - name: Check out pinned vcpkg
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -121,7 +118,7 @@ jobs:
             "-DVCPKG_INSTALLED_DIR=$env:GITHUB_WORKSPACE/build/vcpkg_installed" `
             -DVCPKG_TARGET_TRIPLET=x64-windows-release `
             "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/build-scripts/triplets" `
-            -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON -DFAIL_ON_WARNINGS=OFF -DPORTABLE=1
+            -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON -DJPET_BUILD_GAME_TESTS=ON -DFAIL_ON_WARNINGS=OFF -DPORTABLE=1
       - name: Configure macOS ARM
         if: runner.os == 'macOS'
         run: |
@@ -134,7 +131,7 @@ jobs:
             -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/build/vcpkg_installed" \
             -DVCPKG_TARGET_TRIPLET=arm64-osx-release \
             -DVCPKG_OVERLAY_TRIPLETS="$GITHUB_WORKSPACE/build-scripts/triplets" \
-            -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON
+            -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON -DJPET_BUILD_GAME_TESTS=ON
       - name: Build and test
         run: |
           cmake --build build/release --config Release --parallel 3
