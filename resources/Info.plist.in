@@ -3,6 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
+  <key>CFBundleIconFile</key><string>${MACOSX_BUNDLE_ICON_FILE}</string>
   <key>CFBundleIdentifier</key><string>${MACOSX_BUNDLE_GUI_IDENTIFIER}</string>
   <key>CFBundleName</key><string>JPet</string>
   <key>CFBundlePackageType</key><string>APPL</string>

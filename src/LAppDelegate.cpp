@@ -71,6 +71,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK PreWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam,
                                LPARAM lParam);
 WNDPROC DefaultProc;
+
+// The tray glyph is a one-color silhouette: white on a dark taskbar, dark on a light one.
+static HICON LoadTrayIcon() {
+  DWORD lightTaskbar = 0;
+  DWORD size = sizeof(lightTaskbar);
+  RegGetValueW(HKEY_CURRENT_USER,
+               L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+               L"SystemUsesLightTheme", RRF_RT_REG_DWORD, nullptr, &lightTaskbar, &size);
+  return static_cast<HICON>(LoadImage(
+      GetModuleHandle(NULL), MAKEINTRESOURCE(lightTaskbar ? IDI_TRAY_LIGHT : IDI_TRAY_DARK),
+      IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
+}
 #endif
 
 namespace {
@@ -267,7 +279,8 @@ bool LAppDelegate::Initialize() {
   nid.uID = IDI_ICON1;
   nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
   nid.uCallbackMessage = WM_IAWENTRAY;
-  nid.hIcon = appIcon;
+  trayIcon = LoadTrayIcon();
+  nid.hIcon = trayIcon ? trayIcon : appIcon;
   wcscpy(nid.szTip, TEXT("JPet - 桌面宠物轴伊"));
   Shell_NotifyIcon(NIM_ADD, &nid);
 
@@ -533,6 +546,7 @@ void LAppDelegate::Run() {
   SaveSettings();
 #ifdef _WIN32
   Shell_NotifyIcon(NIM_DELETE, &nid);
+  if (trayIcon) DestroyIcon(trayIcon);
 #endif
   LAppPal::PrintLog(LogLevel::Debug, "[LAppDelegate]TrayICON Delete");
   Release();

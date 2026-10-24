@@ -253,6 +253,7 @@ class LAppDelegate {
 
 #ifdef _WIN32
   HICON appIcon;
+  HICON trayIcon = nullptr;
 #endif
 
   atomic_bool _need_snapshot{false};

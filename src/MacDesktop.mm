@@ -34,7 +34,15 @@ void MacDesktop::Initialize(GLFWwindow* window) {
   menuActions = [[JPetMenuActions alloc] init];
   menuActions.petWindow = window;
   statusItem = [NSStatusBar.systemStatusBar statusItemWithLength:NSVariableStatusItemLength];
-  statusItem.button.title = @"JPet";
+  NSImage* trayIcon = [NSImage imageNamed:@"tray"];
+  if (trayIcon) {
+    [trayIcon setTemplate:YES];  // `template` is a C++ keyword in Objective-C++.
+    trayIcon.accessibilityDescription = @"JPet";
+    statusItem.button.image = trayIcon;
+    statusItem.button.toolTip = @"JPet";
+  } else {
+    statusItem.button.title = @"JPet";
+  }
   NSMenu* menu = [[NSMenu alloc] init];
   NSArray<NSString*>* titles = @[@"显示 / 隐藏", @"设置", @"重置位置", @"项目主页", @"退出 JPet"];
   const NSInteger commands[] = {2004, 2001, 2002, 2005, 2003};
