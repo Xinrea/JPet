@@ -3,6 +3,7 @@
 #include "VoiceCommon.hpp"
 
 #include <atomic>
+#include <cstddef>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -89,7 +90,11 @@ nlohmann::json ChatRequestOptions(const std::string& provider);
 struct ChatModel {
   std::string id, name;
   std::optional<bool> vision;  // Accepts images; unset when the list does not say.
+  std::optional<size_t> contextWindow;  // Token capacity; unset when metadata is absent or invalid.
 };
+inline constexpr size_t kDefaultChatContextWindow = 32768;
+// Shared validation for model metadata and the saved/user-supplied capacity.
+std::optional<size_t> ParseChatContextWindow(const nlohmann::json& value);
 // The provider's GET {base}/models list, sorted by name. OpenRouter lists only
 // models that support tools and let reasoning be turned off.
 std::vector<ChatModel> ParseChatModels(const std::string& provider, const nlohmann::json& body);

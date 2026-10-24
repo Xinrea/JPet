@@ -19,6 +19,7 @@ constexpr int ReplySampleRate = 24000;
 struct CascadeConfig {
   std::string chatUrl, chatKey, chatModel;
   nlohmann::json chatOptions = nlohmann::json::object();  // Provider-specific request fields.
+  size_t contextWindow = kDefaultChatContextWindow;  // Tokens; model metadata or user settings.
 };
 
 // Voice conversation engine (speech recognition + chat model + speech
@@ -62,7 +63,7 @@ class Pipeline {
   void StopReply();
   // Chat context, carried across pipelines so voice and text share one conversation.
   const nlohmann::json& Context() const { return messages_; }
-  void SetContext(nlohmann::json messages) { messages_ = std::move(messages); TrimContext(); }
+  void SetContext(nlohmann::json messages) { messages_ = std::move(messages); }
   bool Recording() const { return inputOpen_; }
   bool Replying() const { return replyActive_; }
   bool WaitingForReply() const;
@@ -100,7 +101,9 @@ class Pipeline {
   std::string SpokenText(uint64_t played) const;
   void Interrupt();
   void FinishReply(ConversationEvent::Type type);
-  void TrimContext();
+  void StartCompaction(size_t requestTokens);
+  void OnCompaction(const ChatEvent& event);
+  void FailCompaction(const std::string& reason);
 
   CascadeConfig config_;
   Callbacks callbacks_;
@@ -130,6 +133,12 @@ class Pipeline {
 
   // The reply to the current user turn, possibly over several tool rounds.
   nlohmann::json messages_ = nlohmann::json::array();
+  // Summary requests share the cancellable chat backend, but never reach speech,
+  // tools, or the visible transcript. Replace history only after a valid summary.
+  bool compacting_ = false;
+  size_t compactCount_ = 0, compactRuns_ = 0;
+  std::string compactText_;
+  nlohmann::json compactUser_;  // Latest user request if it lies in the prefix.
   uint64_t turn_ = 0;
   int round_ = 0, rounds_ = 0;
   bool replyActive_ = false, chatActive_ = false, roundDone_ = false, audible_ = false;

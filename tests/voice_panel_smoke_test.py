@@ -66,6 +66,9 @@ def main(gui=False, app=APP):
             assert config["input_mode"] == "toggle" and config["chat_provider"] == "" and config["chat_model"] == "" and config["chat_base_url"] == ""
             assert [provider["id"] for provider in config["chat_providers"]] == ["deepseek", "openrouter", "thirdparty"]
             assert config["chat_keys"] == {"deepseek": False, "openrouter": False, "thirdparty": False} and config["chat_vision"] is False
+            assert config["chat_context_window"] == 32768
+            for invalid in [None, False, "32768", 32768.0, 4095, -1, 10_000_001, 2**64 - 1]:
+                assert request(port, "/api/config/voice", {"chat_context_window": invalid})[0] == 400, invalid
             # Speech is synthesised on this machine in Joi's voice: no synthesis model or voice to choose.
             assert not {"provider", "model", "voice", "engine", "cascade", "stt", "tts_model", "tts_voice"} & config.keys()
             assert "catalog" not in config and "has_chat_api_key" not in config
@@ -134,14 +137,26 @@ def main(gui=False, app=APP):
             assert "view_desktop" in request(port, "/api/voice")[1]["available_tools"]
             assert request(port, "/api/config/voice", {"chat_model": "llama3.2"})[1]["chat_vision"] is False
             assert request(port, "/api/config/voice", {"chat_model": "llama3", "chat_vision": True})[1]["chat_vision"] is True
+            # Context capacity is retained by unrelated edits, but belongs to the model and endpoint.
+            assert request(port, "/api/config/voice", {"chat_context_window": 65536})[1]["chat_context_window"] == 65536
+            assert request(port, "/api/config/voice", {"input_mode": "hold"})[1]["chat_context_window"] == 65536
+            assert request(port, "/api/config/voice", {"chat_model": "llama3.2"})[1]["chat_context_window"] == 32768
+            assert request(port, "/api/config/voice", {"chat_model": "llama3", "chat_context_window": 4096})[1]["chat_context_window"] == 4096
+            assert request(port, "/api/config/voice", {"chat_base_url": "http://127.0.0.1:11435/v1"})[1]["chat_context_window"] == 32768
+            assert request(port, "/api/config/voice", {"chat_context_window": 10_000_000})[1]["chat_context_window"] == 10_000_000
             # Without a saved key the chat is refused before anything is queued.
             code, result = request(port, "/api/voice/chat", {"text": "你好"})
             assert code == 400 and "API Key" in result["error"], result
             # Another service drops the third-party model and endpoint.
             code, saved = request(port, "/api/config/voice", {"chat_provider": "deepseek"})
             assert code == 200 and saved["chat_provider"] == "deepseek" and saved["chat_model"] == "" and saved["chat_base_url"] == ""
+            assert saved["chat_context_window"] == 32768
             code, saved = request(port, "/api/config/voice", {"chat_model": "deepseek-chat", "input_mode": "hold"})
             assert code == 200 and saved["chat_provider"] == "deepseek" and saved["chat_model"] == "deepseek-chat"
+            assert saved["chat_context_window"] == 32768
+            assert request(port, "/api/config/voice", {"chat_context_window": 65536})[1]["chat_context_window"] == 65536
+            assert request(port, "/api/config/voice", {"chat_provider": "openrouter", "chat_model": "deepseek-chat"})[1]["chat_context_window"] == 32768
+            assert request(port, "/api/config/voice", {"chat_provider": "deepseek", "chat_model": "deepseek-chat"})[1]["chat_context_window"] == 32768
             code, model = request(port, "/api/voice/speech-model", {"action": "cancel"})
             assert code == 200 and model["state"] == "missing"
             assert request(port, "/api/voice/speech-model", {"action": "format"})[0] == 400
@@ -151,6 +166,7 @@ def main(gui=False, app=APP):
             assert not re.search(r'^\s*tts_(model|voice)\s*=', contents, re.MULTILINE)
             assert not re.search(r"^\s*(api_key|chat_api_key|provider|engine|has_chat_api_key|has_api_key|workspace_id)\s*=", contents, re.MULTILINE)
             assert re.search(r'^\s*chat_provider\s*=\s*[\"\']deepseek[\"\']', contents, re.MULTILINE)
+            assert re.search(r'^\s*chat_context_window\s*=\s*32768\s*$', contents, re.MULTILINE)
             output, errors = process.communicate(timeout=10)
             if process.returncode:
                 raise RuntimeError((output + errors).decode(errors="replace")[-2000:])

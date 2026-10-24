@@ -186,6 +186,12 @@ nlohmann::json ChatRequestOptions(const std::string& provider) {
   return nlohmann::json::object();
 }
 
+std::optional<size_t> ParseChatContextWindow(const nlohmann::json& value) {
+  // Check before converting: floats, booleans and overflowing integers are not capacities.
+  if (!value.is_number_integer() || value < 4096 || value > 10000000) return std::nullopt;
+  return value.get<size_t>();
+}
+
 std::vector<ChatModel> ParseChatModels(const std::string& provider, const nlohmann::json& body) {
   std::vector<ChatModel> models;
   if (!body.is_object() || !body.contains("data") || !body["data"].is_array()) return models;
@@ -208,7 +214,14 @@ std::vector<ChatModel> ParseChatModels(const std::string& provider, const nlohma
         const auto& inputs = (*source)["input_modalities"];
         vision = std::find(inputs.begin(), inputs.end(), "image") != inputs.end();
       }
-    models.push_back({id, name, vision});
+    std::optional<size_t> contextWindow;
+    // OpenRouter uses context_length; compatible servers may use either alias.
+    // Do not confuse output-only limits (max_tokens) with the full context.
+    for (const auto* key : {"context_length", "context_window", "max_model_len"}) {
+      if (item.contains(key)) contextWindow = ParseChatContextWindow(item[key]);
+      if (contextWindow) break;
+    }
+    models.push_back({id, name, vision, contextWindow});
     if (models.size() >= 2000) break;
   }
   const auto lower = [](std::string text) {

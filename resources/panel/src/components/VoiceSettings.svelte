@@ -50,7 +50,7 @@
   // Chat service: DeepSeek, OpenRouter or a third-party OpenAI-compatible endpoint,
   // each with its own write-only key; the model is picked from the service's list.
   let chatProviders = [], chatProvider = "", savedProvider = "", chatModel = "", chatBaseUrl = "", savedBaseUrl = "";
-  let chatApiKey = "", chatKeys = {}, chatVision = false;
+  let chatApiKey = "", chatKeys = {}, chatVision = false, chatContextWindow = 32768;
   let chatModels = [], modelsLoading = false, modelsError = "", modelsRequest = 0;
   let chatSaving = false, chatError = "", chatMessage = "";
   let voiceLoading = true, voiceError = "";
@@ -96,7 +96,13 @@
   // Image input decides whether Joi can look at the desktop. The list says so
   // for DeepSeek and OpenRouter; otherwise the user ticks it.
   $: listedVision = chatModels.find(model => model.id === chatModel)?.vision;
-  function changeModel() { if (typeof listedVision === "boolean") chatVision = listedVision; }
+  $: listedContextWindow = chatModels.find(model => model.id === chatModel)?.context_window;
+  function changeModel() {
+    // Read the just-selected model directly; reactive declarations may still refer to the old one.
+    const model = chatModels.find(model => model.id === chatModel);
+    chatVision = typeof model?.vision === "boolean" ? model.vision : false;
+    chatContextWindow = model?.context_window ?? 32768;
+  }
   // A saved model missing from the list (or before it loads) stays selectable.
   $: modelItems = [...(chatModel && !chatModels.some(model => model.id === chatModel) ? [{ value: chatModel, name: `${chatModel}（当前）` }] : []),
     ...chatModels.map(model => ({ value: model.id, name: model.name === model.id ? model.id : `${model.name} · ${model.id}` }))];
@@ -115,7 +121,9 @@
       if (!response.ok) throw new Error(result.error || "无法获取模型列表");
       if (voiceDisposed || request !== modelsRequest) return;
       chatModels = result.models || [];
-      changeModel();
+      const vision = chatModels.find(model => model.id === chatModel)?.vision;
+      if (typeof vision === "boolean") chatVision = vision;
+      // Refreshing metadata must not overwrite a saved or currently edited capacity.
     } catch (error) {
       if (voiceDisposed || request !== modelsRequest) return;
       chatModels = []; modelsError = error.message;
@@ -126,7 +134,14 @@
   function changeProvider() {
     ++modelsRequest;
     chatModels = []; modelsError = ""; modelsLoading = false; chatApiKey = ""; chatMessage = ""; chatError = "";
-    chatModel = ""; chatVision = false; chatBaseUrl = chatProvider === "thirdparty" ? savedBaseUrl : "";
+    chatModel = ""; chatVision = false; chatContextWindow = 32768;
+    chatBaseUrl = chatProvider === "thirdparty" ? savedBaseUrl : "";
+    loadModels();
+  }
+  function changeBaseUrl() {
+    ++modelsRequest;
+    chatModels = []; modelsError = ""; modelsLoading = false;
+    chatContextWindow = 32768;
     loadModels();
   }
   function applyChatSettings(settings) {
@@ -134,6 +149,7 @@
     chatProvider = savedProvider = settings.chat_provider || "";
     chatModel = settings.chat_model || "";
     chatVision = !!settings.chat_vision;
+    chatContextWindow = settings.chat_context_window ?? 32768;
     chatBaseUrl = savedBaseUrl = settings.chat_base_url || "";
     chatKeys = settings.chat_keys || {};
   }
@@ -165,8 +181,15 @@
     return settings;
   }
   async function saveChatSettings(clearKey = false) {
-    chatSaving = true; chatError = ""; chatMessage = "";
-    const payload = { chat_provider: chatProvider, chat_model: chatModel.trim(), chat_base_url: chatBaseUrl.trim(), chat_vision: chatVision };
+    chatError = ""; chatMessage = "";
+    const contextWindow = Number(chatContextWindow);
+    if (!Number.isInteger(contextWindow) || contextWindow < 4096 || contextWindow > 10000000) {
+      chatError = "上下文窗口需为 4096 至 10000000 之间的整数（token）";
+      return;
+    }
+    chatSaving = true;
+    const payload = { chat_provider: chatProvider, chat_model: chatModel.trim(), chat_base_url: chatBaseUrl.trim(),
+      chat_vision: chatVision, chat_context_window: contextWindow };
     if (clearKey) payload.clear_chat_api_key = true;
     else if (chatApiKey.trim()) payload.chat_api_key = chatApiKey.trim();
     try {
@@ -242,7 +265,7 @@
     <SettingCard title="大模型" description="轴伊用来思考和回复的模型服务" icon="settings">
       <div class="setting-field"><label for="chat-provider">服务</label><Select id="chat-provider" items={chatProviders.map(provider => ({ value: provider.id, name: provider.name }))} bind:value={chatProvider} on:change={changeProvider} placeholder="请选择大模型服务" disabled={voiceLoading || chatSaving} /></div>
       {#if chatProvider === "thirdparty"}
-      <div class="setting-field"><label for="chat-base-url">接口地址</label><Input id="chat-base-url" bind:value={chatBaseUrl} on:change={loadModels} placeholder="OpenAI 兼容的 Base URL，如 https://api.example.com/v1" autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || chatSaving} /></div>
+      <div class="setting-field"><label for="chat-base-url">接口地址</label><Input id="chat-base-url" bind:value={chatBaseUrl} on:change={changeBaseUrl} placeholder="OpenAI 兼容的 Base URL，如 https://api.example.com/v1" autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || chatSaving} /></div>
       {/if}
       {#if chatProvider}
       <div class="setting-field"><label for="chat-api-key">{providerName} API Key<span>{chatHasKey ? "已保存" : "待设置"}</span></label><Input id="chat-api-key" type="password" bind:value={chatApiKey} on:change={loadModels} placeholder={chatHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || chatSaving} /></div>
@@ -254,6 +277,14 @@
         {/if}
       </div>
       {#if modelsError}<p class="feedback error" role="alert">{modelsError}</p>{/if}
+      {#if chatModel}
+      <div class="setting-field"><label for="chat-context-window">上下文窗口（token）</label>
+        <Input id="chat-context-window" type="number" min={4096} max={10000000} step={1} bind:value={chatContextWindow} disabled={voiceLoading || chatSaving} aria-describedby="chat-context-help" />
+      </div>
+      <p id="chat-context-help" class="setting-help">对话达到窗口约 80% 时自动压缩较早内容；token 数为估算值。未提供模型信息时可按服务实际限制修改。
+        {#if listedContextWindow && listedContextWindow !== Number(chatContextWindow)}<button type="button" class="link-button" on:click={() => { chatContextWindow = listedContextWindow; }} disabled={voiceLoading || chatSaving}>使用模型值（{listedContextWindow}）</button>{/if}
+      </p>
+      {/if}
       {#if chatModel && typeof listedVision === "boolean"}
       <p class="setting-help">{listedVision ? "支持图片，可以查看桌面" : "不支持图片，无法查看桌面"}</p>
       {:else if chatModel}
