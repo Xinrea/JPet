@@ -1,9 +1,15 @@
 #include "VoiceDesktop.hpp"
 #include <windows.h>
 #include <objidl.h>
-#include <gdiplus.h>
 #include <algorithm>
 #include <vector>
+// NOMINMAX removes the min/max macros that older Windows SDK GDI+ headers
+// (10.0.19041) call unqualified; give them std::min/std::max instead.
+namespace Gdiplus {
+using std::max;
+using std::min;
+}  // namespace Gdiplus
+#include <gdiplus.h>
 
 namespace Voice {
 namespace {
