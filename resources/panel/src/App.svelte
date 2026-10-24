@@ -192,7 +192,8 @@
   .panel-tabs button:not(.active):hover { color: var(--green-ink); background: var(--green-soft); }
   .panel-tabs button.active { color: #fff; border-color: #65b417; background: var(--green-gradient); box-shadow: inset 0 1px 0 #ffffff66, 0 3px 0 #519e19; text-shadow: 0 1px 1px #458c19; }
   .update-dot { width: 7px; height: 7px; background: #ed7291; border: 1px solid white; border-radius: 50%; position: absolute; right: 6px; top: 6px; }
-  .panel-content { position: relative; flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; padding: 24px 26px 16px; }
+  /* Pages with sticky bottom bars read --content-pad-bottom to sit flush with the viewport edge. */
+  .panel-content { --content-pad-bottom: 16px; position: relative; flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; padding: 24px 26px var(--content-pad-bottom); }
   .panel-content:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
   .panel-inner { width: 100%; max-width: 980px; margin: 0 auto; }
   .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
@@ -209,6 +210,6 @@
   .notice-content small { font-size: 11px; }
   .notice-content strong, .notice-content span { display: flex; align-items: center; gap: 6px; }
   .notice-dismiss { align-self: flex-start; padding: 12px; }
-  @media (max-width: 560px) { .panel-header { padding: 14px 16px; } .panel-tabs { padding: 9px 12px; gap: 3px; } .panel-tabs button { gap: 5px; padding: 8px 10px; font-size: 12px; } .panel-tabs button :global(svg) { width: 17px; } .panel-content { padding: 20px 14px 14px; } .page-heading h1 { font-size: 21px; } .page-heading-icon { width: 48px; height: 48px; } .panel-brand { gap: 8px; } .panel-brand strong span { font-size: 14px; } .brand-eyebrow { font-size: 8px; letter-spacing: 1px; } .header-resources { gap: 5px; } .resource-chip { padding-right: 8px; gap: 4px; font-size: 11px; } }
+  @media (max-width: 560px) { .panel-header { padding: 14px 16px; } .panel-tabs { padding: 9px 12px; gap: 3px; } .panel-tabs button { gap: 5px; padding: 8px 10px; font-size: 12px; } .panel-tabs button :global(svg) { width: 17px; } .panel-content { --content-pad-bottom: 14px; padding: 20px 14px var(--content-pad-bottom); } .page-heading h1 { font-size: 21px; } .page-heading-icon { width: 48px; height: 48px; } .panel-brand { gap: 8px; } .panel-brand strong span { font-size: 14px; } .brand-eyebrow { font-size: 8px; letter-spacing: 1px; } .header-resources { gap: 5px; } .resource-chip { padding-right: 8px; gap: 4px; font-size: 11px; } }
   @media (max-width: 380px) { .panel-brand strong span { display: none; } .panel-brand img { height: 40px; width: 40px; } .page-heading-icon { display: none; } .panel-footer { font-size: 9px; gap: 5px; } }
 </style>

@@ -12,8 +12,6 @@
   let error = "";
   let saveError = "";
   let sendError = "";
-  let search = "";
-  let searchOpen = false;
   let draft = "";
   let sending = false;
   let status = { state: "idle", message: "", replying: false, shortcut: "Option" };
@@ -28,14 +26,11 @@
   const suggestions = ["我现在有多少经验？", "有哪些任务可以做？", "搜一下今天的新闻", "把音量调到 30"];
   const format = value => JSON.stringify(value || {}, null, 2);
 
-  $: query = search.trim().toLocaleLowerCase();
-  $: visible = records.filter((item) => !query ||
-    `${item.text || ""}\n${item.name || ""}\n${tools[item.name] || ""}\n${format(item.arguments)}\n${format(item.result)}`.toLocaleLowerCase().includes(query)
-  ).sort((a, b) => a.id - b.id);
+  $: visible = [...records].sort((a, b) => a.id - b.id);
   $: replying = status.replying || sending;
   $: last = records.length ? records.reduce((a, b) => a.id > b.id ? a : b) : null;
   // Dots until the reply's first words arrive, or while a tool runs.
-  $: waiting = replying && !query && (!last || last.role !== "assistant" || last.state !== "pending" || !last.text);
+  $: waiting = replying && (!last || last.role !== "assistant" || last.state !== "pending" || !last.text);
   $: statusError = status.state === "error" && status.message !== dismissedError ? status.message : "";
 
   function dateLabel(timestamp) {
@@ -151,16 +146,7 @@
   <div class="chat-toolbar game-card">
     <span class="summary-icon"><UiIcon name="chat" size={24} /></span>
     <div class="summary-copy"><h2>和轴伊聊天</h2><p>打字或按 {status.shortcut || "Option"} 语音聊天，两种方式共用同一段对话。最近 {limit} 条消息保存在本机。</p></div>
-    <div class="summary-actions">
-      <button class="icon-button" class:active={searchOpen} aria-pressed={searchOpen} aria-label="搜索对话" title="搜索对话" on:click={() => { searchOpen = !searchOpen; if (!searchOpen) search = ""; }}><UiIcon name="search" size={17} /><span>搜索</span></button>
-      <button class="icon-button voice" aria-haspopup="dialog" on:click={() => voiceSettingsOpen = true}><UiIcon name="settings" size={17} /><span>语音对话设置</span></button>
-    </div>
   </div>
-
-  {#if searchOpen}
-    <label class="history-search"><span class="sr-only">搜索消息或工具调用</span><!-- svelte-ignore a11y-autofocus --><input type="search" bind:value={search} placeholder="搜索消息、工具或参数…" autofocus /></label>
-    {#if query}<p class="result-count">找到 {visible.length} 条消息</p>{/if}
-  {/if}
 
   {#if error || saveError}<div class="history-error" role="alert">{error || saveError}{#if error}<button on:click={refresh} disabled={refreshing}>重新加载</button>{/if}</div>{/if}
 
@@ -176,8 +162,6 @@
         <p>轴伊可以查询和安排任务、调整设置、上网搜索，或者只是陪你聊聊天。</p>
         <div class="suggestions">{#each suggestions as suggestion}<button on:click={() => send(suggestion)} disabled={sending}>{suggestion}</button>{/each}</div>
       </div>
-    {:else if query && visible.length === 0}
-      <div class="history-empty"><UiIcon name="chat" size={34} /><h2>没有找到相关对话</h2><p>试试其他关键词，或<button class="link" on:click={() => search = ""}>清空搜索</button>。</p></div>
     {:else}
       {#each visible as item, index (item.id)}
         {#if showTime(index)}<div class="time-divider"><time datetime={new Date(item.created_at * 1000).toISOString()}>{dateLabel(item.created_at)}</time></div>{/if}
@@ -240,6 +224,7 @@
       {:else}
         <button type="submit" class="send-button" disabled={!draft.trim() || sending} aria-label="发送" title="发送（Enter）"><UiIcon name="arrow" size={18} /></button>
       {/if}
+      <button type="button" class="settings-button" aria-haspopup="dialog" aria-label="语音对话设置" title="语音对话设置" on:click={() => voiceSettingsOpen = true}><UiIcon name="settings" size={18} /></button>
     </div>
     <p class="composer-hint">Enter 发送 · Shift+Enter 换行{replying ? " · 发送新消息会打断当前回复" : ""}</p>
   </form>
@@ -256,16 +241,8 @@
   .summary-copy { flex: 1; min-width: 0; }
   .summary-copy h2 { font-size: 15px; font-weight: 800; }
   .summary-copy p { margin-top: 4px; font-size: 11px; color: var(--muted); line-height: 1.7; }
-  .summary-actions { display: flex; align-items: center; gap: 8px; }
-  .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 8px 12px; border: 1px solid #dce3d1; border-radius: 9px; background: #fff; color: var(--ink); font-size: 12px; font-weight: 800; white-space: nowrap; }
-  .icon-button:hover, .icon-button.active { background: var(--green-soft); color: var(--green-ink); }
-  .icon-button.voice { background: var(--green-soft); color: var(--green-ink); }
-  .icon-button.voice:hover { background: #e6f0d6; }
-  .history-search { display: block; margin-bottom: 10px; }
-  .history-search input { width: 100%; min-height: 40px; padding: 9px 12px; border: 1px solid #dce3d1; border-radius: 9px; font-size: 12px; background: white; color: var(--ink); }
-  .result-count { font-size: 11px; color: var(--muted); margin: -2px 0 10px; }
   .history-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; margin-bottom: 12px; border: 1px solid #efc7d1; border-radius: 10px; background: #fff3f5; color: #be5573; font-size: 12px; }
-  .history-error button, .link { text-decoration: underline; font-weight: 700; }
+  .history-error button { text-decoration: underline; font-weight: 700; }
   button:disabled { opacity: .55; cursor: default; }
 
   .chat-thread { flex: 1; display: flex; flex-direction: column; gap: 14px; min-height: 280px; padding: 20px 18px; border: 1px solid #e7ecde; border-radius: 14px; background: #fff; }
@@ -313,7 +290,8 @@
   .tool-detail-label { margin-top: 8px; color: var(--muted); overflow-wrap: anywhere; }
   pre { margin-top: 4px; padding: 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #fff; border: 1px solid #eee8f5; border-radius: 8px; user-select: text; }
 
-  .composer { position: sticky; bottom: 0; z-index: 3; margin-top: 12px; padding: 10px 0 12px; background: linear-gradient(#f5f7ef00, #f5f7ef 14px); }
+  /* Offset by the scroll container's bottom padding so no messages show beneath the bar. */
+  .composer { position: sticky; bottom: calc(-1 * var(--content-pad-bottom, 0px)); z-index: 3; margin-top: 12px; padding: 10px 0 12px; background: linear-gradient(#f5f7ef00, #f5f7ef 14px); }
   .composer-box { display: flex; align-items: flex-end; gap: 8px; padding: 8px 8px 8px 14px; border: 1px solid #d9e3cc; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 #e3e9d8, 0 6px 18px #66744312; }
   .composer-box:focus-within { border-color: #a0c46e; }
   textarea { flex: 1; min-width: 0; max-height: 160px; padding: 7px 0; border: 0; resize: none; background: transparent; color: var(--ink); font-size: 13px; line-height: 1.7; outline: none; box-shadow: none; }
@@ -322,6 +300,8 @@
   .send-button { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px; color: #fff; border: 1px solid #67b320; background: var(--green-gradient); box-shadow: inset 0 1px 0 #ffffff66, 0 2px 0 #579e22; }
   .send-button:disabled { opacity: .45; }
   .send-button.stop { border-color: #dcc9bd; background: #fff; box-shadow: 0 2px 0 #e3dbd3; }
+  .settings-button { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px; color: var(--green-ink); border: 1px solid #dce3d1; background: var(--green-soft); }
+  .settings-button:hover { background: #e6f0d6; }
   .stop-square { width: 12px; height: 12px; border-radius: 3px; background: var(--ink); }
   .composer-hint { margin-top: 6px; padding-left: 4px; font-size: 10px; color: var(--muted); }
   .composer-error { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding: 8px 12px; border: 1px solid #efc7d1; border-radius: 10px; background: #fff3f5; color: #be5573; font-size: 12px; }
@@ -335,8 +315,6 @@
   @media (max-width: 560px) {
     .chat-toolbar { flex-wrap: wrap; padding: 14px; gap: 10px; }
     .summary-icon { width: 38px; height: 38px; }
-    .summary-actions { width: 100%; }
-    .summary-actions .icon-button { flex: 1; }
     .chat-thread { padding: 14px 10px; }
     .message-row { max-width: 94%; gap: 8px; }
     .tool-row { margin-left: 38px; max-width: calc(94% - 38px); }
