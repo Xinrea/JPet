@@ -1,8 +1,15 @@
 {
   "name": "sherpa-onnx-bin",
   "version": "1.13.8",
-  "description": "Prebuilt sherpa-onnx C API with its ONNX Runtime 1.28.2 (CPU, no TTS), loaded by JPet at run time",
+  "port-version": 1,
+  "description": "JPet-patched sherpa-onnx C API with ONNX Runtime 1.28.2 (CPU, no TTS), loaded at run time",
   "homepage": "https://github.com/k2-fsa/sherpa-onnx",
-  "license": "Apache-2.0 AND MIT",
-  "supports": "(windows & x64) | (osx & arm64)"
+  "license": "Apache-2.0 AND BSD-3-Clause AND MIT AND MPL-2.0",
+  "supports": "(windows & x64 & !staticcrt) | (osx & arm64)",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    }
+  ]
 }

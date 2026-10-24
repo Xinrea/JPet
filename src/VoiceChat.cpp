@@ -220,7 +220,8 @@ bool VoiceChat::StartPipeline(Voice::CascadeConfig config, nlohmann::json tools,
     std::lock_guard<std::mutex> lock(recognizerMutex_);
     if (!localRecognizer_ && recognizerError_.empty()) {
       const auto start = Clock::now();
-      localRecognizer_ = Voice::LocalRecognizer::Load(modelDirectory, recognizerError_);
+      const auto hotwords = LAppPal::WStringToString(LAppDefine::execPath) + "resources/models/sensevoice-hotwords.txt";
+      localRecognizer_ = Voice::LocalRecognizer::Load(modelDirectory, hotwords, recognizerError_);
       LAppPal::PrintLog("[Voice] Local recognizer load ok=%d ms=%lld", localRecognizer_ ? 1 : 0,
           static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count()));
     }

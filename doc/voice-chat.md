@@ -79,6 +79,11 @@ API Key 都只写不读，保存在 macOS 钥匙串或 Windows 凭据管理器�
 - 模型下载到资料目录的 `models/sensevoice-int8-2025-09-09/`，逐个文件校验大小与 SHA-256，校验通过后写入 `verified` 标记。
   目前依次尝试 Hugging Face 与 hf-mirror.com；正式发布应改为 JPet 自己的 CDN。识别与合成模型在设置中作为一组下载、取消和删除。
 - 三个模型共用随 JPet 分发的 sherpa-onnx 1.13.8 与 ONNX Runtime 1.28.2（均在运行时加载，最低 macOS 11）。
+  sherpa-onnx 由仓库 overlay port 从固定源码应用热词补丁后构建，不再直接使用官方预编译识别库。
+- 识别使用 CTC prefix beam search（beam=8），内置热词「轴伊」，每个 token 的加分权重为 12。
+  热词按模型 token 保存在随应用分发的 `resources/models/sensevoice-hotwords.txt`（`轴 伊`）；权重集中在 `src/VoiceSpeech.cpp`。
+  这是识别时的加权，不是识别后的文字替换，也不读取聊天上下文。权重可能误伤「周一」「逐一」「皱衣领」等近音词，后续按真人录音调整。
+  旧版或官方运行库缺少热词能力时明确报错，不回退成无热词识别；更新时需要重新构建 C++ 依赖和应用。
 - 识别在独立线程中进行；识别器在第一轮识别时加载（约 1 秒），加载后峰值内存约 560 MB。
 
 Apple M2 Max 上的识别实测（`voice_speech_probe`，识别使用 2 个线程）：
@@ -93,6 +98,9 @@ Apple M2 Max 上的识别实测（`voice_speech_probe`，识别使用 2 个线�
 | 加白噪声 15 dB / 5 dB | CER 19.5% / 34.9% |
 
 合成语音不能代表真人录音，结果只用于比较趋势；真实准确率还需要用真人录音验证。
+
+[SenseVoice CTC 热词实验](sensevoice-hotword-experiment.md)记录了选择权重 12 前的合成语音对照结果。
+独立探针仍可比较 greedy、beam search 与各档热词加权；构建和真人录音测试步骤见 [实验说明](../tests/README-voice-ctc-hotwords.md)。
 
 ## 本机语音合成
 
@@ -237,7 +245,9 @@ AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量�
 | `voice_tools` | 工具参数、游戏操作映射、搜索解析、B站各 action 的请求编排与结果裁剪（离线模拟接口）、取消 |
 
 `python3 tests/voice_panel_smoke_test.py` 使用临时资料目录测试原生启动、设置接口、持久化与参数校验，不写入 API Key。
-`build/macos-arm64/tests/voice_speech_probe <模型目录> [test_wavs 目录]` 在本机测量识别延迟与字错率。
+`build/macos-arm64/tests/voice_speech_probe <模型目录> resources/models/sensevoice-hotwords.txt [test_wavs 目录]`
+使用与应用相同的热词配置测量识别延迟与字错率；追加 `--wav <WAV...>` 可重放固定 16 kHz mono PCM16 WAV。
+独立运行时通过 `JPET_SHERPA_ONNX_PATH` 和 `JPET_ONNXRUNTIME_PATH` 指向构建后随包的运行库。
 设置 `JPET_QWENTTS_PATH` 为 qwentts 运行库后，`voice_synthesis_probe <合成模型目录> resources/models/joi-voice.json [输出目录]`
 测量每句开始出声的时间与 RTF；`voice_synthesis_probe reference <合成模型目录> <24 kHz 单声道 wav> <文字> <来源说明> <输出.json>`
 从一段录音重新生成音色文件。

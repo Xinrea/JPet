@@ -4,6 +4,8 @@ if(NOT TARGET unofficial::sherpa-onnx-bin::headers)
   set_target_properties(unofficial::sherpa-onnx-bin::headers PROPERTIES
       INTERFACE_INCLUDE_DIRECTORIES "${_sherpa_prefix}/include/onnxruntime;${_sherpa_prefix}/include")
 endif()
+# Reject cached stock sherpa packages at configure time, before runtime loading.
+set(SHERPA_ONNX_BIN_JPET_HOTWORDS_VERSION 1)
 # Shared libraries to ship with the application; JPet loads them at run time.
 set(SHERPA_ONNX_BIN_RUNTIMES "@runtimes@")
 set(SHERPA_ONNX_BIN_ONNXRUNTIME "${_sherpa_prefix}/@destination@/@ort_runtime@")

@@ -9,8 +9,10 @@ namespace Voice {
 // install only disables local recognition.
 class LocalRecognizer {
  public:
-  // `directory` holds model.int8.onnx and tokens.txt.
-  static std::unique_ptr<LocalRecognizer> Load(const std::string& directory, std::string& error);
+  // `directory` holds model.int8.onnx and tokens.txt. `hotwordsFile` is the
+  // bundled UTF-8 token file. Uses JPet's patched CTC decoder, beam 8, score 12.
+  static std::unique_ptr<LocalRecognizer> Load(const std::string& directory, const std::string& hotwordsFile,
+                                               std::string& error);
   ~LocalRecognizer();
   // Transcribes one utterance of 16 kHz mono s16le PCM. Not reentrant: call
   // from one thread at a time.

@@ -41,15 +41,15 @@ fi
 echo "Building settings panel..."
 (cd "${ROOT_DIR}/resources/panel" && npm run build)
 
-if [[ ! -d "${VCPKG_INSTALLED_DIR}/arm64-osx/share/unofficial-webrtc-audio-processing" ||
-      ! -d "${VCPKG_INSTALLED_DIR}/arm64-osx/share/unofficial-qwentts" ]]; then
-  echo "Installing C++ dependencies..."
-  "${VCPKG_DIR}/vcpkg" install \
-    --triplet arm64-osx \
-    --x-install-root="${VCPKG_INSTALLED_DIR}" \
-    --overlay-ports="${ROOT_DIR}/build-scripts/ports" \
-    --disable-metrics
-fi
+# vcpkg's incremental install also checks overlay port/patch changes. Directory
+# existence alone would keep an old runtime after an update (e.g. pre-hotword sherpa).
+echo "Checking C++ dependencies..."
+"${VCPKG_DIR}/vcpkg" install \
+  --triplet arm64-osx \
+  --x-manifest-root="${ROOT_DIR}" \
+  --x-install-root="${VCPKG_INSTALLED_DIR}" \
+  --overlay-ports="${ROOT_DIR}/build-scripts/ports" \
+  --disable-metrics
 
 echo "Configuring JPet (${BUILD_TYPE}, arm64)..."
 cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}" -G Ninja \
