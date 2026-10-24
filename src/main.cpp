@@ -83,10 +83,12 @@ int main() {
     return 1;
   }
   
-  wchar_t curPath[256];
-  GetModuleFileName(GetModuleHandle(NULL), static_cast<LPWSTR>(curPath),
-                    sizeof(curPath));
-  LAppDefine::execPath = std::wstring(curPath);
+  wchar_t curPath[MAX_PATH];
+  GetModuleFileName(GetModuleHandle(NULL), curPath, MAX_PATH);
+  // Callers append "resources/...", so keep the directory with a trailing
+  // separator, as mainMac.mm does.
+  LAppDefine::execPath =
+      std::filesystem::path(curPath).parent_path().wstring() + L"\\";
 
   // check dumpfile
   const wstring dumpfile =
