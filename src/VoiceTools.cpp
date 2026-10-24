@@ -103,7 +103,7 @@ json ToolDefinitions() {
       {{"action", Enum({"start_task", "queue_task", "cancel_task", "remove_queued_task", "move_queued_task", "upgrade_attribute", "refund_attribute", "upgrade_task_queue", "star_up", "change_clothes"})},
        {"task_id", Integer(1, 13)}, {"entry_id", Integer(1, INT64_MAX)}, {"direction", Enum({"up", "down"})},
        {"attribute", Enum({"speed", "endurance", "strength", "will", "intellect"})}, {"clothes_id", Integer(0, 2)}}, {"action"}),
-    Definition("jpet_settings", "读取或按用户要求调整JPet日常设置。get的section默认all，可选audio/display/interaction/notifications/shortcuts/clothes/appearance。update一次修改一个section，只修改settings中提供的字段，其余保持原样；section和settings字段对应为：audio为volume(0-100)、mute、idle_audio、touch_audio；display为scale(0-3)、green、limit；interaction为track、dropfile；notifications为dynamic、live、update；appearance为long_hair(长发true/短发false)、left_ear、right_ear、hat(贝雷帽)、glasses、star_eyes、dizzy_eyes、sweat、dark_face、blush、leg_accessories、shoes、tail、gun等布尔开关和mouth(嘴型1-6)。add_watch/remove_watch修改本机通知关注列表（不是B站账号关注），需要uid。set_shortcut配置轮盘方向与类型，application/folder的target必须是用户提供的本机绝对路径，website必须是完整HTTP/HTTPS链接；settings/disabled无需target，不会自动打开入口。change_clothes需要先get clothes查解锁状态，clothes_id为0绿色、1粉色、2冬装，游戏会验证解锁条件。不能读取或修改账号登录、Cookie、AI服务或凭据。",
+    Definition("jpet_settings", "读取或按用户要求调整JPet日常设置。get的section默认all，可选audio/display/interaction/notifications/shortcuts/clothes/appearance。update一次修改一个section，只修改settings中提供的字段，其余保持原样；section和settings字段对应为：audio为volume(0-100)、mute、idle_audio、touch_audio；display为scale(0-3)、green、limit；interaction为track、dropfile；notifications为dynamic、live、update；appearance为long_hair(长发true/短发false)、left_ear、right_ear、hat(贝雷帽)、glasses、star_eyes、dizzy_eyes、sweat、dark_face、blush、leg_accessories、shoes、tail、gun等布尔开关和mouth(嘴型1-6)。get notifications（或all）的watch_list返回uid和uname（名称尚未加载时为空），可按用户描述的名称匹配UID；重名或无法确定时先向用户确认。add_watch/remove_watch修改本机通知关注列表（不是B站账号关注），需要uid。set_shortcut配置轮盘方向与类型，application/folder的target必须是用户提供的本机绝对路径，website必须是完整HTTP/HTTPS链接；settings/disabled无需target，不会自动打开入口。change_clothes需要先get clothes查解锁状态，clothes_id为0绿色、1粉色、2冬装，游戏会验证解锁条件。不能读取或修改账号登录、Cookie、AI服务或凭据。",
       {{"action", Enum({"get", "update", "add_watch", "remove_watch", "set_shortcut", "change_clothes"})},
        {"section", Enum({"all", "audio", "display", "interaction", "notifications", "shortcuts", "clothes", "appearance"})},
        {"settings", {{"type", "object"}, {"additionalProperties", false}, {"properties", {
@@ -286,6 +286,15 @@ json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies, con
     // Network/library errors can contain request headers; never forward them.
     return Fail("工具执行失败，请检查网络和登录状态后重试");
   }
+}
+
+json WatchListView(const std::vector<std::string>& uids, const std::map<std::string, WatchTarget>& targets) {
+  json list = json::array();
+  for (const auto& uid : uids) {
+    const auto target = targets.find(uid);
+    list.push_back({{"uid", uid}, {"uname", target == targets.end() ? "" : target->second.uname}});
+  }
+  return list;
 }
 
 json GameView(const json& game, const std::string& section, size_t offset, size_t limit) {

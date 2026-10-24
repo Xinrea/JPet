@@ -1,6 +1,8 @@
 #pragma once
 
 #include "VoiceCommon.hpp"
+#include "StateMessage.hpp"
+#include <map>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -23,6 +25,8 @@ nlohmann::json ExecuteTool(const ToolCall& call, const ToolDependencies& depende
     const std::function<bool()>& cancelled = {});
 // `game` is a GameManager snapshot whose profile may carry the medal level.
 nlohmann::json GameView(const nlohmann::json& game, const std::string& section, size_t offset = 0, size_t limit = 5);
+// Preserve the configured list even when a watcher's cached name is not available yet.
+nlohmann::json WatchListView(const std::vector<std::string>& uids, const std::map<std::string, WatchTarget>& targets);
 
 class ToolExecutor {
  public:
