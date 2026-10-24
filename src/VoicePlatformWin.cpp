@@ -126,7 +126,9 @@ struct WinState {
   std::atomic<uint64_t> played{0};  // Reply samples written to the device since StopPlayback.
   HWND indicator = nullptr;
   bool indicatorError = false;
-  std::wstring indicatorText;
+  std::wstring indicatorText, indicatorShortcutHint;
+  int indicatorPulseFrame = -1;
+  int indicatorHeight = Indicator::MinHeight;
   HFONT font = nullptr;
   HFONT titleFont = nullptr;
   HFONT shortcutFont = nullptr;
@@ -153,9 +155,10 @@ LRESULT CALLBACK IndicatorProc(HWND window, UINT message, WPARAM wparam, LPARAM 
     const auto oldBitmap = SelectObject(dc, bitmap);
     const int saved = SaveDC(dc);
     SetMapMode(dc, MM_ANISOTROPIC);
-    SetWindowExtEx(dc, Width, Height, nullptr);
+    const int height = state->indicatorHeight;
+    SetWindowExtEx(dc, Width, height, nullptr);
     SetViewportExtEx(dc, rect.right, rect.bottom, nullptr);
-    rect = {0, 0, Width, Height};
+    rect = {0, 0, Width, height};
     HBRUSH brush = CreateSolidBrush(color(Background));
     FillRect(dc, &rect, brush);
     DeleteObject(brush);
@@ -178,16 +181,32 @@ LRESULT CALLBACK IndicatorProc(HWND window, UINT message, WPARAM wparam, LPARAM 
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, RGB(255, 255, 255));
     SelectObject(dc, state->titleFont);
-    RECT title{14, 5, 220, 24};
+    RECT title{14, 5, 150, 24};
     DrawTextW(dc, L"JPet · 语音对话", -1, &title, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
     SelectObject(dc, GetStockObject(DC_BRUSH));
     SelectObject(dc, GetStockObject(NULL_PEN));
     SetDCBrushColor(dc, RGB(255, 255, 255));
-    RoundRect(dc, 277, 5, 326, 23, 14, 14);
+    RoundRect(dc, 150, 5, Width - 14, 23, 14, 14);
     SetTextColor(dc, color(state->indicatorError ? Error : Ink));
     SelectObject(dc, state->shortcutFont);
-    RECT shortcut{277, 5, 326, 23};
-    DrawTextW(dc, L"Ctrl", -1, &shortcut, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    RECT shortcut{150, 5, Width - 14, 23};
+    DrawTextW(dc, state->indicatorShortcutHint.c_str(), -1, &shortcut,
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+    if (state->indicatorPulseFrame >= 0) {
+      // Expand outward while fading into the body background over one pulse.
+      const int frame = state->indicatorPulseFrame;
+      const int radius = 18 + (5 * frame + 15) / 30;
+      const auto fade = [frame](int a, int b) { return a + (b - a) * frame / 30; };
+      HPEN pulsePen = CreatePen(PS_SOLID, 2,
+          RGB(fade(Accent.red, Background.red), fade(Accent.green, Background.green),
+              fade(Accent.blue, Background.blue)));
+      const auto previousPen = SelectObject(dc, pulsePen);
+      SelectObject(dc, GetStockObject(NULL_BRUSH));
+      Ellipse(dc, 31 - radius, 56 - radius, 31 + radius, 56 + radius);
+      SelectObject(dc, previousPen);
+      DeleteObject(pulsePen);
+      SelectObject(dc, GetStockObject(DC_BRUSH));
+    }
     SetDCBrushColor(dc, color(soft));
     Ellipse(dc, 14, 39, 48, 73);
     HPEN micPen = CreatePen(PS_SOLID, 2, color(state->indicatorError ? Error : Accent));
@@ -202,19 +221,19 @@ LRESULT CALLBACK IndicatorProc(HWND window, UINT message, WPARAM wparam, LPARAM 
     SelectObject(dc, oldPen);
     DeleteObject(micPen);
     brush = CreateSolidBrush(color(soft));
-    RECT footer{0, Height - 5, Width, Height};
+    RECT footer{0, height - 5, Width, height};
     FillRect(dc, &footer, brush);
     DeleteObject(brush);
     HPEN border = CreatePen(PS_SOLID, 1, color(state->indicatorError ? ErrorTop : Border));
     SelectObject(dc, border);
-    RoundRect(dc, 0, 0, Width, Height, Radius * 2, Radius * 2);
+    RoundRect(dc, 0, 0, Width, height, Radius * 2, Radius * 2);
     SelectObject(dc, oldPen);
     DeleteObject(border);
     SelectObject(dc, state->font);
-    wchar_t text[512]{};
-    GetWindowTextW(window, text, 512);
-    RECT body{60, 34, 324, 80};
-    DrawTextW(dc, text, -1, &body, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX | DT_END_ELLIPSIS);
+    SetTextColor(dc, color(state->indicatorError ? Error : Ink));
+    RECT body{BodyLeft, BodyTop, Width - BodyRight, height - BodyBottom};
+    DrawTextW(dc, state->indicatorText.c_str(), -1, &body,
+        DT_LEFT | DT_WORDBREAK | DT_NOPREFIX | DT_END_ELLIPSIS);
     RestoreDC(dc, saved);
     GetClientRect(window, &rect);
     BitBlt(target, 0, 0, rect.right, rect.bottom, dc, 0, 0, SRCCOPY);
@@ -313,8 +332,12 @@ class WinPlatform final : public Platform {
     state_->played = 0;
   }
 
-  void ShowIndicator(GLFWwindow* window, const std::string& text, bool error) override {
-    if (text.empty()) { if (state_->indicator) ShowWindow(state_->indicator, SW_HIDE); return; }
+  void ShowIndicator(GLFWwindow* window, const Indicator::Content& content) override {
+    if (content.text.empty()) {
+      if (state_->indicator) ShowWindow(state_->indicator, SW_HIDE);
+      state_->indicatorPulseFrame = -1;
+      return;
+    }
     if (!state_->indicator) {
       WNDCLASSW type{};
       type.lpfnWndProc = IndicatorProc;
@@ -328,17 +351,29 @@ class WinPlatform final : public Platform {
       state_->shortcutFont = CreateFontW(-10, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
           OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
       state_->indicator = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-          type.lpszClassName, L"", WS_POPUP, 0, 0, Indicator::Width, Indicator::Height, nullptr, nullptr, type.hInstance, state_.get());
-      SetWindowRgn(state_->indicator, CreateRoundRectRgn(0, 0, Indicator::Width, Indicator::Height,
+          type.lpszClassName, L"", WS_POPUP, 0, 0, Indicator::Width, Indicator::MinHeight, nullptr, nullptr, type.hInstance, state_.get());
+      SetWindowRgn(state_->indicator, CreateRoundRectRgn(0, 0, Indicator::Width, Indicator::MinHeight,
           Indicator::Radius * 2, Indicator::Radius * 2), TRUE);
     }
-    const auto wideText = Wide(text);
-    const bool changed = state_->indicatorError != error || state_->indicatorText != wideText;
-    state_->indicatorError = error;
+    const auto wideText = Wide(content.text);
+    const auto wideHint = Wide(content.shortcutHint);
     if (state_->indicatorText != wideText) {
-      state_->indicatorText = wideText;
-      SetWindowTextW(state_->indicator, wideText.c_str());
+      // Measure with the same font, width and wrapping flags used by WM_PAINT.
+      HDC dc = GetDC(state_->indicator);
+      const auto previousFont = SelectObject(dc, state_->font);
+      RECT body{0, 0, Indicator::BodyWidth, 0};
+      DrawTextW(dc, wideText.c_str(), -1, &body, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX | DT_CALCRECT);
+      state_->indicatorHeight = Indicator::HeightForText(body.bottom - body.top);
+      SelectObject(dc, previousFont);
+      ReleaseDC(state_->indicator, dc);
     }
+    const int frame = content.microphoneOn && !content.error ? Indicator::PulseFrame() : -1;
+    const bool changed = state_->indicatorError != content.error || state_->indicatorText != wideText ||
+        state_->indicatorShortcutHint != wideHint || state_->indicatorPulseFrame != frame;
+    state_->indicatorError = content.error;
+    state_->indicatorText = wideText;
+    state_->indicatorShortcutHint = wideHint;
+    state_->indicatorPulseFrame = frame;
     RECT pet, screen;
     GetWindowRect(glfwGetWin32Window(window), &pet);
     MONITORINFO monitor{};
@@ -346,7 +381,7 @@ class WinPlatform final : public Platform {
     GetMonitorInfoW(MonitorFromRect(&pet, MONITOR_DEFAULTTONEAREST), &monitor);
     screen = monitor.rcWork;
     const UINT dpi = GetDpiForWindow(glfwGetWin32Window(window));
-    const int width = MulDiv(Indicator::Width, dpi, 96), height = MulDiv(Indicator::Height, dpi, 96);
+    const int width = MulDiv(Indicator::Width, dpi, 96), height = MulDiv(state_->indicatorHeight, dpi, 96);
     RECT previous;
     GetWindowRect(state_->indicator, &previous);
     if (previous.right - previous.left != width || previous.bottom - previous.top != height)

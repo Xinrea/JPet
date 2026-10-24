@@ -2,6 +2,7 @@
 #include "VoiceEventQueue.hpp"
 #include "VoiceShortcut.hpp"
 #include "VoiceHistory.hpp"
+#include "VoiceIndicatorStyle.hpp"
 #include "voice_history_helpers.hpp"
 
 #include <iostream>
@@ -18,6 +19,21 @@ void Check(bool condition, const char* description) {
 int main() {
   try {
     Check(Voice::Trim(" \n sk-test \r") == "sk-test" && !Voice::ValidApiKey("sk-test\r\nHeader: injected"), "credential header validation");
+    Check(Voice::Indicator::ShortcutHint("Ctrl", false) == "按 Ctrl 开启/关闭收音" &&
+          Voice::Indicator::ShortcutHint("Ctrl", true) == "按住 Ctrl 开始收音" &&
+          Voice::Indicator::ShortcutHint("Option", false) == "按 Option 开启/关闭收音" &&
+          Voice::Indicator::ShortcutHint("Option", true) == "按住 Option 开始收音", "indicator shortcut hint follows input mode and platform");
+    Check(Voice::Indicator::BodyText("这是回复", "正在思考…", false) == "这是回复" &&
+          Voice::Indicator::BodyText("这是回复", "麦克风不可用", true) == "麦克风不可用" &&
+          Voice::Indicator::BodyText("", "正在思考…", false) == "正在思考…", "indicator prioritizes errors and falls back to status");
+    Check(Voice::Indicator::HeightForText(16) == Voice::Indicator::MinHeight &&
+          Voice::Indicator::HeightForText(48) == 94 &&
+          Voice::Indicator::HeightForText(64) == 110 &&
+          Voice::Indicator::HeightForText(1000) == Voice::Indicator::MaxHeight,
+          "indicator height follows wrapped text within compact and maximum bounds");
+    const std::string longReply = std::string(1024, 'a') + "\n下一段回复";
+    Check(Voice::Indicator::BodyText(longReply, "正在回复…", false) == longReply,
+          "indicator passes full streaming text and line breaks to native wrapping");
     Check(Voice::ValidAudioDeviceId("") && Voice::ValidAudioDeviceId("{0.0.1.00000000}.{6f1e7a3c-0b2d-4e5f-9a8b-1c2d3e4f5a6b}") &&
           Voice::ValidAudioDeviceId("AppleUSBAudioEngine:Logitech:StreamCam:1:2"), "audio device ids");
     Check(!Voice::ValidAudioDeviceId("id\nother") && !Voice::ValidAudioDeviceId(std::string(257, 'a')), "audio device id limits");
