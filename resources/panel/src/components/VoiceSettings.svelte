@@ -55,6 +55,7 @@
   let modelBusy = false, modelError = "";
   $: speechModel = voiceStatus?.speech_model;
   const megabytes = value => (Number(value || 0) / 1048576).toFixed(0);
+  $: modelPercent = speechModel?.total > 0 ? Math.min(100, Math.floor(100 * speechModel.received / speechModel.total)) : 0;
   async function speechModelAction(action) {
     modelBusy = true; modelError = "";
     try {
@@ -168,8 +169,12 @@
       <div class="voice-tool">
         {#if speechModel?.state === "ready"}<strong>本机语音模型已就绪</strong><p class="setting-help">你的语音只在本机识别（SenseVoice），轴伊的声音在本机合成（Qwen3-TTS），都不会上传。模型约占 1.5 GB 磁盘，对话时约占 3 GB 内存，空闲两分钟后释放。</p>
           <Button size="xs" color="alternative" on:click={() => speechModelAction("remove")} disabled={modelBusy}>删除模型</Button>
-        {:else if speechModel?.state === "downloading"}<strong>正在下载语音模型 {megabytes(speechModel.received)} / {megabytes(speechModel.total)} MB</strong>
-          <Button size="xs" color="alternative" on:click={() => speechModelAction("cancel")} disabled={modelBusy}>取消</Button>
+        {:else if speechModel?.state === "downloading"}<strong>正在下载语音模型 · {modelPercent}%</strong>
+          <div class="model-progress-row">
+            <progress class="model-progress" value={speechModel.received || 0} max={speechModel.total || 1} aria-label="语音模型下载进度"></progress>
+            <Button size="xs" color="alternative" on:click={() => speechModelAction("cancel")} disabled={modelBusy}>取消</Button>
+          </div>
+          <p class="setting-help">{megabytes(speechModel.received)} / {megabytes(speechModel.total)} MB</p>
         {:else}<strong>需要先下载本机语音模型</strong><p class="setting-help">语音识别与轴伊的声音合成共约 1.5 GB，下载一次即可，都在本机运行。</p>
           {#if speechModel?.error}<p class="feedback error">{speechModel.error}</p>{/if}
           <Button size="xs" on:click={() => speechModelAction("download")} disabled={modelBusy}>下载模型</Button>
@@ -223,6 +228,11 @@
   .voice-settings { display: flex; flex-direction: column; gap: 16px; }
   .link-button { color: var(--green-ink); text-decoration: underline; padding: 0 2px; }
   .link-button:disabled { color: var(--muted); text-decoration: none; }
+  .model-progress-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 2px; }
+  .model-progress { display: block; flex: 1; min-width: 0; height: 8px; border: 0; border-radius: 8px; overflow: hidden; background: #edf2e4; }
+  .model-progress::-webkit-progress-bar { background: #edf2e4; border-radius: 8px; }
+  .model-progress::-webkit-progress-value { background: var(--green-gradient); border-radius: 8px; transition: width .3s ease; }
+  .model-progress::-moz-progress-bar { background: #8dce38; border-radius: 8px; }
   .device-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
   @media (max-width: 420px) { .device-row { grid-template-columns: 1fr; gap: 0; } }
   /* A compact dropdown that reads as part of the shortcut sentence. */
