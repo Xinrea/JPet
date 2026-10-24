@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { Button, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell } from "flowbite-svelte";
+  /** @type {{ login: boolean, info: { confirm?: boolean } } | null} */
   export let account_info = null;
   const boards = [{ key: "starcnt", title: "星级榜", label: "星级" }, { key: "exp", title: "经验榜", label: "持有经验" }, { key: "attr", title: "属性榜", label: "总属性值" }];
   let metric = "starcnt", entries = [], me = null, offset = 0, loading = false, error = "";
@@ -22,7 +23,7 @@
       const response = await fetch("/api/account/share", { method: enabled ? "POST" : "DELETE" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "参与排行榜失败");
-      account_info.info.confirm = enabled;
+      if (account_info) account_info.info.confirm = enabled;
       await load();
     } catch (failure) { error = failure.message; }
   }

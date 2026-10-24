@@ -375,7 +375,7 @@
         <div class="account-card">
           {#key account_info.info.avatar}
             <img src={account_info.info.avatar || fanAvatar} alt={`${account_info.info.uname}的头像`} class="account-avatar"
-              on:error={(event) => { const image = event.currentTarget; if (image.getAttribute("src") !== fanAvatar) image.src = fanAvatar; }} />
+              on:error={(event) => { const image = /** @type {HTMLImageElement} */ (event.currentTarget); if (image.getAttribute("src") !== fanAvatar) image.src = fanAvatar; }} />
           {/key}
           <div class="account-copy"><strong>{account_info.info.uname}</strong><span class="level-badge">轴芯等级 Lv.{account_info.info.level}</span><p>等级能起到与智力类似的效果</p></div>
         </div>

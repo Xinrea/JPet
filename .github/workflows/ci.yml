@@ -1,0 +1,73 @@
+name: Lint and test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  panel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: resources/panel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: resources/panel/package-lock.json
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Check Svelte and JS types
+        run: npm run check
+      - name: Build
+        run: npm run build
+
+  cloud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: cloud
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cloud/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      # worker-configuration.d.ts is generated from wrangler.jsonc and not committed.
+      - name: Generate Worker types
+        run: npm run types
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Errors only (syntax, undefined names, unused imports); the scripts keep a compact style.
+      - name: Lint scripts
+        run: pipx run ruff==0.14.0 check --select E9,F tests build-scripts
+      - name: Test cloud build configuration
+        run: python3 tests/cloud_config_test.py

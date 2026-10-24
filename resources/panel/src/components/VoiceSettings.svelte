@@ -5,12 +5,34 @@
   import UiIcon from "./UiIcon.svelte";
 
   // Credentials are write-only; the API never returns a saved key.
-  let voiceInputMode = "toggle";
-  const voiceInputModes = [{ value: "toggle", name: "开关 · 全双工" }, { value: "hold", name: "按住 · 半双工" }];
+  let voiceInputMode = "toggle", savedInputMode = "toggle";
+  const voiceInputModes = [{ value: "toggle", name: "按一下" }, { value: "hold", name: "按住" }];
   // Microphone and speaker; "" is the system default. A saved device that is
   // not connected stays selectable, and the default is used until it returns.
   let inputDevice = "", outputDevice = "", savedInputDevice = "", savedOutputDevice = "";
   let audioDevices = { inputs: [], outputs: [] }, devicesRefreshing = false;
+  // Shortcut mode and devices save as soon as they change, apart from the chat settings form.
+  let audioSaving = false, audioError = "";
+  async function saveAudioSettings() {
+    audioSaving = true; audioError = "";
+    try {
+      const response = await fetch("/api/config/voice", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input_mode: voiceInputMode, input_device: inputDevice, output_device: outputDevice }),
+      });
+      const settings = await response.json();
+      if (!response.ok) throw new Error(settings.error || "保存失败");
+      if (voiceDisposed) return;
+      applyAudioSettings(settings);
+      await refreshVoiceStatus();
+    } catch (error) {
+      if (voiceDisposed) return;
+      audioError = error.message;
+      voiceInputMode = savedInputMode; inputDevice = savedInputDevice; outputDevice = savedOutputDevice;
+    } finally {
+      if (!voiceDisposed) audioSaving = false;
+    }
+  }
   const deviceItems = (devices, saved) => [{ value: "", name: "系统默认" },
     ...devices.map(device => ({ value: device.id, name: device.name || device.id })),
     ...(saved && !devices.some(device => device.id === saved) ? [{ value: saved, name: "已选择的设备（未连接，暂用系统默认）" }] : [])];
@@ -53,11 +75,14 @@
     } catch (_) { /* The next refresh retries a temporarily unavailable panel. */ }
     finally { voiceRefreshing = false; }
   }
-  function applySettings(settings) {
-    voiceInputMode = settings.input_mode || "toggle";
+  function applyAudioSettings(settings) {
+    voiceInputMode = savedInputMode = settings.input_mode || "toggle";
     inputDevice = savedInputDevice = settings.input_device || "";
     outputDevice = savedOutputDevice = settings.output_device || "";
     audioDevices = settings.audio_devices || audioDevices;
+  }
+  function applySettings(settings) {
+    applyAudioSettings(settings);
     voiceWorkspace = settings.workspace_id || "";
     voiceHasKey = !!settings.has_api_key;
     catalog = settings.catalog || catalog;
@@ -79,8 +104,7 @@
   }
   async function saveVoiceSettings(clearKey = false, clearChatKey = false) {
     voiceSaving = true; voiceError = ""; voiceMessage = "";
-    const payload = { workspace_id: voiceWorkspace.trim(), input_mode: voiceInputMode, input_device: inputDevice,
-      output_device: outputDevice, chat_model: chatModel.trim(), chat_base_url: chatBaseUrl.trim() };
+    const payload = { workspace_id: voiceWorkspace.trim(), chat_model: chatModel.trim(), chat_base_url: chatBaseUrl.trim() };
     if (clearKey) payload.clear_api_key = true;
     else if (voiceApiKey.trim()) payload.api_key = voiceApiKey.trim();
     if (clearChatKey) payload.clear_chat_api_key = true;
@@ -131,8 +155,16 @@
 </script>
 
 <div class="voice-settings">
-    <SettingCard title="语音对话" description="快捷键与本机语音模型" icon="mic">
-      <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong><p>{#if voiceInputMode === "hold"}按住 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 打断回复并录音，松开后停止录音、播放回复。{:else}按 <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> 开启或关闭麦克风；开启后可连续对话，说话时可打断回复。{/if}</p></div></div>
+    <SettingCard title="语音对话" description="快捷键、声音设备与本机语音模型" icon="mic">
+      <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong>
+        <p><select class="mode-select" aria-label="快捷键使用方式" bind:value={voiceInputMode} on:change={saveAudioSettings} disabled={voiceLoading || audioSaving}>{#each voiceInputModes as mode}<option value={mode.value}>{mode.name}</option>{/each}</select>
+          <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> {#if voiceInputMode === "hold"}打断回复并录音，松开后停止录音、播放回复。{:else}开启或关闭麦克风；开启后可连续对话，说话时可打断回复。{/if}</p></div></div>
+      <div class="device-row">
+        <div class="setting-field"><label for="voice-input-device">麦克风</label><Select id="voice-input-device" items={inputItems} bind:value={inputDevice} on:change={saveAudioSettings} placeholder="" disabled={voiceLoading || audioSaving} /></div>
+        <div class="setting-field"><label for="voice-output-device">扬声器</label><Select id="voice-output-device" items={outputItems} bind:value={outputDevice} on:change={saveAudioSettings} placeholder="" disabled={voiceLoading || audioSaving} /></div>
+      </div>
+      <p class="setting-help">轴伊的回复从所选扬声器播放。插拔设备后可<button type="button" class="link-button" on:click={refreshDevices} disabled={devicesRefreshing}>{devicesRefreshing ? "刷新中…" : "刷新设备列表"}</button>；所选设备未连接时暂用系统默认。</p>
+      {#if audioError}<p class="feedback error" role="alert">{audioError}</p>{/if}
       <div class="voice-tool">
         {#if speechModel?.state === "ready"}<strong>本机语音模型已就绪</strong><p class="setting-help">你的语音只在本机识别（SenseVoice），轴伊的声音在本机合成（Qwen3-TTS），都不会上传。模型约占 1.5 GB 磁盘，对话时约占 3 GB 内存，空闲两分钟后释放。</p>
           <Button size="xs" color="alternative" on:click={() => speechModelAction("remove")} disabled={modelBusy}>删除模型</Button>
@@ -145,11 +177,7 @@
         {#if modelError}<p class="feedback error" role="alert">{modelError}</p>{/if}
       </div>
     </SettingCard>
-    <SettingCard title="对话设置" description="快捷键方式、声音设备和大模型" icon="settings">
-      <div class="setting-field"><label for="voice-input-mode">Option / Ctrl 使用方式</label><Select id="voice-input-mode" items={voiceInputModes} bind:value={voiceInputMode} disabled={voiceLoading || voiceSaving} /></div>
-      <div class="setting-field"><label for="voice-input-device">麦克风</label><Select id="voice-input-device" items={inputItems} bind:value={inputDevice} placeholder="" disabled={voiceLoading || voiceSaving} /></div>
-      <div class="setting-field"><label for="voice-output-device">扬声器</label><Select id="voice-output-device" items={outputItems} bind:value={outputDevice} placeholder="" disabled={voiceLoading || voiceSaving} /></div>
-      <p class="setting-help">轴伊的回复从所选扬声器播放。插拔设备后可<button type="button" class="link-button" on:click={refreshDevices} disabled={devicesRefreshing}>{devicesRefreshing ? "刷新中…" : "刷新设备列表"}</button>；所选设备未连接时暂用系统默认。</p>
+    <SettingCard title="对话设置" description="百炼 API Key 和大模型" icon="settings">
       <div class="setting-field"><label for="voice-api-key">百炼 API Key<span>{voiceHasKey ? "已保存" : "待设置"}</span></label><Input id="voice-api-key" type="password" bind:value={voiceApiKey} placeholder={voiceHasKey ? "已保存；输入新 Key 可替换" : "sk-…"} autocomplete="off" spellcheck="false" maxlength={512} disabled={voiceLoading || voiceSaving} /></div>
       <div class="setting-field"><label for="voice-workspace">业务空间 ID</label><Input id="voice-workspace" bind:value={voiceWorkspace} placeholder="填写 API Key 所属的业务空间 ID" autocomplete="off" spellcheck="false" maxlength={63} disabled={voiceLoading || voiceSaving} /></div>
       <p class="setting-help">北京地域的 API Key 和业务空间，用于网页搜索、查看桌面，以及未填写接口地址时的大模型。API Key 保存在本机系统凭据存储中。</p>
@@ -195,4 +223,14 @@
   .voice-settings { display: flex; flex-direction: column; gap: 16px; }
   .link-button { color: var(--green-ink); text-decoration: underline; padding: 0 2px; }
   .link-button:disabled { color: var(--muted); text-decoration: none; }
+  .device-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+  @media (max-width: 420px) { .device-row { grid-template-columns: 1fr; gap: 0; } }
+  /* A compact dropdown that reads as part of the shortcut sentence. */
+  .voice-shortcut .mode-select { display: inline-block; min-height: 0; height: 22px; padding: 0 20px 0 8px; margin-right: 2px; vertical-align: 1px;
+    font-size: 11px; font-weight: 800; line-height: 20px; color: var(--green-ink); cursor: pointer;
+    border: 1px solid #cfe2b7; border-radius: 6px; background-color: #f4f9ea; box-shadow: 0 1px 0 #d8e7c6;
+    appearance: none; -webkit-appearance: none; background-repeat: no-repeat; background-position: right 6px center; background-size: 8px 8px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23578a27' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+  .voice-shortcut .mode-select:hover:not(:disabled) { border-color: #a0c46e; }
+  .voice-shortcut .mode-select:disabled { cursor: default; opacity: .7; }
 </style>
