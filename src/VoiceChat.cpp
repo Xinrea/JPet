@@ -416,7 +416,7 @@ void VoiceChat::Tick(GLFWwindow* window) {
       else if (result.call.name == "game_action") visible["label"] = "游戏操作";
       else if (result.call.name == "jpet_settings") visible["label"] = "JPet 设置";
       else if (result.call.name == "web_search") visible["label"] = "网页搜索";
-      else if (result.call.name == "bilibili_search") visible["label"] = "B站搜索";
+      else if (result.call.name == "bilibili") visible["label"] = "B站";
       else if (result.call.name == "open_url") visible["label"] = "打开网页";
       else visible["label"] = "工具";
       for (const auto* key : {"error", "sources", "results", "url"})

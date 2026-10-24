@@ -22,8 +22,6 @@ nlohmann::json ExecuteTool(const ToolCall& call, const ToolDependencies& depende
     const std::function<bool()>& cancelled = {});
 // `game` is a GameManager snapshot whose profile may carry the medal level.
 nlohmann::json GameView(const nlohmann::json& game, const std::string& section, size_t offset = 0, size_t limit = 5);
-nlohmann::json BilibiliSearchResults(const nlohmann::json& response,
-    const std::string& kind, int limit);
 nlohmann::json WebSearchResults(const nlohmann::json& response, int limit);
 
 class ToolExecutor {

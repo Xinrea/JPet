@@ -1,13 +1,16 @@
 #include "VoiceToolsNetwork.hpp"
 #include "VoiceTools.hpp"
+#include "VoiceBilibili.hpp"
 #include "BilibiliDynamic.hpp"
 #include <cpr/cpr.h>
+#include <algorithm>
 #include <ctime>
 
 namespace Voice {
 namespace {
 using nlohmann::json;
 json Fail(const std::string& error) { return {{"ok", false}, {"error", error}}; }
+const char* const kBilibiliApiHosts[] = {"https://api.bilibili.com/", "https://api.live.bilibili.com/", "https://api.vc.bilibili.com/"};
 struct HttpResult { json body; int status = 0; std::string error; };
 
 HttpResult Request(const std::string& url, const cpr::Header& headers, const json* body = nullptr) {
@@ -68,42 +71,22 @@ json SearchWeb(const json& query, const std::string& workspace, const std::strin
   return WebSearchResults(response.body, query.at("limit").get<int>());
 }
 
-json SearchBilibili(const json& query, const std::string& cookies, const std::string& uid) {
-  if (cookies.empty() || uid.empty()) return Fail("请先在JPet中登录B站账号");
+json QueryBilibili(const json& request, const std::string& cookies, const std::string& uid) {
   if (cookies.size() > 65536 || cookies.find_first_of("\r\n") != std::string::npos) return Fail("B站登录信息格式异常，请重新登录");
   const auto built = BilibiliDynamic::BuildHeaders(cookies, BilibiliDynamic::kDefaultUserAgent, {},
     BilibiliDynamic::FetchBuvid3(BilibiliDynamic::kDefaultUserAgent));
-  cpr::Header headers;
-  for (const auto& [key, value] : built) headers[key] = value;
-  headers["Referer"] = "https://search.bilibili.com/";
-  const auto nav = Request("https://api.bilibili.com/x/web-interface/nav", headers);
-  if (!nav.error.empty()) return Fail(nav.error);
-  if (nav.status == 412 || nav.status == 429) return Fail("B站搜索触发了访问限制，请稍后再试");
-  if (nav.status != 200) return Fail("B站登录验证失败，请稍后再试");
-  if (nav.body.value("code", -1) != 0 || !nav.body.contains("data") || !nav.body["data"].value("isLogin", false))
-    return Fail("B站登录已失效，请重新登录JPet");
-  const auto& account = nav.body.at("data");
-  const auto mid = account.at("mid").is_string() ? account.at("mid").get<std::string>() : account.at("mid").dump();
-  if (mid != uid) return Fail("B站Cookie与JPet登录账号不一致，请重新登录");
-  const auto key = [](const std::string& url) {
-    auto slash = url.find_last_of('/'), dot = url.find_last_of('.');
-    return slash != std::string::npos && dot != std::string::npos && dot > slash + 1 ? url.substr(slash + 1, dot - slash - 1) : std::string{};
+  cpr::Header credentialed;
+  for (const auto& [key, value] : built) credentialed[key] = value;
+  const BilibiliGet get = [&](const std::string& url, const std::string& referer) -> BilibiliReply {
+    if (url.compare(0, 8, "https://") != 0) return {{}, 0, "B站工具只访问 HTTPS 接口"};
+    // Cookies go only to Bilibili's API hosts, never to CDN or other hosts.
+    const bool api = std::any_of(std::begin(kBilibiliApiHosts), std::end(kBilibiliApiHosts),
+      [&](const char* host) { return url.compare(0, std::char_traits<char>::length(host), host) == 0; });
+    cpr::Header headers = api ? credentialed : cpr::Header{{"User-Agent", BilibiliDynamic::kDefaultUserAgent}};
+    headers["Referer"] = referer;
+    auto response = Request(url, headers);
+    return {std::move(response.body), response.status, std::move(response.error)};
   };
-  const auto& wbi = account.at("wbi_img");
-  const auto img = key(wbi.at("img_url").get<std::string>()), sub = key(wbi.at("sub_url").get<std::string>());
-  if (img.size() != 32 || sub.size() != 32) return Fail("无法获取B站搜索签名，请稍后重试");
-  const std::map<std::string, std::string> kinds{{"video", "video"}, {"user", "bili_user"}, {"live", "live_room"},
-    {"article", "article"}, {"bangumi", "media_bangumi"}, {"film", "media_ft"}};
-  const std::map<std::string, std::string> orders{{"relevance", "totalrank"}, {"latest", "pubdate"}, {"views", "click"}, {"favorites", "stow"}};
-  json params = {{"keyword", query.at("query")}, {"search_type", kinds.at(query.at("type").get<std::string>())},
-    {"order", orders.at(query.at("order").get<std::string>())}, {"page", query.at("page")}, {"page_size", 20}, {"platform", "pc"}};
-  const auto response = Request("https://api.bilibili.com/x/web-interface/wbi/search/type?" +
-    BilibiliDynamic::SignQuery(params, img, sub, std::time(nullptr)), headers);
-  if (!response.error.empty()) return Fail(response.error);
-  if (response.status == 412 || response.status == 429) return Fail("B站搜索触发了访问限制，请稍后再试");
-  if (response.status != 200) return Fail("B站搜索接口连接失败，请稍后再试");
-  auto result = BilibiliSearchResults(response.body, query.at("type"), query.at("limit").get<int>());
-  if (result.value("ok", false)) result["query"] = query.at("query");
-  return result;
+  return RunBilibili(request, uid, get, static_cast<int64_t>(std::time(nullptr)));
 }
 } // namespace Voice
