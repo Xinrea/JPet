@@ -20,9 +20,28 @@
 namespace {
 NSStatusItem* statusItem;
 JPetMenuActions* menuActions;
+
+void InstallEditMenu() {
+  // GLFW creates the application and Window menus, but no editing commands.
+  // WKWebView relies on these key equivalents and the Cocoa responder chain.
+  NSMenu* edit = [[NSMenu alloc] initWithTitle:@"编辑"];
+  [edit addItemWithTitle:@"撤销" action:@selector(undo:) keyEquivalent:@"z"];
+  NSMenuItem* redo = [edit addItemWithTitle:@"重做" action:@selector(redo:) keyEquivalent:@"z"];
+  redo.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagShift;
+  [edit addItem:NSMenuItem.separatorItem];
+  [edit addItemWithTitle:@"剪切" action:@selector(cut:) keyEquivalent:@"x"];
+  [edit addItemWithTitle:@"复制" action:@selector(copy:) keyEquivalent:@"c"];
+  [edit addItemWithTitle:@"粘贴" action:@selector(paste:) keyEquivalent:@"v"];
+  [edit addItemWithTitle:@"全选" action:@selector(selectAll:) keyEquivalent:@"a"];
+  // Leave targets nil so commands reach the focused WebView or native field.
+  NSMenuItem* item = [[NSMenuItem alloc] initWithTitle:edit.title action:nil keyEquivalent:@""];
+  item.submenu = edit;
+  [NSApp.mainMenu insertItem:item atIndex:1];
+}
 }
 
 void MacDesktop::Initialize(GLFWwindow* window) {
+  InstallEditMenu();
   NSWindow* native = glfwGetCocoaWindow(window);
   native.opaque = NO;
   native.backgroundColor = NSColor.clearColor;
