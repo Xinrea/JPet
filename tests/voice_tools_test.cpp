@@ -20,6 +20,19 @@ int main() {
     Check(definitions.size() == 15, "focused queries and action tools registered within relay limit");
     for (const auto& definition : definitions) Check(definition["type"] == "function" &&
       definition["function"]["parameters"]["additionalProperties"] == false, "nested Qwen schema with closed arguments");
+    const std::map<std::string, WatchTarget> watchTargets = {
+      {"123", {"123", "room-id", "中文名称", "private room title"}},
+      {"456", {"456", "", "中文名称", ""}},
+      {"789", {"789", "", "", ""}},
+      {"999", {"999", "", "not configured", ""}}
+    };
+    Check(Voice::WatchListView({"456", "123", "789", "888"}, watchTargets) == json::array({
+      json{{"uid", "456"}, {"uname", "中文名称"}}, json{{"uid", "123"}, {"uname", "中文名称"}},
+      json{{"uid", "789"}, {"uname", ""}}, json{{"uid", "888"}, {"uname", ""}}
+    }), "watch list exposes only UID and cached name, preserves order and duplicate names, and keeps unresolved UIDs");
+    Check(Voice::WatchListView({}, watchTargets) == json::array(), "empty configured watch list remains an array");
+    Check(Voice::WatchListView({"123"}, {}) == json::array({json{{"uid", "123"}, {"uname", ""}}}),
+      "unavailable notification service preserves configured UIDs with empty names");
     int mutations = 0, queries = 0, external = 0, opens = 0;
     std::string openedUrl;
     json last;
