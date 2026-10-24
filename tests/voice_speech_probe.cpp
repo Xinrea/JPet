@@ -91,12 +91,15 @@ struct Stats {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc < 2) { std::cerr << "Usage: voice_speech_probe <SenseVoice model directory> [test_wavs directory]\n"; return 2; }
+  if (argc < 3) {
+    std::cerr << "Usage: voice_speech_probe <SenseVoice model directory> <hotwords file> [test_wavs directory | --wav WAV...]\n";
+    return 2;
+  }
   using Clock = std::chrono::steady_clock;
   const auto ms = [](Clock::time_point start) { return std::chrono::duration<double, std::milli>(Clock::now() - start).count(); };
   std::string error;
   auto start = Clock::now();
-  auto recognizer = Voice::LocalRecognizer::Load(argv[1], error);
+  auto recognizer = Voice::LocalRecognizer::Load(argv[1], argv[2], error);
   if (!recognizer) { std::cerr << "load failed: " << error << '\n'; return 1; }
   std::printf("model load %.0f ms\n", ms(start));
   // The first decode pays for lazy initialisation; report it separately.
@@ -104,9 +107,20 @@ int main(int argc, char** argv) {
   recognizer->Transcribe(std::string(32000, '\0'));
   std::printf("warm-up decode %.0f ms\n\n", ms(start));
 
-  if (argc > 2) {
+  // Replay fixed fixtures through the same wrapper/config as the application.
+  if (argc > 3 && std::string(argv[3]) == "--wav") {
+    if (argc < 5) { std::cerr << "--wav requires at least one PCM16 mono 16 kHz WAV\n"; return 2; }
+    for (int i = 4; i < argc; ++i) {
+      const auto pcm = ReadWav(argv[i]);
+      if (pcm.empty()) { std::cerr << "Cannot read WAV: " << argv[i] << '\n'; return 1; }
+      std::cout << argv[i] << '\t' << recognizer->Transcribe(pcm) << '\n';
+    }
+    return 0;
+  }
+
+  if (argc > 3) {
     for (const char* name : {"zh", "yue", "en", "ja", "ko"}) {
-      const auto pcm = ReadWav(std::string(argv[2]) + "/" + name + ".wav");
+      const auto pcm = ReadWav(std::string(argv[3]) + "/" + name + ".wav");
       if (pcm.empty()) continue;
       start = Clock::now();
       const auto text = recognizer->Transcribe(pcm);

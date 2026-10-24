@@ -5,6 +5,8 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <type_traits>
 #include <vector>
 
@@ -16,6 +18,10 @@
 
 namespace Voice {
 namespace {
+// Keep tuning here; the tokenized vocabulary ships in resources/models/sensevoice-hotwords.txt.
+constexpr float kHotwordsScore = 12.0f;
+constexpr int kBeamWidth = 8;
+
 // Function table resolved from the shared library; the header only provides types.
 struct Sherpa {
   decltype(&SherpaOnnxCreateOfflineRecognizer) createRecognizer = nullptr;
@@ -26,6 +32,7 @@ struct Sherpa {
   decltype(&SherpaOnnxDecodeOfflineStream) decode = nullptr;
   decltype(&SherpaOnnxGetOfflineStreamResult) result = nullptr;
   decltype(&SherpaOnnxDestroyOfflineRecognizerResult) destroyResult = nullptr;
+  bool available = false;
   std::string error;
 };
 
@@ -48,6 +55,14 @@ const Sherpa& LoadSherpa() {
       function = reinterpret_cast<std::remove_reference_t<decltype(function)>>(symbol(name));
       return function != nullptr;
     };
+    // Stock sherpa exits on an unsupported decoding method. Check the patched
+    // capability before creating any recognizer, including with an env override.
+    using HotwordsVersion = int32_t (*)();
+    const auto hotwordsVersion = reinterpret_cast<HotwordsVersion>(symbol("SherpaOnnxJpetSenseVoiceHotwordsVersion"));
+    if (!hotwordsVersion || hotwordsVersion() != 1) {
+      sherpa.error = "本地语音识别组件不支持热词解码，请重新安装 JPet";
+      return false;
+    }
     if (!bind(sherpa.createRecognizer, "SherpaOnnxCreateOfflineRecognizer") ||
         !bind(sherpa.destroyRecognizer, "SherpaOnnxDestroyOfflineRecognizer") ||
         !bind(sherpa.createStream, "SherpaOnnxCreateOfflineStream") ||
@@ -59,6 +74,7 @@ const Sherpa& LoadSherpa() {
       sherpa.error = "无法加载本地语音识别组件 sherpa-onnx，请重新安装 JPet";
       return false;
     }
+    sherpa.available = true;
     return true;
   }();
   (void)loaded;
@@ -86,9 +102,18 @@ struct LocalRecognizer::Impl {
 LocalRecognizer::LocalRecognizer(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
 LocalRecognizer::~LocalRecognizer() = default;
 
-std::unique_ptr<LocalRecognizer> LocalRecognizer::Load(const std::string& directory, std::string& error) {
+std::unique_ptr<LocalRecognizer> LocalRecognizer::Load(const std::string& directory, const std::string& hotwordsFile,
+                                                       std::string& error) {
+  error.clear();
   const auto& sherpa = LoadSherpa();
-  if (!sherpa.createRecognizer) { error = sherpa.error; return nullptr; }
+  if (!sherpa.available) { error = sherpa.error; return nullptr; }
+  // A missing resource is an installation error, not a reason to silently disable hotwords.
+  std::ifstream hotwords(std::filesystem::u8path(hotwordsFile));
+  hotwords >> std::ws;
+  if (!hotwords || hotwords.peek() == std::ifstream::traits_type::eof()) {
+    error = "无法读取本地语音热词表，请重新安装 JPet";
+    return nullptr;
+  }
   const auto model = directory + "/model.int8.onnx", tokens = directory + "/tokens.txt";
   SherpaOnnxOfflineRecognizerConfig config;
   std::memset(&config, 0, sizeof(config));
@@ -100,11 +125,14 @@ std::unique_ptr<LocalRecognizer> LocalRecognizer::Load(const std::string& direct
   config.model_config.tokens = tokens.c_str();
   config.model_config.num_threads = 2;
   config.model_config.provider = "cpu";
-  config.decoding_method = "greedy_search";
+  config.decoding_method = "jpet_ctc_beam_search";
+  config.max_active_paths = kBeamWidth;
+  config.hotwords_file = hotwordsFile.c_str();
+  config.hotwords_score = kHotwordsScore;
   auto impl = std::make_unique<Impl>();
   impl->sherpa = &sherpa;
   impl->recognizer = sherpa.createRecognizer(&config);
-  if (!impl->recognizer) { error = "无法加载本地语音识别模型，请重新下载"; return nullptr; }
+  if (!impl->recognizer) { error = "无法加载本地语音识别模型或热词表，请检查安装及模型文件"; return nullptr; }
   return std::unique_ptr<LocalRecognizer>(new LocalRecognizer(std::move(impl)));
 }
 

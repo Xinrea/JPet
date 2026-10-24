@@ -136,6 +136,8 @@ jobs:
         run: |
           cmake --build build/release --config Release --parallel 3
           ctest --test-dir build/release -C Release --output-on-failure
+      - name: Verify patched speech runtime package
+        run: python build-scripts/ports/sherpa-onnx-bin/test-package.py build/vcpkg_installed/${{ matrix.triplet }}
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh

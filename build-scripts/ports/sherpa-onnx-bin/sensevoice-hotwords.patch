@@ -1,0 +1,426 @@
+--- /dev/null
++++ b/sherpa-onnx/csrc/offline-sense-voice-ctc-beam-search-decoder.h
+@@ -0,0 +1,246 @@
++// Experimental JPet SenseVoice CTC prefix beam search; not an upstream decoder.
++#ifndef SHERPA_ONNX_CSRC_OFFLINE_SENSE_VOICE_CTC_BEAM_SEARCH_DECODER_H_
++#define SHERPA_ONNX_CSRC_OFFLINE_SENSE_VOICE_CTC_BEAM_SEARCH_DECODER_H_
++
++#include <algorithm>
++#include <cmath>
++#include <fstream>
++#include <limits>
++#include <map>
++#include <memory>
++#include <numeric>
++#include <sstream>
++#include <stdexcept>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "sherpa-onnx/csrc/context-graph.h"
++#include "sherpa-onnx/csrc/macros.h"
++#include "sherpa-onnx/csrc/offline-ctc-decoder.h"
++#include "sherpa-onnx/csrc/symbol-table.h"
++
++namespace sherpa_onnx {
++
++// No segmentation, per-line scores or implicit <unk> fallback. UTF-8 tokens
++// must already match tokens.txt exactly. Blank lines are ignored.
++inline bool ReadJpetSenseVoiceHotwords(
++    std::istream &is, const SymbolTable &symbols, int32_t blank,
++    std::vector<std::vector<int32_t>> *phrases) {
++  phrases->clear();
++  std::string line;
++  int32_t line_number = 0;
++  while (std::getline(is, line)) {
++    ++line_number;
++    std::istringstream input(line);
++    std::vector<int32_t> ids;
++    std::string token;
++    while (input >> token) {
++      if (!symbols.Contains(token)) {
++        SHERPA_ONNX_LOGE("hotwords line %d: unknown token '%s' (use whitespace "
++                         "tokenized UTF-8)", line_number, token.c_str());
++        return false;
++      }
++      int32_t id = symbols[token];
++      if (id < 0 || id == blank ||
++          (token.front() == '<' && token.back() == '>') ||
++          (token.front() == '[' && token.back() == ']')) {
++        SHERPA_ONNX_LOGE("hotwords line %d: reserved/blank token '%s' (id %d)",
++                         line_number, token.c_str(), id);
++        return false;
++      }
++      ids.push_back(id);
++    }
++    if (!ids.empty()) phrases->push_back(std::move(ids));
++  }
++  return !is.bad();
++}
++
++class OfflineSenseVoiceCtcBeamSearchDecoder : public OfflineCtcDecoder {
++ public:
++  OfflineSenseVoiceCtcBeamSearchDecoder(
++      int32_t blank, int32_t beam, float score,
++      const std::vector<std::vector<int32_t>> &phrases = {})
++      : blank_(blank), beam_(beam) {
++    if (blank < 0 || beam < 1 || beam > 128 || !std::isfinite(score) ||
++        score < 0 || score > 100) {
++      throw std::invalid_argument("jpet_ctc_beam_search: beam must be 1..128, "
++                                  "hotwords_score finite and 0..100");
++    }
++    for (const auto &phrase : phrases) {
++      if (phrase.empty()) throw std::invalid_argument("empty hotword");
++      for (int32_t id : phrase) {
++        if (id < 0 || id == blank) throw std::invalid_argument("invalid hotword");
++        hotword_ids_.push_back(id);
++      }
++    }
++    std::sort(hotword_ids_.begin(), hotword_ids_.end());
++    hotword_ids_.erase(std::unique(hotword_ids_.begin(), hotword_ids_.end()),
++                       hotword_ids_.end());
++    if (!phrases.empty()) graph_ = std::make_unique<ContextGraph>(phrases, score);
++  }
++
++  std::vector<OfflineCtcDecoderResult> Decode(
++      Ort::Value logits, Ort::Value lengths) override {
++    auto shape = logits.GetTensorTypeAndShapeInfo().GetShape();
++    auto length_shape = lengths.GetTensorTypeAndShapeInfo().GetShape();
++    if (shape.size() != 3 || length_shape.size() != 1 ||
++        length_shape[0] != shape[0] || shape[1] < 4 || shape[2] <= blank_ ||
++        shape[1] > std::numeric_limits<int32_t>::max() ||
++        shape[2] > std::numeric_limits<int32_t>::max()) {
++      throw std::invalid_argument("invalid SenseVoice logits/lengths shape");
++    }
++    const auto *data = logits.GetTensorData<float>();
++    const auto *lens = lengths.GetTensorData<int64_t>();
++    std::vector<OfflineCtcDecoderResult> result;
++    for (int64_t b = 0; b < shape[0]; ++b) {
++      if (lens[b] < 4 || lens[b] > shape[1])
++        throw std::invalid_argument("invalid SenseVoice valid frame length");
++      result.push_back(DecodeOne(data + b * shape[1] * shape[2],
++                                 lens[b], shape[2]));
++    }
++    return result;
++  }
++
++ private:
++  static double NegInf() { return -std::numeric_limits<double>::infinity(); }
++  static double Add(double a, double b) {
++    if (a == NegInf()) return b;
++    if (b == NegInf()) return a;
++    return std::max(a, b) + std::log1p(std::exp(-std::abs(a - b)));
++  }
++  struct Ending {
++    double sum = NegInf();
++    double best = NegInf();
++    std::vector<int32_t> times;
++  };
++  struct Hypothesis {
++    std::vector<int64_t> tokens;
++    Ending blank, nonblank;
++    const ContextState *state = nullptr;
++    double bonus = 0;
++  };
++  static void Merge(Ending *to, const Ending &from, double score,
++                    int32_t append_time = -1) {
++    to->sum = Add(to->sum, from.sum + score);
++    if (from.best + score > to->best) {
++      to->best = from.best + score;
++      to->times = from.times;
++      if (append_time >= 0) to->times.push_back(append_time);
++    }
++  }
++  double Rank(const Hypothesis &h, bool final) const {
++    return Add(h.blank.sum, h.nonblank.sum) + h.bonus +
++           (final && graph_ ? graph_->Finalize(h.state).first : 0);
++  }
++
++  OfflineCtcDecoderResult DecodeOne(const float *data, int32_t frames,
++                                    int32_t vocab) const {
++    if (!hotword_ids_.empty() && hotword_ids_.back() >= vocab)
++      throw std::invalid_argument("hotword token ID exceeds model vocabulary");
++    OfflineCtcDecoderResult result;
++    // SenseVoice prepends FOUR metadata FRAMES, not four collapsed CTC tokens.
++    // Copy even blanks/repeats, never reward them, and reset CTC for text.
++    for (int32_t t = 0; t < 4; ++t) {
++      const float *row = data + static_cast<int64_t>(t) * vocab;
++      result.tokens.push_back(std::max_element(row, row + vocab) - row);
++      result.timestamps.push_back(t);
++    }
++    Hypothesis initial;
++    initial.blank.sum = initial.blank.best = 0;
++    initial.state = graph_ ? graph_->Root() : nullptr;
++    std::vector<Hypothesis> beam{initial};
++    for (int32_t t = 4; t < frames; ++t) {
++      const float *row = data + static_cast<int64_t>(t) * vocab;
++      std::vector<int32_t> candidates(vocab);
++      std::iota(candidates.begin(), candidates.end(), 0);
++      // Raw logits and log-softmax give identical rankings: all paths consume
++      // one score per frame. Subtract max for numeric stability, keeping the
++      // acoustic log-sums separate from deterministic per-prefix context scores.
++      double offset = NegInf();
++      for (int32_t id = 0; id < vocab; ++id) {
++        if (std::isnan(row[id]) || row[id] == -NegInf())
++          throw std::invalid_argument("non-finite SenseVoice logits");
++        offset = std::max(offset, static_cast<double>(row[id]));
++      }
++      if (!std::isfinite(offset))
++        throw std::invalid_argument("non-finite SenseVoice logits");
++      int32_t k = std::min(beam_, vocab);
++      std::partial_sort(candidates.begin(), candidates.begin() + k,
++                        candidates.end(), [row](int32_t a, int32_t b) {
++        return row[a] != row[b] ? row[a] > row[b] : a < b;
++      });
++      candidates.resize(k);
++      // Cache hotword IDs once; do not walk ContextGraph for each vocab entry.
++      candidates.insert(candidates.end(), hotword_ids_.begin(), hotword_ids_.end());
++      candidates.push_back(blank_);
++      for (const auto &h : beam)
++        if (!h.tokens.empty()) candidates.push_back(h.tokens.back());
++      std::sort(candidates.begin(), candidates.end());
++      candidates.erase(std::unique(candidates.begin(), candidates.end()),
++                        candidates.end());
++      std::map<std::vector<int64_t>, Hypothesis> next;
++      for (const auto &h : beam) {
++        for (int32_t id : candidates) {
++          double acoustic = row[id] - offset;
++          if (acoustic == NegInf()) continue;
++          if (!std::isfinite(acoustic))
++            throw std::invalid_argument("non-finite SenseVoice logits");
++          bool repeat = !h.tokens.empty() && id == h.tokens.back();
++          auto tokens = h.tokens;
++          bool extend = id != blank_;
++          if (extend) tokens.push_back(id);
++          auto &dest = next[tokens];
++          dest.tokens = tokens;
++          dest.state = h.state;
++          dest.bonus = h.bonus;
++          if (extend && graph_) {
++            auto step = graph_->ForwardOneStep(h.state, id);
++            dest.bonus += std::get<0>(step);
++            dest.state = std::get<1>(step);
++          }
++          if (id == blank_) {
++            Merge(&dest.blank, h.blank, acoustic);
++            Merge(&dest.blank, h.nonblank, acoustic);
++          } else {
++            // Repeated labels extend only after blank; uninterrupted repeats
++            // remain on the same prefix and receive no additional context bonus.
++            Merge(&dest.nonblank, h.blank, acoustic, t);
++            if (!repeat) Merge(&dest.nonblank, h.nonblank, acoustic, t);
++            if (repeat) {
++              auto &same = next[h.tokens];
++              same.tokens = h.tokens;
++              same.state = h.state;
++              same.bonus = h.bonus;
++              Merge(&same.nonblank, h.nonblank, acoustic);
++            }
++          }
++        }
++      }
++      beam.clear();
++      for (auto &kv : next)
++        if (Add(kv.second.blank.sum, kv.second.nonblank.sum) != NegInf())
++          beam.push_back(std::move(kv.second));
++      bool final = t == frames - 1;
++      std::sort(beam.begin(), beam.end(), [&](const Hypothesis &a,
++                                             const Hypothesis &b) {
++        double x = Rank(a, final), y = Rank(b, final);
++        return x != y ? x > y : a.tokens < b.tokens;
++      });
++      if (beam.size() > static_cast<size_t>(beam_)) beam.resize(beam_);
++    }
++    const auto &best = beam.front();
++    result.tokens.insert(result.tokens.end(), best.tokens.begin(), best.tokens.end());
++    const auto &times = best.blank.best >= best.nonblank.best
++                            ? best.blank.times : best.nonblank.times;
++    result.timestamps.insert(result.timestamps.end(), times.begin(), times.end());
++    return result;
++  }
++
++  int32_t blank_, beam_;
++  std::vector<int32_t> hotword_ids_;
++  std::unique_ptr<ContextGraph> graph_;
++};
++
++}  // namespace sherpa_onnx
++#endif  // SHERPA_ONNX_CSRC_OFFLINE_SENSE_VOICE_CTC_BEAM_SEARCH_DECODER_H_
+--- a/sherpa-onnx/csrc/offline-recognizer.cc
++++ b/sherpa-onnx/csrc/offline-recognizer.cc
+@@ -4,6 +4,8 @@
+ 
+ #include "sherpa-onnx/csrc/offline-recognizer.h"
+ 
++#include <cmath>
++#include <fstream>
+ #include <memory>
+ #include <string>
+ #include <vector>
+@@ -22,6 +24,7 @@
+ #include "sherpa-onnx/csrc/offline-lm-config.h"
+ #include "sherpa-onnx/csrc/offline-recognizer-impl.h"
+ #include "sherpa-onnx/csrc/text-utils.h"
++#include "sherpa-onnx/csrc/offline-sense-voice-ctc-beam-search-decoder.h"
+ 
+ namespace sherpa_onnx {
+ 
+@@ -81,7 +84,28 @@
+     }
+   }
+ 
+-  if (!hotwords_file.empty() && decoding_method != "modified_beam_search") {
++  const bool jpet_beam = decoding_method == "jpet_ctc_beam_search";
++  if (jpet_beam) {
++    // Only the ONNX Runtime SenseVoice implementation installs this adapter.
++    if (model_config.sense_voice.model.empty() ||
++        !model_config.funasr_nano.encoder_adaptor.empty() ||
++        (model_config.provider != "cpu" && model_config.provider != "cuda" &&
++         model_config.provider != "coreml")) {
++      SHERPA_ONNX_LOGE("jpet_ctc_beam_search requires ONNX SenseVoice "
++                       "(cpu/cuda/coreml), not FunASR-Nano or other models");
++      return false;
++    }
++    if (max_active_paths < 1 || max_active_paths > 128 ||
++        !std::isfinite(hotwords_score) || hotwords_score < 0 ||
++        hotwords_score > 100) {
++      SHERPA_ONNX_LOGE("jpet_ctc_beam_search requires max_active_paths 1..128 "
++                       "and finite hotwords_score 0..100");
++      return false;
++    }
++  }
++
++  if (!hotwords_file.empty() && decoding_method != "modified_beam_search" &&
++      !jpet_beam) {
+     SHERPA_ONNX_LOGE(
+         "Please use --decoding-method=modified_beam_search if you"
+         " provide --hotwords-file. Given --decoding-method='%s'",
+@@ -127,7 +151,18 @@
+     return false;
+   }
+ 
+-  return model_config.Validate();
++  if (!model_config.Validate()) return false;
++  if (jpet_beam && !hotwords_file.empty()) {
++    SymbolTable symbols(model_config.tokens);
++    auto input = OpenInputFile(hotwords_file);
++    std::vector<std::vector<int32_t>> phrases;
++    if (!input || !ReadJpetSenseVoiceHotwords(input, symbols, 0, &phrases)) {
++      SHERPA_ONNX_LOGE("Invalid tokenized SenseVoice hotwords file: %s",
++                       hotwords_file.c_str());
++      return false;
++    }
++  }
++  return true;
+ }
+ 
+ std::string OfflineRecognizerConfig::ToString() const {
+--- a/sherpa-onnx/csrc/offline-recognizer-sense-voice-impl.h
++++ b/sherpa-onnx/csrc/offline-recognizer-sense-voice-impl.h
+@@ -12,9 +12,11 @@
+ #include <vector>
+ 
+ #include "Eigen/Dense"
++#include "sherpa-onnx/csrc/file-utils.h"
+ #include "sherpa-onnx/csrc/lfr.h"
+ #include "sherpa-onnx/csrc/macros.h"
+ #include "sherpa-onnx/csrc/offline-ctc-greedy-search-decoder.h"
++#include "sherpa-onnx/csrc/offline-sense-voice-ctc-beam-search-decoder.h"
+ #include "sherpa-onnx/csrc/offline-model-config.h"
+ #include "sherpa-onnx/csrc/offline-recognizer-impl.h"
+ #include "sherpa-onnx/csrc/offline-recognizer.h"
+@@ -77,6 +79,24 @@
+     if (config.decoding_method == "greedy_search") {
+       decoder_ =
+           std::make_unique<OfflineCtcGreedySearchDecoder>(meta_data.blank_id);
++    } else if (config.decoding_method == "jpet_ctc_beam_search") {
++      if (meta_data.is_funasr_nano) {
++        SHERPA_ONNX_LOGE("jpet_ctc_beam_search does not support FunASR-Nano");
++        SHERPA_ONNX_EXIT(-1);
++      }
++      std::vector<std::vector<int32_t>> phrases;
++      if (!config.hotwords_file.empty()) {
++        auto input = OpenInputFile(config.hotwords_file);
++        if (!input || !ReadJpetSenseVoiceHotwords(
++                          input, symbol_table_, meta_data.blank_id, &phrases)) {
++          SHERPA_ONNX_LOGE("Invalid SenseVoice tokenized hotwords file: %s",
++                           config.hotwords_file.c_str());
++          SHERPA_ONNX_EXIT(-1);
++        }
++      }
++      decoder_ = std::make_unique<OfflineSenseVoiceCtcBeamSearchDecoder>(
++          meta_data.blank_id, config.max_active_paths, config.hotwords_score,
++          phrases);
+     } else {
+       SHERPA_ONNX_LOGE("Only greedy_search is supported at present. Given %s",
+                        config.decoding_method.c_str());
+@@ -97,6 +117,14 @@
+     if (config.decoding_method == "greedy_search") {
+       decoder_ =
+           std::make_unique<OfflineCtcGreedySearchDecoder>(meta_data.blank_id);
++    } else if (config.decoding_method == "jpet_ctc_beam_search") {
++      if (meta_data.is_funasr_nano || !config.hotwords_file.empty()) {
++        SHERPA_ONNX_LOGE("jpet_ctc_beam_search: asset-manager hotwords and "
++                         "FunASR-Nano are unsupported");
++        SHERPA_ONNX_EXIT(-1);
++      }
++      decoder_ = std::make_unique<OfflineSenseVoiceCtcBeamSearchDecoder>(
++          meta_data.blank_id, config.max_active_paths, config.hotwords_score);
+     } else {
+       SHERPA_ONNX_LOGE("Only greedy_search is supported at present. Given %s",
+                        config.decoding_method.c_str());
+--- a/sherpa-onnx/c-api/c-api.cc
++++ b/sherpa-onnx/c-api/c-api.cc
+@@ -51,6 +51,8 @@
+ #endif
+ 
+ #define SHERPA_ONNX_OR(x, y) (x ? x : y)
++
++int32_t SherpaOnnxJpetSenseVoiceHotwordsVersion() { return 1; }
+ 
+ const char *SherpaOnnxGetVersionStr() { return sherpa_onnx::GetVersionStr(); }
+ const char *SherpaOnnxGetGitSha1() { return sherpa_onnx::GetGitSha1(); }
+@@ -659,12 +661,16 @@
+     recognizer_config.decoding_method = "greedy_search";
+   }
+ 
+-  recognizer_config.max_active_paths =
+-      SHERPA_ONNX_OR(config->max_active_paths, 4);
++  const bool jpet_beam =
++      recognizer_config.decoding_method == "jpet_ctc_beam_search";
++  // Experimental settings are explicit: preserve score=0 and reject beam=0.
++  // Keep the existing zero-means-default behavior for every other decoder.
++  recognizer_config.max_active_paths = jpet_beam
++      ? config->max_active_paths : SHERPA_ONNX_OR(config->max_active_paths, 4);
+ 
+   recognizer_config.hotwords_file = SHERPA_ONNX_OR(config->hotwords_file, "");
+-  recognizer_config.hotwords_score =
+-      SHERPA_ONNX_OR(config->hotwords_score, 1.5);
++  recognizer_config.hotwords_score = jpet_beam
++      ? config->hotwords_score : SHERPA_ONNX_OR(config->hotwords_score, 1.5);
+ 
+   recognizer_config.blank_penalty = config->blank_penalty;
+ 
+--- a/sherpa-onnx/c-api/c-api.h
++++ b/sherpa-onnx/c-api/c-api.h
+@@ -129,6 +129,9 @@
+  * @endcode
+  */
+ SHERPA_ONNX_API const char *SherpaOnnxGetVersionStr();
++
++/** JPet patch capability: returns 1 for the SenseVoice hotword CTC decoder. */
++SHERPA_ONNX_API int32_t SherpaOnnxJpetSenseVoiceHotwordsVersion();
+ 
+ /**
+  * @brief Return the Git SHA1 used to build the library.
+--- a/sherpa-onnx/c-api/sherpa-onnx-symbols-c.exp
++++ b/sherpa-onnx/c-api/sherpa-onnx-symbols-c.exp
+@@ -89,6 +89,7 @@
+ _SherpaOnnxGetOnlineStreamResultAsJson
+ _SherpaOnnxGetOnnxruntimeVersionStr
+ _SherpaOnnxGetVersionStr
++_SherpaOnnxJpetSenseVoiceHotwordsVersion
+ _SherpaOnnxIsKeywordStreamReady
+ _SherpaOnnxIsOnlineStreamReady
+ _SherpaOnnxLinearResamplerResample

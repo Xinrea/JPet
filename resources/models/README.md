@@ -14,6 +14,13 @@ SHA-256：
 2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f  smart-turn-v3.2-cpu.onnx
 ```
 
+## 语音识别热词
+
+`sensevoice-hotwords.txt` 随应用分发，每行是一个短语在 SenseVoice `tokens.txt` 中的 token，用空格分隔。
+目前只有 `轴 伊`。应用用打过补丁的 sherpa-onnx CTC beam search 识别，beam=8、每 token 热词权重=12；
+权重统一定义在 `src/VoiceSpeech.cpp`。增加词条时必须核对模型词表，不能直接粘贴未分词短语或注释。
+当前不会加载聊天上下文，也不会将转写中的同音词强行替换；权重过高仍可能误伤普通近音词。
+
 ## 轴伊的声音
 
 `joi-voice.json` 是本机语音合成（Qwen3-TTS 12Hz 0.6B Base）上下文克隆用的音色，已获授权随 JPet 分发：
