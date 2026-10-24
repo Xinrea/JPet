@@ -1,5 +1,7 @@
 #include "VoiceTools.hpp"
 #include "VoiceToolsNetwork.hpp"
+#include "VoiceDeepSeekWeb.hpp"
+#include "VoiceWebFetch.hpp"
 #include "VoiceDesktop.hpp"
 #include "VoicePlatform.hpp"
 #include "DataManager.hpp"
@@ -161,6 +163,20 @@ json ReadBilibili(const json& query) {
   }
   return QueryBilibili(query, cookies, uid);
 }
+// Resolve the selected service at execution time; keys stay in this adapter,
+// never in tool arguments, results, or conversation history.
+json ReadWebTool(const json& request, const std::function<bool()>& cancelled, bool fetch) {
+  if (cancelled && cancelled()) return Fail("网页工具已取消");
+  const auto settings = DataManager::GetInstance()->GetVoiceSettings();
+  if (settings.at("chat_provider") != "deepseek")
+    return fetch ? FetchWebPage(request.at("url").get<std::string>(), cancelled) : QueryWebSearch(request, cancelled);
+  std::string error;
+  const auto key = LoadChatApiKey(LAppPal::WStringToString(LAppDefine::documentPath), "deepseek", error);
+  if (!error.empty() || key.empty()) return Fail("无法读取DeepSeek API Key，请在对话设置中重新保存");
+  // Do not silently switch services after a paid API error or send a DeepSeek
+  // key to the user's third-party base URL.
+  return fetch ? QueryDeepSeekFetch(request, key, cancelled) : QueryDeepSeekSearch(request, key, cancelled);
+}
 } // namespace
 
 ToolDependencies MakeToolDependencies() {
@@ -169,7 +185,8 @@ ToolDependencies MakeToolDependencies() {
     ReadDesktop, ReadBilibili, ::Platform::OpenWebURL,
     [](const json& request, const std::function<bool()>& cancelled) {
       return settingsQueue.Invoke([request] { return ApplySettings(request); }, cancelled);
-    }};
+    }, [](const json& request, const std::function<bool()>& cancelled) { return ReadWebTool(request, cancelled, false); },
+    [](const json& request, const std::function<bool()>& cancelled) { return ReadWebTool(request, cancelled, true); }};
 }
 void DrainSettingsTools() { settingsQueue.Drain(); }
 void CancelSettingsTools() { settingsQueue.Cancel(); }

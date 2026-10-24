@@ -260,12 +260,17 @@
       <SettingToggle label="支持图片输入" bind:checked={chatVision} disabled={voiceLoading || chatSaving} />
       {/if}
       {/if}
+      {#if chatProvider === "deepseek"}
+      <p class="setting-help">网页搜索与读取会复用此 Key 调用 DeepSeek 官方 Search / Fetch API，可能产生独立于对话的按次费用。</p>
+      {:else if chatProvider}
+      <p class="setting-help">网页搜索使用免 Key 的 DuckDuckGo，网页读取由本机提取基础文本；不支持登录或需要 JavaScript 的页面。</p>
+      {/if}
       <div class="setting-actions"><Button size="sm" on:click={() => saveChatSettings()} disabled={voiceLoading || chatSaving || !chatProvider}>{chatSaving ? "保存中…" : "保存大模型设置"}</Button>{#if chatProvider && chatHasKey && chatProvider === savedProvider}<Button size="sm" color="alternative" on:click={() => saveChatSettings(true)} disabled={voiceLoading || chatSaving}>移除 Key</Button>{/if}</div>
       {#if voiceError || chatError}<p class="feedback error" role="alert">{chatError || voiceError}</p>{/if}
       {#if chatMessage}<p class="feedback success" role="status">{chatMessage}</p>{/if}
     </SettingCard>
     <SettingCard title="对话与工具状态" description="查看最近的回复和执行结果" icon="spark">
-      <p class="setting-help">可调整声音、显示、桌面互动、通知、轮盘和装扮，查看桌面、查询游戏数据、安排或取消任务、升级属性、搜索 B 站，以及用默认浏览器打开网页。B 站搜索使用当前登录账号；查看桌面会把截图发给所选大模型，Mac 首次使用需允许录屏权限。</p>
+      <p class="setting-help">可调整声音、显示、桌面互动、通知、轮盘和装扮，查看桌面、查询游戏数据、安排或取消任务、升级属性、搜索 B 站和公开网页、读取网页正文，以及用默认浏览器打开网页。B 站搜索使用当前登录账号；查看桌面会把截图发给所选大模型，Mac 首次使用需允许录屏权限。</p>
       {#if voiceStatus?.message}<p class="feedback" class:error={voiceStatus.state === "error"} aria-live="polite">{voiceStatus.message}</p>{/if}
       {#if voiceStatus?.reply}<p class="voice-reply">{voiceStatus.reply}</p>{/if}
       {#if voiceStatus?.last_tool}

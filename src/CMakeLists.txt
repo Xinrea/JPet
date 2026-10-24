@@ -45,6 +45,12 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolArgs.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceBilibili.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceBilibili.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceWebSearch.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceWebSearch.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceWebFetch.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceWebFetch.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceDeepSeekWeb.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/VoiceDeepSeekWeb.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceSettingsQueue.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolsRuntime.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceToolsNetwork.cpp

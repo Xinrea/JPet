@@ -151,7 +151,7 @@ Apple M2 Max（Metal）实测：每句开始出声约 0.2–0.4 秒，合成速�
 
 可直接说「看看我的桌面」「现在有多少经验，哪些任务能做」「把读书加入队列」
 「取消当前任务」「智力升一点」「去B站搜千问教程」「这个视频讲了什么」「我关注的主播谁在直播」「看看我的稍后再看」「用浏览器打开B站」
-「打开刚才搜索的第一个结果」「把音量调到30」「关闭鼠标追踪」「换成粉色衣服」。
+「搜一下今天的科技新闻」「读取这个链接的正文并总结」「打开刚才搜索的第一个结果」「把音量调到30」「关闭鼠标追踪」「换成粉色衣服」。
 工具执行状态显示在宠物旁边和语音设置中，设置页还会显示最近一次 B 站搜索的结果链接。
 
 | 工具 | 能力 |
@@ -167,6 +167,8 @@ Apple M2 Max（Metal）实测：每句开始出声约 0.2–0.4 秒，合成速�
 | `get_game_statistics` | 查询累计统计、连胜和陪伴日期。 |
 | `game_action` | 开始/安排/取消任务，移除/移动队列项，队列扩容，属性加点/退点，升星和换衣服。任务ID和队列entry_id从游戏状态读取，每次属性操作为一点。 |
 | `jpet_settings` | 读取或调整音量/静音/互动与闲置语音、绿幕/帧率限制/角色缩放、鼠标追踪/文件回收、动态/直播/更新通知、本机通知关注列表、四方向轮盘入口、衣服，以及发型/耳饰/帽子/眼镜/眼睛与脸颊效果/腿饰/鞋子/尾巴/枪/嘴型。仅更新指定字段，服装复用游戏的解锁校验；返回实际设置。 |
+| `web_search` | 搜索公开网页：选择DeepSeek服务时使用其Search API，否则使用免 Key 的DuckDuckGo。`query` 为关键词（最多512 UTF-8字节；DeepSeek额外限制128个Unicode字符），`limit` 默认为5、范围1–5；返回标题、摘要及来源URL。 |
+| `web_fetch` | 读取已知公开HTTP/HTTPS链接：选择DeepSeek服务时使用其Fetch API返回Markdown，否则本机抓取HTML或纯文本并提取基础文本。参数为`url`（最多2048字节），结果包含标题、正文、来源和截断标记；不打开浏览器。 |
 | `bilibili` | 只读的B站查询，用 `action` 选择功能（见下表）。需要时获取WBI密钥签名；账号相关功能先验证Cookie属于JPet登录账号。不点赞、投币、关注或发消息。 |
 | `open_url` | 将完整HTTP/HTTPS地址交给系统默认浏览器打开，可打开用户提供的链接或搜索结果；返回系统是否接受打开请求，不判断网页加载状态。 |
 
@@ -215,6 +217,19 @@ B站Cookie仅用于发往 `api.bilibili.com`、`api.live.bilibili.com` 和 `api.
 搜索服务限流、Cookie过期或录屏权限不足时，工具返回可读错误，不能编造搜索或画面结果。
 截图与搜索中的文字按外部数据处理，不作为额外操作指令。
 
+### 网页工具的服务选择与边界
+
+- **DeepSeek**：两项工具复用本机保存的DeepSeek API Key，分别调用固定的 `https://api.deepseek.com/v1/tools/search` 和 `/v1/tools/fetch`。选择依据是服务ID `deepseek`，不是模型名称或第三方Base URL；经OpenRouter或第三方接口使用DeepSeek模型不会触发此路由。不会把Key发给待抓取的网址，不跟随API重定向。
+- **其他服务**：搜索关键词发送到 `https://html.duckduckgo.com/html/`；读取网页时由本机直接请求目标网站，不携带JPet Cookie或模型API Key，不使用系统代理或 `.netrc` 凭据。仅允许公网HTTP/HTTPS，连接时检查实际目标IP以阻止内网、回环、链路本地地址及DNS重绑定；最多跟随3次经过同样校验的重定向，不允许HTTPS降级为HTTP。
+- **Fallback含义**：非DeepSeek服务使用上述基础实现；搜索不可用且已有用户提供或工具返回的来源URL时，agent可以调用`web_fetch`。不猜测来源地址，不在DeepSeek API失败后静默切换服务。
+
+请求设有超时、取消和2 MiB响应上限；正文按UTF-8边界裁剪，返回`truncated`标记，工具结果控制在12 KB以内。
+本机抓取不运行JavaScript，不支持登录、PDF等二进制内容，也不是完整的浏览器或正文阅读器；验证码、限流、页面不可提取或服务错误会如实返回。
+DeepSeek缺Key、Key无效或余额不足会明确提示，不自动重试收费请求。按[官方文档](https://api-docs.deepseek.com/guides/search)，Search和Fetch按成功请求单独计费（当前各为每1000次0.75美元），与对话Token费用分开，最终以服务方说明为准。
+
+搜索词或URL会发送到相应服务/目标网站；搜索结果、网页正文会交给配置的大模型用于回答。工具历史仅保存有界的参数与结果元数据（来源、标题、服务、截断状态等），不保存抓取正文或凭据；模型回复文字仍随对话保存。
+不要将账号凭据或其他敏感信息放入关键词或URL。所有网页内容都是未经核实的外部数据，不是操作指令；回答应注明来源，搜索摘要不能替代全文核实。
+
 ## 回声消除（Windows）
 
 Windows 录音和播放使用 WASAPI 共享模式，打开设置中选择的设备（未选择或未连接时用默认设备）；由系统音频引擎在设备格式与 16 kHz（录音）/24 kHz（播放）
@@ -242,7 +257,10 @@ AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量�
 | `voice_turn` | VAD 状态机、Whisper 特征、Silero 与 Smart Turn 实际模型（Mac 用系统语音合成测试音频） |
 | `voice_models` | 模型下载：镜像回退、哈希校验失败、取消与重新下载，识别与合成模型的合并状态 |
 | `voice_echo` | AEC3 回声衰减、单讲与双讲时近端语音保留，以及无参考信号时的对照 |
-| `voice_tools` | 工具参数、游戏操作映射、搜索解析、B站各 action 的请求编排与结果裁剪（离线模拟接口）、取消 |
+| `voice_tools` | 工具参数、游戏操作映射、网页搜索分发与取消、B站各 action 的请求编排与结果裁剪（离线模拟接口） |
+| `voice_web_search` | DuckDuckGo HTML解析、来源链接解码、空结果与验证码区分、结果数量及大小限制（离线） |
+| `voice_web_fetch` | 本机网页文本提取、MIME与大小限制、URL和公网地址校验、取消（离线） |
+| `voice_deepseek_web` | DeepSeek请求契约、鉴权头隔离、状态错误、搜索/Markdown结果归一化与大小限制（模拟接口，无Key、无计费） |
 
 `python3 tests/voice_panel_smoke_test.py` 使用临时资料目录测试原生启动、设置接口、持久化与参数校验，不写入 API Key。
 `build/macos-arm64/tests/voice_speech_probe <模型目录> resources/models/sensevoice-hotwords.txt [test_wavs 目录]`
@@ -251,6 +269,11 @@ AEC3 的参考信号是 JPet 实际写入扬声器的回复 PCM（已乘音量�
 设置 `JPET_QWENTTS_PATH` 为 qwentts 运行库后，`voice_synthesis_probe <合成模型目录> resources/models/joi-voice.json [输出目录]`
 测量每句开始出声的时间与 RTF；`voice_synthesis_probe reference <合成模型目录> <24 kHz 单声道 wav> <文字> <来源说明> <输出.json>`
 从一段录音重新生成音色文件。
+
+启用 `JPET_BUILD_VOICE_TESTS=ON` 还会构建 `voice_web_search_probe`，可手动运行
+`build/macos-arm64/tests/voice_web_search_probe "C++ reference"` 验证真实网页搜索的完整工具调用链路（Windows使用对应构建目录）。
+也可运行 `build/macos-arm64/tests/voice_web_search_probe --fetch "https://example.com/"` 验证本机抓取链路。
+探针不需要JPet资料目录或凭据，不启动浏览器，只验证免费fallback，不调用DeepSeek收费接口；会向DuckDuckGo或指定公网网页发请求，输出结果JSON，不加入自动CTest。
 
 macOS 可额外启用 `JPET_BUILD_VOICE_NETWORK_PROBE=ON`，手动运行
 `build/macos-arm64/tests/voice_tools_network_probe "JPet资料目录"`：只读打开游戏数据库，验证 B 站搜索，

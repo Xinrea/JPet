@@ -293,8 +293,8 @@ bool VoiceChat::SendText(const std::string& text, std::string& error) {
 
 bool VoiceChat::Connect(bool voice) {
   if (connected_ && (voice_ || !voice)) return true;
-  // Web search and desktop viewing use the Bailian key when they run; chat
-  // needs only the selected chat service.
+  // Web tools resolve the selected service and its credentials when they run;
+  // chat needs only the selected chat service's key.
   const auto settings = DataManager::GetInstance()->GetVoiceSettings();
   auto error = ChatSettingsError(settings);
   Voice::CascadeConfig config;

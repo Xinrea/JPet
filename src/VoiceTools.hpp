@@ -18,6 +18,7 @@ struct ToolDependencies {
   std::function<nlohmann::json(const nlohmann::json&)> desktop, bilibili;
   std::function<bool(const std::string&, std::string&)> openUrl;
   std::function<nlohmann::json(const nlohmann::json&, const std::function<bool()>&)> settings;
+  std::function<nlohmann::json(const nlohmann::json&, const std::function<bool()>&)> webSearch, webFetch;
 };
 nlohmann::json ExecuteTool(const ToolCall& call, const ToolDependencies& dependencies,
     const std::function<bool()>& cancelled = {});

@@ -57,7 +57,7 @@ macOS 发布包采用 ad-hoc 签名，未进行 Apple Developer ID 签名和公�
 Mac 按 **Option**、Windows 按 **Ctrl** 开启麦克风，再按一次关闭；开启后可连续多轮对话，说话可打断回复。也可以在语音设置中改为按住说话、松开回复。
 首次使用需允许麦克风权限，查看桌面还需要录屏权限。
 
-API Key 保存在 macOS 钥匙串或 Windows 凭据管理器，只用于请求你配置的模型服务。
+API Key 保存在 macOS 钥匙串或 Windows 凭据管理器，只用于请求你配置的服务；选择 DeepSeek 时，网页搜索和读取也使用其官方 Search / Fetch API，可能产生独立于对话的费用。其他服务使用免 Key 的 DuckDuckGo 搜索与本机基础网页抓取。
 最近 200 轮对话文字保存在本机。配置、语音工具和数据处理细节见[语音对话说明](doc/voice-chat.md)。
 
 ### 应用更新

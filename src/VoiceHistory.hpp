@@ -111,7 +111,7 @@ class History {
     return state == "pending" || state == "completed" || state == "interrupted" || state == "failed";
   }
   static std::string KnownTool(const std::string& name) {
-    for (const auto* tool : {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "game_action", "jpet_settings", "web_search", "bilibili", "bilibili_search", "open_url"}) if (name == tool) return name;
+    for (const auto* tool : {"view_desktop", "get_game_profile", "get_game_clothes", "get_task_catalog", "get_current_task", "get_task_queue", "get_task_history", "get_game_achievements", "get_game_statistics", "game_action", "jpet_settings", "web_search", "web_fetch", "bilibili", "bilibili_search", "open_url"}) if (name == tool) return name;
     return "unknown";
   }
   static json Select(const json& data, std::initializer_list<const char*> fields) {
@@ -134,7 +134,7 @@ class History {
     return Bounded(std::move(summary));
   }
   static json Result(const json& data) {
-    auto summary = Select(data, {"ok", "error", "notice", "action", "section", "url", "code", "results_count", "sources_count"});
+    auto summary = Select(data, {"ok", "error", "notice", "action", "section", "url", "code", "results_count", "sources_count", "provider", "title", "format", "truncated"});
     if (data.is_object() && data.contains("settings") && data["settings"].is_object()) {
       auto settings = Settings(data["settings"]);
       for (const auto* section : {"audio", "display", "interaction", "notifications", "appearance"}) if (data["settings"].contains(section)) settings[section] = Settings(data["settings"][section]);
