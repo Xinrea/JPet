@@ -26,6 +26,13 @@ std::string DiagnosticCode(const nlohmann::json& object, const char* field) {
       })) return "unknown";
   return value;
 }
+
+// Replies follow JPet's volume, and 设置 → 静音 silences them too.
+float ReplyVolume() {
+  auto* data = DataManager::GetInstance();
+  return data->GetConfig<bool>("audio", "mute", false) ? 0.0f :
+      std::clamp(data->GetConfig<int>("audio", "volume", 20), 0, 100) / 100.0f;
+}
 }
 
 VoiceChat* VoiceChat::GetInstance() {
@@ -41,12 +48,7 @@ VoiceChat::VoiceChat() : platform_(Voice::MakePlatform()),
   lastActivity_ = stateChangedAt_ = Clock::now();
 }
 
-void VoiceChat::PlayReply(const std::string& pcm) {
-  auto* data = DataManager::GetInstance();
-  const float volume = data->GetConfig<bool>("audio", "mute", false) ? 0.0f :
-      std::clamp(data->GetConfig<int>("audio", "volume", 20), 0, 100) / 100.0f;
-  platform_->Play(pcm, volume);
-}
+void VoiceChat::PlayReply(const std::string& pcm) { platform_->Play(pcm, ReplyVolume()); }
 
 void VoiceChat::SubmitTools(const std::vector<Voice::ToolCall>& calls) {
   for (const auto& call : calls) {
@@ -190,7 +192,8 @@ void VoiceChat::SetState(const std::string& state, const std::string& message) {
     if (state == "listening") text = "正在听…";
     else if (state == "connecting") text = "正在呼唤轴伊…";
     else if (state == "thinking") text = "轴伊正在思考…";
-    else if (state == "speaking") text = "轴伊正在回复…";
+    // A muted reply still plays (silently) and keeps its timing, so say why nothing is heard.
+    else if (state == "speaking") text = ReplyVolume() > 0 ? "轴伊正在回复…" : "JPet 已静音，听不到轴伊的回复";
     else text = std::string(holdMode ? "按住 " : "按 ") + Shortcut + " 开启麦克风";
   }
   const bool microphoneOn = Recording();

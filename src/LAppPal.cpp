@@ -39,7 +39,14 @@ double LAppPal::s_deltaTime = 0.0;
 std::wfstream LAppPal::s_logFile;
 
 void LAppPal::Init() {
-  LAppPal::s_logFile = std::wfstream(std::filesystem::path(documentPath) / "jpet.log", std::ios::out | std::ios::app);
+  // Write UTF-8. In the default "C" locale the first non-ASCII character (a
+  // Chinese device name or message) fails the stream and drops every later line.
+#ifdef _WIN32
+  s_logFile.imbue(std::locale(std::locale::classic(), new std::codecvt_utf8_utf16<wchar_t>));
+#else
+  s_logFile.imbue(std::locale(std::locale::classic(), new std::codecvt_utf8<wchar_t>));
+#endif
+  s_logFile.open(std::filesystem::path(documentPath) / "jpet.log", std::ios::out | std::ios::app);
 }
 
 csmByte* LAppPal::LoadFileAsBytes(const string& filePath, csmSizeInt* outSize) {
