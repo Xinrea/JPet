@@ -86,6 +86,8 @@
 
   function calcRate(task) { return task.rate ?? 0; }
   function calcCost(task) { return task.cost ?? 0; }
+  // 最多保留一位小数，去掉多余的 0（56.99999 → 57，12.34 → 12.3）
+  function formatRate(task) { return Number(calcRate(task).toFixed(1)); }
 
   function formatRemain(seconds) {
     const s = Math.max(0, Math.floor(seconds));
@@ -155,7 +157,7 @@
           {#if currentTask.special}<span class="text-sm">{currentTask.special.desc}</span>{/if}
         </div>
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="text-sm">成功率 {calcRate(currentTask)}% · 完成后自动结算</span>
+          <span class="text-sm">成功率 {formatRate(currentTask)}% · 完成后自动结算</span>
           <span class="flex gap-2">
             {#if currentTask.repeatable}
               <Button color="alternative" size="xs" disabled={busy || !canQueue(currentTask)}
@@ -200,7 +202,7 @@
                 <span class="queue-position">{index + 1}</span>
                 <div>
                   <p class="text-sm">{task.title}</p>
-                  <p class="text-xs text-gray-400">预计 {formatRemain(calcCost(task))} · 当前成功率 {calcRate(task)}%</p>
+                  <p class="text-xs text-gray-400">预计 {formatRemain(calcCost(task))} · 当前成功率 {formatRate(task)}%</p>
                 </div>
               </div>
               <div class="flex gap-1">
@@ -291,7 +293,7 @@
               </div>
             {/if}
             {#if task.status !== 3}
-              <p class="text-xs text-gray-500">成功率 {calcRate(task)}%{!task.repeatable && queue.some((entry) => entry.id === task.id) ? " · 已排队" : ""}</p>
+              <p class="text-xs text-gray-500">成功率 {formatRate(task)}%{!task.repeatable && queue.some((entry) => entry.id === task.id) ? " · 已排队" : ""}</p>
             {/if}
           </li>
         {/each}
