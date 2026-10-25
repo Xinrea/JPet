@@ -83,12 +83,26 @@ int main() {
     return 1;
   }
   
-  wchar_t curPath[MAX_PATH];
-  GetModuleFileName(GetModuleHandle(NULL), curPath, MAX_PATH);
-  // Callers append "resources/...", so keep the directory with a trailing
-  // separator, as mainMac.mm does.
-  LAppDefine::execPath =
-      std::filesystem::path(curPath).parent_path().wstring() + L"\\";
+  wchar_t curPath[32768];
+  const DWORD pathLength = GetModuleFileNameW(nullptr, curPath, 32768);
+  if (pathLength == 0 || pathLength >= 32768) {
+    LAppPal::PrintLog(LogLevel::Error, "Cannot determine executable directory");
+    MessageBox(nullptr, L"无法确定 JPet 安装目录，请重新安装。", L"启动失败", MB_OK | MB_ICONERROR);
+    return 1;
+  }
+  const auto appDirectory = std::filesystem::path(curPath).parent_path();
+  // All relative resources must resolve beside the executable, not against
+  // the launcher's working directory (shortcuts, startup, or a terminal).
+  std::error_code pathError;
+  std::filesystem::current_path(appDirectory, pathError);
+  if (pathError) {
+    // Windows system error messages may use the ANSI code page, not UTF-8.
+    LAppPal::PrintLog(LogLevel::Error, "Cannot set resource directory (error %d)", pathError.value());
+    MessageBox(nullptr, L"无法访问 JPet 安装目录，请检查目录权限。", L"启动失败", MB_OK | MB_ICONERROR);
+    return 1;
+  }
+  // Callers append "resources/...", so keep a trailing separator.
+  LAppDefine::execPath = appDirectory.wstring() + L"\\";
 
   // check dumpfile
   const wstring dumpfile =
@@ -119,14 +133,30 @@ int main() {
     }
   }
 
-  // create the application instance
-  if (LAppDelegate::GetInstance()->Initialize() == GL_FALSE) {
-    return 1;
+  int exitCode = 0;
+  try {
+    if (LAppDelegate::GetInstance()->Initialize() == GL_FALSE) {
+      exitCode = 1;
+    } else {
+      LAppDelegate::GetInstance()->Run();
+    }
+  } catch (const std::exception& error) {
+    try {
+      LAppPal::PrintLog(LogLevel::Error, "JPet startup failed: %s", error.what());
+    } catch (...) {
+      // what() is not guaranteed to be UTF-8. Logging must not prevent the
+      // error dialog or turn a handled startup failure into another crash.
+      OutputDebugStringA("JPet startup failed; unable to write the error log.\n");
+    }
+    MessageBox(nullptr,
+               L"JPet 启动失败，资源可能缺失或损坏。请重新安装，并查看文档目录中的 jpet\\jpet.log。",
+               L"启动失败", MB_OK | MB_ICONERROR);
+    exitCode = 1;
   }
-  LAppDelegate::GetInstance()->Run();
 
   ReleaseMutex(hMutex);
   CloseHandle(hMutex);
+  LAppPal::ReleaseLog();
 
-  return 0;
+  return exitCode;
 }

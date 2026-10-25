@@ -23,6 +23,7 @@
 #include "LAppPal.hpp"
 #include "LAppTextureManager.hpp"
 #include "PartStateManager.h"
+#include "ModelSettings.hpp"
 #include "Type/CubismBasicType.hpp"
 
 using namespace Live2D::Cubism::Framework;
@@ -64,11 +65,13 @@ LAppModel::~LAppModel() {
   ReleaseMotions();
   ReleaseExpressions();
 
-  for (csmInt32 i = 0; i < _modelSetting->GetMotionGroupCount(); i++) {
-    const csmChar* group = _modelSetting->GetMotionGroupName(i);
-    ReleaseMotionGroup(group);
+  if (_modelSetting) {
+    for (csmInt32 i = 0; i < _modelSetting->GetMotionGroupCount(); i++) {
+      const csmChar* group = _modelSetting->GetMotionGroupName(i);
+      ReleaseMotionGroup(group);
+    }
+    delete _modelSetting;
   }
-  delete (_modelSetting);
 }
 
 void LAppModel::LoadAssets(const csmChar* dir, const csmChar* fileName) {
@@ -78,14 +81,9 @@ void LAppModel::LoadAssets(const csmChar* dir, const csmChar* fileName) {
     LAppPal::PrintLog("[APP]load model setting: %s", fileName);
   }
 
-  csmSizeInt size;
   const csmString path = csmString(dir) + fileName;
-
-  csmByte* buffer = CreateBuffer(path.GetRawString(), &size);
-  ICubismModelSetting* setting = new CubismModelSettingJson(buffer, size);
-  DeleteBuffer(buffer, path.GetRawString());
-
-  SetupModel(setting);
+  auto setting = LoadModelSettings(path.GetRawString());
+  SetupModel(setting.release());
 
   CreateRenderer();
 
@@ -115,8 +113,17 @@ void LAppModel::SetupModel(ICubismModelSetting* setting) {
     }
 
     buffer = CreateBuffer(path.GetRawString(), &size);
+    if (!buffer) {
+      throw std::runtime_error(std::string("Cannot read model: ") + path.GetRawString());
+    }
     LoadModel(buffer, size);
     DeleteBuffer(buffer, path.GetRawString());
+    if (!_model) {
+      // The base destructor assumes a non-null Moc owns a model.
+      CubismMoc::Delete(_moc);
+      _moc = nullptr;
+      throw std::runtime_error(std::string("Invalid model: ") + path.GetRawString());
+    }
   }
 
   // Expression

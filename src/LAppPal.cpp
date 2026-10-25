@@ -10,7 +10,8 @@
 
 #include <GLFW/glfw3.h>
 #include <fstream>
-#include <sys/stat.h>
+#include <limits>
+#include <memory>
 
 #include <Model/CubismMoc.hpp>
 #include <cstdarg>
@@ -50,33 +51,26 @@ void LAppPal::Init() {
 }
 
 csmByte* LAppPal::LoadFileAsBytes(const string& filePath, csmSizeInt* outSize) {
-  // filePath;//
-  const char* path = filePath.c_str();
-
-  int size = 0;
-  struct stat statBuf {};
-  if (stat(path, &statBuf) == 0) {
-    size = statBuf.st_size;
-  } else {
+  // Never leave a stale/uninitialized length behind when a resource is missing.
+  *outSize = 0;
+  std::ifstream file(std::filesystem::u8path(filePath),
+                     std::ios::binary | std::ios::ate);
+  const auto size = file.tellg();
+  if (!file || size <= 0 || size > std::numeric_limits<csmSizeInt>::max()) {
     PrintLog(LogLevel::Error, "[LAppPal]Load file failed: %s", filePath.c_str());
     return nullptr;
   }
 
-  std::fstream file;
-  char* buf = new char[size];
-
-  file.open(path, std::ios::in | std::ios::binary);
-  if (!file.is_open()) {
-    if (DebugLogEnable) {
-      PrintLog("file open error: %s", filePath.c_str());
-    }
+  auto buffer = std::make_unique<csmByte[]>(static_cast<csmSizeInt>(size));
+  file.seekg(0);
+  if (!file.read(reinterpret_cast<char*>(buffer.get()),
+                 static_cast<std::streamsize>(size))) {
+    PrintLog(LogLevel::Error, "[LAppPal]Read file failed: %s", filePath.c_str());
     return nullptr;
   }
-  file.read(buf, size);
-  file.close();
 
-  *outSize = size;
-  return reinterpret_cast<csmByte*>(buf);
+  *outSize = static_cast<csmSizeInt>(size);
+  return buffer.release();
 }
 
 void LAppPal::ReleaseBytes(const csmByte* byteData) { delete[] byteData; }

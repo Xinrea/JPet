@@ -18,6 +18,7 @@
 
 #include <Rendering/CubismRenderer.hpp>
 #include <string>
+#include <memory>
 
 #include "AudioManager.hpp"
 #include "GameManager.hpp"
@@ -64,7 +65,12 @@ void LAppLive2DManager::ReleaseInstance() {
 
 LAppLive2DManager::LAppLive2DManager()
     : _viewMatrix(NULL), _sceneIndex(0), _isNew(true), _mouthCount(0) {
-  InitScene();
+  try {
+    InitScene();
+  } catch (...) {
+    ReleaseAllModel();
+    throw;
+  }
 }
 
 LAppLive2DManager::~LAppLive2DManager() { ReleaseAllModel(); }
@@ -211,12 +217,14 @@ void LAppLive2DManager::InitScene() {
   // ModelDir[]に保持したディレクトリ名から
   // model3.jsonのパスを決定する.
   // ディレクトリ名とmodel3.jsonの名前を一致させておくこと.
-  std::string modelPath = std::string(ResourcesPath) + "/joi/";
-  std::string modelJsonName = "zmcw.model3.json";
+  std::string modelPath = std::string(ResourcesPath) + "joi/";
+  std::string modelJsonName = "ZMCW.model3.json";
 
   ReleaseAllModel();
-  _models.PushBack(new LAppModel());
-  _models[0]->LoadAssets(modelPath.c_str(), modelJsonName.c_str());
+  auto model = std::make_unique<LAppModel>();
+  model->LoadAssets(modelPath.c_str(), modelJsonName.c_str());
+  _models.PushBack(model.get());
+  model.release();
 
   /*
    * モデル半透明表示を行うサンプルを提示する。
@@ -239,9 +247,11 @@ void LAppLive2DManager::InitScene() {
 
 #if defined(USE_RENDER_TARGET) || defined(USE_MODEL_RENDER_TARGET)
     // モデル個別にαを付けるサンプルとして、もう1体モデルを作成し、少し位置をずらす
-    _models.PushBack(new LAppModel());
-    _models[1]->LoadAssets(modelPath.c_str(), modelJsonName.c_str());
-    _models[1]->GetModelMatrix()->TranslateX(0.2f);
+    auto secondModel = std::make_unique<LAppModel>();
+    secondModel->LoadAssets(modelPath.c_str(), modelJsonName.c_str());
+    secondModel->GetModelMatrix()->TranslateX(0.2f);
+    _models.PushBack(secondModel.get());
+    secondModel.release();
 #endif
 
     LAppDelegate::GetInstance()->GetView()->SwitchRenderingTarget(

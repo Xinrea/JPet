@@ -118,7 +118,7 @@ jobs:
             "-DVCPKG_INSTALLED_DIR=$env:GITHUB_WORKSPACE/build/vcpkg_installed" `
             -DVCPKG_TARGET_TRIPLET=x64-windows-release `
             "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/build-scripts/triplets" `
-            -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON -DJPET_BUILD_GAME_TESTS=ON -DFAIL_ON_WARNINGS=OFF -DPORTABLE=1
+            -DJPET_BUILD_UPDATE_TESTS=ON -DJPET_BUILD_VOICE_TESTS=ON -DJPET_BUILD_GAME_TESTS=ON -DJPET_BUILD_MODEL_TESTS=ON -DFAIL_ON_WARNINGS=OFF -DPORTABLE=1
       - name: Configure macOS ARM
         if: runner.os == 'macOS'
         run: |
