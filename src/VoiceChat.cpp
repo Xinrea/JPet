@@ -27,12 +27,8 @@ std::string DiagnosticCode(const nlohmann::json& object, const char* field) {
   return value;
 }
 
-// Replies follow JPet's volume, and 设置 → 静音 silences them too.
-float ReplyVolume() {
-  auto* data = DataManager::GetInstance();
-  return data->GetConfig<bool>("audio", "mute", false) ? 0.0f :
-      std::clamp(data->GetConfig<int>("audio", "volume", 20), 0, 100) / 100.0f;
-}
+// Replies follow JPet's master volume, and its mute silences them too.
+float ReplyVolume() { return DataManager::GetInstance()->GetAudio().MasterGain(); }
 
 std::string Profile() { return LAppPal::WStringToString(LAppDefine::documentPath); }
 

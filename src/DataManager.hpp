@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <nlohmann/json.hpp>
 
+#include "AudioSettings.hpp"
 #include "GameData.hpp"
 
 class DataManager {
@@ -38,8 +39,8 @@ class DataManager {
   void GetWindowPos(int *x, int *y);
   void UpdateWindowPos(int x, int y);
 
-  void GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touch_audio);
-  void UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio);
+  AudioSettings GetAudio();  // volumes clamped to 0-100
+  void UpdateAudio(const AudioSettings& audio);
 
   nlohmann::json GetVoiceSettings();
   nlohmann::json LoadVoiceHistory();

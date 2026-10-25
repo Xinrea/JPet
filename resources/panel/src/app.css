@@ -92,8 +92,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .feedback.error { color: #bd5d76; background: #fff1f4; }
 .feedback.success { color: var(--green-ink); background: var(--green-soft); }
 .volume-control { display: flex; align-items: center; gap: 14px; }
-.volume-control > div { width: 80px; flex-shrink: 0; }
 .volume-control input[type="range"] { width: 100%; min-width: 0; accent-color: #8bce36; height: 5px; cursor: pointer; }
+.volume-control input[type="range"].muted { accent-color: #c6c8bc; }
+.setting-volume { padding: 16px 0; }
+.setting-volume + .setting-volume { border-top: 1px dashed #e9eadd; }
+.setting-volume-copy { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.setting-volume-copy strong { font-size: 13px; font-weight: 800; }
+.setting-volume-copy > span { font-size: 11px; font-weight: 700; color: #a1a38f; font-variant-numeric: tabular-nums; }
+.setting-volume > p { margin-top: 4px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.setting-volume .volume-control { margin-top: 10px; }
+.volume-silenced { opacity: .5; }
+.mute-button { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; border: 1px solid #deebcb; border-radius: 10px; color: #71a43e; background: #fff; box-shadow: 0 2px 0 #e0eaca; }
+.mute-button:hover { background: #f3f8e9; }
+.mute-button.muted { color: #c9677f; border-color: #f2d3db; background: #fff4f6; box-shadow: 0 2px 0 #f2dce2; }
 .voice-shortcut { display: flex; align-items: center; gap: 12px; padding: 14px 0 0; color: #87b152; }
 .voice-shortcut svg { flex-shrink: 0; }
 .voice-shortcut strong { color: var(--ink); font-size: 13px; font-weight: 800; }

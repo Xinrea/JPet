@@ -51,9 +51,10 @@ struct AudioManager::Impl {
   // Called with mutex held and an autorelease pool in place. A single player
   // implements the existing non-overlapping channel behavior without a cache
   // of decoded sounds that would grow for arbitrary caller-supplied paths.
-  void Play(const wstring& file) {
+  void Play(AudioType type, const wstring& file) {
     if (!initialized || file.empty() || player.isPlaying) return;
-    if (DataManager::GetInstance()->GetConfig<bool>("audio", "mute", false)) return;
+    const float gain = DataManager::GetInstance()->GetAudio().Gain(type);
+    if (gain <= 0) return;
 
     const std::string path = LAppPal::WStringToString(file);
     NSString* filename = [[NSString alloc] initWithBytes:path.data()
@@ -67,8 +68,8 @@ struct AudioManager::Impl {
       LAppPal::PrintLog("[AudioManager]Unable to load audio: %s", path.c_str());
       return;
     }
-    volume = static_cast<float>(
-        DataManager::GetInstance()->GetConfig<int>("audio", "volume", 20)) / 10.0f;
+    // Same scale as the FMOD channel gain: full gain is 10.
+    volume = gain * 10.0f;
     player = next;
     ApplySpatial();
     if (![player play]) {
@@ -138,7 +139,7 @@ void AudioManager::Play3dSound(AudioType type) {
     const auto* files = impl_->Files(type);
     if (!files || files->empty()) return;
     std::uniform_int_distribution<size_t> choose(0, files->size() - 1);
-    impl_->Play(L"resources/audios/" + (*files)[choose(impl_->random)]);
+    impl_->Play(type, L"resources/audios/" + (*files)[choose(impl_->random)]);
   }
 }
 
@@ -150,14 +151,14 @@ void AudioManager::Play3dSound(AudioType type, int no) {
     // Normalize negative indices too, without signed overflow for INT_MIN.
     const auto count = static_cast<std::int64_t>(files->size());
     const auto index = (static_cast<std::int64_t>(no) % count + count) % count;
-    impl_->Play(L"resources/audios/" + (*files)[static_cast<size_t>(index)]);
+    impl_->Play(type, L"resources/audios/" + (*files)[static_cast<size_t>(index)]);
   }
 }
 
-void AudioManager::Play3dSound(const wstring& file) {
+void AudioManager::Play3dSound(AudioType type, const wstring& file) {
   @autoreleasepool {
     std::lock_guard<std::mutex> lock(impl_->mutex);
-    impl_->Play(file);
+    impl_->Play(type, file);
   }
 }
 

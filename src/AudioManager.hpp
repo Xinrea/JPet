@@ -7,14 +7,11 @@
 #else
 #include "fmod.hpp"
 #endif
+#include "AudioSettings.hpp"
 #pragma once
 using std::map;
 using std::vector;
 using std::wstring;
-
-enum class AudioType {
- START, IDLE, CLICK
-};
 
 class AudioManager {
  public:
@@ -25,9 +22,10 @@ class AudioManager {
   bool Initialize();
   bool IsPlay();
   void Stop();
+  // Each type plays at its gain from AudioSettings; muted types are skipped.
   void Play3dSound(AudioType t, int no);
   void Play3dSound(AudioType t);
-  void Play3dSound(const wstring& file);
+  void Play3dSound(AudioType t, const wstring& file);
   void Update(int x, int y, int w, int h, int mw, int mh);
   void Release();
 

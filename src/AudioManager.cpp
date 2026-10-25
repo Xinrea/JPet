@@ -93,12 +93,13 @@ void AudioManager::Play3dSound(AudioType t, int no) {
       break;
     }
   }
-  Play3dSound(L"resources/audios/" + target_audio_file);
+  Play3dSound(t, L"resources/audios/" + target_audio_file);
 }
 
-void AudioManager::Play3dSound(const wstring& target_audio_file) {
+void AudioManager::Play3dSound(AudioType t, const wstring& target_audio_file) {
   LAppPal::PrintLog(LogLevel::Debug, L"[AudioManager]Play Sound: %ls", target_audio_file.c_str());
-  if (DataManager::GetInstance()->GetConfig<bool>("audio", "mute", false)) {
+  const float gain = DataManager::GetInstance()->GetAudio().Gain(t);
+  if (gain <= 0) {
     return;
   }
   bool isPlay;
@@ -110,7 +111,8 @@ void AudioManager::Play3dSound(const wstring& target_audio_file) {
   } else {
     sound = iter->second;
   }
-  float volume = float(DataManager::GetInstance()->GetConfig<int>("audio", "volume", 20)) / 10;
+  // FMOD gain can exceed one: full gain is 10, keeping the original volume / 10.
+  float volume = gain * 10;
   if (_channel) {
     _channel->isPlaying(&isPlay);
     if (!isPlay) {

@@ -323,15 +323,7 @@ void PanelServer::doServe() {
                });
   server->Get("/api/config/audio",
               [](const httplib::Request &req, httplib::Response &res) {
-                bool mute;
-                int volume;
-                bool idle_audio, touch_audio;
-                DataManager::GetInstance()->GetAudio(&volume, &mute, &idle_audio, &touch_audio);
-                auto json = nlohmann::json::object();
-                json["volume"] = volume;
-                json["mute"] = mute;
-                json["idle_audio"] = idle_audio;
-                json["touch_audio"] = touch_audio;
+                const nlohmann::json json = DataManager::GetInstance()->GetAudio();
                 res.set_content(json.dump(), "application/json");
               });
   server->Get("/api/config/voice", [](const httplib::Request&, httplib::Response& res) {
@@ -425,9 +417,7 @@ void PanelServer::doServe() {
                  LAppPal::PrintLog("POST /api/config/audio");
                  try {
                    auto json = nlohmann::json::parse(req.body);
-                   DataManager::GetInstance()->UpdateAudio(
-                       json.at("volume"), json.at("mute"),
-                       json.at("idle_audio"), json.at("touch_audio"));
+                   DataManager::GetInstance()->UpdateAudio(json.get<AudioSettings>());
                    DataManager::GetInstance()->Save();
                    res.status = 200;
                  } catch (nlohmann::json::exception &e) {
