@@ -255,12 +255,12 @@ class MacPlatform final : public Platform {
 
   bool KeyHeld(const Key& key) const override {
     constexpr auto mac = [](const char* code) { return KeyCode(code, true); };
-    static_assert(mac("Control") == NSEventModifierFlagControl && mac("ControlLeft") == NX_DEVICELCTLKEYMASK &&
-        mac("ControlRight") == NX_DEVICERCTLKEYMASK && mac("Alt") == NSEventModifierFlagOption &&
+    static_assert(mac("Control") == kCGEventFlagMaskControl && mac("ControlLeft") == NX_DEVICELCTLKEYMASK &&
+        mac("ControlRight") == NX_DEVICERCTLKEYMASK && mac("Alt") == kCGEventFlagMaskAlternate &&
         mac("AltLeft") == NX_DEVICELALTKEYMASK && mac("AltRight") == NX_DEVICERALTKEYMASK &&
-        mac("Shift") == NSEventModifierFlagShift && mac("ShiftLeft") == NX_DEVICELSHIFTKEYMASK &&
+        mac("Shift") == kCGEventFlagMaskShift && mac("ShiftLeft") == NX_DEVICELSHIFTKEYMASK &&
         mac("ShiftRight") == NX_DEVICERSHIFTKEYMASK && mac("MetaLeft") == NX_DEVICELCMDKEYMASK &&
-        mac("MetaRight") == NX_DEVICERCMDKEYMASK, "modifiers match the macOS modifier flags");
+        mac("MetaRight") == NX_DEVICERCMDKEYMASK, "modifiers match the macOS event flags");
     static_assert(mac("F1") == kVK_F1 && mac("F2") == kVK_F2 && mac("F3") == kVK_F3 && mac("F4") == kVK_F4 &&
         mac("F5") == kVK_F5 && mac("F6") == kVK_F6 && mac("F7") == kVK_F7 && mac("F8") == kVK_F8 &&
         mac("F9") == kVK_F9 && mac("F10") == kVK_F10 && mac("F11") == kVK_F11 && mac("F12") == kVK_F12 &&
@@ -295,8 +295,12 @@ class MacPlatform final : public Platform {
         mac("NumpadMultiply") == kVK_ANSI_KeypadMultiply && mac("NumpadAdd") == kVK_ANSI_KeypadPlus &&
         mac("NumpadSubtract") == kVK_ANSI_KeypadMinus && mac("NumpadDecimal") == kVK_ANSI_KeypadDecimal &&
         mac("NumpadDivide") == kVK_ANSI_KeypadDivide, "editing and keypad keys match the macOS virtual keys");
-    // Modifier flags are readable without permission; other keys need Input Monitoring.
-    if (key.kind == KeyKind::Modifier) return ([NSEvent modifierFlags] & key.mac) != 0;
+    // Modifiers need no permission. Only the event source's flags carry the
+    // left/right bits: +[NSEvent modifierFlags] keeps just the side-agnostic
+    // ones, and CGEventSourceKeyState reports right Command as the left key.
+    if (key.kind == KeyKind::Modifier)
+      return (CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState) & key.mac) != 0;
+    // Other keys need Input Monitoring.
     return CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, static_cast<CGKeyCode>(key.mac));
   }
   bool ShortcutReadable(const Shortcut& shortcut, bool prompt) override {

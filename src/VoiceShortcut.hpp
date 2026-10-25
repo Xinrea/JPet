@@ -30,7 +30,7 @@ struct Key {
   const char* name;
   KeyKind kind;
   uint32_t windows;  // Virtual-key code.
-  uint32_t mac;      // Modifiers: NSEventModifierFlags mask (NX_DEVICE*KEYMASK for one side); others: kVK_* code.
+  uint32_t mac;      // Modifiers: CGEventFlags mask (NX_DEVICE*KEYMASK for one side); others: kVK_* code.
 };
 // Modifiers come first, in the order shortcuts are written.
 inline constexpr Key Keys[] = {
