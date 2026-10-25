@@ -21,6 +21,13 @@
   let controller;
   let destroyed = false;
   let stickToBottom = true;
+  // Whether typed messages are also read aloud; on unless turned off here before.
+  const speakKey = "jpet.chat.speak";
+  let speak = (() => { try { return localStorage.getItem(speakKey) !== "off"; } catch { return true; } })();
+  function toggleSpeak() {
+    speak = !speak;
+    try { localStorage.setItem(speakKey, speak ? "on" : "off"); } catch { /* Kept for this visit only. */ }
+  }
   const states = { pending: "进行中", completed: "已完成", interrupted: "已打断", failed: "失败" };
   const tools = { view_desktop: "查看桌面", get_game_profile: "查询属性", get_game_clothes: "查询服装", get_task_catalog: "查询任务目录", get_current_task: "查询当前任务", get_task_queue: "查询任务队列", get_task_history: "查询任务历史", get_game_achievements: "查询成就", get_game_statistics: "查询统计", game_action: "游戏操作", jpet_settings: "JPet 设置", web_search: "网页搜索", web_fetch: "读取网页", bilibili: "B站", bilibili_search: "B站搜索", open_url: "打开网页" };
   const suggestions = ["我现在有多少经验？", "有哪些任务可以做？", "搜一下今天的新闻", "把音量调到 30"];
@@ -32,6 +39,9 @@
   // Dots until the reply's first words arrive, or while a tool runs.
   $: waiting = replying && (!last || last.role !== "assistant" || last.state !== "pending" || !last.text);
   $: statusError = status.state === "error" && status.message !== dismissedError ? status.message : "";
+  // Spoken replies need the local speech models; without them replies are text only.
+  $: speechMissing = speak && status.speech_model && status.speech_model.state !== "ready";
+  $: speakLabel = !speak ? "朗读回复：已关闭" : speechMissing ? "朗读回复：已开启，下载本机语音模型后生效" : "朗读回复：已开启";
 
   function dateLabel(timestamp) {
     return new Date(timestamp * 1000).toLocaleString("zh-CN", {
@@ -96,7 +106,7 @@
     dismissedError = status.state === "error" ? status.message : dismissedError;
     try {
       const response = await fetch("/api/voice/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: message }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: message, speak }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "消息发送失败，请重试");
@@ -217,6 +227,7 @@
       </div>
     {/if}
     <div class="composer-box">
+      <button type="button" class="speak-toggle" class:off={!speak} class:pending={speechMissing} aria-pressed={speak} aria-label={speakLabel} title={speakLabel} on:click={toggleSpeak}><UiIcon name={speak ? "sound" : "mute"} size={18} /></button>
       <label class="sr-only" for="chat-input">给轴伊发消息</label>
       <textarea id="chat-input" bind:this={input} bind:value={draft} rows="1" maxlength="2000" placeholder="给轴伊发消息…" on:keydown={onKeydown} on:input={resize}></textarea>
       {#if replying && !draft.trim()}
@@ -226,7 +237,7 @@
       {/if}
       <button type="button" class="settings-button" aria-haspopup="dialog" aria-label="语音对话设置" title="语音对话设置" on:click={() => voiceSettingsOpen = true}><UiIcon name="settings" size={18} /></button>
     </div>
-    <p class="composer-hint">Enter 发送 · Shift+Enter 换行{replying ? " · 发送新消息会打断当前回复" : ""}</p>
+    <p class="composer-hint">Enter 发送 · Shift+Enter 换行{replying ? " · 发送新消息会打断当前回复" : ""}{speechMissing ? " · 下载本机语音模型后才会朗读回复" : ""}</p>
   </form>
 </section>
 
@@ -292,7 +303,7 @@
 
   /* Offset by the scroll container's bottom padding so no messages show beneath the bar. */
   .composer { position: sticky; bottom: calc(-1 * var(--content-pad-bottom, 0px)); z-index: 3; margin-top: 12px; padding: 10px 0 12px; background: linear-gradient(#f5f7ef00, #f5f7ef 14px); }
-  .composer-box { display: flex; align-items: flex-end; gap: 8px; padding: 8px 8px 8px 14px; border: 1px solid #d9e3cc; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 #e3e9d8, 0 6px 18px #66744312; }
+  .composer-box { display: flex; align-items: flex-end; gap: 8px; padding: 8px; border: 1px solid #d9e3cc; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 #e3e9d8, 0 6px 18px #66744312; }
   .composer-box:focus-within { border-color: #a0c46e; }
   textarea { flex: 1; min-width: 0; max-height: 160px; padding: 7px 0; border: 0; resize: none; background: transparent; color: var(--ink); font-size: 13px; line-height: 1.7; outline: none; box-shadow: none; }
   textarea:focus { box-shadow: none; }
@@ -302,6 +313,11 @@
   .send-button.stop { border-color: #dcc9bd; background: #fff; box-shadow: 0 2px 0 #e3dbd3; }
   .settings-button { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px; color: var(--green-ink); border: 1px solid #dce3d1; background: var(--green-soft); }
   .settings-button:hover { background: #e6f0d6; }
+  .speak-toggle { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px; color: var(--green-ink); border: 1px solid #dce3d1; background: var(--green-soft); }
+  .speak-toggle:hover { background: #e6f0d6; }
+  .speak-toggle.pending { opacity: .6; }
+  .speak-toggle.off { color: var(--muted); border-color: #e6e1da; background: #f6f4f0; }
+  .speak-toggle.off:hover { background: #efebe5; }
   .stop-square { width: 12px; height: 12px; border-radius: 3px; background: var(--ink); }
   .composer-hint { margin-top: 6px; padding-left: 4px; font-size: 10px; color: var(--muted); }
   .composer-error { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding: 8px 12px; border: 1px solid #efc7d1; border-radius: 10px; background: #fff3f5; color: #be5573; font-size: 12px; }

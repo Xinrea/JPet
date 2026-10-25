@@ -56,9 +56,10 @@ class Pipeline {
   void AppendInput(const std::string& pcm);
   void EndInput();
   void CompleteTool(const std::string& callId, const nlohmann::json& result);
-  // A typed message from the panel: interrupts any reply and is answered in
-  // text only, never spoken.
-  void SubmitText(const std::string& text);
+  // A typed message from the panel: interrupts any reply. The reply is also
+  // spoken when `speak` is set and this pipeline has a synthesizer; otherwise
+  // it is answered in text only.
+  void SubmitText(const std::string& text, bool speak = false);
   // Stops the current reply, keeping what was shown or heard in the context.
   void StopReply();
   // Chat context, carried across pipelines so voice and text share one conversation.
@@ -92,7 +93,7 @@ class Pipeline {
   void OnInterim(const std::string& text);
   void OnTranscript(const std::string& text, bool tentative);
 
-  void StartReply(const std::string& text, bool voice = true);
+  void StartReply(const std::string& text, bool typed = false, bool speak = true);
   void RequestChat();
   void OnChat(const ChatEvent& event);
   void Speak(const std::string& sentence);
@@ -142,7 +143,8 @@ class Pipeline {
   uint64_t turn_ = 0;
   int round_ = 0, rounds_ = 0;
   bool replyActive_ = false, chatActive_ = false, roundDone_ = false, audible_ = false;
-  bool voiceReply_ = true;           // Spoken; typed messages get text-only replies.
+  bool voiceReply_ = true;           // Spoken; typed messages are spoken only on request.
+  bool typed_ = false;               // The user typed this turn, so the whole reply was shown.
   std::string roundText_, replyText_;
   SentenceSplitter splitter_;
   std::set<std::string> pendingTools_;

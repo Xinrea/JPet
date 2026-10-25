@@ -236,11 +236,11 @@ void Pipeline::OnTranscript(const std::string& text, bool tentative) {
 
 // ---- Chat --------------------------------------------------------------------
 
-void Pipeline::SubmitText(const std::string& text) {
+void Pipeline::SubmitText(const std::string& text, bool speak) {
   const auto message = Trimmed(text);
   if (message.empty()) return;
   if (BotBusy()) Interrupt();
-  StartReply(message, false);
+  StartReply(message, true, speak);
 }
 
 void Pipeline::StopReply() {
@@ -249,12 +249,13 @@ void Pipeline::StopReply() {
   if (listen_ != Listen::Active) Status(inputOpen_ ? "listening" : "idle");
 }
 
-void Pipeline::StartReply(const std::string& text, bool voice) {
+void Pipeline::StartReply(const std::string& text, bool typed, bool speak) {
   ++turn_;
   round_ = rounds_ = 0;
   compactRuns_ = 0;
   replyActive_ = true;
-  voiceReply_ = voice && synthesizer_;
+  typed_ = typed;
+  voiceReply_ = speak && synthesizer_;
   audible_ = false;
   replyText_.clear();
   segments_.clear();
@@ -265,7 +266,7 @@ void Pipeline::StartReply(const std::string& text, bool voice) {
     callbacks_.stopPlayback();
     enqueued_ = 0;
   }
-  Record(ConversationEvent::Type::Started, "", "", voice ? nlohmann::json::object() : nlohmann::json{{"input", "text"}});
+  Record(ConversationEvent::Type::Started, "", "", typed ? nlohmann::json{{"input", "text"}} : nlohmann::json::object());
   Record(ConversationEvent::Type::UserTranscript, text);
   messages_.push_back({{"role", "user"}, {"content", text}});
   if (callbacks_.transcript) callbacks_.transcript("");
@@ -531,8 +532,10 @@ void Pipeline::Interrupt() {
     }
     pendingTools_.clear();
   } else {
-    // Only what the user heard (or, for a typed message, saw) of this round stays in the conversation.
-    const auto spoken = voiceReply_ ? SpokenText(played) : roundText_;
+    // Only what the user heard (or, for a typed message, saw) of this round stays
+    // in the conversation. A typed message's reply is shown in full as it
+    // streams, even while it is also being spoken.
+    const auto spoken = typed_ ? roundText_ : SpokenText(played);
     if (!spoken.empty()) messages_.push_back({{"role", "assistant"}, {"content", spoken}});
     Record(ConversationEvent::Type::AssistantTranscript, spoken, ReplyId());
   }
