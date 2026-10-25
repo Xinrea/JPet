@@ -394,8 +394,11 @@ void PanelServer::doServe() {
     if (!localRequest(req, res, true, 8192)) return;
     const auto payload = nlohmann::json::parse(req.body, nullptr, false);
     std::string error = "消息格式不正确";
+    // `speak` (optional, default false) asks for the reply to be read aloud too.
+    const bool speak = payload.is_object() && payload.contains("speak") && payload["speak"].is_boolean() &&
+        payload["speak"].get<bool>();
     if (!payload.is_object() || !payload.contains("text") || !payload["text"].is_string() ||
-        !VoiceChat::GetInstance()->SendText(payload["text"].get<std::string>(), error)) {
+        !VoiceChat::GetInstance()->SendText(payload["text"].get<std::string>(), speak, error)) {
       res.status = 400;
       res.set_content(nlohmann::json{{"error", error}}.dump(), "application/json");
       return;

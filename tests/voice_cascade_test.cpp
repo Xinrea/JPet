@@ -333,6 +333,30 @@ void TypedMessages() {
   Check(f.chat->requests.size() == 3, "blank messages are ignored");
 }
 
+void SpokenTypedMessages() {
+  Fixture f(false);  // A voice pipeline, microphone closed.
+  f.pipeline->SubmitText("今天天气怎么样", true);
+  const auto prompt = f.chat->requests.back()["messages"][0]["content"].get<std::string>();
+  Check(prompt.find("语音表达：") != std::string::npos && prompt.find("文字表达：") == std::string::npos,
+        "a typed message read aloud uses the pronunciation-safe speech rules");
+  Check(f.history[0].data == json({{"input", "text"}}), "a spoken reply to a typed message is still marked as typed");
+  f.Stream({"今天是晴天。明天", "可能下雨。"});
+  Check(f.synth->spoken.size() == 1 && f.synth->spoken[0].second == "今天是晴天。", "the typed reply is synthesised");
+  f.Synthesize(4800);
+  Check(!f.played.empty() && f.state == "speaking", "the typed reply plays");
+  f.heard = 2400;
+  f.pipeline->StopReply();
+  Check(f.pipeline->Context().back() == json({{"role", "assistant"}, {"content", "今天是晴天。明天可能下雨。"}}),
+        "a stopped spoken reply to a typed message keeps all the text that was shown");
+
+  const auto spoken = f.synth->spoken.size();
+  f.pipeline->SubmitText("谢谢", false);
+  Check(f.chat->requests.back()["messages"][0]["content"].get<std::string>().find("文字表达：") != std::string::npos,
+        "with speech off, a voice pipeline answers typed messages in text");
+  f.Stream({"不客气。"});
+  Check(f.synth->spoken.size() == spoken && f.state == "idle", "a reply with speech off is not spoken");
+}
+
 void DesktopImage() {
   Fixture f(false, false, false);
   f.pipeline->SubmitText("看看我的桌面");
@@ -561,6 +585,7 @@ int main() {
     Conversation();
     SynthesisFailure();
     TypedMessages();
+    SpokenTypedMessages();
     DesktopImage();
     ContextCompaction();
     CompactionFailures();

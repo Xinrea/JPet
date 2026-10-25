@@ -98,6 +98,11 @@ std::vector<Voice::SpeechModelStore*> VoiceChat::ModelStores() {
   return {recognitionModel_.get(), synthesisModel_.get()};
 }
 
+bool VoiceChat::SpeechModelsInstalled() {
+  const auto stores = ModelStores();
+  return std::all_of(stores.begin(), stores.end(), [](auto* store) { return !store->Installed().empty(); });
+}
+
 nlohmann::json VoiceChat::SpeechModelStatus() {
   std::vector<nlohmann::json> statuses;
   for (auto* store : ModelStores()) statuses.push_back(store->Status());
@@ -281,7 +286,7 @@ nlohmann::json VoiceChat::Status() {
 
 bool VoiceChat::IsBusy() const { return busy_; }
 
-bool VoiceChat::SendText(const std::string& text, std::string& error) {
+bool VoiceChat::SendText(const std::string& text, bool speak, std::string& error) {
   const auto first = text.find_first_not_of(" \t\r\n");
   if (first == std::string::npos) { error = "消息不能为空"; return false; }
   if (text.size() > 6000) { error = "消息太长，请精简后再发送"; return false; }
@@ -289,7 +294,7 @@ bool VoiceChat::SendText(const std::string& text, std::string& error) {
   if (!error.empty()) return false;
   std::lock_guard<std::mutex> lock(textMutex_);
   if (texts_.size() >= 4) { error = "消息发送太快了，请稍后再试"; return false; }
-  texts_.push_back(text);
+  texts_.push_back({text, speak});
   return true;
 }
 
@@ -426,16 +431,19 @@ void VoiceChat::Tick(GLFWwindow* window) {
   if (action == Voice::ShortcutControl::Action::Begin) Begin();
   else if (action == Voice::ShortcutControl::Action::End) End();
   Drain();
-  std::vector<std::string> texts;
+  std::vector<TypedMessage> texts;
   {
     std::lock_guard<std::mutex> lock(textMutex_);
     texts.swap(texts_);
   }
-  for (const auto& text : texts) {
-    if (!Connect(false)) break;
-    LAppPal::PrintLog("[Voice] Text message bytes=%zu", text.size());
+  for (const auto& message : texts) {
+    // Without the local speech models a spoken reply falls back to text, as
+    // does one whose voice pipeline cannot start.
+    bool speak = message.speak && SpeechModelsInstalled() && Connect(true);
+    if (!speak && !Connect(false)) break;
+    LAppPal::PrintLog("[Voice] Text message bytes=%zu speak=%d", message.text.size(), speak ? 1 : 0);
     if (!tools_) tools_ = std::make_unique<Voice::ToolExecutor>(Voice::MakeToolDependencies());
-    pipeline_->SubmitText(text);
+    pipeline_->SubmitText(message.text, speak);
     lastActivity_ = Clock::now();
   }
   if (stopRequested_.exchange(false) && pipeline_) {

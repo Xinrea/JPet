@@ -25,8 +25,9 @@ class VoiceChat {
     return history_.Clear();
   }
   bool IsBusy() const;
-  // A typed message from the panel's chat; answered in text by the next Tick.
-  bool SendText(const std::string& text, std::string& error);
+  // A typed message from the panel's chat; answered by the next Tick in text,
+  // and also spoken when `speak` is set and the local speech models are installed.
+  bool SendText(const std::string& text, bool speak, std::string& error);
   void StopReply() { stopRequested_ = true; }
   // Local speech recognition and synthesis models, managed as one download:
   // download, cancel or remove them.
@@ -39,8 +40,9 @@ class VoiceChat {
  private:
   using Clock = std::chrono::steady_clock;
   VoiceChat();
-  // Starts the pipeline: with voice for the shortcut, text-only for typed
-  // messages. A text-only pipeline is replaced when the microphone opens.
+  // Starts the pipeline: with voice for the shortcut and spoken typed replies,
+  // text-only for other typed messages. A text-only pipeline is replaced when
+  // voice is needed.
   bool Connect(bool voice);
   void Begin();
   void End();
@@ -53,6 +55,7 @@ class VoiceChat {
   void PlayReply(const std::string& pcm);
   void SubmitTools(const std::vector<Voice::ToolCall>& calls);
   std::vector<Voice::SpeechModelStore*> ModelStores();  // Recognition, synthesis.
+  bool SpeechModelsInstalled();
   std::unique_ptr<Voice::Platform> platform_;
   std::unique_ptr<Voice::ToolExecutor> tools_;
   Voice::History history_;
@@ -71,8 +74,9 @@ class VoiceChat {
   std::atomic<bool> historyClearRequested_{false};
   std::atomic<bool> busy_{false};
   std::atomic<bool> stopRequested_{false};
+  struct TypedMessage { std::string text; bool speak; };
   std::mutex textMutex_;
-  std::vector<std::string> texts_;
+  std::vector<TypedMessage> texts_;
   // Voice and text share one conversation; kept when an idle pipeline closes,
   // reset with the settings or history.
   nlohmann::json context_ = nlohmann::json::array();
