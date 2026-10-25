@@ -346,6 +346,28 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_definitions(${APP_NAME} PRIVATE JPET_DEBUG)
 endif()
 
+option(JPET_BUILD_MODEL_TESTS "Build Windows model resource loading tests" OFF)
+if(JPET_BUILD_MODEL_TESTS AND WIN32)
+  enable_testing()
+  add_executable(model_settings_test tests/model_settings_test.cpp src/LAppPal.cpp
+    src/LAppAllocator.cpp src/LAppDefine.cpp)
+  set_target_properties(model_settings_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+  target_include_directories(model_settings_test PRIVATE src)
+  target_compile_options(model_settings_test PRIVATE
+    "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>"
+    "$<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>"
+    "$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>")
+  target_compile_definitions(model_settings_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+  target_link_libraries(model_settings_test PRIVATE Framework glfw GLEW::GLEW
+    OpenGL::GL Comdlg32 Shell32 Ole32)
+  if(MSVC)
+    target_link_libraries(model_settings_test PRIVATE
+      debug -NODEFAULTLIB:libcmtd.lib optimized -NODEFAULTLIB:libcmt.lib)
+  endif()
+  add_test(NAME model_settings COMMAND model_settings_test
+    "${RES_PATH}/joi/ZMCW.model3.json" "${CMAKE_CURRENT_BINARY_DIR}")
+endif()
+
 option(JPET_BUILD_UPDATE_TESTS "Build release selection and checksum tests" OFF)
 option(JPET_BUILD_VOICE_TESTS "Build voice conversation protocol tests" OFF)
 if(JPET_BUILD_VOICE_TESTS)
