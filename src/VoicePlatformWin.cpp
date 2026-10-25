@@ -259,11 +259,27 @@ class WinPlatform final : public Platform {
     if (state_->titleFont) DeleteObject(state_->titleFont);
     if (state_->shortcutFont) DeleteObject(state_->shortcutFont);
   }
-  bool ShortcutHeld(const ShortcutKey& key) const override {
-    static_assert(ShortcutKeys[0].code == VK_CONTROL && ShortcutKeys[1].code == VK_RCONTROL &&
-        ShortcutKeys[2].code == VK_RMENU, "shortcut key codes match the Windows virtual keys");
-    return (GetAsyncKeyState(static_cast<int>(key.code)) & 0x8000) != 0;
+  bool KeyHeld(const Key& key) const override {
+    constexpr auto vk = [](const char* code) { return KeyCode(code, false); };
+    static_assert(vk("Control") == VK_CONTROL && vk("ControlLeft") == VK_LCONTROL && vk("ControlRight") == VK_RCONTROL &&
+        vk("Alt") == VK_MENU && vk("AltLeft") == VK_LMENU && vk("AltRight") == VK_RMENU && vk("Shift") == VK_SHIFT &&
+        vk("ShiftLeft") == VK_LSHIFT && vk("ShiftRight") == VK_RSHIFT && vk("MetaLeft") == VK_LWIN && vk("MetaRight") == VK_RWIN &&
+        vk("F1") == VK_F1 && vk("F12") == VK_F12 && vk("F13") == VK_F13 && vk("F24") == VK_F24 &&
+        vk("Pause") == VK_PAUSE && vk("ScrollLock") == VK_SCROLL && vk("KeyA") == 'A' && vk("Digit0") == '0' &&
+        vk("Backquote") == VK_OEM_3 && vk("Minus") == VK_OEM_MINUS && vk("Equal") == VK_OEM_PLUS &&
+        vk("BracketLeft") == VK_OEM_4 && vk("BracketRight") == VK_OEM_6 && vk("Backslash") == VK_OEM_5 &&
+        vk("Semicolon") == VK_OEM_1 && vk("Quote") == VK_OEM_7 && vk("Comma") == VK_OEM_COMMA &&
+        vk("Period") == VK_OEM_PERIOD && vk("Slash") == VK_OEM_2 && vk("Space") == VK_SPACE && vk("Tab") == VK_TAB &&
+        vk("Enter") == VK_RETURN && vk("Backspace") == VK_BACK && vk("Escape") == VK_ESCAPE && vk("Insert") == VK_INSERT &&
+        vk("Delete") == VK_DELETE && vk("Home") == VK_HOME && vk("End") == VK_END && vk("PageUp") == VK_PRIOR &&
+        vk("PageDown") == VK_NEXT && vk("ArrowLeft") == VK_LEFT && vk("ArrowUp") == VK_UP && vk("ArrowRight") == VK_RIGHT &&
+        vk("ArrowDown") == VK_DOWN && vk("Numpad0") == VK_NUMPAD0 && vk("Numpad9") == VK_NUMPAD9 &&
+        vk("NumpadMultiply") == VK_MULTIPLY && vk("NumpadAdd") == VK_ADD && vk("NumpadSubtract") == VK_SUBTRACT &&
+        vk("NumpadDecimal") == VK_DECIMAL && vk("NumpadDivide") == VK_DIVIDE,
+        "shortcut keys match the Windows virtual keys");
+    return (GetAsyncKeyState(static_cast<int>(key.windows)) & 0x8000) != 0;
   }
+  bool ShortcutReadable(const Shortcut&, bool) override { return true; }
 
   void StartCapture() override {
     if (microphone_.joinable()) {

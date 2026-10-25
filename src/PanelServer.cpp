@@ -357,6 +357,18 @@ void PanelServer::doServe() {
     res.set_header("Cache-Control", "no-store");
     res.set_content(VoiceChat::GetInstance()->Status().dump(), "application/json");
   });
+  // The panel records a new voice shortcut: {active: bool}.
+  server->Post("/api/voice/shortcut-recording", [localRequest](const httplib::Request& req, httplib::Response& res) {
+    if (!localRequest(req, res, true)) return;
+    const auto payload = nlohmann::json::parse(req.body, nullptr, false);
+    if (!payload.is_object() || !payload.contains("active") || !payload["active"].is_boolean()) {
+      res.status = 400;
+      res.set_content(R"({"error":"录制状态格式不正确"})", "application/json");
+      return;
+    }
+    VoiceChat::GetInstance()->SuspendShortcut(payload["active"].get<bool>());
+    res.set_content("{}", "application/json");
+  });
   // POST because the request may carry an API key that is not saved yet.
   server->Post("/api/voice/chat-models", [localRequest](const httplib::Request& req, httplib::Response& res) {
     if (!localRequest(req, res, true, 4096)) return;

@@ -21,7 +21,12 @@ struct Event {
 class Platform {
  public:
   virtual ~Platform() = default;
-  virtual bool ShortcutHeld(const ShortcutKey& key) const = 0;
+  // Whether a key of a voice shortcut is down, whichever window has focus.
+  virtual bool KeyHeld(const Key& key) const = 0;
+  // Whether every key of the shortcut can be read while other apps have focus.
+  // macOS needs Input Monitoring for keys other than modifiers; `prompt` asks
+  // the system for it (shown once per app).
+  virtual bool ShortcutReadable(const Shortcut& shortcut, bool prompt) = 0;
   virtual void StartCapture() = 0;
   virtual void StopCapture() = 0;
   virtual std::vector<Event> Poll() = 0;
