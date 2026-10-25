@@ -29,6 +29,11 @@ class VoiceChat {
   // and also spoken when `speak` is set and the local speech models are installed.
   bool SendText(const std::string& text, bool speak, std::string& error);
   void StopReply() { stopRequested_ = true; }
+  // While the panel records a new shortcut, the saved one must not start voice
+  // chat. Lapses on its own in case the panel closes mid-recording.
+  void SuspendShortcut(bool active) {
+    shortcutSuspendedUntil_ = active ? (Clock::now() + std::chrono::seconds(30)).time_since_epoch().count() : 0;
+  }
   // Local speech recognition and synthesis models, managed as one download:
   // download, cancel or remove them.
   bool SpeechModelAction(const std::string& action, std::string& error);
@@ -44,9 +49,12 @@ class VoiceChat {
   // text-only for other typed messages. A text-only pipeline is replaced when
   // voice is needed.
   bool Connect(bool voice);
+  void Prepare();
   void Begin();
+  void Cancel();
   void End();
   void Drain();
+  void Feed(const std::string& pcm);
   void Close(bool failed = false);
   void Fail(const std::string& error);
   void SetState(const std::string& state, const std::string& message = "");
@@ -85,6 +93,14 @@ class VoiceChat {
   GLFWwindow* window_ = nullptr;
   bool connected_ = false, voice_ = false;
   Voice::ShortcutControl shortcut_;
+  bool shortcutSuspended_ = false;
+  std::atomic<Clock::rep> shortcutSuspendedUntil_{0};
+  // Whether the shortcut's keys can be read globally (macOS Input Monitoring).
+  bool shortcutReadable_ = true;
+  Clock::time_point shortcutCheckedAt_;
+  // Hold mode: audio captured after the press, before the turn is confirmed.
+  bool pendingCapture_ = false;
+  std::string pendingAudio_;
   bool microphoneEnabled_ = false;
   size_t capturedBytes_ = 0;
   double capturedEnergy_ = 0;

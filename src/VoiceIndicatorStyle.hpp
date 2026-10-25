@@ -11,7 +11,7 @@ struct Content {
   bool error = false, microphoneOn = false;
 };
 
-inline std::string ShortcutHint(const char* shortcut, bool holdMode) {
+inline std::string ShortcutHint(const std::string& shortcut, bool holdMode) {
   return std::string(holdMode ? "按住 " : "按 ") + shortcut +
       (holdMode ? " 开始收音" : " 开启/关闭收音");
 }

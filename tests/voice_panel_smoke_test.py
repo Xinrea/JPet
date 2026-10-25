@@ -77,6 +77,23 @@ def main(gui=False, app=APP):
             for invalid_mode in ["", "invalid", None, 123, False]:
                 assert request(port, "/api/config/voice", {"input_mode": invalid_mode})[0] == 400
             assert request(port, "/api/config/voice")[1]["input_mode"] == "hold"
+            # The shortcut is recorded as KeyboardEvent.code keys; the default is the platform's previous fixed key.
+            assert config["shortcut"] in ("Alt", "Control") and config["shortcut_default"] is True and config["shortcut_name"] in ("Option", "Ctrl")
+            code, saved = request(port, "/api/config/voice", {"shortcut": "Space+ControlRight"})
+            assert code == 200 and saved["shortcut"] == "ControlRight+Space" and saved["shortcut_default"] is False, saved
+            assert saved["shortcut_name"].endswith(" + 空格") and saved["input_mode"] == "hold"
+            for invalid_key, error in [("KeyA", "打字"), ("ShiftLeft+KeyA", "打字"), ("Fn", "快捷键"), ("Control+", "快捷键"),
+                                       ("ControlLeft+AltLeft+MetaLeft+ShiftLeft+KeyK", "4 个键"), (None, "快捷键"), (1, "快捷键")]:
+                code, result = request(port, "/api/config/voice", {"shortcut": invalid_key})
+                assert code == 400 and error in result["error"], (invalid_key, result)
+            assert request(port, "/api/config/voice", {"input_mode": "hold"})[1]["shortcut"] == "ControlRight+Space"
+            assert request(port, "/api/voice")[1]["shortcut"] == saved["shortcut_name"]
+            # Recording a new shortcut pauses the saved one.
+            assert request(port, "/api/voice/shortcut-recording", {"active": True})[0] == 200
+            assert request(port, "/api/voice/shortcut-recording", {"active": False})[0] == 200
+            for invalid in [{}, {"active": "yes"}, {"active": 1}]:
+                assert request(port, "/api/voice/shortcut-recording", invalid)[0] == 400, invalid
+            assert request(port, "/api/voice/shortcut-recording", {"active": True}, "text/plain")[0] == 403
             # Microphone and speaker default to the system devices; a saved id need not be connected.
             assert config["input_device"] == "" and config["output_device"] == ""
             assert all(isinstance(config["audio_devices"][kind], list) for kind in ("inputs", "outputs"))
@@ -163,6 +180,11 @@ def main(gui=False, app=APP):
             assert request(port, "/api/voice/speech-model", {"action": "download"}, "text/plain")[0] == 403
             contents = Path(profile, "jpet.toml").read_text()
             assert re.search(r'^\s*input_mode\s*=\s*[\"\']hold[\"\']', contents, re.MULTILINE)
+            assert re.search(r'^\s*shortcut\s*=\s*[\"\']ControlRight\+Space[\"\']', contents, re.MULTILINE)
+            # An empty shortcut restores the default, saved empty so it follows the platform.
+            code, saved = request(port, "/api/config/voice", {"shortcut": ""})
+            assert code == 200 and saved["shortcut"] == config["shortcut"] and saved["shortcut_default"] is True
+            assert re.search(r'^\s*shortcut\s*=\s*[\"\'][\"\']', Path(profile, "jpet.toml").read_text(), re.MULTILINE)
             assert not re.search(r'^\s*tts_(model|voice)\s*=', contents, re.MULTILINE)
             assert not re.search(r"^\s*(api_key|chat_api_key|provider|engine|has_chat_api_key|has_api_key|workspace_id)\s*=", contents, re.MULTILINE)
             assert re.search(r'^\s*chat_provider\s*=\s*[\"\']deepseek[\"\']', contents, re.MULTILINE)

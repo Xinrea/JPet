@@ -23,6 +23,30 @@ int main() {
           Voice::Indicator::ShortcutHint("Ctrl", true) == "按住 Ctrl 开始收音" &&
           Voice::Indicator::ShortcutHint("Option", false) == "按 Option 开启/关闭收音" &&
           Voice::Indicator::ShortcutHint("Option", true) == "按住 Option 开始收音", "indicator shortcut hint follows input mode and platform");
+    // Recorded shortcuts: KeyboardEvent.code combinations, normalized to modifiers first.
+    std::string shortcutError;
+    const auto parse = [&](const std::string& text) { shortcutError.clear(); return Voice::ParseShortcut(text, shortcutError); };
+#ifdef __APPLE__
+    Check(Voice::DefaultShortcut().Code() == "Alt" && Voice::DefaultShortcut().Name() == "Option", "Option stays the default on macOS");
+    Check(parse("Space+MetaRight")->Name() == "右 Command + 空格", "macOS key names");
+    Check(!parse("Pause") && !parse("F21"), "keys missing from Mac keyboards are rejected");
+#else
+    Check(Voice::DefaultShortcut().Code() == "Control" && Voice::DefaultShortcut().Name() == "Ctrl", "Ctrl stays the default on Windows");
+    Check(parse("Space+MetaRight")->Name() == "右 Win + 空格" && parse("Pause") && parse("F24"), "Windows key names and keys");
+#endif
+    Check(parse("")->Code() == Voice::DefaultShortcut().Code(), "an empty shortcut is the default");
+    Check(parse("Space+ControlLeft")->Code() == "ControlLeft+Space" && parse("AltRight")->Code() == "AltRight" &&
+          parse("F13")->Code() == "F13" && parse("ShiftLeft+F8")->Code() == "ShiftLeft+F8" &&
+          parse("KeyK+AltLeft+KeyK")->Code() == "AltLeft+KeyK", "shortcuts are normalized and deduplicated");
+    Check(parse("ControlRight")->ModifiersOnly() && !parse("ControlRight+KeyK")->ModifiersOnly(), "modifier-only shortcuts");
+    for (const auto* typing : {"KeyA", "Space", "Digit1", "ShiftLeft", "ShiftLeft+KeyA", "Shift+Slash", "Enter", "ArrowUp"})
+      Check(!parse(typing) && shortcutError.find("打字") != std::string::npos, "keys that type text need a modifier");
+    for (const auto* invalid : {"Fn", "CapsLock", "Control+", "+Control", "control", "ControlLeft+AltLeft+MetaLeft+ShiftLeft+KeyK"})
+      Check(!parse(invalid) && !shortcutError.empty(), "unknown keys and more than four keys are rejected");
+    Check(Voice::SavedShortcut("KeyA").Code() == Voice::DefaultShortcut().Code() &&
+          Voice::SavedShortcut("AltRight").Code() == "AltRight", "an unusable saved shortcut falls back to the default");
+    for (const auto& key : Voice::Keys)
+      Check(Voice::FindKey(key.code) == &key && (key.windows != Voice::NoKey || key.mac != Voice::NoKey), "key table codes are unique");
     Check(Voice::Indicator::BodyText("这是回复", "正在思考…", false) == "这是回复" &&
           Voice::Indicator::BodyText("这是回复", "麦克风不可用", true) == "麦克风不可用" &&
           Voice::Indicator::BodyText("", "正在思考…", false) == "正在思考…", "indicator prioritizes errors and falls back to status");
@@ -49,26 +73,42 @@ int main() {
     }
 
     using Action = Voice::ShortcutControl::Action;
+    using Ms = std::chrono::milliseconds;
+    const auto t0 = Voice::ShortcutControl::Clock::time_point{};
+    const auto at = [&](int ms) { return t0 + Ms(ms); };
     Voice::ShortcutControl toggleKey, holdKey;
-    Check(toggleKey.Update(true, false, false) == Action::Begin &&
-        toggleKey.Update(true, false, true) == Action::None &&
-        toggleKey.Update(false, false, true) == Action::None &&
-        toggleKey.Update(true, false, true) == Action::End,
+    Check(toggleKey.Update(true, false, false, at(0)) == Action::Begin &&
+        toggleKey.Update(true, false, true, at(16)) == Action::None &&
+        toggleKey.Update(false, false, true, at(32)) == Action::None &&
+        toggleKey.Update(true, false, true, at(48)) == Action::End,
         "toggle starts on press, ignores holding/release, and stops on the next press");
-    Check(holdKey.Update(true, true, false) == Action::Begin &&
-        holdKey.Update(true, true, true) == Action::None &&
-        holdKey.Update(false, true, true) == Action::End &&
-        holdKey.Update(false, true, false) == Action::None,
-        "hold starts once on press and stops once on release");
+    Check(holdKey.Update(true, true, false, at(0)) == Action::Prepare &&
+        holdKey.Update(true, true, false, at(199)) == Action::None &&
+        holdKey.Update(true, true, false, at(200)) == Action::Begin &&
+        holdKey.Update(true, true, true, at(216)) == Action::None &&
+        holdKey.Update(false, true, true, at(500)) == Action::End &&
+        holdKey.Update(false, true, false, at(516)) == Action::None,
+        "hold prepares on press, begins after the hold delay and stops once on release");
+    Check(holdKey.Update(true, true, false, at(1000)) == Action::Prepare && holdKey.Preparing() &&
+        holdKey.Update(false, true, false, at(1150)) == Action::Cancel && !holdKey.Preparing() &&
+        holdKey.Update(false, true, false, at(1400)) == Action::None,
+        "a hold shorter than the delay (an accidental Ctrl+C) is cancelled without starting");
+    Check(holdKey.Update(true, true, false, at(2000)) == Action::Prepare &&
+        holdKey.Update(true, false, false, at(2050)) == Action::Cancel,
+        "switching to toggle mode while a hold is prepared cancels it");
+    holdKey.Update(false, true, false, at(2100));
     holdKey.BlockUntilRelease(true);
-    Check(holdKey.Update(true, true, false) == Action::None &&
-        holdKey.Update(false, true, false) == Action::None &&
-        holdKey.Update(true, true, false) == Action::Begin,
+    Check(holdKey.Update(true, true, false, at(3000)) == Action::None &&
+        holdKey.Update(false, true, false, at(3016)) == Action::None &&
+        holdKey.Update(true, true, false, at(3032)) == Action::Prepare &&
+        holdKey.Update(true, true, false, at(3232)) == Action::Begin,
         "settings reset while held requires release before starting again");
-    holdKey.BlockUntilRelease();
-    Check(holdKey.Update(true, true, false) == Action::None &&
-        holdKey.Update(false, true, false) == Action::None &&
-        holdKey.Update(true, false, false) == Action::Begin,
+    holdKey.Update(false, true, true, at(3300));
+    holdKey.Update(true, true, false, at(3400));
+    holdKey.BlockUntilRelease();  // The microphone failed while the hold was prepared.
+    Check(!holdKey.Preparing() && holdKey.Update(true, true, false, at(3700)) == Action::None &&
+        holdKey.Update(false, true, false, at(3716)) == Action::None &&
+        holdKey.Update(true, false, false, at(3732)) == Action::Begin,
         "capture failure does not repeatedly restart while held and recovery can switch modes");
 
     using Event = Voice::ConversationEvent;

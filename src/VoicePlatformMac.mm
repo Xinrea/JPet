@@ -8,6 +8,8 @@
 #import <AVFoundation/AVFoundation.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <CoreAudio/CoreAudio.h>
+#import <IOKit/hidsystem/IOLLEvent.h>
+#import <Carbon/Carbon.h>  // kVK_* virtual key codes
 #import <Security/Security.h>
 
 #define GLFW_EXPOSE_NATIVE_COCOA
@@ -251,8 +253,60 @@ class MacPlatform final : public Platform {
     [state_->indicator close];
   }
 
-  bool ShortcutHeld() const override {
-    return ([NSEvent modifierFlags] & NSEventModifierFlagOption) != 0;
+  bool KeyHeld(const Key& key) const override {
+    constexpr auto mac = [](const char* code) { return KeyCode(code, true); };
+    static_assert(mac("Control") == kCGEventFlagMaskControl && mac("ControlLeft") == NX_DEVICELCTLKEYMASK &&
+        mac("ControlRight") == NX_DEVICERCTLKEYMASK && mac("Alt") == kCGEventFlagMaskAlternate &&
+        mac("AltLeft") == NX_DEVICELALTKEYMASK && mac("AltRight") == NX_DEVICERALTKEYMASK &&
+        mac("Shift") == kCGEventFlagMaskShift && mac("ShiftLeft") == NX_DEVICELSHIFTKEYMASK &&
+        mac("ShiftRight") == NX_DEVICERSHIFTKEYMASK && mac("MetaLeft") == NX_DEVICELCMDKEYMASK &&
+        mac("MetaRight") == NX_DEVICERCMDKEYMASK, "modifiers match the macOS event flags");
+    static_assert(mac("F1") == kVK_F1 && mac("F2") == kVK_F2 && mac("F3") == kVK_F3 && mac("F4") == kVK_F4 &&
+        mac("F5") == kVK_F5 && mac("F6") == kVK_F6 && mac("F7") == kVK_F7 && mac("F8") == kVK_F8 &&
+        mac("F9") == kVK_F9 && mac("F10") == kVK_F10 && mac("F11") == kVK_F11 && mac("F12") == kVK_F12 &&
+        mac("F13") == kVK_F13 && mac("F14") == kVK_F14 && mac("F15") == kVK_F15 && mac("F16") == kVK_F16 &&
+        mac("F17") == kVK_F17 && mac("F18") == kVK_F18 && mac("F19") == kVK_F19 && mac("F20") == kVK_F20,
+        "function keys match the macOS virtual keys");
+    static_assert(mac("KeyA") == kVK_ANSI_A && mac("KeyB") == kVK_ANSI_B && mac("KeyC") == kVK_ANSI_C &&
+        mac("KeyD") == kVK_ANSI_D && mac("KeyE") == kVK_ANSI_E && mac("KeyF") == kVK_ANSI_F &&
+        mac("KeyG") == kVK_ANSI_G && mac("KeyH") == kVK_ANSI_H && mac("KeyI") == kVK_ANSI_I &&
+        mac("KeyJ") == kVK_ANSI_J && mac("KeyK") == kVK_ANSI_K && mac("KeyL") == kVK_ANSI_L &&
+        mac("KeyM") == kVK_ANSI_M && mac("KeyN") == kVK_ANSI_N && mac("KeyO") == kVK_ANSI_O &&
+        mac("KeyP") == kVK_ANSI_P && mac("KeyQ") == kVK_ANSI_Q && mac("KeyR") == kVK_ANSI_R &&
+        mac("KeyS") == kVK_ANSI_S && mac("KeyT") == kVK_ANSI_T && mac("KeyU") == kVK_ANSI_U &&
+        mac("KeyV") == kVK_ANSI_V && mac("KeyW") == kVK_ANSI_W && mac("KeyX") == kVK_ANSI_X &&
+        mac("KeyY") == kVK_ANSI_Y && mac("KeyZ") == kVK_ANSI_Z, "letters match the macOS virtual keys");
+    static_assert(mac("Digit0") == kVK_ANSI_0 && mac("Digit1") == kVK_ANSI_1 && mac("Digit2") == kVK_ANSI_2 &&
+        mac("Digit3") == kVK_ANSI_3 && mac("Digit4") == kVK_ANSI_4 && mac("Digit5") == kVK_ANSI_5 &&
+        mac("Digit6") == kVK_ANSI_6 && mac("Digit7") == kVK_ANSI_7 && mac("Digit8") == kVK_ANSI_8 &&
+        mac("Digit9") == kVK_ANSI_9 && mac("Backquote") == kVK_ANSI_Grave && mac("Minus") == kVK_ANSI_Minus &&
+        mac("Equal") == kVK_ANSI_Equal && mac("BracketLeft") == kVK_ANSI_LeftBracket &&
+        mac("BracketRight") == kVK_ANSI_RightBracket && mac("Backslash") == kVK_ANSI_Backslash &&
+        mac("Semicolon") == kVK_ANSI_Semicolon && mac("Quote") == kVK_ANSI_Quote && mac("Comma") == kVK_ANSI_Comma &&
+        mac("Period") == kVK_ANSI_Period && mac("Slash") == kVK_ANSI_Slash, "digits and symbols match the macOS virtual keys");
+    static_assert(mac("Space") == kVK_Space && mac("Tab") == kVK_Tab && mac("Enter") == kVK_Return &&
+        mac("Backspace") == kVK_Delete && mac("Escape") == kVK_Escape && mac("Delete") == kVK_ForwardDelete &&
+        mac("Home") == kVK_Home && mac("End") == kVK_End && mac("PageUp") == kVK_PageUp && mac("PageDown") == kVK_PageDown &&
+        mac("ArrowLeft") == kVK_LeftArrow && mac("ArrowUp") == kVK_UpArrow && mac("ArrowRight") == kVK_RightArrow &&
+        mac("ArrowDown") == kVK_DownArrow && mac("Numpad0") == kVK_ANSI_Keypad0 && mac("Numpad1") == kVK_ANSI_Keypad1 &&
+        mac("Numpad2") == kVK_ANSI_Keypad2 && mac("Numpad3") == kVK_ANSI_Keypad3 && mac("Numpad4") == kVK_ANSI_Keypad4 &&
+        mac("Numpad5") == kVK_ANSI_Keypad5 && mac("Numpad6") == kVK_ANSI_Keypad6 && mac("Numpad7") == kVK_ANSI_Keypad7 &&
+        mac("Numpad8") == kVK_ANSI_Keypad8 && mac("Numpad9") == kVK_ANSI_Keypad9 &&
+        mac("NumpadMultiply") == kVK_ANSI_KeypadMultiply && mac("NumpadAdd") == kVK_ANSI_KeypadPlus &&
+        mac("NumpadSubtract") == kVK_ANSI_KeypadMinus && mac("NumpadDecimal") == kVK_ANSI_KeypadDecimal &&
+        mac("NumpadDivide") == kVK_ANSI_KeypadDivide, "editing and keypad keys match the macOS virtual keys");
+    // Modifiers need no permission. Only the event source's flags carry the
+    // left/right bits: +[NSEvent modifierFlags] keeps just the side-agnostic
+    // ones, and CGEventSourceKeyState reports right Command as the left key.
+    if (key.kind == KeyKind::Modifier)
+      return (CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState) & key.mac) != 0;
+    // Other keys need Input Monitoring.
+    return CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, static_cast<CGKeyCode>(key.mac));
+  }
+  bool ShortcutReadable(const Shortcut& shortcut, bool prompt) override {
+    if (shortcut.ModifiersOnly() || CGPreflightListenEventAccess()) return true;
+    if (prompt) CGRequestListenEventAccess();
+    return false;
   }
 
   void StartCapture() override {

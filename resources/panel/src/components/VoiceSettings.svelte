@@ -8,18 +8,75 @@
   // Credentials are write-only; the API never returns a saved key.
   let voiceInputMode = "toggle", savedInputMode = "toggle";
   const voiceInputModes = [{ value: "toggle", name: "按一下" }, { value: "hold", name: "按住" }];
+  // The voice shortcut is recorded: a KeyboardEvent.code combination such as
+  // "AltRight" or "ControlLeft+Space"; "" restores the platform default.
+  let voiceShortcut = "", savedShortcut = "", shortcutName = "", shortcutDefault = true;
+  let recording = false, recordCodes = [], recordTimer = null;
+  const modifierCode = /^(Control|Alt|Shift|Meta)(Left|Right)?$/;
+  // The saved shortcut must not start voice chat while its replacement is pressed.
+  const setShortcutRecording = active => fetch("/api/voice/shortcut-recording", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }),
+  }).catch(() => {});
+  function startRecording() {
+    if (recording) return;
+    recording = true; recordCodes = []; audioError = "";
+    setShortcutRecording(true);
+    window.addEventListener("keydown", recordKeyDown, true);
+    window.addEventListener("keyup", recordKeyUp, true);
+    window.addEventListener("blur", cancelRecording);
+    recordTimer = setTimeout(cancelRecording, 15000);
+  }
+  function stopListening() {
+    recording = false;
+    clearTimeout(recordTimer);
+    window.removeEventListener("keydown", recordKeyDown, true);
+    window.removeEventListener("keyup", recordKeyUp, true);
+    window.removeEventListener("blur", cancelRecording);
+  }
+  function cancelRecording() {
+    if (!recording) return;
+    stopListening();
+    setShortcutRecording(false);
+  }
+  // A key other than a modifier completes the combination as it goes down (macOS
+  // drops its keyup while Command is held); modifiers alone complete on release.
+  function recordKeyDown(event) {
+    event.preventDefault(); event.stopPropagation();
+    if (event.repeat || !event.code) return;
+    if (event.code === "Escape" && !recordCodes.length) { cancelRecording(); return; }
+    if (!recordCodes.includes(event.code)) recordCodes = [...recordCodes, event.code];
+    if (!modifierCode.test(event.code)) finishRecording();
+  }
+  function recordKeyUp(event) {
+    event.preventDefault(); event.stopPropagation();
+    if (recordCodes.length) finishRecording();
+  }
+  async function finishRecording() {
+    if (!recording) return;
+    stopListening();
+    voiceShortcut = recordCodes.join("+");
+    await saveAudioSettings();
+    setShortcutRecording(false);
+  }
+  function restoreDefaultShortcut() {
+    voiceShortcut = "";
+    saveAudioSettings();
+  }
+  // The system asks for Input Monitoring only once per app build; afterwards the user grants it here.
+  const openInputMonitoring = () => fetch("/api/openlink", { method: "POST",
+    body: JSON.stringify({ link: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent" }) }).catch(() => {});
   // Microphone and speaker; "" is the system default. A saved device that is
   // not connected stays selectable, and the default is used until it returns.
   let inputDevice = "", outputDevice = "", savedInputDevice = "", savedOutputDevice = "";
   let audioDevices = { inputs: [], outputs: [] }, devicesRefreshing = false;
-  // Shortcut mode and devices save as soon as they change, apart from the chat settings form.
+  // Shortcut key, mode and devices save as soon as they change, apart from the chat settings form.
   let audioSaving = false, audioError = "";
   async function saveAudioSettings() {
     audioSaving = true; audioError = "";
     try {
       const response = await fetch("/api/config/voice", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input_mode: voiceInputMode, input_device: inputDevice, output_device: outputDevice }),
+        body: JSON.stringify({ input_mode: voiceInputMode, shortcut: voiceShortcut, input_device: inputDevice, output_device: outputDevice }),
       });
       const settings = await response.json();
       if (!response.ok) throw new Error(settings.error || "保存失败");
@@ -29,7 +86,7 @@
     } catch (error) {
       if (voiceDisposed) return;
       audioError = error.message;
-      voiceInputMode = savedInputMode; inputDevice = savedInputDevice; outputDevice = savedOutputDevice;
+      voiceInputMode = savedInputMode; voiceShortcut = savedShortcut; inputDevice = savedInputDevice; outputDevice = savedOutputDevice;
     } finally {
       if (!voiceDisposed) audioSaving = false;
     }
@@ -82,6 +139,9 @@
   }
   function applyAudioSettings(settings) {
     voiceInputMode = savedInputMode = settings.input_mode || "toggle";
+    voiceShortcut = savedShortcut = settings.shortcut || "";
+    shortcutName = settings.shortcut_name || "";
+    shortcutDefault = settings.shortcut_default !== false;
     inputDevice = savedInputDevice = settings.input_device || "";
     outputDevice = savedOutputDevice = settings.output_device || "";
     audioDevices = settings.audio_devices || audioDevices;
@@ -232,6 +292,7 @@
   onDestroy(() => {
     voiceDisposed = true;
     clearInterval(voiceTimer);
+    cancelRecording();
   });
 </script>
 
@@ -239,7 +300,10 @@
     <SettingCard title="语音对话" description="快捷键、声音设备与本机语音模型" icon="mic">
       <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong>
         <p><select class="mode-select" aria-label="快捷键使用方式" bind:value={voiceInputMode} on:change={saveAudioSettings} disabled={voiceLoading || audioSaving}>{#each voiceInputModes as mode}<option value={mode.value}>{mode.name}</option>{/each}</select>
-          <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> {#if voiceInputMode === "hold"}打断回复并录音，松开后停止录音、播放回复。{:else}开启或关闭麦克风；开启后可连续对话，说话时可打断回复。{/if}</p></div></div>
+          <button type="button" class="shortcut-button" class:recording aria-label="录制语音对话快捷键" title="点击后按下新的快捷键" on:click={startRecording} disabled={voiceLoading || audioSaving}>{recording ? "请按下快捷键…" : shortcutName || "…"}</button>
+          {#if voiceInputMode === "hold"}打断回复并录音，松开后停止录音、播放回复。{:else}开启或关闭麦克风；开启后可连续对话，说话时可打断回复。{/if}</p>
+        <p class="shortcut-help">{#if recording}按下单个键或组合键，松开即保存；Esc 取消。{:else}点击快捷键可重新录制，建议使用右侧修饰键或组合键以免误触。{#if !shortcutDefault}<button type="button" class="link-button" on:click={restoreDefaultShortcut} disabled={voiceLoading || audioSaving}>恢复默认</button>{/if}{/if}</p>
+        {#if voiceStatus?.shortcut_readable === false}<p class="feedback error" role="alert">当前快捷键包含修饰键以外的按键，需要在「系统设置 → 隐私与安全性 → 输入监控」中允许 JPet 并重新打开 JPet（JPet 更新后可能需要先移除旧条目再添加）；也可以改用只含 Control、Option、Command、Shift 的快捷键。<button type="button" class="link-button" on:click={openInputMonitoring}>打开输入监控设置</button></p>{/if}</div></div>
       <div class="device-row">
         <div class="setting-field"><label for="voice-input-device">麦克风</label><Select id="voice-input-device" items={inputItems} bind:value={inputDevice} on:change={saveAudioSettings} placeholder="" disabled={voiceLoading || audioSaving} /></div>
         <div class="setting-field"><label for="voice-output-device">扬声器</label><Select id="voice-output-device" items={outputItems} bind:value={outputDevice} on:change={saveAudioSettings} placeholder="" disabled={voiceLoading || audioSaving} /></div>
@@ -346,4 +410,12 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23578a27' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
   .voice-shortcut .mode-select:hover:not(:disabled) { border-color: #a0c46e; }
   .voice-shortcut .mode-select:disabled { cursor: default; opacity: .7; }
+  .voice-shortcut .shortcut-button { display: inline-block; height: 22px; padding: 0 8px; margin-right: 2px; vertical-align: 1px;
+    font-size: 11px; font-weight: 800; line-height: 20px; color: var(--green-ink); cursor: pointer;
+    border: 1px dashed #a0c46e; border-radius: 6px; background: #fff; box-shadow: 0 1px 0 #d8e7c6; }
+  .voice-shortcut .shortcut-button:hover:not(:disabled) { border-style: solid; }
+  .voice-shortcut .shortcut-button.recording { border-style: solid; border-color: #79c91b; background: #f4f9ea; animation: shortcut-recording 1.2s ease-in-out infinite; }
+  .voice-shortcut .shortcut-button:disabled { cursor: default; opacity: .7; }
+  .voice-shortcut .shortcut-help { margin-top: 0; }
+  @keyframes shortcut-recording { 50% { box-shadow: 0 0 0 3px rgba(121, 201, 27, .2); } }
 </style>

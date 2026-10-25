@@ -10,11 +10,9 @@
 #include <stdexcept>
 
 namespace {
-#ifdef __APPLE__
-constexpr const char* Shortcut = "Option";
-#else
-constexpr const char* Shortcut = "Ctrl";
-#endif
+Voice::Shortcut Shortcut() {
+  return Voice::SavedShortcut(DataManager::GetInstance()->GetConfig<std::string>("voice", "shortcut", ""));
+}
 
 std::string DiagnosticCode(const nlohmann::json& object, const char* field) {
   const auto it = object.find(field);
@@ -273,7 +271,7 @@ nlohmann::json VoiceChat::Status() {
   auto status = status_;
   status["model"] = settings.at("chat_model");
   status["speech_model"] = speechModel;
-  status["shortcut"] = Shortcut;
+  status["shortcut"] = settings.at("shortcut_name");
   status["input_mode"] = settings.at("input_mode");
   status["available_tools"] = nlohmann::json::array();
   for (const auto& definition : ChatTools(settings)) status["available_tools"].push_back(definition["function"]["name"]);
@@ -322,9 +320,41 @@ bool VoiceChat::Connect(bool voice) {
   return true;
 }
 
+// Hold mode: the microphone opens at once so words spoken right after the press
+// are kept, but replies and the indicator are left alone until the press lasts
+// long enough to be a turn.
+void VoiceChat::Prepare() {
+  const auto settings = DataManager::GetInstance()->GetVoiceSettings();
+  platform_->SetDevices(settings.at("input_device"), settings.at("output_device"));
+  pendingAudio_.clear();
+  pendingCapture_ = true;
+  platform_->StartCapture();
+}
+
+// The press was too short to be a turn: nothing is sent and nothing changes.
+void VoiceChat::Cancel() {
+  platform_->StopCapture();
+  Drain();
+  pendingCapture_ = false;
+  pendingAudio_.clear();
+  LAppPal::PrintLog("[Voice] Shortcut released within %lld ms; ignored",
+      static_cast<long long>(Voice::ShortcutControl::HoldDelay.count()));
+}
+
 void VoiceChat::Begin() {
   auto* data = DataManager::GetInstance();
+  // Keep what a prepared capture heard; Connect closes a text-only pipeline,
+  // which also stops the microphone.
+  const bool prepared = pendingCapture_;
+  if (prepared) {
+    Drain();
+    if (!pendingCapture_) return;  // The microphone failed while the press was confirmed.
+  }
+  const auto preRoll = std::move(pendingAudio_);
+  pendingAudio_.clear();
+  pendingCapture_ = false;
   if (!Connect(true)) {
+    if (prepared) platform_->StopCapture();
     shortcut_.BlockUntilRelease();
     return;
   }
@@ -335,7 +365,8 @@ void VoiceChat::Begin() {
   pipeline_->BeginInput(data->GetConfig<std::string>("voice", "input_mode", "toggle") == "hold");
   const auto settings = data->GetVoiceSettings();
   platform_->SetDevices(settings.at("input_device"), settings.at("output_device"));
-  platform_->StartCapture();
+  platform_->StartCapture();  // Already running after Prepare, unless Connect stopped it.
+  Feed(preRoll);
   microphoneEnabled_ = true;
   lastActivity_ = Clock::now();
 }
@@ -360,20 +391,29 @@ void VoiceChat::Drain() {
       continue;
     }
     if (event.type == Voice::Event::Type::Error) { Fail(event.data); break; }
-    if (event.type != Voice::Event::Type::Microphone || !pipeline_) continue;
+    if (event.type != Voice::Event::Type::Microphone) continue;
     if (event.data.size() % 2) { Fail("轴伊没能听清这段语音，请重新说话"); break; }
-    if (Recording()) {
-      capturedBytes_ += event.data.size();
-      for (size_t i = 0; i < event.data.size(); i += 2) {
-        const uint16_t raw = static_cast<unsigned char>(event.data[i]) |
-            (static_cast<uint16_t>(static_cast<unsigned char>(event.data[i + 1])) << 8);
-        const int sample = static_cast<int16_t>(raw);
-        capturedEnergy_ += double(sample) * sample;
-        capturedPeak_ = std::max(capturedPeak_, std::abs(sample));
-      }
+    if (pendingCapture_) {
+      pendingAudio_ += event.data;
+      continue;
     }
-    pipeline_->AppendInput(event.data);
+    Feed(event.data);
   }
+}
+
+void VoiceChat::Feed(const std::string& pcm) {
+  if (!pipeline_ || pcm.empty()) return;
+  if (Recording()) {
+    capturedBytes_ += pcm.size();
+    for (size_t i = 0; i < pcm.size(); i += 2) {
+      const uint16_t raw = static_cast<unsigned char>(pcm[i]) |
+          (static_cast<uint16_t>(static_cast<unsigned char>(pcm[i + 1])) << 8);
+      const int sample = static_cast<int16_t>(raw);
+      capturedEnergy_ += double(sample) * sample;
+      capturedPeak_ = std::max(capturedPeak_, std::abs(sample));
+    }
+  }
+  pipeline_->AppendInput(pcm);
 }
 
 void VoiceChat::Close(bool failed) {
@@ -391,7 +431,8 @@ void VoiceChat::Close(bool failed) {
     localRecognizer_.reset();
     recognizerError_.clear();
   }
-  connected_ = voice_ = microphoneEnabled_ = false;
+  connected_ = voice_ = microphoneEnabled_ = pendingCapture_ = false;
+  pendingAudio_.clear();
   busy_ = false;
 }
 
@@ -408,12 +449,25 @@ void VoiceChat::Tick(GLFWwindow* window) {
   if (std::getenv("JPET_SMOKE_TEST")) return;
   window_ = window;
   const auto now = Clock::now();
-  const bool held = platform_->ShortcutHeld();
+  const auto shortcut = Shortcut();
+  // Recording a new shortcut in the panel releases the saved one; keys still
+  // down when recording ends start nothing until they are released.
+  const bool suspended = now.time_since_epoch().count() < shortcutSuspendedUntil_;
+  const bool held = !suspended && std::all_of(shortcut.keys.begin(), shortcut.keys.end(),
+      [this](const Voice::Key* key) { return platform_->KeyHeld(*key); });
+  if (shortcutSuspended_ && !suspended) shortcut_.BlockUntilRelease(held);
+  shortcutSuspended_ = suspended;
   if (resetRequested_.exchange(false)) {
     Close();
     context_ = nlohmann::json::array();
     shortcut_.BlockUntilRelease(held);
     SetState("idle");
+    // A newly saved shortcut asks for Input Monitoring when it needs it.
+    shortcutReadable_ = platform_->ShortcutReadable(shortcut, true);
+    shortcutCheckedAt_ = now;
+  } else if (now - shortcutCheckedAt_ > std::chrono::seconds(2)) {
+    shortcutReadable_ = platform_->ShortcutReadable(shortcut, false);
+    shortcutCheckedAt_ = now;
   }
   if (historyClearRequested_.exchange(false)) {
     // Messages from the old session may have arrived before Close().
@@ -423,8 +477,10 @@ void VoiceChat::Tick(GLFWwindow* window) {
     status_.erase("last_tool");
   }
   const bool holdMode = DataManager::GetInstance()->GetConfig<std::string>("voice", "input_mode", "toggle") == "hold";
-  const auto action = shortcut_.Update(held, holdMode, microphoneEnabled_);
-  if (action == Voice::ShortcutControl::Action::Begin) Begin();
+  const auto action = shortcut_.Update(held, holdMode, microphoneEnabled_, now);
+  if (action == Voice::ShortcutControl::Action::Prepare) Prepare();
+  else if (action == Voice::ShortcutControl::Action::Begin) Begin();
+  else if (action == Voice::ShortcutControl::Action::Cancel) Cancel();
   else if (action == Voice::ShortcutControl::Action::End) End();
   Drain();
   std::vector<TypedMessage> texts;
@@ -479,6 +535,7 @@ void VoiceChat::Tick(GLFWwindow* window) {
     std::lock_guard<std::mutex> lock(statusMutex_);
     status_["replying"] = pipeline_ && pipeline_->Replying();
     status_["microphone_on"] = Recording();
+    status_["shortcut_readable"] = shortcutReadable_;
   }
   const auto state = Status().value("state", std::string{});
   if (state == "speaking" && !(pipeline_ && pipeline_->WaitingForReply()) && !platform_->IsPlaying())
@@ -494,7 +551,7 @@ void VoiceChat::Tick(GLFWwindow* window) {
       now - stateChangedAt_ < std::chrono::seconds(indicatorError_ || !reply.empty() ? 6 : 2);
   platform_->ShowIndicator(window_, {
       show ? Voice::Indicator::BodyText(reply, indicator_, indicatorNotice_) : "",
-      Voice::Indicator::ShortcutHint(Shortcut, holdMode), indicatorError_, Recording()});
+      Voice::Indicator::ShortcutHint(shortcut.Name(), holdMode), indicatorError_, Recording()});
 }
 
 void VoiceChat::Stop() {
