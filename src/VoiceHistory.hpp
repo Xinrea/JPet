@@ -125,7 +125,7 @@ class History {
     return summary;
   }
   static json Settings(const json& data) {
-    return Select(data, {"volume", "scale", "mute", "idle_audio", "touch_audio", "green", "limit", "track", "dropfile", "dynamic", "live", "update", "long_hair", "left_ear", "right_ear", "hat", "glasses", "star_eyes", "dizzy_eyes", "sweat", "dark_face", "blush", "leg_accessories", "shoes", "tail", "gun", "mouth"});
+    return Select(data, {"volume", "scale", "mute", "touch_volume", "idle_volume", "idle_audio", "touch_audio", "green", "limit", "track", "dropfile", "dynamic", "live", "update", "long_hair", "left_ear", "right_ear", "hat", "glasses", "star_eyes", "dizzy_eyes", "sweat", "dark_face", "blush", "leg_accessories", "shoes", "tail", "gun", "mouth"});
   }
   static json Arguments(const json& data) {
     auto summary = Select(data, {"action", "section", "task_id", "entry_id", "direction", "attribute", "clothes_id", "offset", "limit", "metric", "question", "display", "query", "type", "order", "page", "url", "uid", "shortcut_type", "target", "video", "part", "mid", "room_id", "folder_id", "category", "days"});

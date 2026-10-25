@@ -34,11 +34,7 @@ json ReadSettingsValues(const std::string& section) {
   auto* app = LAppDelegate::GetInstance();
   std::lock_guard<std::recursive_mutex> lock(data->GameMutex());
   json result = json::object();
-  if (section == "all" || section == "audio") {
-    int volume; bool mute, idle, touch;
-    data->GetAudio(&volume, &mute, &idle, &touch);
-    result["audio"] = {{"volume", volume}, {"mute", mute}, {"idle_audio", idle}, {"touch_audio", touch}};
-  }
+  if (section == "all" || section == "audio") result["audio"] = data->GetAudio();
   if (section == "all" || section == "display")
     result["display"] = {{"scale", app->GetScale()}, {"green", app->Green}, {"limit", app->isLimit}};
   if (section == "all" || section == "interaction")
@@ -99,7 +95,7 @@ json ApplySettings(const json& request) {
     std::lock_guard<std::recursive_mutex> lock(data->GameMutex());
     auto values = ReadSettingsValues(section).at(section);
     values.update(request.at("settings"));
-    if (section == "audio") data->UpdateAudio(values.at("volume"), values.at("mute"), values.at("idle_audio"), values.at("touch_audio"));
+    if (section == "audio") data->UpdateAudio(values.get<AudioSettings>());
     else if (section == "display") {
       // Both GLFW calls and live flags are applied on the render thread.
       if (request["settings"].contains("green")) app->SetGreen(values.at("green"));

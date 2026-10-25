@@ -2,6 +2,7 @@
   import { Input, Button, Modal, Select } from "flowbite-svelte";
   import SettingCard from "../components/SettingCard.svelte";
   import SettingToggle from "../components/SettingToggle.svelte";
+  import SettingVolume from "../components/SettingVolume.svelte";
   import UiIcon from "../components/UiIcon.svelte";
   let category = "general";
   const categories = [
@@ -14,11 +15,13 @@
   import fanAvatar from "../assets/fan.png";
   import { sse } from "../sse.js";
   import { onDestroy } from "svelte";
-  // audio
-  let _volume = "20";
+  // audio: the panel shows mute buttons; the server stores whether touch/idle voices play
+  let _volume = 20;
   let _mute = false;
-  let _touch_audio = false;
-  let _idle_audio = false;
+  let _touch_volume = 100;
+  let _touch_mute = false;
+  let _idle_volume = 100;
+  let _idle_mute = false;
   // display
   let _green = false;
   let _limit = false;
@@ -50,8 +53,10 @@
       .then((data) => {
         _volume = data.volume;
         _mute = data.mute;
-        _touch_audio = data.touch_audio;
-        _idle_audio = data.idle_audio;
+        _touch_volume = data.touch_volume;
+        _touch_mute = !data.touch_audio;
+        _idle_volume = data.idle_volume;
+        _idle_mute = !data.idle_audio;
       });
     fetch("/api/config/display")
       .then((res) => res.json())
@@ -110,10 +115,12 @@
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        volume: parseInt(_volume),
+        volume: _volume,
         mute: _mute,
-        idle_audio: _idle_audio,
-        touch_audio: _touch_audio,
+        touch_volume: _touch_volume,
+        touch_audio: !_touch_mute,
+        idle_volume: _idle_volume,
+        idle_audio: !_idle_mute,
       }),
     });
   }
@@ -390,12 +397,9 @@
 
   <div class="settings-grid" class:section-hidden={category !== "sound"}>
     <SettingCard title="角色音频" description="熟悉的声音，随时陪在身边" icon="sound">
-      <SettingToggle label="静音" description="关闭角色语音和对话回复声音" bind:checked={_mute} on:change={updateAudio} />
-      {#if !_mute}
-        <SettingToggle label="互动语音" description="触摸角色时播放语音" bind:checked={_touch_audio} on:change={updateAudio} />
-        <SettingToggle label="闲置语音" description="闲置时偶尔播放角色语音" bind:checked={_idle_audio} on:change={updateAudio} />
-      {/if}
-      <div class="setting-field"><label for="volume">音量<span>{_volume}%</span></label><div class="volume-control"><input aria-label="音量滑块" type="range" min="0" max="100" step="1" bind:value={_volume} on:change={updateAudio} /><Input id="volume" bind:value={_volume} on:change={updateAudio} type="number" min={0} max={100} step={1} /></div></div>
+      <SettingVolume label="总音量" description="角色语音和对话回复的整体音量" bind:volume={_volume} bind:muted={_mute} on:change={updateAudio} />
+      <SettingVolume label="互动语音" description="触摸角色时播放的语音" bind:volume={_touch_volume} bind:muted={_touch_mute} silenced={_mute} on:change={updateAudio} />
+      <SettingVolume label="闲置语音" description="闲置时偶尔播放的角色语音" bind:volume={_idle_volume} bind:muted={_idle_mute} silenced={_mute} on:change={updateAudio} />
     </SettingCard>
 
 

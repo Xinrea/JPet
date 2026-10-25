@@ -19,6 +19,7 @@ target_sources(${APP_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/TouchManager.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AudioManager.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/AudioSettings.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceChat.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/VoiceCommon.cpp

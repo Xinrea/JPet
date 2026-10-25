@@ -400,7 +400,6 @@ void LAppDelegate::Release() {
 
 void LAppDelegate::Run() {
   static double initial_audio_idle_time = glfwGetTime();
-  DataManager* dataManager = DataManager::GetInstance();
   LAppLive2DManager::GetInstance()->UpdateViewPort();
 
   // 随机播放启动语音
@@ -507,7 +506,8 @@ void LAppDelegate::Run() {
     glfwPollEvents();
     VoiceChat::GetInstance()->Tick(_window);
 
-    if (!VoiceChat::GetInstance()->IsBusy() && dataManager->GetConfig<bool>("audio", "idle_audio", true)) {
+    // AudioManager skips the idle voice while it is muted.
+    if (!VoiceChat::GetInstance()->IsBusy()) {
       if (glfwGetTime() - initial_audio_idle_time > 30.0f) {
         initial_audio_idle_time = glfwGetTime();
         if (rand() % 100 >= 90) {

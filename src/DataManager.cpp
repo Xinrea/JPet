@@ -7,6 +7,7 @@
 #include "VoiceCascade.hpp"
 #include "VoiceCommon.hpp"
 
+#include <algorithm>
 #include <filesystem>
 
 bool DataManager::init() {
@@ -72,29 +73,28 @@ void DataManager::UpdateWindowPos(int x, int y) {
   data.insert_or_assign("window", toml::table{{"x", x}, {"y", y}});
 }
 
-void DataManager::GetAudio(int* volume, bool* mute, bool* idle_audio, bool* touch_audio) {
+AudioSettings DataManager::GetAudio() {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  // if audio doesn't exist, create it
-  if (!data.contains("audio")) {
-    data.insert("audio", toml::table{{"volume", 20},
-                                     {"mute", false},
-                                     {"idle_audio", true},
-                                     {"touch_audio", true}});
-  }
-  // get volume, mute from data
-  *volume = GetConfig("audio", "volume", 20);
-  *mute = GetConfig("audio", "mute", false);
-  *idle_audio = GetConfig("audio", "idle_audio", true);
-  *touch_audio = GetConfig("audio", "touch_audio", true);
+  // Fields missing from older config files keep their defaults.
+  AudioSettings audio;
+  const auto percent = [&](const char* key, int value) { return std::clamp(GetConfig("audio", key, value), 0, 100); };
+  audio.volume = percent("volume", audio.volume);
+  audio.mute = GetConfig("audio", "mute", audio.mute);
+  audio.touch_volume = percent("touch_volume", audio.touch_volume);
+  audio.touch_audio = GetConfig("audio", "touch_audio", audio.touch_audio);
+  audio.idle_volume = percent("idle_volume", audio.idle_volume);
+  audio.idle_audio = GetConfig("audio", "idle_audio", audio.idle_audio);
+  return audio;
 }
 
-void DataManager::UpdateAudio(int volume, bool mute, bool idle_audio, bool touch_audio) {
+void DataManager::UpdateAudio(const AudioSettings& audio) {
   std::lock_guard<std::recursive_mutex> lock(gameMutex);
-  // update volume in data
-  data.insert_or_assign("audio", toml::table{{"volume", volume},
-                                             {"mute", mute},
-                                             {"idle_audio", idle_audio},
-                                             {"touch_audio", touch_audio}});
+  data.insert_or_assign("audio", toml::table{{"volume", audio.volume},
+                                             {"mute", audio.mute},
+                                             {"touch_volume", audio.touch_volume},
+                                             {"touch_audio", audio.touch_audio},
+                                             {"idle_volume", audio.idle_volume},
+                                             {"idle_audio", audio.idle_audio}});
 }
 
 void DataManager::GetDisplay(float* scale, bool* green, bool* rateLimit) {

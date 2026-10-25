@@ -1,3 +1,4 @@
+#include "AudioSettings.hpp"
 #include "VoiceTools.hpp"
 #include "VoiceBilibili.hpp"
 #include "VoiceSettingsQueue.hpp"
@@ -52,6 +53,7 @@ int main() {
     for (const auto& request : {
       json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 30}}}},
       json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 0}, {"mute", true}, {"idle_audio", false}, {"touch_audio", false}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"touch_volume", 0}, {"idle_volume", 100}}}},
       json{{"action", "update"}, {"section", "display"}, {"settings", {{"scale", 1.25}, {"green", true}, {"limit", true}}}},
       json{{"action", "update"}, {"section", "display"}, {"settings", {{"scale", 0}}}},
       json{{"action", "update"}, {"section", "interaction"}, {"settings", {{"track", false}, {"dropfile", false}}}},
@@ -66,8 +68,25 @@ int main() {
     Check(run("jpet_settings", {{"action", "set_shortcut"}, {"direction", "up"}, {"shortcut_type", "website"}, {"target", " HTTPS://example.com/a%2Fb?sig=x%2Fy "}})["ok"] == true &&
       last["target"] == "https://example.com/a%2Fb?sig=x%2Fy", "website shortcuts use the URL validator without rewriting query strings");
     Check(run("jpet_settings", {{"action", "update"}, {"settings", {{"volume", 10}}}})["ok"] == true && last["section"] == "audio" &&
+      run("jpet_settings", {{"action", "update"}, {"settings", {{"idle_volume", 10}}}})["ok"] == true && last["section"] == "audio" &&
       run("jpet_settings", {{"action", "update"}, {"settings", {{"tail", true}}}})["ok"] == true && last["section"] == "appearance",
       "update infers an omitted section from its unique field names");
+    {
+      // The runtime merges a partial audio patch into the stored settings the same way.
+      json audio = AudioSettings{40, false, 50, true, 25, true};
+      audio.update(json{{"idle_volume", 100}, {"touch_audio", false}});
+      const auto merged = audio.get<AudioSettings>();
+      Check(merged.volume == 40 && merged.idle_volume == 100 && !merged.touch_audio && merged.touch_volume == 50,
+        "partial audio updates keep the other fields");
+      Check(merged.MasterGain() == 0.4f && merged.Gain(AudioType::START) == 0.4f && merged.Gain(AudioType::IDLE) == 0.4f &&
+        merged.Gain(AudioType::CLICK) == 0.0f, "touch and idle voices scale with the master volume and their own mute");
+      auto muted = merged;
+      muted.mute = true;
+      Check(muted.Gain(AudioType::START) == 0.0f && muted.Gain(AudioType::IDLE) == 0.0f, "master mute silences every voice");
+      bool rejected = false;
+      try { json{{"volume", 20}, {"mute", false}}.get<AudioSettings>(); } catch (const json::exception&) { rejected = true; }
+      Check(rejected, "panel audio updates must send every field");
+    }
     const auto mixed = run("jpet_settings", {{"action", "update"}, {"settings", {{"volume", 10}, {"tail", true}}}});
     Check(mixed["code"] == "invalid_arguments" && mixed["error"].get<std::string>().find("section") != std::string::npos,
       "fields from several sections ask for separate calls");
@@ -80,6 +99,9 @@ int main() {
       json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", -1}}}},
       json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 101}}}},
       json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 20.5}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"touch_volume", 101}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"idle_volume", -1}}}},
+      json{{"action", "update"}, {"section", "audio"}, {"settings", {{"idle_volume", true}}}},
       json{{"action", "update"}, {"section", "audio"}, {"settings", {{"mute", "false"}}}},
       json{{"action", "update"}, {"section", "audio"}, {"settings", {{"mute", 1}}}},
       json{{"action", "update"}, {"section", "audio"}, {"settings", {{"volume", 20}, {"provider", "jpet"}}}},
