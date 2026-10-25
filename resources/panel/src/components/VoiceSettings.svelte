@@ -8,18 +8,20 @@
   // Credentials are write-only; the API never returns a saved key.
   let voiceInputMode = "toggle", savedInputMode = "toggle";
   const voiceInputModes = [{ value: "toggle", name: "按一下" }, { value: "hold", name: "按住" }];
+  // The keys this platform offers; the first is the default.
+  let voiceShortcut = "", savedShortcut = "", shortcutKeys = [];
   // Microphone and speaker; "" is the system default. A saved device that is
   // not connected stays selectable, and the default is used until it returns.
   let inputDevice = "", outputDevice = "", savedInputDevice = "", savedOutputDevice = "";
   let audioDevices = { inputs: [], outputs: [] }, devicesRefreshing = false;
-  // Shortcut mode and devices save as soon as they change, apart from the chat settings form.
+  // Shortcut key, mode and devices save as soon as they change, apart from the chat settings form.
   let audioSaving = false, audioError = "";
   async function saveAudioSettings() {
     audioSaving = true; audioError = "";
     try {
       const response = await fetch("/api/config/voice", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input_mode: voiceInputMode, input_device: inputDevice, output_device: outputDevice }),
+        body: JSON.stringify({ input_mode: voiceInputMode, shortcut: voiceShortcut, input_device: inputDevice, output_device: outputDevice }),
       });
       const settings = await response.json();
       if (!response.ok) throw new Error(settings.error || "保存失败");
@@ -29,7 +31,7 @@
     } catch (error) {
       if (voiceDisposed) return;
       audioError = error.message;
-      voiceInputMode = savedInputMode; inputDevice = savedInputDevice; outputDevice = savedOutputDevice;
+      voiceInputMode = savedInputMode; voiceShortcut = savedShortcut; inputDevice = savedInputDevice; outputDevice = savedOutputDevice;
     } finally {
       if (!voiceDisposed) audioSaving = false;
     }
@@ -82,6 +84,8 @@
   }
   function applyAudioSettings(settings) {
     voiceInputMode = savedInputMode = settings.input_mode || "toggle";
+    shortcutKeys = settings.shortcut_keys || shortcutKeys;
+    voiceShortcut = savedShortcut = settings.shortcut || shortcutKeys[0]?.id || "";
     inputDevice = savedInputDevice = settings.input_device || "";
     outputDevice = savedOutputDevice = settings.output_device || "";
     audioDevices = settings.audio_devices || audioDevices;
@@ -239,7 +243,8 @@
     <SettingCard title="语音对话" description="快捷键、声音设备与本机语音模型" icon="mic">
       <div class="voice-shortcut"><UiIcon name="mic" size={23} /><div><strong>和轴伊聊一聊</strong>
         <p><select class="mode-select" aria-label="快捷键使用方式" bind:value={voiceInputMode} on:change={saveAudioSettings} disabled={voiceLoading || audioSaving}>{#each voiceInputModes as mode}<option value={mode.value}>{mode.name}</option>{/each}</select>
-          <kbd>{voiceStatus?.shortcut || "Option / Ctrl"}</kbd> {#if voiceInputMode === "hold"}打断回复并录音，松开后停止录音、播放回复。{:else}开启或关闭麦克风；开启后可连续对话，说话时可打断回复。{/if}</p></div></div>
+          <select class="mode-select" aria-label="语音对话快捷键" bind:value={voiceShortcut} on:change={saveAudioSettings} disabled={voiceLoading || audioSaving || !shortcutKeys.length}>{#each shortcutKeys as key}<option value={key.id}>{key.name}</option>{/each}</select>
+          {#if voiceInputMode === "hold"}打断回复并录音，松开后停止录音、播放回复。{:else}开启或关闭麦克风；开启后可连续对话，说话时可打断回复。{/if}</p></div></div>
       <div class="device-row">
         <div class="setting-field"><label for="voice-input-device">麦克风</label><Select id="voice-input-device" items={inputItems} bind:value={inputDevice} on:change={saveAudioSettings} placeholder="" disabled={voiceLoading || audioSaving} /></div>
         <div class="setting-field"><label for="voice-output-device">扬声器</label><Select id="voice-output-device" items={outputItems} bind:value={outputDevice} on:change={saveAudioSettings} placeholder="" disabled={voiceLoading || audioSaving} /></div>

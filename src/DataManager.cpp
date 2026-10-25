@@ -6,6 +6,7 @@
 #include "VoicePlatform.hpp"
 #include "VoiceCascade.hpp"
 #include "VoiceCommon.hpp"
+#include "VoiceShortcut.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -140,11 +141,14 @@ nlohmann::json DataManager::GetVoiceSettings() {
     providers.push_back({{"id", provider.id}, {"name", provider.name}, {"base_url", provider.baseUrl}});
   auto inputMode = GetConfig<std::string>("voice", "input_mode", "toggle");
   if (inputMode != "hold") inputMode = "toggle";
+  const auto& shortcut = Voice::FindShortcutKey(GetConfig<std::string>("voice", "shortcut", ""));
+  auto shortcutKeys = nlohmann::json::array();
+  for (const auto& key : Voice::ShortcutKeys) shortcutKeys.push_back({{"id", key.id}, {"name", key.name}});
   auto inputDevice = GetConfig<std::string>("voice", "input_device", "");
   if (!Voice::ValidAudioDeviceId(inputDevice)) inputDevice.clear();
   auto outputDevice = GetConfig<std::string>("voice", "output_device", "");
   if (!Voice::ValidAudioDeviceId(outputDevice)) outputDevice.clear();
-  return {{"input_mode", inputMode},
+  return {{"input_mode", inputMode}, {"shortcut", shortcut.id}, {"shortcut_keys", shortcutKeys},
           {"input_device", inputDevice}, {"output_device", outputDevice},
           {"chat_provider", chatProvider}, {"chat_model", chatModel}, {"chat_base_url", chatUrl},
           // Whether the model reads images, i.e. may be offered view_desktop.
@@ -174,9 +178,13 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
     value = Voice::Trim(payload[key].get<std::string>());
     return true;
   };
-  std::string inputMode, inputDevice, outputDevice, chatProvider, chatModel, chatUrl;
+  std::string inputMode, shortcut, inputDevice, outputDevice, chatProvider, chatModel, chatUrl;
   if (!text("input_mode", inputMode) || (inputMode != "toggle" && inputMode != "hold")) {
     error = "请选择开关或按住的快捷键方式";
+    return false;
+  }
+  if (!text("shortcut", shortcut) || !Voice::ValidShortcutKey(shortcut)) {
+    error = "请重新选择语音对话的快捷键";
     return false;
   }
   // Not checked against connected devices: an unplugged device stays selected
@@ -246,6 +254,7 @@ bool DataManager::UpdateVoiceSettings(const nlohmann::json& payload, std::string
                              "workspace_id", "has_api_key"})
     table.erase(legacy);
   table.insert_or_assign("input_mode", inputMode);
+  table.insert_or_assign("shortcut", shortcut);
   table.insert_or_assign("input_device", inputDevice);
   table.insert_or_assign("output_device", outputDevice);
   table.insert_or_assign("chat_provider", chatProvider);

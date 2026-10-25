@@ -77,6 +77,15 @@ def main(gui=False, app=APP):
             for invalid_mode in ["", "invalid", None, 123, False]:
                 assert request(port, "/api/config/voice", {"input_mode": invalid_mode})[0] == 400
             assert request(port, "/api/config/voice")[1]["input_mode"] == "hold"
+            # The shortcut key defaults to the platform's previous fixed key and only accepts offered keys.
+            keys = [key["id"] for key in config["shortcut_keys"]]
+            assert config["shortcut"] == keys[0] and len(keys) == len(set(keys)) > 1 and all(key["name"] for key in config["shortcut_keys"])
+            code, saved = request(port, "/api/config/voice", {"shortcut": keys[1]})
+            assert code == 200 and saved["shortcut"] == keys[1] and saved["input_mode"] == "hold"
+            for invalid_key in ["", "F13", "right_ctrl" if "right_ctrl" not in keys else "right_option", None, 1]:
+                assert request(port, "/api/config/voice", {"shortcut": invalid_key})[0] == 400, invalid_key
+            assert request(port, "/api/config/voice", {"input_mode": "hold"})[1]["shortcut"] == keys[1]
+            assert request(port, "/api/voice")[1]["shortcut"] == config["shortcut_keys"][1]["name"]
             # Microphone and speaker default to the system devices; a saved id need not be connected.
             assert config["input_device"] == "" and config["output_device"] == ""
             assert all(isinstance(config["audio_devices"][kind], list) for kind in ("inputs", "outputs"))
@@ -163,6 +172,7 @@ def main(gui=False, app=APP):
             assert request(port, "/api/voice/speech-model", {"action": "download"}, "text/plain")[0] == 403
             contents = Path(profile, "jpet.toml").read_text()
             assert re.search(r'^\s*input_mode\s*=\s*[\"\']hold[\"\']', contents, re.MULTILINE)
+            assert re.search(r'^\s*shortcut\s*=\s*[\"\']' + keys[1] + r'[\"\']', contents, re.MULTILINE)
             assert not re.search(r'^\s*tts_(model|voice)\s*=', contents, re.MULTILINE)
             assert not re.search(r"^\s*(api_key|chat_api_key|provider|engine|has_chat_api_key|has_api_key|workspace_id)\s*=", contents, re.MULTILINE)
             assert re.search(r'^\s*chat_provider\s*=\s*[\"\']deepseek[\"\']', contents, re.MULTILINE)

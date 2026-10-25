@@ -1,6 +1,7 @@
 #pragma once
 
 #include "VoiceIndicatorStyle.hpp"
+#include "VoiceShortcut.hpp"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -20,7 +21,7 @@ struct Event {
 class Platform {
  public:
   virtual ~Platform() = default;
-  virtual bool ShortcutHeld() const = 0;
+  virtual bool ShortcutHeld(const ShortcutKey& key) const = 0;
   virtual void StartCapture() = 0;
   virtual void StopCapture() = 0;
   virtual std::vector<Event> Poll() = 0;

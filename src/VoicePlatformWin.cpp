@@ -259,7 +259,11 @@ class WinPlatform final : public Platform {
     if (state_->titleFont) DeleteObject(state_->titleFont);
     if (state_->shortcutFont) DeleteObject(state_->shortcutFont);
   }
-  bool ShortcutHeld() const override { return (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0; }
+  bool ShortcutHeld(const ShortcutKey& key) const override {
+    static_assert(ShortcutKeys[0].code == VK_CONTROL && ShortcutKeys[1].code == VK_RCONTROL &&
+        ShortcutKeys[2].code == VK_RMENU, "shortcut key codes match the Windows virtual keys");
+    return (GetAsyncKeyState(static_cast<int>(key.code)) & 0x8000) != 0;
+  }
 
   void StartCapture() override {
     if (microphone_.joinable()) {

@@ -10,11 +10,9 @@
 #include <stdexcept>
 
 namespace {
-#ifdef __APPLE__
-constexpr const char* Shortcut = "Option";
-#else
-constexpr const char* Shortcut = "Ctrl";
-#endif
+const Voice::ShortcutKey& Shortcut() {
+  return Voice::FindShortcutKey(DataManager::GetInstance()->GetConfig<std::string>("voice", "shortcut", ""));
+}
 
 std::string DiagnosticCode(const nlohmann::json& object, const char* field) {
   const auto it = object.find(field);
@@ -273,7 +271,7 @@ nlohmann::json VoiceChat::Status() {
   auto status = status_;
   status["model"] = settings.at("chat_model");
   status["speech_model"] = speechModel;
-  status["shortcut"] = Shortcut;
+  status["shortcut"] = Voice::FindShortcutKey(settings.at("shortcut")).name;
   status["input_mode"] = settings.at("input_mode");
   status["available_tools"] = nlohmann::json::array();
   for (const auto& definition : ChatTools(settings)) status["available_tools"].push_back(definition["function"]["name"]);
@@ -408,7 +406,8 @@ void VoiceChat::Tick(GLFWwindow* window) {
   if (std::getenv("JPET_SMOKE_TEST")) return;
   window_ = window;
   const auto now = Clock::now();
-  const bool held = platform_->ShortcutHeld();
+  const auto& shortcut = Shortcut();
+  const bool held = platform_->ShortcutHeld(shortcut);
   if (resetRequested_.exchange(false)) {
     Close();
     context_ = nlohmann::json::array();
@@ -494,7 +493,7 @@ void VoiceChat::Tick(GLFWwindow* window) {
       now - stateChangedAt_ < std::chrono::seconds(indicatorError_ || !reply.empty() ? 6 : 2);
   platform_->ShowIndicator(window_, {
       show ? Voice::Indicator::BodyText(reply, indicator_, indicatorNotice_) : "",
-      Voice::Indicator::ShortcutHint(Shortcut, holdMode), indicatorError_, Recording()});
+      Voice::Indicator::ShortcutHint(shortcut.name, holdMode), indicatorError_, Recording()});
 }
 
 void VoiceChat::Stop() {

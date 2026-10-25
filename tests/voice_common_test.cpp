@@ -23,6 +23,19 @@ int main() {
           Voice::Indicator::ShortcutHint("Ctrl", true) == "按住 Ctrl 开始收音" &&
           Voice::Indicator::ShortcutHint("Option", false) == "按 Option 开启/关闭收音" &&
           Voice::Indicator::ShortcutHint("Option", true) == "按住 Option 开始收音", "indicator shortcut hint follows input mode and platform");
+    // Each platform offers its previous fixed key first, so existing and unknown settings keep it.
+    Check(&Voice::FindShortcutKey("") == &Voice::ShortcutKeys[0] && &Voice::FindShortcutKey("F13") == &Voice::ShortcutKeys[0] &&
+          !Voice::ValidShortcutKey("") && !Voice::ValidShortcutKey("F13"), "unknown shortcut keys fall back to the default");
+#ifdef __APPLE__
+    Check(std::string(Voice::ShortcutKeys[0].name) == "Option", "Option stays the default on macOS");
+    // A config copied from Windows does not select a key macOS cannot read.
+    Check(!Voice::ValidShortcutKey("right_ctrl") && Voice::ValidShortcutKey("right_option"), "macOS shortcut keys");
+#else
+    Check(std::string(Voice::ShortcutKeys[0].name) == "Ctrl", "Ctrl stays the default on Windows");
+    Check(!Voice::ValidShortcutKey("right_option") && Voice::ValidShortcutKey("right_ctrl"), "Windows shortcut keys");
+#endif
+    for (const auto& key : Voice::ShortcutKeys)
+      Check(&Voice::FindShortcutKey(key.id) == &key && Voice::ValidShortcutKey(key.id) && key.code, "every offered key is selectable");
     Check(Voice::Indicator::BodyText("这是回复", "正在思考…", false) == "这是回复" &&
           Voice::Indicator::BodyText("这是回复", "麦克风不可用", true) == "麦克风不可用" &&
           Voice::Indicator::BodyText("", "正在思考…", false) == "正在思考…", "indicator prioritizes errors and falls back to status");

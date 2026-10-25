@@ -8,6 +8,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <CoreAudio/CoreAudio.h>
+#import <IOKit/hidsystem/IOLLEvent.h>
 #import <Security/Security.h>
 
 #define GLFW_EXPOSE_NATIVE_COCOA
@@ -251,8 +252,11 @@ class MacPlatform final : public Platform {
     [state_->indicator close];
   }
 
-  bool ShortcutHeld() const override {
-    return ([NSEvent modifierFlags] & NSEventModifierFlagOption) != 0;
+  bool ShortcutHeld(const ShortcutKey& key) const override {
+    static_assert(ShortcutKeys[0].code == NSEventModifierFlagOption && ShortcutKeys[1].code == NX_DEVICERALTKEYMASK &&
+        ShortcutKeys[2].code == NX_DEVICERCMDKEYMASK && ShortcutKeys[3].code == NSEventModifierFlagControl,
+        "shortcut key codes match the macOS modifier flags");
+    return ([NSEvent modifierFlags] & key.code) != 0;
   }
 
   void StartCapture() override {
